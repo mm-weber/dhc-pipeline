@@ -1,0 +1,74 @@
+# Conventions
+
+Rules for every definition, chart, and PR in this catalogue. CI enforces what
+it can (see `policies/` and `.github/workflows/validate.yml`); reviewers hold
+the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements.md`.
+
+## Naming (Req 2.3)
+
+- Images: `ghcr.io/mm-weber/dhc/<name>:<semver>-<os><osver>[-<variant>]`
+  - Example: `ghcr.io/mm-weber/dhc/cert-manager-controller:1.17.2-debian12`
+  - `<semver>` is the upstream version, without a `v` prefix
+  - `<os><osver>`: `debian12`, `alpine321`, or `static` (distroless static base)
+- Variants: no suffix = runtime (non-root, minimal). `-dev` = build-stage tooling,
+  root permitted, never deployed. `-compat` = runtime plus shell/coreutils for
+  charts that assume them; using it requires a documented decision (Req 4.5).
+- Charts: directory `chart/<upstream-name>/`; adapted release name `dhc-<name>`.
+- Definitions: directory `image/<name>/` containing `image.yaml`. A monorepo
+  producing several images stays ONE definition (see cert-manager) so one
+  version variable moves all of them.
+
+## Pinning (Req 1.2, 1.3, 1.6)
+
+- Every base image reference carries `@sha256:<digest>`. No exceptions.
+- Every upstream source is `git+https://...#<ref>` plus a `checksum:` line.
+- Every upstream chart is pinned to an exact version in `chart/<name>/chart.yaml`.
+- Floating tags (`latest`, bare majors like `:1`, digestless tags) fail CI.
+- Humans never bump pins by hand when Renovate is able to; hand-bumps are reserved
+  for CVE fix-forwards (Req 6.5) and say so in the PR description.
+
+## Runtime accounts (Req 1.4)
+
+- Runtime images run as UID/GID **65532** (`nonroot`), declared in the definition's
+  `accounts:` block. Only `-dev` variants run as root, and only at build time.
+
+## Chart override style (Req 4)
+
+- Upstream chart templates are never edited, forked, or patched (Req 4.1).
+- All deltas live in `chart/<name>/config/values-hardened.yaml`.
+- Canonical securityContext block (Req 4.3) — pod level unless the chart only
+  exposes container level:
+
+  ```yaml
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile: {type: RuntimeDefault}
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities: {drop: [ALL]}
+  ```
+
+- Writable paths get named `emptyDir` mounts, one per path, commented with why
+  the workload writes there (Req 4.4).
+- Every deviation from upstream defaults appears in `chart/<name>/README.md`
+  as: *what changed → why → requirement or upstream issue link* (Req 4.7).
+
+## Policy gate (Req 4.6)
+
+Rendered manifests of every chart are evaluated by the Kyverno policies in
+`policies/`: images referenced by digest, only from `ghcr.io/mm-weber/dhc`,
+workloads non-root. Policy fixtures live in `policies/tests/` and run via
+`kyverno test` in CI (no kyverno binary in the devcontainer — Req 8.2).
+
+## Pull requests (Req 7)
+
+- One logical change per PR; definition bumps and chart changes do not mix
+  unless a bump forces the chart change (say so).
+- PR description references the requirement IDs it serves.
+- Green checks required; digest-only patch bumps automerge (Req 3.5); majors
+  wait behind Dependency Dashboard approval (Req 3.4).
+- Review checklist: pins intact, conventions above, README deviations updated,
+  test evidence for behavior claims.

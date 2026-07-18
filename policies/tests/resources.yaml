@@ -1,0 +1,66 @@
+# Test fixtures for policies/ — one compliant pod, one compliant controller,
+# and one violation per policy. Digests are syntactically valid placeholders;
+# the policies match shape, not registry content.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: good-pod
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+  containers:
+    - name: app
+      image: ghcr.io/mm-weber/dhc/hardened-app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tag-pod
+spec:
+  securityContext:
+    runAsNonRoot: true
+  containers:
+    - name: app
+      image: ghcr.io/mm-weber/dhc/hardened-app:1.0.0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: foreign-registry-pod
+spec:
+  securityContext:
+    runAsNonRoot: true
+  containers:
+    - name: app
+      image: docker.io/library/nginx@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: root-pod
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/mm-weber/dhc/hardened-app@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: good-deployment
+spec:
+  selector:
+    matchLabels: {app: hardened-app}
+  template:
+    metadata:
+      labels: {app: hardened-app}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      initContainers:
+        - name: init
+          image: ghcr.io/mm-weber/dhc/hardened-app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      containers:
+        - name: app
+          image: ghcr.io/mm-weber/dhc/hardened-app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

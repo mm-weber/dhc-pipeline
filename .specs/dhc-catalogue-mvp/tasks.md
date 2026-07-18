@@ -3,7 +3,7 @@
 ## Task List
 
 - [ ] 1. Repository skeleton and conventions (Day 1)
-  - [ ] 1.1 Scaffold layout, CONVENTIONS.md, and Kyverno policies
+  - [x] 1.1 Scaffold layout, CONVENTIONS.md, and Kyverno policies
     - Create `image/`, `chart/`, `test/`, `triage/vex/`, `policies/`, `docs/decisions/`, `.github/workflows/`
     - Write `docs/CONVENTIONS.md`: naming (`<semver>-<os><osver>[-variant]`), pinning rules (digest/checksum everywhere, no floating tags), override style, PR conventions
     - Port lab Kyverno policies into `policies/` (require-image-digest, restrict-registries → `ghcr.io/mm-weber/dhc`, require-nonroot)

@@ -1,0 +1,28 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-nonroot
+  annotations:
+    policies.kyverno.io/title: Require Non-Root
+    policies.kyverno.io/category: dhc-supply-chain
+    policies.kyverno.io/description: >-
+      Catalogue workloads run as the nonroot account (UID 65532) baked into
+      every runtime image (Req 1.4, 4.3). Pods declare runAsNonRoot so the
+      kubelet refuses root images outright.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: check-run-as-nonroot
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: >-
+          Pods set spec.securityContext.runAsNonRoot: true (Req 4.3).
+        pattern:
+          spec:
+            securityContext:
+              runAsNonRoot: true
