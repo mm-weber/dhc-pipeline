@@ -8,7 +8,7 @@
     - Write `docs/CONVENTIONS.md`: naming (`<semver>-<os><osver>[-variant]`), pinning rules (digest/checksum everywhere, no floating tags), override style, PR conventions
     - Port lab Kyverno policies into `policies/` (require-image-digest, restrict-registries → `ghcr.io/mm-weber/dhc`, require-nonroot)
     - _Requirements: Req 7.1, Req 4.6_
-  - [ ] 1.2 Convention gate: `validate.yml`
+  - [x] 1.2 Convention gate: `validate.yml`
     - yamllint config + workflow job on changed YAML
     - Floating-tag linter failing with the offending reference named
     - PR template prompting for requirement refs and convention compliance

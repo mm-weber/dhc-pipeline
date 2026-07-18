@@ -1,0 +1,35 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  conventions:
+    name: yamllint, pin lint, policy tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: yamllint (Req 7.2)
+        run: |
+          pip install --quiet yamllint==1.38.0
+          yamllint .
+
+      - name: pin lint — docs/CONVENTIONS.md Pinning (Req 1.6, 7.4)
+        run: scripts/lint-pins.sh
+
+      - name: kyverno policy tests (Req 4.6 gate self-test)
+        env:
+          KYVERNO_VERSION: v1.18.2
+        run: |
+          curl -fsSL "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz" \
+            | tar -xz -C /usr/local/bin kyverno
+          kyverno test policies/tests/
+
+      - name: pin-linter unit tests
+        run: scripts/lint-pins_test.sh
