@@ -12,48 +12,39 @@ results:
   # compliant pod passes all three policies
   - policy: require-image-digest
     rule: check-image-digest
-    kinds: [Pod]
     resources: [good-pod]
     result: pass
   - policy: restrict-registries
     rule: check-registry
-    kinds: [Pod]
     resources: [good-pod]
     result: pass
   - policy: require-nonroot
     rule: check-run-as-nonroot
-    kinds: [Pod]
     resources: [good-pod]
     result: pass
   # one violation per policy
   - policy: require-image-digest
     rule: check-image-digest
-    kinds: [Pod]
     resources: [tag-pod]
     result: fail
   - policy: restrict-registries
     rule: check-registry
-    kinds: [Pod]
     resources: [foreign-registry-pod]
     result: fail
   - policy: require-nonroot
     rule: check-run-as-nonroot
-    kinds: [Pod]
     resources: [root-pod]
     result: fail
   # controller coverage via kyverno autogen (Deployment pod template)
   - policy: require-image-digest
     rule: autogen-check-image-digest
-    kinds: [Deployment]
     resources: [good-deployment]
     result: pass
   - policy: restrict-registries
     rule: autogen-check-registry
-    kinds: [Deployment]
     resources: [good-deployment]
     result: pass
   - policy: require-nonroot
     rule: autogen-check-run-as-nonroot
-    kinds: [Deployment]
     resources: [good-deployment]
     result: pass
