@@ -15,7 +15,7 @@
     - _Requirements: Req 7.2, Req 7.3, Req 7.4, Req 1.6_
 
 - [ ] 2. Build-layer decision (Day 1, 3h timebox) [OPERATOR: host + dhi.io login]
-  - [ ] 2.1 Spike the real `dhi.io/build` frontend on operator host
+  - [x] 2.1 Spike the real `dhi.io/build` frontend on operator host
     - `docker login dhi.io` (Community tier), clone `docker-hardened-images/catalog`
     - Build one existing simple definition verbatim; record friction points
     - Attempt one minimal own definition in native syntax
