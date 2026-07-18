@@ -24,8 +24,13 @@ in `docs/`.
 
 ## Environment constraints
 
-- This devcontainer has **no outbound internet** (github.com works). Do not
-  attempt WebSearch/WebFetch — the user researches on their host and drops
-  results into `data/`.
-- Image builds, kind-based tests, and registry pushes run in **GitHub Actions**
-  or on the user's host — not in this container.
+- Devcontainer egress is **allowlist-firewalled** (`/workspace/.devcontainer/init-firewall.sh`),
+  not offline: GitHub (git/SSH, API, release binaries, ghcr.io), Docker Hub,
+  PyPI, npm, and the Go proxy are reachable; everything else is blocked.
+  Tools like kyverno/kind/trivy install fine from GitHub releases.
+- For open-web research, the user prefers doing it on their host and dropping
+  results into `data/` — ask rather than reaching for WebSearch/WebFetch.
+- **GitHub Actions is the authoritative environment** for image builds, kind
+  e2e, registry pushes, and scans (Req 8). Local kind runs are feasible
+  (kindest/node via Docker Hub, our images via ghcr.io) and welcome for
+  iteration speed — CI results are what count.
