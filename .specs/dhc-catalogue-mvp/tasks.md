@@ -31,7 +31,7 @@
   - [x] 3.1 hardened-app definition
     - Port lab Dockerfile semantics into a definition: digest-pinned distroless base, nonroot 65532, multi-arch
     - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4_
-  - [ ] 3.2 cert-manager definition (monorepo → three images)
+  - [x] 3.2 cert-manager definition (monorepo → three images)
     - One version var driving controller/webhook/cainjector from one pinned source ref + checksum
     - Pin one minor release behind latest upstream (stale-pin bootstrap)
     - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6_

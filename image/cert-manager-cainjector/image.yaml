@@ -1,0 +1,103 @@
+# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc
+
+name: cert-manager cainjector 1.20.x
+image: ghcr.io/mm-weber/dhc/cert-manager-cainjector
+variant: runtime
+tags:
+  - 1-alpine3.23
+  - 1.20-alpine3.23
+  - 1.20.3-alpine3.23
+platforms:
+  - linux/amd64
+  - linux/arm64
+dates:
+  release: "2026-06-25"
+vars:
+  COMMIT_SHA: 1e1d16d1744e6d9c80e464e58e8d9ab1caed222b
+  GOLANG_REFERENCE: dhi.io/golang:1.26.4-alpine3.23-dev@sha256:a34c915874fb9e84b247465f6f7ea5d24277f9766bf81aa36bbc6b57691e315e
+  SEMVER_MAJOR_MINOR_VERSION: "1.20"
+  SEMVER_MAJOR_VERSION: "1"
+  SEMVER_VERSION: 1.20.3
+  VERSION: 1.20.3
+contents:
+  repositories:
+    - https://dhi.io/apk/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/community
+  keyring:
+    - https://dhi.io/keyring/dhi-apk@docker-0F81AD7700D99184.rsa.pub
+  packages:
+    - alpine-baselayout-data
+    - ca-certificates-bundle
+    - tzdata
+  builds:
+    - name: cert-manager-cainjector
+      uses: dhi.io/golang:1.26.4-alpine3.23-dev@sha256:a34c915874fb9e84b247465f6f7ea5d24277f9766bf81aa36bbc6b57691e315e
+      work-dir: /go/src/github.com/cert-manager/cert-manager
+      caches:
+        - path: /go/pkg/mod
+      contents:
+        packages:
+          - ca-certificates-bundle
+        files:
+          - url: git+https://github.com/cert-manager/cert-manager.git#v1.20.3
+            checksum: 1e1d16d1744e6d9c80e464e58e8d9ab1caed222b
+            path: /go/src/github.com/cert-manager/cert-manager
+            spdx:
+              name: cert-manager-cainjector
+              version: 1.20.3
+              packages:
+                - name: cert-manager-cainjector
+                  purl: pkg:golang/github.com/cert-manager/cert-manager@1.20.3
+                  license: Apache-2.0
+            uid: 0
+            gid: 0
+      pipeline:
+        # No test step: cmd/* submodules share the monorepo's suite, which
+        # needs upstream's make tooling; functional verification is the e2e
+        # suite's job (Req 5.5). Upstream ldflags recipe: make/00_mod.mk.
+        - name: build
+          uses: go/build@v1
+          work-dir: /go/src/github.com/cert-manager/cert-manager/cmd/cainjector
+          with:
+            ldflags:
+              - -w
+              - -s
+              - -X github.com/cert-manager/cert-manager/pkg/util.AppVersion=v1.20.3
+              - -X github.com/cert-manager/cert-manager/pkg/util.AppGitCommit=1e1d16d1744e6d9c80e464e58e8d9ab1caed222b
+            output: ${target.dir}/usr/local/bin/cert-manager-cainjector
+            packages: .
+      outputs:
+        - source: ${target.dir}/usr/local/bin/cert-manager-cainjector
+          target: /usr/local/bin/cert-manager-cainjector
+          uid: 0
+          gid: 0
+          mode: "0755"
+        - source: /opt/docker/sbom/cert-manager-cainjector
+          target: /opt/docker/sbom/cert-manager-cainjector
+          uid: 0
+          gid: 0
+accounts:
+  run-as: nonroot
+  users:
+    - name: nonroot
+      uid: 65532
+      gid: 65532
+  groups:
+    - name: nonroot
+      gid: 65532
+      members:
+        - nonroot
+os-release:
+  name: dhc hardened images (Alpine)
+  id: alpine
+  version-id: "3.23"
+  pretty-name: dhc hardened images/Alpine Linux v3.23
+  home-url: https://github.com/mm-weber/dhc-pipeline
+  bug-report-url: https://github.com/mm-weber/dhc-pipeline/issues
+annotations:
+  org.opencontainers.image.description: Minimal cert-manager cainjector image
+  org.opencontainers.image.source: https://github.com/mm-weber/dhc-pipeline
+  org.opencontainers.image.licenses: Apache-2.0
+entrypoint:
+  - /usr/local/bin/cert-manager-cainjector

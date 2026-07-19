@@ -17,9 +17,12 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
   root permitted, never deployed. `-compat` = runtime plus shell/coreutils for
   charts that assume them; using it requires a documented decision (Req 4.5).
 - Charts: directory `chart/<upstream-name>/`; adapted release name `dhc-<name>`.
-- Definitions: directory `image/<name>/` containing `image.yaml`. A monorepo
-  producing several images stays ONE definition (see cert-manager) so one
-  version variable moves all of them.
+- Definitions: directory `image/<name>/` containing `image.yaml`, one per
+  emitted image (a definition's top-level `image:` names exactly one
+  repository — upstream catalog structure). A monorepo producing several
+  images (see cert-manager-{controller,webhook,cainjector}) keeps byte-equal
+  source pins (`vars:`, `url:`, `checksum:`) across its definitions; Renovate
+  groups their bumps into a single PR (Req 3.3) so one version moves all.
 
 ## Pinning (Req 1.2, 1.3, 1.6)
 
