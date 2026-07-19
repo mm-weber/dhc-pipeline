@@ -21,7 +21,7 @@
     - Attempt one minimal own definition in native syntax
     - Write decision as ADR `docs/decisions/0001-build-layer.md` (A: native / B: fallback)
     - _Requirements: Req 1.7, Req 1.8_
-  - [ ] 2.2 Wire the chosen build layer
+  - [x] 2.2 Wire the chosen build layer
     - If A: frontend syntax directive in definitions; definition validation via frontend dry-run in CI
     - If B: thin renderer (yq/gomplate first; small Go via TDD only if templating proves insufficient) rendering `image.yaml` → multi-stage Dockerfile + bake target, with golden-file tests
     - Author definition JSON Schema (B) or schema-check wiring (A) into `validate.yml`

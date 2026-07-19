@@ -20,7 +20,9 @@ jobs:
           pip install --quiet yamllint==1.38.0
           yamllint .
 
-      - name: pin lint — docs/CONVENTIONS.md Pinning (Req 1.6, 7.4)
+      # Fast deterministic gate; the authoritative definition validator is
+      # the dhi.io/build frontend compiling each changed definition (build.yml)
+      - name: pin + definition lint — docs/CONVENTIONS.md (Req 1.5, 1.6, 7.4)
         run: scripts/lint-pins.sh
 
       - name: kyverno policy tests (Req 4.6 gate self-test)

@@ -19,24 +19,60 @@ scan_dirs=()
 
 while IFS= read -r -d '' file; do
   rel="${file#"$ROOT"/}"
-  while IFS=$'\t' read -r line_no ref; do
+
+  # Keyed references: image:/base: always need a digest; uses: only when it
+  # names a registry image (first path segment contains a dot). Bare actions
+  # like go/build@v1 resolve inside the pinned frontend — nothing to fetch,
+  # nothing to pin (see docs/concepts.md).
+  while IFS=$'\t' read -r key line_no ref; do
     # strip surrounding quotes and trailing comments
     ref="${ref%%[[:space:]]#*}"
     ref="${ref%\"}"; ref="${ref#\"}"
     ref="${ref%\'}"; ref="${ref#\'}"
     [ -z "$ref" ] && continue
+    if [ "$key" = "uses" ]; then
+      [[ "$ref" != */* ]] && continue
+      first="${ref%%/*}"
+      [[ "$first" != *.* ]] && continue
+    fi
     if [[ "$ref" != *"@sha256:"* ]]; then
       echo "::error file=${rel},line=${line_no}::pinning convention (docs/CONVENTIONS.md): floating reference '${ref}' — pin by @sha256 digest"
       violations=$((violations + 1))
     fi
-  done < <(awk 'match($0, /^[[:space:]]*(-[[:space:]]+)?(image|base):[[:space:]]*/) {
+  done < <(awk 'match($0, /^[[:space:]]*(-[[:space:]]+)?(image|base|uses):[[:space:]]*/) {
+                  key = substr($0, RSTART, RLENGTH)
+                  gsub(/[^a-z]/, "", key)
                   val = substr($0, RSTART + RLENGTH)
-                  if (val != "") printf "%d\t%s\n", NR, val
+                  if (val != "") printf "%s\t%d\t%s\n", key, NR, val
                 }' "$file")
+
+  # Frontend pin (ADR 0001): any '# syntax=' line carries a digest
+  while IFS=: read -r line_no rest; do
+    if [[ "$rest" != *"@sha256:"* ]]; then
+      echo "::error file=${rel},line=${line_no}::pinning convention (docs/CONVENTIONS.md): '# syntax=' must pin the frontend by @sha256 digest"
+      violations=$((violations + 1))
+    fi
+  done < <(grep -n '^#[[:space:]]*syntax=' "$file" || true)
+
+  # Definitions declare the frontend on line 1
+  if [[ "$file" == "$ROOT"/image/*/image.yaml ]]; then
+    if ! head -1 "$file" | grep -q '^#[[:space:]]*syntax='; then
+      echo "::error file=${rel},line=1::pinning convention (docs/CONVENTIONS.md): definition missing digest-pinned '# syntax=' frontend line"
+      violations=$((violations + 1))
+    fi
+  fi
+
+  # Every git+ source pins a commit checksum (Req 1.3)
+  c_git=$(grep -cE 'url:[[:space:]]*["'\'']?git\+' "$file" || true)
+  c_sum=$(grep -cE '^[[:space:]]*checksum:' "$file" || true)
+  if [ "$c_git" -gt "$c_sum" ]; then
+    echo "::error file=${rel}::pinning convention (docs/CONVENTIONS.md): ${c_git} git+ source(s) but ${c_sum} checksum line(s) — every git source pins a commit checksum"
+    violations=$((violations + 1))
+  fi
 done < <(find "${scan_dirs[@]}" -type f -name '*.yaml' -print0)
 
 if [ "$violations" -gt 0 ]; then
   echo "lint-pins: ${violations} floating reference(s) — see docs/CONVENTIONS.md (Pinning)"
   exit 1
 fi
-echo "lint-pins: all image/base references digest-pinned"
+echo "lint-pins: all pinning conventions satisfied"

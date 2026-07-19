@@ -22,10 +22,11 @@ run_case() { # name, expected_exit, expect_substring(optional) — sandbox in $S
 
 fresh() { SB=$(mktemp -d); mkdir -p "$SB/image/app" "$SB/chart/app/config" "$SB/policies/tests"; }
 DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+SYNTAX="# syntax=dhi.io/build:2-alpine3.22@${DIGEST}"
 
-# 1: digest-pinned image + base pass
+# 1: digest-pinned definition + chart values pass
 fresh
-printf 'base: ghcr.io/mm-weber/dhc/base@%s\n' "$DIGEST" > "$SB/image/app/image.yaml"
+printf '%s\nbase: ghcr.io/mm-weber/dhc/base@%s\n' "$SYNTAX" "$DIGEST" > "$SB/image/app/image.yaml"
 printf 'image: ghcr.io/mm-weber/dhc/app@%s\n' "$DIGEST" > "$SB/chart/app/config/values.yaml"
 run_case "digest-pinned passes" 0
 
@@ -60,6 +61,53 @@ run_case "policies/ not scanned" 0
 fresh
 printf 'spec:\n  template:\n    image: docker.io/library/nginx:1.27\n' > "$SB/chart/app/config/values.yaml"
 run_case "indented key caught" 1 "nginx:1.27"
+
+# --- definition rules (decision A, ADR 0001) ---
+
+# 8: full valid definition passes (pinned syntax, pinned uses, git+checksum)
+fresh
+cat > "$SB/image/app/image.yaml" <<EOF
+$SYNTAX
+vars:
+  VERSION: 1.0.0
+contents:
+  builds:
+    - name: app
+      uses: dhi.io/golang:1.26.4-alpine3.23-dev@$DIGEST
+      contents:
+        files:
+          - url: git+https://github.com/mm-weber/app.git#v1.0.0
+            checksum: 73f83dfd5f84221455606ad7c3813d4f0ec1330d
+      pipeline:
+        - name: build
+          uses: go/build@v1
+EOF
+run_case "valid definition passes" 0
+
+# 9: syntax line without digest fails
+fresh
+printf '# syntax=dhi.io/build:2-alpine3.22\nvars: {VERSION: 1.0.0}\n' > "$SB/image/app/image.yaml"
+run_case "unpinned syntax line fails" 1 "syntax"
+
+# 10: definition file without any syntax line fails
+fresh
+printf 'vars: {VERSION: 1.0.0}\n' > "$SB/image/app/image.yaml"
+run_case "missing syntax line fails" 1 "syntax"
+
+# 11: uses with registry host but no digest fails
+fresh
+printf '%s\ncontents:\n  builds:\n    - uses: dhi.io/golang:1.26-alpine3.23-dev\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "unpinned builder uses fails" 1 "dhi.io/golang:1.26-alpine3.23-dev"
+
+# 12: action uses (no registry host) is NOT an image ref, passes
+fresh
+printf '%s\ncontents:\n  builds:\n    - pipeline:\n        - uses: go/bump@v2\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "action uses not flagged" 0
+
+# 13: git+ source without checksum fails
+fresh
+printf '%s\nfiles:\n  - url: git+https://github.com/x/y.git#v1\n    path: /src\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "git source without checksum fails" 1 "checksum"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
