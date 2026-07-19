@@ -7,9 +7,12 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
 ## Naming (Req 2.3)
 
 - Images: `ghcr.io/mm-weber/dhc/<name>:<semver>-<os><osver>[-<variant>]`
-  - Example: `ghcr.io/mm-weber/dhc/cert-manager-controller:1.17.2-debian12`
+  - Example: `ghcr.io/mm-weber/dhc/hardened-app:0.1.0-alpine3.23`
   - `<semver>` is the upstream version, without a `v` prefix
-  - `<os><osver>`: `debian12`, `alpine321`, or `static` (distroless static base)
+  - `<os><osver>` follows the upstream catalog's dotted form: `alpine3.23`
+    (alpine-only for now — ADR 0001; the deb path is unverified)
+  - Each release also carries major and major.minor alias tags
+    (`0-alpine3.23`, `0.1-alpine3.23`), catalog-style
 - Variants: no suffix = runtime (non-root, minimal). `-dev` = build-stage tooling,
   root permitted, never deployed. `-compat` = runtime plus shell/coreutils for
   charts that assume them; using it requires a documented decision (Req 4.5).
@@ -41,6 +44,9 @@ One file per component at `image/<name>/image.yaml`. Rules, all enforced by
   # syntax=dhi.io/build:2-alpine3.22@sha256:<digest>
   ```
 
+- Top-level `image:` is the publish name — a bare repository reference
+  (`ghcr.io/mm-weber/dhc/<name>`): its digest cannot exist before the build,
+  and release tags live under `tags:`.
 - Builder images in `uses:` (e.g. `dhi.io/golang:*-dev`) are digest-pinned.
   Pipeline actions (`go/build@v1`, `go/bump@v2`) carry interface versions
   only — they resolve inside the pinned frontend, nothing to checksum.

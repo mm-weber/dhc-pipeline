@@ -39,7 +39,7 @@ run_case "failure cites convention" 1 "CONVENTIONS.md"
 
 # 3: :latest fails
 fresh
-printf 'image: ghcr.io/mm-weber/dhc/app:latest\n' > "$SB/image/app/image.yaml"
+printf 'image: ghcr.io/mm-weber/dhc/app:latest\n' > "$SB/chart/app/config/values.yaml"
 run_case ":latest fails" 1 ":latest"
 
 # 4: tag plus digest passes
@@ -49,7 +49,7 @@ run_case "tag+digest passes" 0
 
 # 5: bare reference without tag or digest fails (implicit latest)
 fresh
-printf 'image: ghcr.io/mm-weber/dhc/app\n' > "$SB/image/app/image.yaml"
+printf 'image: ghcr.io/mm-weber/dhc/app\n' > "$SB/chart/app/config/values.yaml"
 run_case "bare ref fails" 1 "ghcr.io/mm-weber/dhc/app"
 
 # 6: only image/ and chart/ are scanned (policy fixtures may hold bad refs)
@@ -108,6 +108,21 @@ run_case "action uses not flagged" 0
 fresh
 printf '%s\nfiles:\n  - url: git+https://github.com/x/y.git#v1\n    path: /src\n' "$SYNTAX" > "$SB/image/app/image.yaml"
 run_case "git source without checksum fails" 1 "checksum"
+
+# 14: definition top-level image: is the PUBLISH name — bare ref passes
+fresh
+printf '%s\nimage: ghcr.io/mm-weber/dhc/app\ntags:\n  - 1.0.0-alpine3.23\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "definition publish name passes" 0
+
+# 15: definition publish name must NOT carry a tag (tags live under tags:)
+fresh
+printf '%s\nimage: ghcr.io/mm-weber/dhc/app:1.0.0\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "tagged publish name fails" 1 "publish name"
+
+# 16: indented image: inside a definition still needs a digest
+fresh
+printf '%s\nspec:\n  image: docker.io/library/nginx:1.27\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "indented image in definition caught" 1 "nginx:1.27"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

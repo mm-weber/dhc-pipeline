@@ -24,12 +24,22 @@ while IFS= read -r -d '' file; do
   # names a registry image (first path segment contains a dot). Bare actions
   # like go/build@v1 resolve inside the pinned frontend — nothing to fetch,
   # nothing to pin (see docs/concepts.md).
-  while IFS=$'\t' read -r key line_no ref; do
+  while IFS=$'\t' read -r key line_no top ref; do
     # strip surrounding quotes and trailing comments
     ref="${ref%%[[:space:]]#*}"
     ref="${ref%\"}"; ref="${ref#\"}"
     ref="${ref%\'}"; ref="${ref#\'}"
     [ -z "$ref" ] && continue
+    # In a definition, top-level image: is the PUBLISH name (what we build):
+    # a bare repository reference — its digest cannot exist before the build,
+    # and release tags live under tags:.
+    if [ "$key" = "image" ] && [ "$top" = "1" ] && [[ "$file" == "$ROOT"/image/*/image.yaml ]]; then
+      if [[ "$ref" == *:* ]]; then
+        echo "::error file=${rel},line=${line_no}::pinning convention (docs/CONVENTIONS.md): definition 'image:' is the publish name — bare reference only, got '${ref}' (tags live under 'tags:')"
+        violations=$((violations + 1))
+      fi
+      continue
+    fi
     if [ "$key" = "uses" ]; then
       [[ "$ref" != */* ]] && continue
       first="${ref%%/*}"
@@ -42,8 +52,9 @@ while IFS= read -r -d '' file; do
   done < <(awk 'match($0, /^[[:space:]]*(-[[:space:]]+)?(image|base|uses):[[:space:]]*/) {
                   key = substr($0, RSTART, RLENGTH)
                   gsub(/[^a-z]/, "", key)
+                  top = ($0 ~ /^image:/) ? 1 : 0
                   val = substr($0, RSTART + RLENGTH)
-                  if (val != "") printf "%s\t%d\t%s\n", key, NR, val
+                  if (val != "") printf "%s\t%d\t%d\t%s\n", key, NR, top, val
                 }' "$file")
 
   # Frontend pin (ADR 0001): any '# syntax=' line carries a digest

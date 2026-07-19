@@ -1,0 +1,101 @@
+# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc
+
+name: Hardened App 0.1.x
+image: ghcr.io/mm-weber/dhc/hardened-app
+variant: runtime
+tags:
+  - 0-alpine3.23
+  - 0.1-alpine3.23
+  - 0.1.0-alpine3.23
+platforms:
+  - linux/amd64
+  - linux/arm64
+dates:
+  release: "2026-07-19"
+vars:
+  COMMIT_SHA: 90a8da0c20eaf60d75e4faed6f27fef5b1611fc4
+  GOLANG_REFERENCE: dhi.io/golang:1.26.4-alpine3.23-dev@sha256:a34c915874fb9e84b247465f6f7ea5d24277f9766bf81aa36bbc6b57691e315e
+  SEMVER_MAJOR_MINOR_VERSION: "0.1"
+  SEMVER_MAJOR_VERSION: "0"
+  SEMVER_VERSION: 0.1.0
+  VERSION: 0.1.0
+contents:
+  repositories:
+    - https://dhi.io/apk/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/community
+  keyring:
+    - https://dhi.io/keyring/dhi-apk@docker-0F81AD7700D99184.rsa.pub
+  packages:
+    - alpine-baselayout-data
+    - ca-certificates-bundle
+  builds:
+    - name: hardened-app
+      uses: dhi.io/golang:1.26.4-alpine3.23-dev@sha256:a34c915874fb9e84b247465f6f7ea5d24277f9766bf81aa36bbc6b57691e315e
+      work-dir: /go/src/github.com/mm-weber/hardened-app
+      caches:
+        - path: /go/pkg/mod
+      contents:
+        packages:
+          - ca-certificates-bundle
+        files:
+          - url: git+https://github.com/mm-weber/hardened-app.git#v0.1.0
+            checksum: 90a8da0c20eaf60d75e4faed6f27fef5b1611fc4
+            path: /go/src/github.com/mm-weber/hardened-app
+            spdx:
+              name: hardened-app
+              version: 0.1.0
+              packages:
+                - name: hardened-app
+                  purl: pkg:golang/github.com/mm-weber/hardened-app@0.1.0
+                  license: MIT
+            uid: 0
+            gid: 0
+      pipeline:
+        - name: test
+          runs: |
+            set -eux -o pipefail
+
+            CGO_ENABLED=0 go test ./...
+        - name: build
+          uses: go/build@v1
+          with:
+            ldflags:
+              - -w
+              - -s
+              - -X main.version=0.1.0
+            output: ${target.dir}/usr/local/bin/hardened-app
+            packages: .
+      outputs:
+        - source: ${target.dir}/usr/local/bin/hardened-app
+          target: /usr/local/bin/hardened-app
+          uid: 0
+          gid: 0
+        - source: /opt/docker/sbom/hardened-app
+          target: /opt/docker/sbom/hardened-app
+          uid: 0
+          gid: 0
+accounts:
+  run-as: nonroot
+  users:
+    - name: nonroot
+      uid: 65532
+      gid: 65532
+  groups:
+    - name: nonroot
+      gid: 65532
+      members:
+        - nonroot
+os-release:
+  name: dhc hardened images (Alpine)
+  id: alpine
+  version-id: "3.23"
+  pretty-name: dhc hardened images/Alpine Linux v3.23
+  home-url: https://github.com/mm-weber/dhc-pipeline
+  bug-report-url: https://github.com/mm-weber/dhc-pipeline/issues
+annotations:
+  org.opencontainers.image.description: Minimal hardened-app image (supply-chain lab HTTP service)
+  org.opencontainers.image.source: https://github.com/mm-weber/dhc-pipeline
+  org.opencontainers.image.licenses: MIT
+entrypoint:
+  - hardened-app
