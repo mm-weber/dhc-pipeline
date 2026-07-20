@@ -35,3 +35,11 @@ jobs:
 
       - name: pin-linter unit tests
         run: scripts/lint-pins_test.sh
+
+      # Renovate config: validate the schema, then prove the custom managers
+      # actually extract the right deps from the definitions (Req 3.2).
+      - name: renovate config + manager fixtures
+        run: |
+          npm install --no-save --no-audit --no-fund renovate@41 json5@2
+          ./node_modules/.bin/renovate-config-validator --strict renovate.json5
+          NODE_PATH="$PWD/node_modules" node test/renovate/managers.test.mjs

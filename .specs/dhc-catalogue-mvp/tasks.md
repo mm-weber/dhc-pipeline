@@ -42,7 +42,7 @@
     - _Requirements: Req 2.1, Req 2.2, Req 2.3, Req 2.4, Req 2.5, Req 8.1_
 
 - [ ] 4. Upstream tracking live (Day 2)
-  - [ ] 4.1 `renovate.json5` with regex managers and fixtures
+  - [x] 4.1 `renovate.json5` with regex managers and fixtures
     - Managers over definition pin fields (github-tags/github-releases/docker datasources); parse fixtures committed
     - cert-manager monorepo grouping; majors behind Dependency Dashboard approval; automerge only digest-only patch updates
     - Validate with renovate-config-validator in `validate.yml`
