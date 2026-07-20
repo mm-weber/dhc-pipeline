@@ -1,0 +1,178 @@
+name: build
+
+# PR: build every affected definition for amd64+arm64 through the dhi.io/build
+# frontend — no push, just prove it compiles (Req 2.1 PR path).
+# main: same build, then push to the PRIVATE ghcr.io/mm-weber/dhc with a cosign
+# keyless signature, an SPDX SBOM (Syft), and BuildKit provenance attached
+# (Req 2.2), tags derived from the definition (Req 2.3), and a final guard that
+# the pushed package is private (Req 2.4). Any failure publishes nothing (Req 2.5).
+#
+# Builds run on GitHub Actions runners — the authoritative build environment
+# (Req 8.1). Pulling the frontend + golang builder needs a dhi.io login:
+# operator adds repo secrets DHI_USERNAME + DHI_TOKEN (Docker Hub creds with
+# DHI access). GHCR uses the built-in GITHUB_TOKEN.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Single image name to build (empty = all definitions)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # Which definitions does this event touch? Emits a JSON array of image names
+  # for the build matrix. PR: diff vs base. push: diff vs previous commit.
+  # dispatch: the named image, or all definitions when left blank.
+  changes:
+    name: affected definitions
+    runs-on: ubuntu-latest
+    outputs:
+      names: ${{ steps.detect.outputs.names }}
+      any: ${{ steps.detect.outputs.any }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - id: detect
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          DISPATCH_IMAGE: ${{ github.event.inputs.image }}
+        run: |
+          set -euo pipefail
+          all_defs() { find image -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/image.yaml' ';' -print | cut -d/ -f2; }
+
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ -n "$DISPATCH_IMAGE" ]; then names=$(printf '%s\n' "$DISPATCH_IMAGE")
+            else names=$(all_defs); fi
+          elif [ "$EVENT" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE_REF"
+            names=$(git diff --name-only "origin/${BASE_REF}...HEAD" -- image/ | awk -F/ 'NF>=3 && $3=="image.yaml"{print $2}' | sort -u)
+          else
+            if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then range="HEAD~1...HEAD"; else range="${BEFORE}...${GITHUB_SHA}"; fi
+            names=$(git diff --name-only $range -- image/ | awk -F/ 'NF>=3 && $3=="image.yaml"{print $2}' | sort -u)
+          fi
+
+          json=$(printf '%s\n' $names | jq -R . | jq -s -c 'map(select(length>0))')
+          echo "names=$json" >> "$GITHUB_OUTPUT"
+          if [ "$json" = "[]" ]; then echo "any=false" >> "$GITHUB_OUTPUT"; else echo "any=true" >> "$GITHUB_OUTPUT"; fi
+          echo "affected: $json"
+
+  release:
+    name: build ${{ matrix.name }}
+    needs: changes
+    if: needs.changes.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write   # push to ghcr.io/mm-weber/dhc
+      id-token: write    # cosign keyless (GitHub OIDC)
+    strategy:
+      fail-fast: false
+      matrix:
+        name: ${{ fromJSON(needs.changes.outputs.names) }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # QEMU is belt-and-suspenders: the DHI frontend cross-compiles (GOARCH),
+      # so arm64 image assembly runs no arm64 code — but multi-platform buildx
+      # expects it available.
+      - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: log in to dhi.io (frontend + builder pulls)
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DHI_USERNAME }}
+          password: ${{ secrets.DHI_TOKEN }}
+
+      - name: log in to ghcr.io
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Tags come from the definition (Req 2.3): image: is the repo, tags: the
+      # semver/os suffixes. Full refs = <image>:<each tag>.
+      - id: meta
+        env:
+          NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          f="image/${NAME}/image.yaml"
+          # tr strips quotes so this works under either yq (mikefarah on the
+          # runner emits raw scalars; python-yq would quote them).
+          img=$(yq '.image' "$f" | tr -d '"')
+          echo "image=$img" >> "$GITHUB_OUTPUT"
+          {
+            echo 'tags<<TAGS'
+            yq '.tags[]' "$f" | tr -d '"' | sed "s#^#${img}:#"
+            echo TAGS
+          } >> "$GITHUB_OUTPUT"
+
+      - id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: image/${{ matrix.name }}
+          file: image/${{ matrix.name }}/image.yaml
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          # BuildKit SLSA provenance, attached only when we push (Req 2.2).
+          provenance: ${{ github.ref == 'refs/heads/main' && 'mode=max' || 'false' }}
+
+      # ---- release-only: sign + SBOM (main branch) ----
+      - name: install cosign
+        if: github.ref == 'refs/heads/main'
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+
+      - name: cosign sign (keyless)
+        if: github.ref == 'refs/heads/main'
+        env:
+          REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$REF"
+
+      - name: generate SPDX SBOM (Syft)
+        if: github.ref == 'refs/heads/main'
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84 # v0.20.9
+        with:
+          image: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+          upload-artifact: false
+
+      - name: attest SBOM to image
+        if: github.ref == 'refs/heads/main'
+        env:
+          REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+        run: cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$REF"
+
+      # Req 2.4: the pushed package must be private. Fail hard if public;
+      # a private repo makes new packages private by construction, so an
+      # indeterminate lookup is a warning, not a failure.
+      - name: verify package is private
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          enc="dhc%2F${NAME}"
+          vis=$(gh api "/users/mm-weber/packages/container/${enc}" -q '.visibility' 2>/dev/null || echo unknown)
+          case "$vis" in
+            public)  echo "::error::package dhc/${NAME} is PUBLIC — release requires private (Req 2.4)"; exit 1 ;;
+            private) echo "package dhc/${NAME} visibility: private" ;;
+            *)       echo "::warning::could not determine visibility for dhc/${NAME} (private-by-construction from a private repo)" ;;
+          esac

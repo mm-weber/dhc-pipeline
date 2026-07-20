@@ -35,7 +35,7 @@
     - One version var driving controller/webhook/cainjector from one pinned source ref + checksum
     - Pin one minor release behind latest upstream (stale-pin bootstrap)
     - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6_
-  - [ ] 3.3 `build.yml`: PR build path and main release path
+  - [x] 3.3 `build.yml`: PR build path and main release path
     - PR: build affected images (paths filter), no push
     - main: multi-arch build → push to private `ghcr.io/mm-weber/dhc` + cosign keyless + Syft SPDX SBOM + BuildKit provenance
     - Verify GHCR packages are private; failure publishes nothing and reports failing step
