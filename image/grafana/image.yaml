@@ -13,12 +13,11 @@ platforms:
 dates:
   release: "2026-07-20"
 vars:
-  # Grafana OSS release tarballs name arches amd64/arm64 directly.
-  GRAFANA_ARCH: ${target.arch}
   # Per-arch tarball SHA-256 (from https://dl.grafana.com/oss/release/
-  # grafana-13.0.4.linux-<arch>.tar.gz.sha256) — pinned, verified in-pipeline.
-  GRAFANA_SHA256_AMD64: cd8c8b31b0482f48f98018030c142919dab6debbe81f747f3521af6f6a6b4490
-  GRAFANA_SHA256_ARM64: bcf8b9fbfac00bece5bccdda44512b9f7ba81d3105db1a255e0efd37a2fbf6df
+  # grafana-13.0.4.linux-<arch>.tar.gz.sha256), selected by target arch the
+  # way the catalog does per-arch values — amd64 first, arm64 second. Pinned;
+  # verified in-pipeline.
+  GRAFANA_SHA256: '#{ target.arch == "amd64" ? "cd8c8b31b0482f48f98018030c142919dab6debbe81f747f3521af6f6a6b4490" : "bcf8b9fbfac00bece5bccdda44512b9f7ba81d3105db1a255e0efd37a2fbf6df" }'
   SEMVER_MAJOR_MINOR_VERSION: "13.0"
   SEMVER_MAJOR_VERSION: "13"
   SEMVER_VERSION: 13.0.4
@@ -41,9 +40,10 @@ contents:
       contents:
         packages:
           - busybox
+          - tar
           - ca-certificates-bundle
         files:
-          - url: https://dl.grafana.com/oss/release/grafana-13.0.4.linux-${GRAFANA_ARCH}.tar.gz
+          - url: https://dl.grafana.com/oss/release/grafana-13.0.4.linux-${target.arch}.tar.gz
             path: ${source.dir}/grafana.tar.gz
             spdx:
               name: grafana
@@ -59,12 +59,7 @@ contents:
           runs: |
             set -eux -o pipefail
 
-            case "${target.arch}" in
-              amd64) want="${GRAFANA_SHA256_AMD64}" ;;
-              arm64) want="${GRAFANA_SHA256_ARM64}" ;;
-              *) echo "unsupported arch ${target.arch}" >&2; exit 1 ;;
-            esac
-            echo "${want}  ${source.dir}/grafana.tar.gz" | sha256sum -c -
+            echo "${GRAFANA_SHA256}  ${source.dir}/grafana.tar.gz" | sha256sum -c -
         - name: extract and stage
           runs: |
             set -eux -o pipefail
