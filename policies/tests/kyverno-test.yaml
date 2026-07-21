@@ -1,0 +1,50 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: dhc-policy-gate
+policies:
+  - ../require-image-digest.yaml
+  - ../restrict-registries.yaml
+  - ../require-nonroot.yaml
+resources:
+  - resources.yaml
+results:
+  # compliant pod passes all three policies
+  - policy: require-image-digest
+    rule: check-image-digest
+    resources: [good-pod]
+    result: pass
+  - policy: restrict-registries
+    rule: check-registry
+    resources: [good-pod]
+    result: pass
+  - policy: require-nonroot
+    rule: check-run-as-nonroot
+    resources: [good-pod]
+    result: pass
+  # one violation per policy
+  - policy: require-image-digest
+    rule: check-image-digest
+    resources: [tag-pod]
+    result: fail
+  - policy: restrict-registries
+    rule: check-registry
+    resources: [foreign-registry-pod]
+    result: fail
+  - policy: require-nonroot
+    rule: check-run-as-nonroot
+    resources: [root-pod]
+    result: fail
+  # controller coverage via kyverno autogen (Deployment pod template)
+  - policy: require-image-digest
+    rule: autogen-check-image-digest
+    resources: [good-deployment]
+    result: pass
+  - policy: restrict-registries
+    rule: autogen-check-registry
+    resources: [good-deployment]
+    result: pass
+  - policy: require-nonroot
+    rule: autogen-check-run-as-nonroot
+    resources: [good-deployment]
+    result: pass

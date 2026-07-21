@@ -1,0 +1,13 @@
+# Synthetic fixture: a definition for a different upstream owner, proving the
+# source manager captures depName/currentValue generically (not just our two
+# real components). Not a buildable definition — a parse fixture only.
+# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc
+vars:
+  GOLANG_REFERENCE: dhi.io/golang:1.26.4-alpine3.23-dev@sha256:a34c915874fb9e84b247465f6f7ea5d24277f9766bf81aa36bbc6b57691e315e
+contents:
+  builds:
+    - uses: dhi.io/golang:1.26.4-alpine3.23-dev@sha256:a34c915874fb9e84b247465f6f7ea5d24277f9766bf81aa36bbc6b57691e315e
+      contents:
+        files:
+          - url: git+https://github.com/grafana/grafana.git#v11.2.0
+            checksum: 0000000000000000000000000000000000000000

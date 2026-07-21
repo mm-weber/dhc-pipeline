@@ -1,0 +1,30 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-registries
+  annotations:
+    policies.kyverno.io/title: Restrict Registries
+    policies.kyverno.io/category: dhc-supply-chain
+    policies.kyverno.io/description: >-
+      Workloads run only images from this catalogue's namespace
+      ghcr.io/mm-weber/dhc (Req 4.2). Anything else — upstream defaults,
+      docker.io, unqualified references — is rejected at the gate.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: check-registry
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: >-
+          Only images from ghcr.io/mm-weber/dhc are allowed (Req 4.2).
+        pattern:
+          spec:
+            =(initContainers):
+              - image: "ghcr.io/mm-weber/dhc/*"
+            containers:
+              - image: "ghcr.io/mm-weber/dhc/*"

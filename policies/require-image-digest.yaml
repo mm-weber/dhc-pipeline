@@ -1,0 +1,31 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-image-digest
+  annotations:
+    policies.kyverno.io/title: Require Image Digest
+    policies.kyverno.io/category: dhc-supply-chain
+    policies.kyverno.io/description: >-
+      A tag is a mutable pointer, a digest is content. Every image reference
+      in this catalogue is pinned by sha256 digest (Req 1.2, 4.2); tag-only
+      references are rejected.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: check-image-digest
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: >-
+          Image references require a sha256 digest (repo@sha256:...);
+          tag-only references are rejected (Req 1.2).
+        pattern:
+          spec:
+            =(initContainers):
+              - image: "*@sha256:*"
+            containers:
+              - image: "*@sha256:*"
