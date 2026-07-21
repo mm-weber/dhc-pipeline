@@ -5,20 +5,20 @@ image: ghcr.io/mm-weber/dhc/cert-manager-cainjector
 variant: runtime
 tags:
   - 1-alpine3.23
-  - 1.20-alpine3.23
-  - 1.20.3-alpine3.23
+  - 1.21-alpine3.23
+  - 1.21.0-alpine3.23
 platforms:
   - linux/amd64
   - linux/arm64
 dates:
   release: "2026-06-25"
 vars:
-  COMMIT_SHA: 1e1d16d1744e6d9c80e464e58e8d9ab1caed222b
+  COMMIT_SHA: b8f325e36f49626ba72d7efbe138c01a5e661d96
   GOLANG_REFERENCE: dhi.io/golang:1.26.4-alpine3.23-dev@sha256:a34c915874fb9e84b247465f6f7ea5d24277f9766bf81aa36bbc6b57691e315e
-  SEMVER_MAJOR_MINOR_VERSION: "1.20"
+  SEMVER_MAJOR_MINOR_VERSION: "1.21"
   SEMVER_MAJOR_VERSION: "1"
-  SEMVER_VERSION: 1.20.3
-  VERSION: 1.20.3
+  SEMVER_VERSION: 1.21.0
+  VERSION: 1.21.0
 contents:
   repositories:
     - https://dhi.io/apk/alpine/v3.23/main
@@ -40,15 +40,15 @@ contents:
         packages:
           - ca-certificates-bundle
         files:
-          - url: git+https://github.com/cert-manager/cert-manager.git#v1.20.3
-            checksum: 1e1d16d1744e6d9c80e464e58e8d9ab1caed222b
+          - url: git+https://github.com/cert-manager/cert-manager.git#v1.21.0
+            checksum: b8f325e36f49626ba72d7efbe138c01a5e661d96
             path: /go/src/github.com/cert-manager/cert-manager
             spdx:
               name: cert-manager-cainjector
-              version: 1.20.3
+              version: 1.21.0
               packages:
                 - name: cert-manager-cainjector
-                  purl: pkg:golang/github.com/cert-manager/cert-manager@1.20.3
+                  purl: pkg:golang/github.com/cert-manager/cert-manager@1.21.0
                   license: Apache-2.0
             uid: 0
             gid: 0
@@ -63,8 +63,8 @@ contents:
             ldflags:
               - -w
               - -s
-              - -X github.com/cert-manager/cert-manager/pkg/util.AppVersion=v1.20.3
-              - -X github.com/cert-manager/cert-manager/pkg/util.AppGitCommit=1e1d16d1744e6d9c80e464e58e8d9ab1caed222b
+              - -X github.com/cert-manager/cert-manager/pkg/util.AppVersion=v1.21.0
+              - -X github.com/cert-manager/cert-manager/pkg/util.AppGitCommit=b8f325e36f49626ba72d7efbe138c01a5e661d96
             output: ${target.dir}/usr/local/bin/cert-manager-cainjector
             packages: .
       outputs:
