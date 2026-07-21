@@ -64,6 +64,19 @@
       automerge: true,
     },
     {
+      // Req 3.2: Renovate bumps only the source ref; this recomputes the
+      // checksum and regenerates every version-derived field (vars, tags,
+      // ldflags) so the bumped definition is coherent. Scoped to github-tags
+      // so docker digest bumps don't trigger it. The command is allowlisted in
+      // renovate.yml via RENOVATE_ALLOWED_POST_UPGRADE_COMMANDS (self-hosted).
+      matchDatasources: ["github-tags"],
+      postUpgradeTasks: {
+        commands: ["scripts/refresh-definition.sh {{{packageFileDir}}}"],
+        fileFilters: ["image/**/image.yaml"],
+        executionMode: "update",
+      },
+    },
+    {
       // The build layer is our own stricter pin surface — a frontend/builder
       // change alters build behavior, so it is always reviewed, never merged
       // automatically. Grouped for a tidy dashboard.

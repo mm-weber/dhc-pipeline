@@ -49,7 +49,7 @@
     - cert-manager monorepo grouping; majors behind Dependency Dashboard approval; automerge only digest-only patch updates
     - Validate with renovate-config-validator in `validate.yml`
     - _Requirements: Req 3.2, Req 3.3, Req 3.4, Req 3.5_
-  - [ ] 4.2 `renovate.yml` self-hosted cron [OPERATOR: repo secret]
+  - [x] 4.2 `renovate.yml` self-hosted cron [OPERATOR: repo secret]
     - `renovatebot/github-action` on ≤6h cron; `postUpgradeTasks` recompute source checksums
     - Operator adds the PAT as a repo secret; scope check documented
     - _Requirements: Req 3.1, Req 3.2_

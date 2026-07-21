@@ -1,0 +1,54 @@
+name: renovate
+
+# Self-hosted Renovate (Req 3.1): opens/updates upstream bump PRs on a ≤6h
+# cadence — every 4h, giving margin against GitHub's scheduler delay. Also
+# runnable on demand with dry-run + log-level knobs for iteration (Req 3.6
+# bootstrap / task 4.3 proving the loop).
+#
+# OPERATOR secrets:
+#   RENOVATE_TOKEN  — a PAT Renovate acts as. Needs contents + pull-requests
+#                     write AND issues write (the Dependency Dashboard is an
+#                     issue; without it major-staging and the dashboard break).
+#   DHI_USERNAME/DHI_TOKEN — let the docker datasource resolve the dhi.io
+#                     frontend/builder digests (reused from build.yml).
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: "Renovate log level"
+        default: "info"
+        type: choice
+        options: [info, debug]
+      dryRun:
+        description: "Dry run (resolve + log, open no PRs)"
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: renovatebot/github-action@a447f09147d00e00ae2a82ad5ef51ca89352da80 # v43.0.9
+        with:
+          token: ${{ secrets.RENOVATE_TOKEN }}
+        env:
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          LOG_LEVEL: ${{ inputs.logLevel || 'info' }}
+          RENOVATE_DRY_RUN: ${{ inputs.dryRun && 'full' || '' }}
+          # postUpgradeTasks run scripts/refresh-definition.sh — self-hosted
+          # requires this command to be explicitly allowlisted.
+          RENOVATE_ALLOW_POST_UPGRADE_COMMAND_TEMPLATING: "true"
+          RENOVATE_ALLOWED_POST_UPGRADE_COMMANDS: '["^scripts/refresh-definition\\.sh .+$"]'
+          # dhi.io credentials for the docker datasource (frontend + builder).
+          RENOVATE_HOST_RULES: >-
+            [{"hostType":"docker","matchHost":"dhi.io","username":"${{ secrets.DHI_USERNAME }}","password":"${{ secrets.DHI_TOKEN }}"}]

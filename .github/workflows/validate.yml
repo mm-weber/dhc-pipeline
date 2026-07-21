@@ -36,6 +36,9 @@ jobs:
       - name: pin-linter unit tests
         run: scripts/lint-pins_test.sh
 
+      - name: refresh-definition unit tests (postUpgradeTask, Req 3.2)
+        run: scripts/refresh-definition_test.sh
+
       # Renovate config: validate the schema, then prove the custom managers
       # actually extract the right deps from the definitions (Req 3.2).
       - name: renovate config + manager fixtures
