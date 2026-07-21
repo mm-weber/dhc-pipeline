@@ -58,7 +58,7 @@
     - _Requirements: Req 3.2, Req 3.3, Req 3.4, Req 3.6_
 
 - [ ] 5. Remaining definitions and chart adaptations (Day 2)
-  - [ ] 5.1 grafana definition (tarball repackage archetype)
+  - [x] 5.1 grafana definition (tarball repackage archetype)
     - Official release tarball onto minimal digest-pinned base; nonroot 65532; writable-path inventory for chart work; stale pin
     - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6_
   - [ ] 5.2 valkey definition (stateful archetype) [CUT 2nd-last if pressed]

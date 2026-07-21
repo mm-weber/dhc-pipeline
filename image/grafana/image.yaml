@@ -1,0 +1,183 @@
+# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc
+
+name: Grafana 13.0.x
+image: ghcr.io/mm-weber/dhc/grafana
+variant: runtime
+tags:
+  - 13-alpine3.23
+  - 13.0-alpine3.23
+  - 13.0.4-alpine3.23
+platforms:
+  - linux/amd64
+  - linux/arm64
+dates:
+  release: "2026-07-20"
+vars:
+  # Grafana OSS release tarballs name arches amd64/arm64 directly.
+  GRAFANA_ARCH: ${target.arch}
+  # Per-arch tarball SHA-256 (from https://dl.grafana.com/oss/release/
+  # grafana-13.0.4.linux-<arch>.tar.gz.sha256) — pinned, verified in-pipeline.
+  GRAFANA_SHA256_AMD64: cd8c8b31b0482f48f98018030c142919dab6debbe81f747f3521af6f6a6b4490
+  GRAFANA_SHA256_ARM64: bcf8b9fbfac00bece5bccdda44512b9f7ba81d3105db1a255e0efd37a2fbf6df
+  SEMVER_MAJOR_MINOR_VERSION: "13.0"
+  SEMVER_MAJOR_VERSION: "13"
+  SEMVER_VERSION: 13.0.4
+  VERSION: 13.0.4
+contents:
+  repositories:
+    - https://dhi.io/apk/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/community
+  keyring:
+    - https://dhi.io/keyring/dhi-apk@docker-0F81AD7700D99184.rsa.pub
+  packages:
+    - alpine-baselayout-data
+    - ca-certificates-bundle
+    - tzdata
+  builds:
+    # Tarball-repackage archetype: fetch the official prebuilt release,
+    # verify its pinned checksum, extract onto the runtime — no compilation.
+    - name: grafana
+      contents:
+        packages:
+          - busybox
+          - ca-certificates-bundle
+        files:
+          - url: https://dl.grafana.com/oss/release/grafana-13.0.4.linux-${GRAFANA_ARCH}.tar.gz
+            path: ${source.dir}/grafana.tar.gz
+            spdx:
+              name: grafana
+              version: 13.0.4
+              packages:
+                - name: grafana
+                  purl: pkg:generic/grafana@13.0.4
+                  license: AGPL-3.0
+            uid: 0
+            gid: 0
+      pipeline:
+        - name: verify checksum
+          runs: |
+            set -eux -o pipefail
+
+            case "${target.arch}" in
+              amd64) want="${GRAFANA_SHA256_AMD64}" ;;
+              arm64) want="${GRAFANA_SHA256_ARM64}" ;;
+              *) echo "unsupported arch ${target.arch}" >&2; exit 1 ;;
+            esac
+            echo "${want}  ${source.dir}/grafana.tar.gz" | sha256sum -c -
+        - name: extract and stage
+          runs: |
+            set -eux -o pipefail
+
+            mkdir -p "${target.dir}/usr/share/grafana"
+            # --strip-components=1 drops the top-level grafana-<ver>/ directory.
+            tar -zxf "${source.dir}/grafana.tar.gz" --strip-components=1 -C "${target.dir}/usr/share/grafana"
+
+            mkdir -p "${target.dir}/etc/grafana"
+            cp "${target.dir}/usr/share/grafana/conf/sample.ini" "${target.dir}/etc/grafana/grafana.ini"
+            cp "${target.dir}/usr/share/grafana/conf/ldap.toml" "${target.dir}/etc/grafana/ldap.toml"
+      outputs:
+        - source: ${target.dir}/usr/share/grafana
+          target: /usr/share/grafana
+          uid: 0
+          gid: 0
+        - source: ${target.dir}/etc/grafana
+          target: /etc/grafana
+          uid: 65532
+          gid: 65532
+        - source: /opt/docker/sbom/grafana
+          target: /opt/docker/sbom/grafana
+          uid: 0
+          gid: 0
+accounts:
+  run-as: nonroot
+  users:
+    - name: nonroot
+      uid: 65532
+      gid: 65532
+  groups:
+    - name: nonroot
+      gid: 65532
+      members:
+        - nonroot
+os-release:
+  name: dhc hardened images (Alpine)
+  id: alpine
+  version-id: "3.23"
+  pretty-name: dhc hardened images/Alpine Linux v3.23
+  home-url: https://github.com/mm-weber/dhc-pipeline
+  bug-report-url: https://github.com/mm-weber/dhc-pipeline/issues
+work-dir: /var/lib/grafana
+environment:
+  GRAFANA_VERSION: 13.0.4
+  PATH: /usr/share/grafana/bin:/usr/sbin:/sbin:/usr/bin:/bin:/usr/local/bin
+# Writable-path inventory (Req 4.4 chart work): every path the runtime writes
+# to gets an emptyDir mount in the chart. Owned by nonroot 65532.
+paths:
+  - type: directory
+    path: /etc/grafana
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /etc/grafana/provisioning
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /etc/grafana/provisioning/alerting
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /etc/grafana/provisioning/dashboards
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /etc/grafana/provisioning/datasources
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /etc/grafana/provisioning/plugins
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /var/lib/grafana
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /var/lib/grafana/plugins
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /var/log/grafana
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /tmp
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+annotations:
+  org.opencontainers.image.description: Minimal Grafana image (official release tarball, repackaged)
+  org.opencontainers.image.source: https://github.com/mm-weber/dhc-pipeline
+  org.opencontainers.image.licenses: AGPL-3.0
+entrypoint:
+  - grafana
+  - server
+  - --homepath=/usr/share/grafana
+  - --config=/etc/grafana/grafana.ini
+  - --packaging=docker
+  - cfg:default.log.mode=console
+  - cfg:default.paths.data=/var/lib/grafana
+  - cfg:default.paths.logs=/var/log/grafana
+  - cfg:default.paths.plugins=/var/lib/grafana/plugins
+  - cfg:default.paths.provisioning=/etc/grafana/provisioning
+ports:
+  - 3000/tcp

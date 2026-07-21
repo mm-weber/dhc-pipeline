@@ -54,6 +54,13 @@ One file per component at `image/<name>/image.yaml`. Rules, all enforced by
   Pipeline actions (`go/build@v1`, `go/bump@v2`) carry interface versions
   only — they resolve inside the pinned frontend, nothing to checksum.
 - Every `git+` source line has a sibling `checksum:` (commit hash).
+- **Prebuilt-tarball archetype** (grafana): the source is a versioned vendor
+  URL (`https://…/<name>-<ver>.linux-${ARCH}.tar.gz`) pinned by version. A
+  per-arch release has a different SHA-256 per arch, so it can't use one
+  `checksum:` line — instead pin each arch's SHA-256 in `vars:`
+  (`*_SHA256_AMD64` / `*_SHA256_ARM64`) and verify it in a pipeline
+  `sha256sum -c` step. That pinned-and-verified hash is the content pin
+  (Req 1.3) for this archetype.
 - Version state lives in `vars:` with the catalog's names (`VERSION`,
   `SEMVER_*`, `COMMIT_SHA`) — that block is the Renovate bump surface.
 - Runtime `accounts:` declare `nonroot` 65532 with `run-as` (Req 1.4).
