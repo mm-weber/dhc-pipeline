@@ -1,7 +1,8 @@
 name: build
 
-# PR: build every affected definition for amd64+arm64 through the dhi.io/build
-# frontend — no push, just prove it compiles (Req 2.1 PR path).
+# PR: build every affected definition for amd64 through the dhi.io/build
+# frontend — no push, just prove it compiles (fast gate; both arches are a
+# release concern, Req 2.1).
 # main: same build, then push to the PRIVATE ghcr.io/mm-weber/dhc with a cosign
 # keyless signature, an SPDX SBOM (Syft), and BuildKit provenance attached
 # (Req 2.2), tags derived from the definition (Req 2.3), and a final guard that
@@ -127,9 +128,17 @@ jobs:
         with:
           context: image/${{ matrix.name }}
           file: image/${{ matrix.name }}/image.yaml
-          platforms: linux/amd64,linux/arm64
+          # PR gate builds amd64 only — fast feedback that the definition
+          # compiles. The release path (main) builds both arches per Req 2.1;
+          # arm64 there goes through the frontend cross-compile / emulation
+          # once, at merge, where the cost belongs.
+          platforms: ${{ github.ref == 'refs/heads/main' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: ${{ github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta.outputs.tags }}
+          # Warm the Go module + compile layers across runs so repeat builds of
+          # a large upstream (cert-manager) aren't cache-cold every time.
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
           # BuildKit SLSA provenance, attached only when we push (Req 2.2).
           provenance: ${{ github.ref == 'refs/heads/main' && 'mode=max' || 'false' }}
 

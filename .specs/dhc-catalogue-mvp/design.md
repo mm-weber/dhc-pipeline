@@ -154,6 +154,14 @@ for install/upgrade, readiness, live securityContext assertion, functional probe
 `validate.yml` (schema/yamllint/conventions), `build.yml` (PR build + gates; main: release),
 `e2e.yml` (kind matrix), `renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).
 
+**Build cost split (validated on the first CI run):** the PR gate builds
+`linux/amd64` only — fast proof a definition compiles — while the release path
+(main) builds both arches per Req 2.1. arm64 through the frontend runs cross-
+compiled or QEMU-emulated on an amd64 runner; paying that once at merge, not on
+every PR, keeps PR feedback fast. Both paths use `type=gha` build cache
+(per-image scope) so repeat builds of a large upstream (cert-manager, ~30–40 min
+cold multi-arch) reuse the Go module + compile layers.
+
 ## Data Models
 
 Definition schema (fallback-B shape, mirroring real DHI fields; JSON Schema enforced in CI):

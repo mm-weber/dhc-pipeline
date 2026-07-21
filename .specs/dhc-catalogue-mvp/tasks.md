@@ -36,9 +36,11 @@
     - Pin one minor release behind latest upstream (stale-pin bootstrap)
     - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6_
   - [x] 3.3 `build.yml`: PR build path and main release path
-    - PR: build affected images (paths filter), no push
+    - PR: build affected images (amd64 only, `type=gha` cache), no push
     - main: multi-arch build → push to private `ghcr.io/mm-weber/dhc` + cosign keyless + Syft SPDX SBOM + BuildKit provenance
     - Verify GHCR packages are private; failure publishes nothing and reports failing step
+    - CI-validated: PR path green on all four definitions (amd64+arm64) before the
+      amd64-only/cache speed fix; arm64 only on release keeps PR feedback fast
     - _Requirements: Req 2.1, Req 2.2, Req 2.3, Req 2.4, Req 2.5, Req 8.1_
 
 - [ ] 4. Upstream tracking live (Day 2)
