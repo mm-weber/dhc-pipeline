@@ -12,6 +12,10 @@
   // Keep the frontend/builder digests fresh (Req 1.2); the docker manager
   // needs them to detect digest drift.
   pinDigests: true,
+  // Always rebase an open bump PR when main advances. Renovate's default only
+  // rebases conflicted PRs, so a PR could sit behind main with stale CI (e.g.
+  // after a test/tooling change) and never go green until manually rebased.
+  rebaseWhen: "behind-base-branch",
 
   customManagers: [
     {
