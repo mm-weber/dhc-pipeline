@@ -59,32 +59,27 @@ const has = (deps, want) =>
   );
 
 // --- source manager: the upstream version knob ---
+// Version-agnostic on purpose: a Renovate bump must NOT break this test, so it
+// asserts the manager extracts the right depName + a well-formed tag/digest,
+// never the exact pinned version (which changes on every bump).
+const dep = (deps, want) => deps.find((d) => Object.entries(want).every(([k, v]) => d[k] === v));
+const isTag = (v) => /^v\d+\.\d+\.\d+/.test(v ?? "");
+const is64 = (h) => /^sha256:[a-f0-9]{64}$/.test(h ?? "");
+
 const sHardened = extract(sourceMgr, read("image/hardened-app/image.yaml"));
-check(
-  "source: hardened-app → github-tags mm-weber/hardened-app v0.1.0",
-  has(sHardened, {
-    datasource: "github-tags",
-    depName: "mm-weber/hardened-app",
-    currentValue: "v0.1.0",
-  }),
-  JSON.stringify(sHardened),
-);
+{
+  const d = dep(sHardened, { datasource: "github-tags", depName: "mm-weber/hardened-app" });
+  check("source: hardened-app → github-tags mm-weber/hardened-app", !!d && isTag(d.currentValue), JSON.stringify(sHardened));
+}
 check("source: hardened-app yields exactly one dep", sHardened.length === 1, `${sHardened.length}`);
 
 for (const role of ["controller", "webhook", "cainjector"]) {
   const deps = extract(sourceMgr, read(`image/cert-manager-${role}/image.yaml`));
-  check(
-    `source: cert-manager-${role} → cert-manager/cert-manager v1.20.3`,
-    has(deps, {
-      datasource: "github-tags",
-      depName: "cert-manager/cert-manager",
-      currentValue: "v1.20.3",
-    }),
-    JSON.stringify(deps),
-  );
+  const d = dep(deps, { datasource: "github-tags", depName: "cert-manager/cert-manager" });
+  check(`source: cert-manager-${role} → cert-manager/cert-manager`, !!d && isTag(d.currentValue), JSON.stringify(deps));
 }
 
-// generic owner/repo + a two-digit-minor tag, via synthetic fixture
+// generic owner/repo + a two-digit-minor tag, via a frozen fixture (safe to pin exactly)
 const sOther = extract(sourceMgr, read("test/renovate/fixtures/other-owner.yaml"));
 check(
   "source: fixture → grafana/grafana v11.2.0",
@@ -98,35 +93,26 @@ check(
   JSON.stringify(sOther),
 );
 
-// --- docker manager: the dhc build layer ---
+// --- docker manager: the dhc build layer (version-agnostic) ---
 const dHardened = extract(dockerMgr, read("image/hardened-app/image.yaml"));
-check(
-  "docker: captures dhi.io/build with tag + digest",
-  has(dHardened, {
-    datasource: "docker",
-    depName: "dhi.io/build",
-    currentValue: "2-alpine3.23",
-    currentDigest: "sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc",
-  }),
-  JSON.stringify(dHardened),
-);
-check(
-  "docker: captures dhi.io/golang builder with digest",
-  has(dHardened, {
-    datasource: "docker",
-    depName: "dhi.io/golang",
-    currentValue: "1.26.4-alpine3.23-dev",
-    currentDigest: "sha256:a34c915874fb9e84b247465f6f7ea5d24277f9766bf81aa36bbc6b57691e315e",
-  }),
-  JSON.stringify(dHardened),
-);
+{
+  const b = dep(dHardened, { datasource: "docker", depName: "dhi.io/build" });
+  check(
+    "docker: captures dhi.io/build with tag + digest",
+    !!b && /^\d+-alpine3\.23$/.test(b.currentValue ?? "") && is64(b.currentDigest),
+    JSON.stringify(dHardened),
+  );
+  const g = dep(dHardened, { datasource: "docker", depName: "dhi.io/golang" });
+  check(
+    "docker: captures dhi.io/golang builder with digest",
+    !!g && /-alpine3\.23-dev$/.test(g.currentValue ?? "") && is64(g.currentDigest),
+    JSON.stringify(dHardened),
+  );
+}
 // every docker capture carries a digest (pinDigests invariant) and is a dhi.io image
 check(
   "docker: every capture is a digest-pinned dhi.io image",
-  dHardened.length > 0 &&
-    dHardened.every(
-      (d) => d.depName?.startsWith("dhi.io/") && /^sha256:[a-f0-9]{64}$/.test(d.currentDigest ?? ""),
-    ),
+  dHardened.length > 0 && dHardened.every((d) => d.depName?.startsWith("dhi.io/") && is64(d.currentDigest)),
   JSON.stringify(dHardened),
 );
 // the docker manager must NOT capture upstream git sources or bare actions

@@ -53,7 +53,7 @@
     - `renovatebot/github-action` on ≤6h cron; `postUpgradeTasks` recompute source checksums
     - Operator adds the PAT as a repo secret; scope check documented
     - _Requirements: Req 3.1, Req 3.2_
-  - [ ] 4.3 Prove the operating loop
+  - [x] 4.3 Prove the operating loop
     - Confirm real bump PRs open from stale pins; grouped cert-manager PR; one real major staged on the dashboard
     - _Requirements: Req 3.2, Req 3.3, Req 3.4, Req 3.6_
 
