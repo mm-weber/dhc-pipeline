@@ -64,7 +64,7 @@
   - [ ] 5.2 valkey definition (stateful archetype) [CUT 2nd-last if pressed]
     - Binary repackage, nonroot, stale pin
     - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6_
-  - [ ] 5.3 cert-manager chart adaptation
+  - [x] 5.3 cert-manager chart adaptation
     - Pin upstream chart version; `config/values-hardened.yaml` (digest-pinned image swap, restricted PSS); README documenting every deviation + rationale
     - _Requirements: Req 4.1, Req 4.2, Req 4.3, Req 4.7_
   - [ ] 5.4 grafana chart adaptation
