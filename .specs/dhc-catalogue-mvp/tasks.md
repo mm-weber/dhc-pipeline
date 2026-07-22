@@ -67,7 +67,7 @@
   - [x] 5.3 cert-manager chart adaptation
     - Pin upstream chart version; `config/values-hardened.yaml` (digest-pinned image swap, restricted PSS); README documenting every deviation + rationale
     - _Requirements: Req 4.1, Req 4.2, Req 4.3, Req 4.7_
-  - [ ] 5.4 grafana chart adaptation
+  - [x] 5.4 grafana chart adaptation
     - As 5.3 plus emptyDir mounts for writable paths; compat-variant decision documented if chart assumes shell utilities
     - _Requirements: Req 4.1, Req 4.2, Req 4.3, Req 4.4, Req 4.5, Req 4.7_
   - [ ] 5.5 Chart CI gate
