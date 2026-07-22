@@ -1,6 +1,9 @@
-// Package checks holds the pure assertion predicates the e2e specs build on:
-// small, dependency-free functions over corev1 objects (no cluster access) so
-// the hardening claims are unit-testable in isolation before the kind suite.
+// Package checks is the e2e assertion layer. Its core is pure predicates over
+// corev1 objects — RestrictedViolations (restricted securityContext) and
+// PodReady — that are unit-tested in isolation so the hardening claims are
+// verified before the kind suite ever runs. Thin cluster helpers (WaitReady,
+// DumpDiagnostics) then layer those same predicates onto e2e-framework so the
+// live checks match what the unit tests cover.
 package checks
 
 import (

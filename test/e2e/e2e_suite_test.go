@@ -1,17 +1,21 @@
 package e2e
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/e2e-framework/pkg/env"
+	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
 	"sigs.k8s.io/e2e-framework/support/kind"
 
+	"github.com/mm-weber/dhc-pipeline/test/checks"
 	"github.com/mm-weber/dhc-pipeline/test/harness"
 )
 
@@ -26,9 +30,15 @@ func init() {
 }
 
 // testenv is the e2e-framework environment provisioned in TestMain and shared by
-// the Ginkgo specs added in tasks 6.2 (readiness + restricted securityContext)
-// and 6.3 (per-component functional probes).
+// the Ginkgo specs added in task 6.3 (install + functional probes). The shared
+// assertions those specs call — readiness (checks.WaitReady) and restricted
+// securityContext (checks.RestrictedViolations) — landed in task 6.2.
 var testenv env.Environment
+
+// cfg is the environment config testenv is built from; the kind provisioning
+// funcs populate its kubeconfig, so the diagnostics hook can reach the cluster
+// client after a spec fails.
+var cfg *envconf.Config
 
 // selected is the component chartFlag resolved to; specs read it to know which
 // chart to install and which functional probe to run.
@@ -60,7 +70,8 @@ func TestMain(m *testing.M) {
 		kind.WithImage(img)(provider)
 	}
 
-	testenv = env.New()
+	cfg = envconf.New()
+	testenv = env.NewWithConfig(cfg)
 	testenv.Setup(
 		envfuncs.CreateCluster(provider, clusterName),
 		envfuncs.CreateNamespace(comp.Namespace),
@@ -77,10 +88,27 @@ func TestE2E(t *testing.T) {
 	RunSpecs(t, "dhc-pipeline e2e suite")
 }
 
+// ReportAfterEach preserves cluster diagnostics whenever a spec fails (Req 5.7):
+// the selected component's pods, events, and deployments are written under
+// checks.ArtifactsDir() for the e2e workflow (task 6.5) to upload. No-op unless a
+// cluster was provisioned (cfg is nil in the DHC_E2E!=1 bootstrap path).
+var _ = ReportAfterEach(func(report SpecReport) {
+	if !report.Failed() || cfg == nil {
+		return
+	}
+	outDir := filepath.Join(checks.ArtifactsDir(), selected.Name)
+	r := cfg.Client().Resources(selected.Namespace)
+	if err := checks.DumpDiagnostics(context.Background(), r, selected.Namespace, outDir); err != nil {
+		GinkgoWriter.Printf("diagnostics dump for %s failed: %v\n", selected.Name, err)
+		return
+	}
+	GinkgoWriter.Printf("diagnostics for %s written to %s\n", selected.Name, outDir)
+})
+
 var _ = Describe("hardened catalogue component on kind", func() {
-	// The live-cluster assertions land in task 6.2 (Ready within five minutes +
-	// restricted securityContext: UID 65532, read-only rootfs, seccomp, dropped
-	// caps) and 6.3 (per-component functional probes: cert-manager issues a
+	// The per-component specs land in task 6.3: each installs its chart, waits
+	// Ready via checks.WaitReady, asserts checks.RestrictedViolations is empty on
+	// the live pods, then runs its functional probe (cert-manager issues a
 	// Certificate, grafana answers HTTP health, valkey serves SET/GET,
 	// hardened-app returns HTTP 200). Pending until then so bootstrap CI is green
 	// without a cluster.

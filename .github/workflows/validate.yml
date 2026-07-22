@@ -61,7 +61,8 @@ jobs:
       # Fast, Docker-free guard on the e2e Go module (Req 5.1). The kind cluster
       # matrix that actually runs the Ginkgo specs is a separate workflow
       # (e2e.yml, task 6.5); here we only compile the whole module and run the
-      # pure provisioning-helper unit tests so a broken helper can never merge.
+      # pure helper unit tests (harness provisioning + checks assertions) so a
+      # broken helper can never merge.
       - name: gofmt
         working-directory: test
         run: test -z "$(gofmt -l .)" || { echo 'gofmt needed:'; gofmt -l .; exit 1; }
@@ -76,4 +77,4 @@ jobs:
 
       - name: helper unit tests
         working-directory: test
-        run: go test ./harness/...
+        run: go test ./harness/... ./checks/...
