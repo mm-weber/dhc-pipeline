@@ -82,7 +82,7 @@
   - [x] 6.2 Shared assertions
     - Ready ≤5min; live pod securityContext (UID 65532, RO rootfs, seccomp, caps); diagnostics dump to workflow artifacts on failure
     - _Requirements: Req 5.3, Req 5.4, Req 5.7_
-  - [ ] 6.3 Per-component specs with functional probes
+  - [x] 6.3 Per-component specs with functional probes
     - cert-manager issues a Certificate; grafana HTTP health; valkey SET/GET; hardened-app HTTP 200
     - _Requirements: Req 5.5_
   - [ ] 6.4 Upgrade-path spec [CUT 3rd if pressed: grafana depth only]
