@@ -27,7 +27,7 @@
       customType: "regex",
       managerFilePatterns: ["/^image/.+/image\\.yaml$/"],
       matchStrings: [
-        "url:\\s*[\"']?git\\+https://github\\.com/(?<depName>[^/]+/[^/.]+?)(?:\\.git)?#(?<currentValue>v[0-9][^\\s\"']*)",
+        "url:\\s*[\"']?git\\+https://github\\.com/(?<depName>[^/]+/[^/.]+?)(?:\\.git)?#(?<currentValue>v?[0-9][^\\s\"']*)",
       ],
       datasourceTemplate: "github-tags",
     },

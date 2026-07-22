@@ -61,7 +61,7 @@
   - [x] 5.1 grafana definition (tarball repackage archetype)
     - Official release tarball onto minimal digest-pinned base; nonroot 65532; writable-path inventory for chart work; stale pin
     - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6_
-  - [ ] 5.2 valkey definition (stateful archetype) [CUT 2nd-last if pressed]
+  - [x] 5.2 valkey definition (stateful archetype) [CUT 2nd-last if pressed]
     - Binary repackage, nonroot, stale pin
     - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6_
   - [x] 5.3 cert-manager chart adaptation
