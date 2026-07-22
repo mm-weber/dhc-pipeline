@@ -59,6 +59,11 @@ jobs:
                 names="$names $c"
               fi
             done
+            # When the e2e harness itself changes (this workflow or the Go suite),
+            # smoke-test it on the simplest component so a harness edit is exercised.
+            if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/e2e\.yml$|^test/(e2e|checks|install|harness)/'; then
+              names="$names hardened-app"
+            fi
           fi
 
           json=$(printf '%s\n' $names | jq -R . | jq -s -c 'map(select(length>0)) | unique')
@@ -94,9 +99,10 @@ jobs:
 
       - name: install kind
         run: |
-          curl -fsSLo /usr/local/bin/kind \
+          curl -fsSLo ./kind \
             "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
-          chmod +x /usr/local/bin/kind
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
           kind version
 
       - name: create kind cluster
