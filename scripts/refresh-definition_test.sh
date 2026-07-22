@@ -79,6 +79,31 @@ contents:
 EOF
 }
 
+# valkey-shaped: source ref has NO leading v (#9.0.5), C build so no ldflags.
+valkey_def() { # ver majmin maj
+  cat <<EOF
+$SYNTAX
+image: ghcr.io/mm-weber/dhc/valkey
+tags:
+  - $3-alpine3.23
+  - $2-alpine3.23
+  - $1-alpine3.23
+vars:
+  COMMIT_SHA: $OLD_SHA
+  SEMVER_MAJOR_MINOR_VERSION: "$2"
+  SEMVER_MAJOR_VERSION: "$3"
+  SEMVER_VERSION: $1
+  VERSION: $1
+contents:
+  builds:
+    - name: valkey
+      contents:
+        files:
+          - url: git+https://github.com/valkey-io/valkey.git#$1
+            checksum: $OLD_SHA
+EOF
+}
+
 assert() { # label file 'grep-pattern'
   if grep -qF -- "$3" "$2"; then echo "ok   $1"; else
     echo "FAIL $1: expected to find '$3' in $2"; sed 's/^/    /' "$2"; FAILURES=$((FAILURES+1)); fi
@@ -135,6 +160,15 @@ assert "cert major: SEMVER_MAJOR"             "$F" 'SEMVER_MAJOR_VERSION: "2"'
 assert "cert major: SEMVER_MAJOR_MINOR"       "$F" 'SEMVER_MAJOR_MINOR_VERSION: "2.0"'
 assert "cert major: major alias tag"          "$F" "- 2-alpine3.23"
 assert "cert major: full tag"                 "$F" "- 2.0.0-alpine3.23"
+
+# 5: valkey-style no-v tag patch bump 9.0.5 -> 9.0.6 (ref extraction + rewrite)
+newtag="9.0.6"; run_bump valkey_def 9.0.5 "$newtag"
+assert "valkey: checksum recomputed"     "$F" "checksum: $NEW_SHA"
+assert "valkey: COMMIT_SHA recomputed"   "$F" "COMMIT_SHA: $NEW_SHA"
+assert "valkey: VERSION"                 "$F" "VERSION: 9.0.6"
+assert "valkey: SEMVER_MAJOR_MINOR kept" "$F" 'SEMVER_MAJOR_MINOR_VERSION: "9.0"'
+assert "valkey: no-v url ref bumped"     "$F" ".git#9.0.6"
+refute "valkey: no stale 9.0.5"          "$F" "9.0.5"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all refresh-definition tests passed"

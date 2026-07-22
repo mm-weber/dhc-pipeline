@@ -63,7 +63,8 @@ const has = (deps, want) =>
 // asserts the manager extracts the right depName + a well-formed tag/digest,
 // never the exact pinned version (which changes on every bump).
 const dep = (deps, want) => deps.find((d) => Object.entries(want).every(([k, v]) => d[k] === v));
-const isTag = (v) => /^v\d+\.\d+\.\d+/.test(v ?? "");
+// v-optional: some upstreams tag with a leading v (cert-manager), some without (valkey).
+const isTag = (v) => /^v?\d+\.\d+\.\d+/.test(v ?? "");
 const is64 = (h) => /^sha256:[a-f0-9]{64}$/.test(h ?? "");
 
 const sHardened = extract(sourceMgr, read("image/hardened-app/image.yaml"));
@@ -77,6 +78,13 @@ for (const role of ["controller", "webhook", "cainjector"]) {
   const deps = extract(sourceMgr, read(`image/cert-manager-${role}/image.yaml`));
   const d = dep(deps, { datasource: "github-tags", depName: "cert-manager/cert-manager" });
   check(`source: cert-manager-${role} → cert-manager/cert-manager`, !!d && isTag(d.currentValue), JSON.stringify(deps));
+}
+
+// valkey tags have no leading 'v' (#9.0.5) — proves the v-optional regex tracks it
+{
+  const deps = extract(sourceMgr, read("image/valkey/image.yaml"));
+  const d = dep(deps, { datasource: "github-tags", depName: "valkey-io/valkey" });
+  check("source: valkey → github-tags valkey-io/valkey (no-v tag)", !!d && isTag(d.currentValue), JSON.stringify(deps));
 }
 
 // generic owner/repo + a two-digit-minor tag, via a frozen fixture (safe to pin exactly)

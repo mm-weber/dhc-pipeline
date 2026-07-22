@@ -21,10 +21,10 @@ f="$dir/image.yaml"
 esc() { printf '%s' "$1" | sed 's/[.[\*^$/]/\\&/g'; }   # escape regex metachars
 
 # New ref/version from the (already bumped) source url line.
-ref_line=$(grep -oE 'git\+https://[^#"]+#v[0-9][^ "'\'']*' "$f" | head -1)
+ref_line=$(grep -oE 'git\+https://[^#"]+#v?[0-9][^ "'\'']*' "$f" | head -1)
 [ -n "$ref_line" ] || { echo "refresh: no git+ source ref in $f" >&2; exit 1; }
 repo_url="${ref_line%#*}"; repo_url="${repo_url#git+}"
-new_tag="${ref_line#*#}"          # vX.Y.Z
+new_tag="${ref_line#*#}"          # vX.Y.Z or X.Y.Z (valkey has no leading v)
 new_ver="${new_tag#v}"            # X.Y.Z
 new_maj="${new_ver%%.*}"
 new_rest="${new_ver#*.}"

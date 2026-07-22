@@ -1,0 +1,189 @@
+# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc
+
+name: Valkey 9.0.x
+image: ghcr.io/mm-weber/dhc/valkey
+variant: runtime
+tags:
+  - 9-alpine3.23
+  - 9.0-alpine3.23
+  - 9.0.5-alpine3.23
+platforms:
+  - linux/amd64
+  - linux/arm64
+dates:
+  release: "2026-07-21"
+vars:
+  COMMIT_SHA: a253513ac7ff5790ca119053f3c7fbca4fdaad44
+  SEMVER_MAJOR_MINOR_VERSION: "9.0"
+  SEMVER_MAJOR_VERSION: "9"
+  SEMVER_VERSION: 9.0.5
+  VERSION: 9.0.5
+contents:
+  repositories:
+    - https://dhi.io/apk/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/community
+  keyring:
+    - https://dhi.io/keyring/dhi-apk@docker-0F81AD7700D99184.rsa.pub
+  # Runtime: musl is implicit in the base; libssl3 (pulls libcrypto3) is the
+  # only shared lib the TLS build links. No shell — valkey-server is PID 1.
+  packages:
+    - alpine-baselayout-data
+    - ca-certificates-bundle
+    - libssl3
+  builds:
+    # Build-then-repackage archetype: compile valkey from source (C, make) and
+    # copy the binaries onto the minimal runtime. git+checksum pins the source
+    # (Req 1.3).
+    - name: valkey
+      work-dir: ${source.dir}/valkey
+      contents:
+        packages:
+          - busybox
+          - bash
+          - gcc
+          - make
+          - libc-dev
+          - linux-headers
+          - openssl-dev
+          - pkgconf
+        files:
+          - url: git+https://github.com/valkey-io/valkey.git#9.0.5
+            checksum: a253513ac7ff5790ca119053f3c7fbca4fdaad44
+            path: ${source.dir}/valkey
+            spdx:
+              name: valkey
+              version: 9.0.5
+              packages:
+                - name: valkey
+                  purl: pkg:github/valkey-io/valkey@9.0.5
+                  license: BSD-3-Clause
+            uid: 0
+            gid: 0
+      pipeline:
+        - name: build
+          runs: |
+            set -eux -o pipefail
+
+            make -j4 BUILD_TLS=yes
+
+            mkdir -p "${target.dir}/usr/local/bin"
+            for b in valkey-server valkey-cli valkey-benchmark; do
+              cp "src/${b}" "${target.dir}/usr/local/bin/${b}"
+            done
+      outputs:
+        - source: ${target.dir}/usr/local/bin/valkey-server
+          target: /usr/local/bin/valkey-server
+          uid: 0
+          gid: 0
+          mode: "0755"
+        - source: ${target.dir}/usr/local/bin/valkey-cli
+          target: /usr/local/bin/valkey-cli
+          uid: 0
+          gid: 0
+          mode: "0755"
+        - source: ${target.dir}/usr/local/bin/valkey-benchmark
+          target: /usr/local/bin/valkey-benchmark
+          uid: 0
+          gid: 0
+          mode: "0755"
+        - source: /opt/docker/sbom/valkey
+          target: /opt/docker/sbom/valkey
+          uid: 0
+          gid: 0
+accounts:
+  run-as: nonroot
+  users:
+    - name: nonroot
+      uid: 65532
+      gid: 65532
+  groups:
+    - name: nonroot
+      gid: 65532
+      members:
+        - nonroot
+os-release:
+  name: dhc hardened images (Alpine)
+  id: alpine
+  version-id: "3.23"
+  pretty-name: dhc hardened images/Alpine Linux v3.23
+  home-url: https://github.com/mm-weber/dhc-pipeline
+  bug-report-url: https://github.com/mm-weber/dhc-pipeline/issues
+work-dir: /data
+# Stateful archetype: valkey persists to /data (RDB/AOF). Writable dirs owned
+# by nonroot 65532 — the volume-mount surface for the chart. redis-* symlinks
+# give drop-in Redis compatibility (valkey-server dispatches on argv[0]).
+paths:
+  - type: symlink
+    path: /usr/local/bin/redis-server
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: symlink
+    path: /usr/local/bin/redis-cli
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-cli
+  - type: symlink
+    path: /usr/local/bin/redis-benchmark
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-benchmark
+  - type: symlink
+    path: /usr/local/bin/redis-sentinel
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: symlink
+    path: /usr/local/bin/redis-check-rdb
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: symlink
+    path: /usr/local/bin/redis-check-aof
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: symlink
+    path: /usr/local/bin/valkey-sentinel
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: symlink
+    path: /usr/local/bin/valkey-check-rdb
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: symlink
+    path: /usr/local/bin/valkey-check-aof
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: directory
+    path: /data
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /var/lib/valkey
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /var/log/valkey
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /run/valkey
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+annotations:
+  org.opencontainers.image.description: Minimal Valkey image (built from source, TLS)
+  org.opencontainers.image.source: https://github.com/mm-weber/dhc-pipeline
+  org.opencontainers.image.licenses: BSD-3-Clause
+entrypoint:
+  - valkey-server
+ports:
+  - 6379/tcp
