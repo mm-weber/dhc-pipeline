@@ -61,7 +61,13 @@ func httpProbe(path string) probeFunc {
 								url,
 							},
 							SecurityContext: &corev1.SecurityContext{
-								RunAsNonRoot:             ptr(true),
+								RunAsNonRoot: ptr(true),
+								// Explicit numeric UID: with only RunAsNonRoot set, kubelet
+								// cannot verify a non-root image whose USER is a name
+								// (curlimages/curl's curl_user) and rejects the container
+								// with CreateContainerConfigError. curl needs no writes for
+								// an HTTP GET, so any non-root UID works.
+								RunAsUser:                ptr(int64(65532)),
 								AllowPrivilegeEscalation: ptr(false),
 								ReadOnlyRootFilesystem:   ptr(true),
 								Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
