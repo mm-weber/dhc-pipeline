@@ -46,3 +46,34 @@ jobs:
           npm install --no-save --no-audit --no-fund renovate@41 json5@2
           ./node_modules/.bin/renovate-config-validator --strict renovate.json5
           NODE_PATH="$PWD/node_modules" node test/renovate/managers.test.mjs
+
+  go-unit:
+    name: e2e module (build, vet, helper unit tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: test/go.mod
+          cache-dependency-path: test/go.sum
+
+      # Fast, Docker-free guard on the e2e Go module (Req 5.1). The kind cluster
+      # matrix that actually runs the Ginkgo specs is a separate workflow
+      # (e2e.yml, task 6.5); here we only compile the whole module and run the
+      # pure provisioning-helper unit tests so a broken helper can never merge.
+      - name: gofmt
+        working-directory: test
+        run: test -z "$(gofmt -l .)" || { echo 'gofmt needed:'; gofmt -l .; exit 1; }
+
+      - name: go vet
+        working-directory: test
+        run: go vet ./...
+
+      - name: go build (compiles suite + helpers)
+        working-directory: test
+        run: go build ./...
+
+      - name: helper unit tests
+        working-directory: test
+        run: go test ./harness/...
