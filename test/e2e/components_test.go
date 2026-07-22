@@ -1,13 +1,11 @@
 package e2e
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/mm-weber/dhc-pipeline/test/checks"
 	"github.com/mm-weber/dhc-pipeline/test/harness"
 )
 
@@ -59,6 +57,9 @@ var _ = Describe("hardened catalogue component on kind", func() {
 				if selected.Name != s.Name {
 					Skip("this run targets -chart=" + selected.Name)
 				}
+				if os.Getenv("DHC_UPGRADE_FROM") != "" {
+					Skip("bump PR — the upgrade-path spec installs and upgrades instead")
+				}
 			})
 
 			It("installs, reaches Ready, matches the restricted securityContext, and passes its probe", func(ctx SpecContext) {
@@ -67,20 +68,7 @@ var _ = Describe("hardened catalogue component on kind", func() {
 				By("helm install of the hardened chart")
 				Expect(helmInstall(ctx, s)).To(Succeed())
 
-				By("workload pods reach Ready within five minutes")
-				Expect(checks.WaitReady(ctx, r, s.Selector, s.Replicas, checks.ReadyTimeout)).To(Succeed())
-
-				By("every live pod matches the restricted securityContext")
-				var pods corev1.PodList
-				Expect(r.List(ctx, &pods, resources.WithLabelSelector(s.Selector))).To(Succeed())
-				Expect(pods.Items).NotTo(BeEmpty())
-				for i := range pods.Items {
-					Expect(checks.RestrictedViolations(&pods.Items[i])).To(
-						BeEmpty(), "pod %s violates the restricted profile", pods.Items[i].Name)
-				}
-
-				By("functional probe")
-				Expect(s.Probe(ctx, r, s.Component)).To(Succeed())
+				assertHealthy(ctx, r, s)
 			})
 		})
 	}

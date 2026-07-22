@@ -8,9 +8,8 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"sigs.k8s.io/yaml"
-
 	"github.com/mm-weber/dhc-pipeline/test/harness"
+	"github.com/mm-weber/dhc-pipeline/test/install"
 )
 
 // repoRoot resolves the catalogue root from this test file's location
@@ -20,63 +19,57 @@ func repoRoot() string {
 	return filepath.Join(filepath.Dir(file), "..", "..")
 }
 
-// pin mirrors the adapted chart's chart.yaml `upstream:` block (Req 4.1): the
-// pinned upstream chart the e2e install renders live, exactly as render-chart.sh
-// and the kyverno gate do.
-type pin struct {
-	Name       string `json:"name"`
-	Repository string `json:"repository"`
-	Version    string `json:"version"`
-}
-
-// readPin loads the upstream pin from an adapted chart directory.
-func readPin(chartDir string) (pin, error) {
-	b, err := os.ReadFile(filepath.Join(repoRoot(), chartDir, "chart.yaml"))
-	if err != nil {
-		return pin{}, err
+// deploySpec turns a componentSpec into an install.Spec for the given helm verb.
+// version (non-empty only on the upgrade path) overrides the adapted chart's
+// pinned version so the suite can install an older revision then upgrade to the
+// proposed one (Req 5.6). Owned and adapted charts deploy the same two ways
+// render-chart.sh renders them.
+func deploySpec(verb string, s componentSpec, version string) (install.Spec, error) {
+	c := s.Component
+	spec := install.Spec{
+		Verb:       verb,
+		Release:    c.Release,
+		Namespace:  c.Namespace,
+		Kubeconfig: cfg.KubeconfigFile(),
+		Owned:      c.Owned,
+		Version:    version,
+		Extra:      s.ExtraArgs,
 	}
-	var doc struct {
-		Upstream pin `json:"upstream"`
-	}
-	if err := yaml.Unmarshal(b, &doc); err != nil {
-		return pin{}, fmt.Errorf("parse %s/chart.yaml: %w", chartDir, err)
-	}
-	if doc.Upstream.Name == "" || doc.Upstream.Repository == "" || doc.Upstream.Version == "" {
-		return pin{}, fmt.Errorf("%s/chart.yaml: incomplete upstream pin %+v", chartDir, doc.Upstream)
-	}
-	return doc.Upstream, nil
-}
-
-// helmInstall installs a component's chart onto the kind cluster the same two
-// ways render-chart.sh renders it: an owned chart from its local directory, an
-// adapted chart from its pinned upstream (--repo/--version) with the hardened
-// values overlay as the only change. Extra --set args (e.g. cert-manager CRDs)
-// are appended. Errors carry helm's combined output so a failed install is
-// diagnosable from the CI log.
-func helmInstall(ctx context.Context, spec componentSpec) error {
-	c := spec.Component
-	args := []string{"install", c.Release}
 	if c.Owned {
-		args = append(args, filepath.Join(repoRoot(), c.ChartDir))
-	} else {
-		p, err := readPin(c.ChartDir)
-		if err != nil {
-			return err
-		}
-		values := filepath.Join(repoRoot(), c.ChartDir, "config", "values-hardened.yaml")
-		args = append(args, p.Name, "--repo", p.Repository, "--version", p.Version, "-f", values)
+		spec.ChartPath = filepath.Join(repoRoot(), c.ChartDir)
+		return spec, nil
 	}
-	args = append(args,
-		"--namespace", c.Namespace, "--create-namespace",
-		"--kubeconfig", cfg.KubeconfigFile(),
-	)
-	args = append(args, spec.ExtraArgs...)
-
-	out, err := exec.CommandContext(ctx, "helm", args...).CombinedOutput()
+	b, err := os.ReadFile(filepath.Join(repoRoot(), c.ChartDir, "chart.yaml"))
 	if err != nil {
-		return fmt.Errorf("helm install %s: %w\n%s", c.Name, err, out)
+		return install.Spec{}, err
+	}
+	p, err := install.ParsePin(b)
+	if err != nil {
+		return install.Spec{}, fmt.Errorf("%s/chart.yaml: %w", c.ChartDir, err)
+	}
+	spec.Pin = p
+	spec.ValuesFile = filepath.Join(repoRoot(), c.ChartDir, "config", "values-hardened.yaml")
+	return spec, nil
+}
+
+// helmDeploy runs `helm <verb>` for a component, building the argv with the
+// unit-tested install package. Errors carry helm's combined output so a failed
+// deploy is diagnosable from the CI log.
+func helmDeploy(ctx context.Context, verb string, s componentSpec, version string) error {
+	spec, err := deploySpec(verb, s, version)
+	if err != nil {
+		return err
+	}
+	out, err := exec.CommandContext(ctx, "helm", install.Args(spec)...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("helm %s %s: %w\n%s", verb, s.Name, err, out)
 	}
 	return nil
+}
+
+// helmInstall installs a component's chart at its pinned version.
+func helmInstall(ctx context.Context, s componentSpec) error {
+	return helmDeploy(ctx, "install", s, "")
 }
 
 // component looks a registry entry up or dies at suite build — the registry is
