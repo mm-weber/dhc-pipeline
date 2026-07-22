@@ -32,9 +32,9 @@ jobs:
           curl -fsSL "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz" \
             | tar -xz -C /usr/local/bin kyverno
           curl -fsSL "https://github.com/helm/chart-testing/releases/download/${CT_VERSION}/chart-testing_${CT_VERSION#v}_linux_amd64.tar.gz" \
-            | tar -xz -C /usr/local/bin ct etc/chart_schema.yaml etc/lintconf.yaml || \
-          curl -fsSL "https://github.com/helm/chart-testing/releases/download/${CT_VERSION}/chart-testing_${CT_VERSION#v}_linux_amd64.tar.gz" \
             | tar -xz -C /usr/local/bin ct
+          # ct lint validates Chart.yaml with yamale and lints with yamllint.
+          pip install --quiet yamale yamllint
 
       - name: render every chart and gate with kyverno (Req 4.6)
         run: |
