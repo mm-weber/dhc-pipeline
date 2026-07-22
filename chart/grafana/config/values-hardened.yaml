@@ -1,0 +1,51 @@
+# Hardening overlay for the upstream grafana chart (Req 4.2-4.5). Applied with
+# `-f`; upstream templates are untouched. Every delta is documented in
+# ../README.md.
+
+# Swap to the digest-pinned catalogue image (Req 4.2). image.sha is the hex
+# digest; the chart renders repo:tag@sha256:<sha>. Renovate keeps it current.
+image:
+  registry: ghcr.io
+  repository: mm-weber/dhc/grafana
+  tag: 13.0.4-alpine3.23
+  sha: b6987eb3910fe3f4a05011f76f76c5d56728017a6db1afb491d7f4ba51ff182e
+
+# Our runtime image runs as 65532; the chart defaults to grafana's UID 472
+# (Req 4.3). runAsNonRoot + seccomp are already chart defaults.
+securityContext:
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+
+# The chart omits readOnlyRootFilesystem; add it (Req 4.3). The other container
+# settings (drop-ALL caps, allowPrivilegeEscalation false, seccomp) are chart
+# defaults and merge in.
+containerSecurityContext:
+  readOnlyRootFilesystem: true
+
+# initChownData chowns the data dir via a busybox shell init container. With an
+# emptyDir data volume and fsGroup 65532, the kubelet sets ownership — the chown
+# is unnecessary, and our images ship no shell (Req 4.5). Disable it.
+initChownData:
+  enabled: false
+
+# testFramework renders a Helm-test Pod from a non-catalogue bats image; disable
+# so the policy gate only ever sees catalogue images.
+testFramework:
+  enabled: false
+
+# Writable paths under readOnlyRootFilesystem (Req 4.4). The chart already
+# mounts emptyDir at /var/lib/grafana (data, persistence off) and
+# /var/lib/grafana-search; grafana additionally writes /tmp and, via the
+# default file logger at GF_PATHS_LOGS, /var/log/grafana. From the definition's
+# writable-path inventory:
+extraVolumes:
+  - name: tmp
+    emptyDir: {}
+  - name: log
+    emptyDir: {}
+extraVolumeMounts:
+  - name: tmp
+    mountPath: /tmp
+  - name: log
+    mountPath: /var/log/grafana
