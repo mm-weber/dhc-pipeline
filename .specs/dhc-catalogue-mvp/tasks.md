@@ -88,7 +88,7 @@
   - [x] 6.4 Upgrade-path spec [CUT 3rd if pressed: grafana depth only]
     - On bump PRs: install currently pinned version → upgrade to proposed → re-assert
     - _Requirements: Req 5.6_
-  - [ ] 6.5 `e2e.yml` workflow
+  - [x] 6.5 `e2e.yml` workflow
     - Affected-component kind matrix on PRs
     - _Requirements: Req 5.2, Req 8.1_
 
