@@ -34,6 +34,9 @@ func Lookup(name string) (Component, error) {
 	return Component{}, fmt.Errorf("unknown component %q", name)
 }
 
+// maxLabelLen is the RFC1123 DNS label limit ClusterName truncates to.
+const maxLabelLen = 63
+
 // ClusterName derives a kind-safe cluster name from base (RFC1123 label:
 // lowercase, [a-z0-9-], starts/ends alphanumeric, <= 63 chars). Every run of
 // characters outside [a-z0-9] collapses to a single dash; leading/trailing
@@ -54,8 +57,8 @@ func ClusterName(base string) string {
 	}
 
 	s := strings.Trim(b.String(), "-")
-	if len(s) > 63 {
-		s = strings.TrimRight(s[:63], "-")
+	if len(s) > maxLabelLen {
+		s = strings.TrimRight(s[:maxLabelLen], "-")
 	}
 	if s == "" {
 		return "dhc"
