@@ -104,15 +104,3 @@ var _ = ReportAfterEach(func(report SpecReport) {
 	}
 	GinkgoWriter.Printf("diagnostics for %s written to %s\n", selected.Name, outDir)
 })
-
-var _ = Describe("hardened catalogue component on kind", func() {
-	// The per-component specs land in task 6.3: each installs its chart, waits
-	// Ready via checks.WaitReady, asserts checks.RestrictedViolations is empty on
-	// the live pods, then runs its functional probe (cert-manager issues a
-	// Certificate, grafana answers HTTP health, valkey serves SET/GET,
-	// hardened-app returns HTTP 200). Pending until then so bootstrap CI is green
-	// without a cluster.
-	PIt("reaches Ready and matches the restricted securityContext", func() {
-		Expect(selected.Name).NotTo(BeEmpty())
-	})
-})
