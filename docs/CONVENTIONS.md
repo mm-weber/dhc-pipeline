@@ -106,6 +106,15 @@ Rendered manifests of every chart are evaluated by the Kyverno policies in
 workloads non-root. Policy fixtures live in `policies/tests/` and run via
 `kyverno test` in CI (no kyverno binary in the devcontainer — Req 8.2).
 
+## Scanning & triage (Req 6)
+
+Every image a PR builds is scanned by Trivy for `HIGH,CRITICAL` in
+`build.yml`; the gate fails on any finding **not** excused by an OpenVEX
+statement in `triage/vex/`, and a Grype second opinion runs on any surviving
+`CRITICAL`. Red gates are cleared by a recorded decision — an OpenVEX statement
+(`vexctl`, `cosign attest`) plus a `triage/LOG.md` entry, or a fix-bump PR —
+never by silencing the scanner. See `triage/README.md`.
+
 ## Pull requests (Req 7)
 
 - One logical change per PR; definition bumps and chart changes do not mix

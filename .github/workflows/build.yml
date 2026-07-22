@@ -2,7 +2,10 @@ name: build
 
 # PR: build every affected definition for amd64 through the dhi.io/build
 # frontend — no push, just prove it compiles (fast gate; both arches are a
-# release concern, Req 2.1).
+# release concern, Req 2.1) — then load it into the docker daemon and run the
+# CVE scan gate: Trivy over HIGH/CRITICAL, failing on anything not excused by an
+# OpenVEX statement in triage/vex/ (Req 6.1), with a Grype second opinion
+# whenever a CRITICAL is present (Req 6.6).
 # main: same build, then push to the PRIVATE ghcr.io/mm-weber/dhc with a cosign
 # keyless signature, an SPDX SBOM (Syft), and BuildKit provenance attached
 # (Req 2.2), tags derived from the definition (Req 2.3), and a final guard that
@@ -57,13 +60,20 @@ jobs:
             else names=$(all_defs); fi
           elif [ "$EVENT" = "pull_request" ]; then
             git fetch --no-tags --depth=1 origin "$BASE_REF"
-            names=$(git diff --name-only "origin/${BASE_REF}...HEAD" -- image/ | awk -F/ 'NF>=3 && $3=="image.yaml"{print $2}' | sort -u)
+            changed=$(git diff --name-only "origin/${BASE_REF}...HEAD")
+            names=$(printf '%s\n' "$changed" | awk -F/ '$1=="image" && NF>=3 && $3=="image.yaml"{print $2}' | sort -u)
+            # Canary: a change to the gate itself (this workflow) or to the VEX
+            # inputs it consumes touches no definition — build+scan the simplest
+            # image so the gate is actually exercised on the PR that changes it.
+            if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/build\.yml$|^triage/vex/'; then
+              names="$names hardened-app"
+            fi
           else
             if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then range="HEAD~1...HEAD"; else range="${BEFORE}...${GITHUB_SHA}"; fi
             names=$(git diff --name-only $range -- image/ | awk -F/ 'NF>=3 && $3=="image.yaml"{print $2}' | sort -u)
           fi
 
-          json=$(printf '%s\n' $names | jq -R . | jq -s -c 'map(select(length>0))')
+          json=$(printf '%s\n' $names | jq -R . | jq -s -c 'map(select(length>0)) | unique')
           echo "names=$json" >> "$GITHUB_OUTPUT"
           if [ "$json" = "[]" ]; then echo "any=false" >> "$GITHUB_OUTPUT"; else echo "any=true" >> "$GITHUB_OUTPUT"; fi
           echo "affected: $json"
@@ -134,6 +144,10 @@ jobs:
           # once, at merge, where the cost belongs.
           platforms: ${{ github.ref == 'refs/heads/main' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: ${{ github.ref == 'refs/heads/main' }}
+          # PR builds single-arch amd64, so load it into the docker daemon for the
+          # scan gate below; a multi-arch main build can't be loaded, and there
+          # the rescan cron (task 7.2) covers the pushed image instead.
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           # Warm the Go module + compile layers across runs so repeat builds of
           # a large upstream (cert-manager) aren't cache-cold every time.
@@ -141,6 +155,97 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
           # BuildKit SLSA provenance, attached only when we push (Req 2.2).
           provenance: ${{ github.ref == 'refs/heads/main' && 'mode=max' || 'false' }}
+
+      # ---- PR-only: CVE scan gate (Req 6.1, 6.6) ----
+      # Real tools do the work: Trivy suppresses via our OpenVEX and reports the
+      # remaining HIGH/CRITICAL; Grype corroborates a CRITICAL; a jq count is the
+      # only glue. Authoring VEX statements is task 7.3 — here we just consume them.
+      - name: install trivy + grype
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          # Latest by design: a scanner is only as good as its newest detection
+          # logic and advisory DB, so the gate tracks upstream rather than pinning.
+          curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
+          curl -fsSL https://raw.githubusercontent.com/anchore/grype/main/install.sh           | sudo sh -s -- -b /usr/local/bin
+          trivy --version
+          grype version
+
+      - name: Trivy scan (VEX-gated)
+        id: trivy
+        if: github.event_name == 'pull_request'
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          ref=$(printf '%s\n' "$TAGS" | head -n1)
+          echo "scanning $ref"
+          # Consume our OpenVEX statements when any exist. --vex is a slice of
+          # sources (each a file path), so pass one per statement; an empty
+          # triage/vex/ excuses nothing, so every HIGH/CRITICAL counts — correct
+          # until a triage decision lands (task 7.3).
+          vex=()
+          for f in triage/vex/*.json; do [ -e "$f" ] && vex+=(--vex "$f"); done
+          # One scan → JSON of the POST-VEX findings (suppressed ones drop out
+          # unless --show-suppressed). exit-code 0 keeps us in control: the Grype
+          # second opinion must still run when a CRITICAL is present.
+          trivy image "${vex[@]}" \
+            --severity HIGH,CRITICAL \
+            --pkg-types os,library \
+            --format json --output trivy.json \
+            --no-progress --exit-code 0 "$ref"
+          high=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")]     | length' trivy.json)
+          crit=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy.json)
+          echo "high=$high" >> "$GITHUB_OUTPUT"
+          echo "crit=$crit" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Trivy — ${ref}"
+            echo "Uncovered after VEX: **${crit} CRITICAL**, **${high} HIGH**"
+            echo '```'
+            trivy convert --format table trivy.json 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Grype second opinion (CRITICAL present)
+        if: github.event_name == 'pull_request' && steps.trivy.outputs.crit != '0'
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          ref=$(printf '%s\n' "$TAGS" | head -n1)
+          # A different DB + matcher corroborating Trivy's CRITICAL (Req 6.6);
+          # informational — the authoritative gate is the Trivy result below.
+          grype "$ref" -o table | tee grype.txt
+          {
+            echo "### Grype second opinion — ${ref}"
+            echo '```'
+            cat grype.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Scan gate — fail on uncovered HIGH/CRITICAL
+        if: github.event_name == 'pull_request'
+        env:
+          HIGH: ${{ steps.trivy.outputs.high }}
+          CRIT: ${{ steps.trivy.outputs.crit }}
+          NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          if [ "${CRIT:-0}" -gt 0 ] || [ "${HIGH:-0}" -gt 0 ]; then
+            echo "::error::${NAME}: ${CRIT} CRITICAL / ${HIGH} HIGH not covered by a VEX statement in triage/vex/ (Req 6.1). Triage it: OpenVEX statement (task 7.3) or a fix-bump PR."
+            exit 1
+          fi
+          echo "${NAME}: no uncovered HIGH/CRITICAL ✓"
+
+      - name: upload scan reports
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scan-${{ matrix.name }}
+          path: |
+            trivy.json
+            grype.txt
+          if-no-files-found: ignore
 
       # ---- release-only: sign + SBOM (main branch) ----
       - name: install cosign
