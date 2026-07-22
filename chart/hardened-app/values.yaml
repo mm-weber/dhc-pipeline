@@ -1,0 +1,35 @@
+# Owned chart: the hardening is baked into the defaults (no overlay). Digest
+# tracks the published catalogue image; Renovate keeps it current.
+image:
+  repository: ghcr.io/mm-weber/dhc/hardened-app
+  tag: 0.1.0-alpine3.23
+  digest: sha256:253705899cf9bf976ccaa225ee58050abeff518c671c6c99a865697ec9357b3a
+
+replicaCount: 1
+port: 8080
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    memory: 64Mi
+
+# Restricted PSS (Req 4.3), matching the runtime image (nonroot 65532).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL

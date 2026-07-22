@@ -124,5 +124,12 @@ fresh
 printf '%s\nspec:\n  image: docker.io/library/nginx:1.27\n' "$SYNTAX" > "$SB/image/app/image.yaml"
 run_case "indented image in definition caught" 1 "nginx:1.27"
 
+# 17: Helm-template image ref in an owned chart is not a literal pin — passes
+# (the digest lives in values.yaml; kyverno gates the rendered manifests)
+fresh
+mkdir -p "$SB/chart/app/templates"
+printf 'image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}@{{ .Values.image.digest }}"\n' > "$SB/chart/app/templates/deployment.yaml"
+run_case "helm-template image ref not flagged" 0
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

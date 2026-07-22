@@ -17,3 +17,4 @@ rules:
 ignore: |
   data/
   temp/
+  chart/*/templates/

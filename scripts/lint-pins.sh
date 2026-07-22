@@ -30,6 +30,10 @@ while IFS= read -r -d '' file; do
     ref="${ref%\"}"; ref="${ref#\"}"
     ref="${ref%\'}"; ref="${ref#\'}"
     [ -z "$ref" ] && continue
+    # Helm-template refs (chart templates) render to a digest at deploy time and
+    # are gated by kyverno over the rendered manifests — the literal pin lives in
+    # the chart's values, not here.
+    [[ "$ref" == *'{{'* ]] && continue
     # In a definition, top-level image: is the PUBLISH name (what we build):
     # a bare repository reference — its digest cannot exist before the build,
     # and release tags live under tags:.
