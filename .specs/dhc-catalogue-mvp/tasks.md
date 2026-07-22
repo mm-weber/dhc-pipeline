@@ -85,7 +85,7 @@
   - [x] 6.3 Per-component specs with functional probes
     - cert-manager issues a Certificate; grafana HTTP health; valkey SET/GET; hardened-app HTTP 200
     - _Requirements: Req 5.5_
-  - [ ] 6.4 Upgrade-path spec [CUT 3rd if pressed: grafana depth only]
+  - [x] 6.4 Upgrade-path spec [CUT 3rd if pressed: grafana depth only]
     - On bump PRs: install currently pinned version → upgrade to proposed → re-assert
     - _Requirements: Req 5.6_
   - [ ] 6.5 `e2e.yml` workflow
