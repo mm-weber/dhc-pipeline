@@ -44,10 +44,14 @@ var cfg *envconf.Config
 // chart to install and which functional probe to run.
 var selected harness.Component
 
-// TestMain provisions an ephemeral kind cluster for the selected component, then
-// hands off to the Ginkgo specs. Provisioning is gated on DHC_E2E=1 (set by the
-// e2e.yml workflow, task 6.5); without it the suite runs cluster-free so
-// `go test ./...` and the unit layer stay fast and Docker-free.
+// TestMain provisions the cluster the Ginkgo specs run against, then hands off.
+// Provisioning is gated on DHC_E2E=1 (set by the e2e.yml workflow, task 6.5);
+// without it the suite runs cluster-free so `go test ./...` and the unit layer
+// stay fast and Docker-free. Two cluster modes:
+//   - E2E_KUBECONFIG set (CI): attach to the kind cluster the workflow already
+//     created and loaded the private images into; the suite only creates the
+//     component namespace and never tears the cluster down (the workflow owns it).
+//   - otherwise (local): create and destroy an ephemeral kind cluster.
 func TestMain(m *testing.M) {
 	flag.Parse()
 
@@ -63,22 +67,26 @@ func TestMain(m *testing.M) {
 	}
 	selected = comp
 
-	clusterName := harness.ClusterName("dhc-e2e-" + comp.Name)
-	provider := kind.NewProvider()
-	if img := os.Getenv("KIND_NODE_IMAGE"); img != "" {
-		// Pin the node image from CI (task 6.5) so kind never floats a tag.
-		kind.WithImage(img)(provider)
+	if kubeconfig := os.Getenv("E2E_KUBECONFIG"); kubeconfig != "" {
+		// CI: the workflow owns the cluster and has already loaded the images.
+		cfg = envconf.NewWithKubeConfig(kubeconfig)
+		testenv = env.NewWithConfig(cfg)
+		testenv.Setup(envfuncs.CreateNamespace(comp.Namespace))
+	} else {
+		// Local: create an ephemeral kind cluster and tear it down after.
+		clusterName := harness.ClusterName("dhc-e2e-" + comp.Name)
+		provider := kind.NewProvider()
+		if img := os.Getenv("KIND_NODE_IMAGE"); img != "" {
+			kind.WithImage(img)(provider)
+		}
+		cfg = envconf.New()
+		testenv = env.NewWithConfig(cfg)
+		testenv.Setup(
+			envfuncs.CreateCluster(provider, clusterName),
+			envfuncs.CreateNamespace(comp.Namespace),
+		)
+		testenv.Finish(envfuncs.DestroyCluster(clusterName))
 	}
-
-	cfg = envconf.New()
-	testenv = env.NewWithConfig(cfg)
-	testenv.Setup(
-		envfuncs.CreateCluster(provider, clusterName),
-		envfuncs.CreateNamespace(comp.Namespace),
-	)
-	testenv.Finish(
-		envfuncs.DestroyCluster(clusterName),
-	)
 	os.Exit(testenv.Run(m))
 }
 

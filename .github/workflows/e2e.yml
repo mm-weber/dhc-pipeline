@@ -1,0 +1,193 @@
+name: e2e
+
+# Phase-6 integration suite (Req 5.2, Req 8.1). For each chart-backed component
+# a PR touches, provision an ephemeral kind cluster, load the component's PRIVATE
+# ghcr.io/mm-weber/dhc images into it (kind nodes have no registry creds, so the
+# images are preloaded rather than pulled), install the hardened chart, and run
+# the Ginkgo suite — which asserts readiness (Req 5.3), the restricted
+# securityContext on live pods (Req 5.4), and the functional probe (Req 5.5); on
+# a chart-version bump it runs the upgrade path instead (Req 5.6). Diagnostics
+# are uploaded on failure (Req 5.7). GitHub Actions is the authoritative
+# environment for this — chart repos and Docker Hub are unreachable from the
+# devcontainer (Req 8.1).
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: "Single component (cert-manager|grafana|hardened-app); empty = all"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: read # pull the private ghcr.io/mm-weber/dhc images
+
+jobs:
+  # Which chart-backed components does this PR touch? valkey has no chart yet
+  # (task 8.1), so it is never in the matrix. Emits a JSON array for the matrix.
+  affected:
+    name: affected components
+    runs-on: ubuntu-latest
+    outputs:
+      names: ${{ steps.detect.outputs.names }}
+      any: ${{ steps.detect.outputs.any }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - id: detect
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          DISPATCH: ${{ github.event.inputs.component }}
+        run: |
+          set -euo pipefail
+          ALL="cert-manager grafana hardened-app"
+
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            names="${DISPATCH:-$ALL}"
+          else
+            git fetch --no-tags --depth=1 origin "$BASE_REF"
+            changed=$(git diff --name-only "origin/${BASE_REF}...HEAD")
+            names=""
+            for c in $ALL; do
+              # affected if the component's chart or any of its image definitions changed
+              if printf '%s\n' "$changed" | grep -qE "^chart/${c}/|^image/${c}(-|/)"; then
+                names="$names $c"
+              fi
+            done
+          fi
+
+          json=$(printf '%s\n' $names | jq -R . | jq -s -c 'map(select(length>0)) | unique')
+          echo "names=$json" >> "$GITHUB_OUTPUT"
+          if [ "$json" = "[]" ]; then echo "any=false" >> "$GITHUB_OUTPUT"; else echo "any=true" >> "$GITHUB_OUTPUT"; fi
+          echo "affected: $json"
+
+  e2e:
+    name: e2e ${{ matrix.component }}
+    needs: affected
+    if: needs.affected.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        component: ${{ fromJSON(needs.affected.outputs.names) }}
+    env:
+      KIND_VERSION: v0.32.0
+      CLUSTER: dhc-e2e
+      PROBE_IMAGE: curlimages/curl:8.11.1
+      ARTIFACTS: ${{ github.workspace }}/e2e-artifacts
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: test/go.mod
+          cache-dependency-path: test/go.sum
+
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+
+      - name: install kind
+        run: |
+          curl -fsSLo /usr/local/bin/kind \
+            "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+          chmod +x /usr/local/bin/kind
+          kind version
+
+      - name: create kind cluster
+        run: |
+          kind create cluster --name "$CLUSTER" --wait 120s
+          kind export kubeconfig --name "$CLUSTER"
+          echo "E2E_KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
+
+      - name: log in to ghcr.io
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # kind nodes cannot pull private images; render the chart, then pull each
+      # ghcr.io/mm-weber/dhc image by digest, tag it, and load it into the node
+      # (charts pin repo:tag@digest with imagePullPolicy IfNotPresent, so the
+      # loaded image is used and no in-cluster pull secret is needed).
+      - name: load private images into kind
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          set -euo pipefail
+          scripts/render-chart.sh "chart/${COMPONENT}" > /tmp/rendered.yaml
+          refs=$(grep -oE 'ghcr\.io/mm-weber/dhc/[a-z0-9._/-]+:[a-z0-9._-]+@sha256:[a-f0-9]{64}' /tmp/rendered.yaml | sort -u || true)
+          [ -n "$refs" ] || { echo "::error::no ghcr.io/mm-weber/dhc images found in chart/${COMPONENT}"; exit 1; }
+          for ref in $refs; do
+            by_digest=$(printf '%s' "$ref" | sed -E 's/:[^@/]+@/@/')  # repo:tag@digest -> repo@digest
+            repo_tag="${ref%@*}"                                       # repo:tag
+            echo "::group::load $repo_tag"
+            docker pull "$by_digest"
+            docker tag "$by_digest" "$repo_tag"
+            kind load docker-image --name "$CLUSTER" "$repo_tag"
+            echo "::endgroup::"
+          done
+
+      - name: load probe image into kind
+        run: |
+          docker pull "$PROBE_IMAGE"
+          kind load docker-image --name "$CLUSTER" "$PROBE_IMAGE"
+
+      # On a chart-version bump the upgrade-path spec (Req 5.6) installs the base
+      # version then upgrades to the proposed one. Adapted charts only: the pin
+      # is chart/<c>/chart.yaml upstream.version.
+      - name: compute upgrade-from on a chart bump
+        id: upgrade
+        env:
+          COMPONENT: ${{ matrix.component }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          pinfile="chart/${COMPONENT}/chart.yaml"
+          if [ -f "$pinfile" ] && [ -n "${BASE_REF:-}" ]; then
+            head_ver=$(yq '.upstream.version' "$pinfile" | tr -d '"')
+            base_ver=$(git show "origin/${BASE_REF}:${pinfile}" 2>/dev/null | yq '.upstream.version' | tr -d '"' || echo "")
+            if [ -n "$base_ver" ] && [ "$base_ver" != "null" ] && [ "$base_ver" != "$head_ver" ]; then
+              echo "from=$base_ver" >> "$GITHUB_OUTPUT"
+              echo "upgrade path: ${base_ver} -> ${head_ver}"
+            fi
+          fi
+
+      - name: run e2e suite
+        working-directory: test
+        env:
+          COMPONENT: ${{ matrix.component }}
+          DHC_E2E: "1"
+          DHC_PROBE_IMAGE: ${{ env.PROBE_IMAGE }}
+          DHC_UPGRADE_FROM: ${{ steps.upgrade.outputs.from }}
+          DHC_ARTIFACTS: ${{ env.ARTIFACTS }}
+        run: go test ./e2e/ -v -timeout 25m -args --chart "$COMPONENT"
+
+      # Belt-and-suspenders diagnostics beyond the suite's own dump (Req 5.7).
+      - name: collect diagnostics on failure
+        if: failure()
+        run: |
+          set +e
+          mkdir -p "$ARTIFACTS"
+          kubectl get all -A                                  > "$ARTIFACTS/all.txt"           2>&1
+          kubectl get events -A --sort-by=.lastTimestamp      > "$ARTIFACTS/events.txt"        2>&1
+          kubectl describe pods -A                            > "$ARTIFACTS/pods-describe.txt" 2>&1
+          kind export logs "$ARTIFACTS/kind-logs" --name "$CLUSTER"
+
+      - name: upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-diagnostics-${{ matrix.component }}
+          path: e2e-artifacts/
+          if-no-files-found: warn
+
+      - name: delete kind cluster
+        if: always()
+        run: kind delete cluster --name "$CLUSTER" || true
