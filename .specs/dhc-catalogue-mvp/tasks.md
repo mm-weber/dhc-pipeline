@@ -76,7 +76,7 @@
     - _Requirements: Req 4.6_
 
 - [ ] 6. Go integration test suite (Day 3)
-  - [ ] 6.1 Test module bootstrap
+  - [x] 6.1 Test module bootstrap
     - `test/` Go module: Ginkgo v2 + Gomega + e2e-framework; kind provisioning helpers (TDD on helpers)
     - _Requirements: Req 5.1_
   - [ ] 6.2 Shared assertions
