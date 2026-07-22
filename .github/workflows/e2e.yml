@@ -179,6 +179,13 @@ jobs:
           kubectl get all -A                                  > "$ARTIFACTS/all.txt"           2>&1
           kubectl get events -A --sort-by=.lastTimestamp      > "$ARTIFACTS/events.txt"        2>&1
           kubectl describe pods -A                            > "$ARTIFACTS/pods-describe.txt" 2>&1
+          # per-pod logs (incl. the curl probe Job) — the suite dump has no logs
+          kubectl get pods -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' \
+            | while IFS=/ read -r ns name; do
+                [ -n "$name" ] || continue
+                kubectl logs -n "$ns" "$name" --all-containers=true --tail=-1 --prefix \
+                  > "$ARTIFACTS/logs_${ns}_${name}.txt" 2>&1
+              done
           kind export logs "$ARTIFACTS/kind-logs" --name "$CLUSTER"
 
       - name: upload diagnostics
