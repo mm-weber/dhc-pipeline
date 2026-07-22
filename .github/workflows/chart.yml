@@ -19,7 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       KYVERNO_VERSION: v1.18.2
-      CT_VERSION: v3.14.0
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -27,14 +26,16 @@ jobs:
 
       - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
 
-      - name: install kyverno + ct
+      # Sets up ct with its Chart.yaml schema validator (yamale) and yamllint on
+      # PATH — a plain `pip install` lands them in a dir the runner PATH misses.
+      - uses: helm/chart-testing-action@cf48dbf901ed202ae2c5aee26422dd6dfdf41e47 # v2.7.0
+        with:
+          version: v3.14.0
+
+      - name: install kyverno
         run: |
           curl -fsSL "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz" \
             | tar -xz -C /usr/local/bin kyverno
-          curl -fsSL "https://github.com/helm/chart-testing/releases/download/${CT_VERSION}/chart-testing_${CT_VERSION#v}_linux_amd64.tar.gz" \
-            | tar -xz -C /usr/local/bin ct
-          # ct lint validates Chart.yaml with yamale and lints with yamllint.
-          pip install --quiet yamale yamllint
 
       - name: render every chart and gate with kyverno (Req 4.6)
         run: |
