@@ -59,6 +59,11 @@ jobs:
                 names="$names $c"
               fi
             done
+            # When the e2e harness itself changes (this workflow or the Go suite),
+            # smoke-test it on the simplest component so a harness edit is exercised.
+            if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/e2e\.yml$|^test/(e2e|checks|install|harness)/'; then
+              names="$names hardened-app"
+            fi
           fi
 
           json=$(printf '%s\n' $names | jq -R . | jq -s -c 'map(select(length>0)) | unique')
@@ -94,9 +99,10 @@ jobs:
 
       - name: install kind
         run: |
-          curl -fsSLo /usr/local/bin/kind \
+          curl -fsSLo ./kind \
             "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
-          chmod +x /usr/local/bin/kind
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
           kind version
 
       - name: create kind cluster
@@ -105,34 +111,29 @@ jobs:
           kind export kubeconfig --name "$CLUSTER"
           echo "E2E_KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
 
-      - name: log in to ghcr.io
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # kind nodes cannot pull private images; render the chart, then pull each
-      # ghcr.io/mm-weber/dhc image by digest, tag it, and load it into the node
-      # (charts pin repo:tag@digest with imagePullPolicy IfNotPresent, so the
-      # loaded image is used and no in-cluster pull secret is needed).
-      - name: load private images into kind
+      # kind nodes need registry creds to pull the PRIVATE ghcr.io/mm-weber/dhc
+      # images. Loading them with `kind load` does not work: the charts pin the
+      # multi-arch INDEX digest (from `imagetools inspect`), but a loaded image
+      # carries a single-arch manifest digest, so containerd never matches
+      # repo:tag@indexdigest and tries to pull it. Instead give kubelet a
+      # config.json so pods pull the exact index digest straight from ghcr,
+      # authenticated — uniform across every chart, and digest pinning is kept.
+      - name: give kind nodes ghcr pull credentials
         env:
-          COMPONENT: ${{ matrix.component }}
+          ACTOR: ${{ github.actor }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          scripts/render-chart.sh "chart/${COMPONENT}" > /tmp/rendered.yaml
-          refs=$(grep -oE 'ghcr\.io/mm-weber/dhc/[a-z0-9._/-]+:[a-z0-9._-]+@sha256:[a-f0-9]{64}' /tmp/rendered.yaml | sort -u || true)
-          [ -n "$refs" ] || { echo "::error::no ghcr.io/mm-weber/dhc images found in chart/${COMPONENT}"; exit 1; }
-          for ref in $refs; do
-            by_digest=$(printf '%s' "$ref" | sed -E 's/:[^@/]+@/@/')  # repo:tag@digest -> repo@digest
-            repo_tag="${ref%@*}"                                       # repo:tag
-            echo "::group::load $repo_tag"
-            docker pull "$by_digest"
-            docker tag "$by_digest" "$repo_tag"
-            kind load docker-image --name "$CLUSTER" "$repo_tag"
-            echo "::endgroup::"
+          auth=$(printf '%s:%s' "$ACTOR" "$TOKEN" | base64 -w0)
+          cfg=$(mktemp)
+          printf '{"auths":{"ghcr.io":{"auth":"%s"}}}' "$auth" > "$cfg"
+          for node in $(kind get nodes --name "$CLUSTER"); do
+            docker cp "$cfg" "${node}:/var/lib/kubelet/config.json"
+            docker exec "$node" systemctl restart kubelet
           done
+          rm -f "$cfg"
+          # kubelet restart briefly flips the node NotReady; wait before testing.
+          kubectl wait --for=condition=Ready nodes --all --timeout=120s
 
       - name: load probe image into kind
         run: |
@@ -178,6 +179,13 @@ jobs:
           kubectl get all -A                                  > "$ARTIFACTS/all.txt"           2>&1
           kubectl get events -A --sort-by=.lastTimestamp      > "$ARTIFACTS/events.txt"        2>&1
           kubectl describe pods -A                            > "$ARTIFACTS/pods-describe.txt" 2>&1
+          # per-pod logs (incl. the curl probe Job) — the suite dump has no logs
+          kubectl get pods -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' \
+            | while IFS=/ read -r ns name; do
+                [ -n "$name" ] || continue
+                kubectl logs -n "$ns" "$name" --all-containers=true --tail=-1 --prefix \
+                  > "$ARTIFACTS/logs_${ns}_${name}.txt" 2>&1
+              done
           kind export logs "$ARTIFACTS/kind-logs" --name "$CLUSTER"
 
       - name: upload diagnostics
