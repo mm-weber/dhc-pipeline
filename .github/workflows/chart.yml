@@ -1,0 +1,68 @@
+name: chart
+
+# Chart policy gate (Req 4.6): every chart is rendered and its manifests are
+# evaluated by the Kyverno policies (digest pinning, allowed registry, non-root).
+# Owned charts (Chart.yaml) additionally get `ct lint`. The kind-based install
+# (ct install / functional probes) is the e2e suite's job (phase 6).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: render + policy gate
+    runs-on: ubuntu-latest
+    env:
+      KYVERNO_VERSION: v1.18.2
+      CT_VERSION: v3.14.0
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+
+      - name: install kyverno + ct
+        run: |
+          curl -fsSL "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz" \
+            | tar -xz -C /usr/local/bin kyverno
+          curl -fsSL "https://github.com/helm/chart-testing/releases/download/${CT_VERSION}/chart-testing_${CT_VERSION#v}_linux_amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin ct etc/chart_schema.yaml etc/lintconf.yaml || \
+          curl -fsSL "https://github.com/helm/chart-testing/releases/download/${CT_VERSION}/chart-testing_${CT_VERSION#v}_linux_amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin ct
+
+      - name: render every chart and gate with kyverno (Req 4.6)
+        run: |
+          set -euo pipefail
+          rc=0
+          for d in chart/*/; do
+            echo "::group::$d"
+            if scripts/render-chart.sh "$d" > /tmp/rendered.yaml; then
+              kyverno apply \
+                policies/require-image-digest.yaml \
+                policies/restrict-registries.yaml \
+                policies/require-nonroot.yaml \
+                --resource /tmp/rendered.yaml || rc=1
+            else
+              echo "::error::failed to render $d"; rc=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $rc
+
+      - name: ct lint owned charts
+        run: |
+          set -euo pipefail
+          for d in chart/*/; do
+            if [ -f "${d}Chart.yaml" ]; then
+              echo "ct lint ${d}"
+              ct lint --charts "${d%/}" \
+                --check-version-increment=false \
+                --validate-maintainers=false
+            fi
+          done

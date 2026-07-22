@@ -1,0 +1,6 @@
+apiVersion: v2
+name: hardened-app
+description: Hardened Go HTTP service from the supply-chain lab — the catalogue's owned chart and e2e deploy path.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
