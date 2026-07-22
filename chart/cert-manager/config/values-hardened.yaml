@@ -1,0 +1,44 @@
+# Hardening overlay for the upstream cert-manager chart (Req 4.2, 4.3).
+# Applied with `-f`; upstream templates are untouched. Every delta below is
+# documented with its rationale in ../README.md.
+#
+# Digests are the published catalogue images (ghcr.io/mm-weber/dhc, private).
+# Renovate keeps them current (docker datasource); hand-bumps are CVE-only.
+
+# --- controller (top-level image + pod securityContext) ---
+image:
+  repository: ghcr.io/mm-weber/dhc/cert-manager-controller
+  tag: 1.21.0-alpine3.23
+  digest: sha256:22c9acf8a4a82a19911d45a74165f0917f06a72493261b19a3e39f77dac8e827
+securityContext:
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+
+# --- webhook ---
+webhook:
+  image:
+    repository: ghcr.io/mm-weber/dhc/cert-manager-webhook
+    tag: 1.21.0-alpine3.23
+    digest: sha256:7e5189a954ef1e63a49fd65f9818dbad9604f79b5a85fdf3ba2fda577e5fcb17
+  securityContext:
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+
+# --- cainjector ---
+cainjector:
+  image:
+    repository: ghcr.io/mm-weber/dhc/cert-manager-cainjector
+    tag: 1.21.0-alpine3.23
+    digest: sha256:6f5e0d57baa05056e63dd902c8ce828c9653c9b6b9a6fcaf65a52e55871dbfe6
+  securityContext:
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+
+# startupapicheck runs a post-install Job from cert-manager-startupapicheck,
+# an image this catalogue does not build. Disable it (optional API validation)
+# rather than pull a non-catalogue image, which the registry policy forbids.
+startupapicheck:
+  enabled: false
