@@ -93,7 +93,7 @@
     - _Requirements: Req 5.2, Req 8.1_
 
 - [ ] 7. CVE triage lane (Day 3)
-  - [ ] 7.1 Scan gates
+  - [x] 7.1 Scan gates
     - Trivy PR gate consuming `triage/vex/`; fail on uncovered HIGH/CRITICAL; Grype second opinion on CRITICAL
     - _Requirements: Req 6.1, Req 6.6_
   - [ ] 7.2 `rescan.yml` daily cron
