@@ -2,10 +2,6 @@
 // scan + enrichment data (all plain data, no network or I/O) and decides which
 // NEW HIGH/CRITICAL CVEs warrant a GitHub issue, producing the templated issue
 // content.
-//
-// RED phase: the function bodies below are stubs that compile and return zero
-// values so the test suite RUNS and FAILS with assertion errors. GREEN fills in
-// the real logic against the signatures and types pinned here.
 package rescan
 
 import (
@@ -97,12 +93,11 @@ type Inputs struct {
 // then CVE id ascending.
 func Aggregate(reports []TrivyReport) []Finding {
 	type agg struct {
-		rank     int
-		images   map[string]bool
-		pkgOrder []string
-		pkgs     map[string]Package
-		title    string
-		url      string
+		rank   int
+		images map[string]bool
+		pkgs   map[string]Package
+		title  string
+		url    string
 	}
 	byCVE := map[string]*agg{}
 	for _, report := range reports {
@@ -122,7 +117,6 @@ func Aggregate(reports []TrivyReport) []Finding {
 				}
 				a.images[report.ArtifactName] = true
 				if _, seen := a.pkgs[v.PkgName]; !seen {
-					a.pkgOrder = append(a.pkgOrder, v.PkgName)
 					a.pkgs[v.PkgName] = Package{
 						Name:      v.PkgName,
 						Installed: v.InstalledVersion,
@@ -148,8 +142,8 @@ func Aggregate(reports []TrivyReport) []Finding {
 		sort.Strings(images)
 
 		pkgs := make([]Package, 0, len(a.pkgs))
-		for _, name := range a.pkgOrder {
-			pkgs = append(pkgs, a.pkgs[name])
+		for _, p := range a.pkgs {
+			pkgs = append(pkgs, p)
 		}
 		sort.Slice(pkgs, func(i, j int) bool { return pkgs[i].Name < pkgs[j].Name })
 
@@ -253,14 +247,14 @@ func renderIssue(f Finding, epss EPSSScore, hasEPSS, kev bool) Issue {
 	fmt.Fprintf(&b, "## %s — %s\n\n", f.CVE, f.Severity)
 	fmt.Fprintf(&b, "<!-- rescan-cve: %s -->\n\n", f.CVE)
 
-	fmt.Fprintf(&b, "| Field | Value |\n")
-	fmt.Fprintf(&b, "|---|---|\n")
+	b.WriteString("| Field | Value |\n")
+	b.WriteString("|---|---|\n")
 	fmt.Fprintf(&b, "| Severity | %s |\n", f.Severity)
 	fmt.Fprintf(&b, "| EPSS | %s |\n", epssCell)
 	fmt.Fprintf(&b, "| CISA KEV | %s |\n", kevCell)
 	fmt.Fprintf(&b, "| Affected images | %s |\n\n", strings.Join(f.Images, ", "))
 
-	fmt.Fprintf(&b, "### Package(s)\n\n")
+	b.WriteString("### Package(s)\n\n")
 	for _, p := range f.Packages {
 		if p.Fixed == "" {
 			fmt.Fprintf(&b, "- `%s` %s → no fix available\n", p.Name, p.Installed)
@@ -270,7 +264,7 @@ func renderIssue(f Finding, epss EPSSScore, hasEPSS, kev bool) Issue {
 	}
 	b.WriteString("\n")
 
-	fmt.Fprintf(&b, "### Details\n\n")
+	b.WriteString("### Details\n\n")
 	if f.Title != "" {
 		fmt.Fprintf(&b, "%s\n\n", f.Title)
 	}
@@ -278,7 +272,7 @@ func renderIssue(f Finding, epss EPSSScore, hasEPSS, kev bool) Issue {
 		fmt.Fprintf(&b, "%s\n\n", f.URL)
 	}
 
-	fmt.Fprintf(&b, "### Triage\n\n")
+	b.WriteString("### Triage\n\n")
 	b.WriteString("- [ ] Assess exploitability in our build context.\n")
 	b.WriteString("- [ ] If not-affected, publish an OpenVEX statement under `triage/vex/` (task 7.3) and record it in `triage/LOG.md`.\n")
 	b.WriteString("- [ ] If a fix is warranted, open a version-bump / rebuild PR.\n")
