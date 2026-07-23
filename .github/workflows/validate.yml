@@ -48,7 +48,7 @@ jobs:
           NODE_PATH="$PWD/node_modules" node test/renovate/managers.test.mjs
 
   go-unit:
-    name: e2e module (build, vet, helper unit tests)
+    name: go modules (e2e + rescan tool)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -78,3 +78,19 @@ jobs:
       - name: helper unit tests
         working-directory: test
         run: go test ./harness/... ./checks/... ./install/...
+
+      # The CVE rescan reporter (task 7.2) is its own stdlib-only module — a pure,
+      # unit-tested tool that the daily rescan.yml drives to open issues
+      # unattended. Gate it here (same Go toolchain) so a broken reporter can
+      # never merge.
+      - name: rescan tool — gofmt
+        working-directory: triage/rescan
+        run: test -z "$(gofmt -l .)" || { echo 'gofmt needed:'; gofmt -l .; exit 1; }
+
+      - name: rescan tool — go vet
+        working-directory: triage/rescan
+        run: go vet ./...
+
+      - name: rescan tool — go test
+        working-directory: triage/rescan
+        run: go test ./...
