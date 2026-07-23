@@ -96,7 +96,7 @@
   - [x] 7.1 Scan gates
     - Trivy PR gate consuming `triage/vex/`; fail on uncovered HIGH/CRITICAL; Grype second opinion on CRITICAL
     - _Requirements: Req 6.1, Req 6.6_
-  - [ ] 7.2 `rescan.yml` daily cron
+  - [x] 7.2 `rescan.yml` daily cron
     - Rescan published images; new HIGH/CRITICAL → templated issue (severity, EPSS, KEV, affected images)
     - _Requirements: Req 6.2, Req 6.3_
   - [ ] 7.3 First real triage decision

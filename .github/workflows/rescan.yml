@@ -1,0 +1,179 @@
+name: rescan
+
+# Daily CVE rescan of the PUBLISHED, private ghcr.io/mm-weber/dhc images (Req 6.2).
+# Trivy re-scans each catalogue image for HIGH/CRITICAL honouring our OpenVEX
+# statements in triage/vex/. Findings that are new — not already tracked by an
+# open `cve` issue — are enriched with EPSS (FIRST.org) and CISA KEV status and
+# filed as one GitHub issue per CVE, listing severity, EPSS, KEV, and affected
+# images (Req 6.3). A CRITICAL also gets a Grype second opinion (Req 6.6),
+# mirroring the PR gate.
+#
+# The join/dedup/templating is the tested triage/rescan Go tool; this workflow is
+# the I/O around it. GitHub Actions is the authoritative environment (Req 8.1):
+# the Trivy/Grype DBs, the EPSS API, and the CISA feed are reachable here but not
+# from the devcontainer. Scan/feed failures soft-fail (skip + warn) so a transient
+# outage never turns the cron permanently red.
+
+on:
+  schedule:
+    - cron: "17 6 * * *" # daily ~06:17 UTC, off the top of the hour
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read # pull the private ghcr.io/mm-weber/dhc images
+  issues: write # file new-CVE issues
+
+jobs:
+  rescan:
+    name: rescan published images
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ghcr.io/mm-weber/dhc
+      KEV_URL: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+      OUT: ${{ github.workspace }}/rescan-out
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: triage/rescan/go.mod
+          cache: false # stdlib-only tool, no go.sum to key a cache on
+
+      - name: log in to ghcr.io
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: install trivy + grype
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
+          curl -fsSL https://raw.githubusercontent.com/anchore/grype/main/install.sh           | sudo sh -s -- -b /usr/local/bin
+          trivy --version
+          grype version
+
+      - name: scan published images
+        id: scan
+        run: |
+          # No `set -e`: an unpublished image or a transient scan failure must skip,
+          # not abort the whole rescan (Req 6 soft-fail).
+          set -uo pipefail
+          mkdir -p "$OUT/trivy"
+          # VEX sources: one --vex per statement (same contract as the PR gate).
+          vex=(); for f in triage/vex/*.json; do [ -e "$f" ] && vex+=(--vex "$f"); done
+          scanned=0
+          for d in image/*/; do
+            name=$(basename "$d")
+            f="${d}image.yaml"
+            [ -f "$f" ] || continue
+            img=$(yq '.image' "$f" | tr -d '"')
+            tag=$(yq '.tags[0]' "$f" | tr -d '"')
+            ref="${img}:${tag}"
+            echo "::group::scan ${ref}"
+            if trivy image "${vex[@]}" --severity HIGH,CRITICAL --pkg-types os,library \
+               --format json --output "$OUT/trivy/${name}.json" --no-progress --exit-code 0 "$ref"; then
+              scanned=$((scanned + 1))
+            else
+              echo "::warning::scan failed or image not published: ${ref} (skipped)"
+              rm -f "$OUT/trivy/${name}.json"
+            fi
+            echo "::endgroup::"
+          done
+          echo "scanned=${scanned}" >> "$GITHUB_OUTPUT"
+          # Union of post-VEX HIGH/CRITICAL CVE IDs across all reports.
+          jq -r '.Results[]?.Vulnerabilities[]?.VulnerabilityID' "$OUT"/trivy/*.json 2>/dev/null \
+            | grep -E '^CVE-' | sort -u > "$OUT/cves.txt" || true
+          echo "distinct HIGH/CRITICAL CVEs: $(grep -c . "$OUT/cves.txt" || echo 0)"
+
+      - name: enrich — EPSS + CISA KEV
+        run: |
+          set -euo pipefail
+          mapfile -t cves < <(grep -E '^CVE-' "$OUT/cves.txt" 2>/dev/null || true)
+          # CISA KEV catalogue (best-effort; empty on feed outage → nothing marked KEV).
+          curl -fsSL "$KEV_URL" -o "$OUT/kev.json" || echo '{"vulnerabilities":[]}' > "$OUT/kev.json"
+          # EPSS bulk lookup, comma-separated CVEs (best-effort). MVP catalogue CVE
+          # counts sit well under the API's per-request limit; batch if that changes.
+          if [ "${#cves[@]}" -gt 0 ]; then
+            csv=$(IFS=,; echo "${cves[*]}")
+            curl -fsSL "https://api.first.org/data/v1/epss?cve=${csv}" -o "$OUT/epss.json" \
+              || echo '{"data":[]}' > "$OUT/epss.json"
+          else
+            echo '{"data":[]}' > "$OUT/epss.json"
+          fi
+
+      - name: dedup — already-open CVE issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Our issues carry a stable marker: <!-- rescan-cve: CVE-... -->. Extract
+          # the CVE from every open `cve` issue so the reporter skips duplicates.
+          bodies=$(gh issue list --state open --label cve --limit 500 --json body --jq '.[].body' || true)
+          printf '%s' "$bodies" \
+            | grep -oE 'rescan-cve: CVE-[0-9]{4}-[0-9]+' \
+            | grep -oE 'CVE-[0-9]{4}-[0-9]+' \
+            | sort -u | jq -R . | jq -s -c . > "$OUT/existing.json" || echo '[]' > "$OUT/existing.json"
+          echo "already open: $(jq 'length' "$OUT/existing.json")"
+
+      - name: build issue set (tested reporter)
+        id: report
+        run: |
+          set -euo pipefail
+          go -C triage/rescan run ./cmd/rescan-report \
+            --trivy "$OUT/trivy" --epss "$OUT/epss.json" --kev "$OUT/kev.json" --existing "$OUT/existing.json" \
+            > "$OUT/issues.json"
+          n=$(jq 'length' "$OUT/issues.json")
+          echo "count=${n}" >> "$GITHUB_OUTPUT"
+          echo "new CVE issues to file: ${n}"
+
+      - name: Grype second opinion on CRITICAL (Req 6.6)
+        if: steps.report.outputs.count != '0'
+        run: |
+          set -uo pipefail
+          # Corroborate each CRITICAL we're about to file, on its affected images.
+          jq -r '.[] | select(.severity == "CRITICAL") | .images[]' "$OUT/issues.json" | sort -u \
+            | while read -r ref; do
+                [ -n "$ref" ] || continue
+                echo "::group::grype ${ref}"
+                grype "$ref" -o table || echo "::warning::grype failed for ${ref}"
+                echo "::endgroup::"
+              done
+
+      - name: file new-CVE issues (Req 6.3)
+        if: steps.report.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Labels must exist before use; create idempotently.
+          gh label create cve               --color B60205 --description "CVE tracked by the rescan cron" 2>/dev/null || true
+          gh label create security          --color D93F0B --description "Security finding" 2>/dev/null || true
+          gh label create severity:high     --color FBCA04 --description "HIGH severity" 2>/dev/null || true
+          gh label create severity:critical --color B60205 --description "CRITICAL severity" 2>/dev/null || true
+          jq -c '.[]' "$OUT/issues.json" | while read -r issue; do
+            title=$(jq -r '.title'  <<<"$issue")
+            body=$(jq -r '.body'    <<<"$issue")
+            labels=$(jq -r '.labels | join(",")' <<<"$issue")
+            echo "opening: ${title}"
+            gh issue create --title "$title" --body "$body" --label "$labels"
+          done
+
+      - name: summary
+        if: always()
+        run: |
+          {
+            echo "### Daily rescan"
+            echo "- images scanned: ${{ steps.scan.outputs.scanned || 0 }}"
+            echo "- new CVE issues filed: ${{ steps.report.outputs.count || 0 }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: upload rescan artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rescan-${{ github.run_id }}
+          path: rescan-out/
+          if-no-files-found: warn

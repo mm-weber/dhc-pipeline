@@ -113,7 +113,12 @@ Every image a PR builds is scanned by Trivy for `HIGH,CRITICAL` in
 statement in `triage/vex/`, and a Grype second opinion runs on any surviving
 `CRITICAL`. Red gates are cleared by a recorded decision — an OpenVEX statement
 (`vexctl`, `cosign attest`) plus a `triage/LOG.md` entry, or a fix-bump PR —
-never by silencing the scanner. See `triage/README.md`.
+never by silencing the scanner.
+
+A daily `rescan.yml` cron re-scans the published images for CVEs that land after
+merge; new HIGH/CRITICAL findings (not already tracked, VEX-aware) are enriched
+with EPSS + CISA KEV and filed as one issue per CVE by the unit-tested
+`triage/rescan/` Go tool. See `triage/README.md`.
 
 ## Pull requests (Req 7)
 
