@@ -109,12 +109,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Our issues carry a stable marker: <!-- rescan-cve: CVE-... -->. Extract
-          # the CVE from every open `cve` issue so the reporter skips duplicates.
+          # Our issues carry a stable marker: <!-- rescan-cve: <ID> -->, where <ID>
+          # is the scanner's vulnerability id — a CVE (CVE-2026-1234), a GHSA
+          # advisory (GHSA-hrxh-6v49-42gf), or any other id. Extract the whole id
+          # from every open `cve` issue so the reporter skips duplicates. A
+          # CVE-only match silently re-filed GHSA findings on every daily run.
           bodies=$(gh issue list --state open --label cve --limit 500 --json body --jq '.[].body' || true)
           printf '%s' "$bodies" \
-            | grep -oE 'rescan-cve: CVE-[0-9]{4}-[0-9]+' \
-            | grep -oE 'CVE-[0-9]{4}-[0-9]+' \
+            | grep -oE 'rescan-cve: [A-Za-z0-9][A-Za-z0-9._-]*' \
+            | sed 's/^rescan-cve: //' \
             | sort -u | jq -R . | jq -s -c . > "$OUT/existing.json" || echo '[]' > "$OUT/existing.json"
           echo "already open: $(jq 'length' "$OUT/existing.json")"
 
