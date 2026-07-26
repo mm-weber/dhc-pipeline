@@ -150,9 +150,26 @@ const gGrafana = extract(grafanaMgr, read("image/grafana/image.yaml"));
   // the pinned url has no leading 'v'; upstream tags do — extractVersionTemplate
   // bridges that, so assert it is present and actually strips the prefix.
   const ev = grafanaMgr.extractVersionTemplate;
+  const extractV = (tag) => (ev ? new RegExp(ev).exec(tag)?.groups?.version : undefined);
   check(
     "grafana: extractVersionTemplate strips upstream 'v' prefix",
-    !!ev && new RegExp(ev).exec("v13.1.1")?.groups?.version === "13.1.1",
+    extractV("v13.1.1") === "13.1.1",
+    `extractVersionTemplate=${ev}`,
+  );
+  // Grafana ships out-of-band fixes as semver build metadata
+  // (v13.0.1+security-01, v12.4.3+security-02). Anchoring extractVersion at
+  // the patch digit silently drops every one of them, so a security release
+  // would never reach us.
+  check(
+    "grafana: extractVersionTemplate keeps the +security build suffix",
+    extractV("v13.0.1+security-01") === "13.0.1+security-01",
+    `extractVersionTemplate=${ev}`,
+  );
+  // …without letting junk tags through: grafana/grafana carries a stray
+  // `vtest-new-release-pipeline` tag that the releases feed does not list.
+  check(
+    "grafana: extractVersionTemplate rejects non-version tags",
+    extractV("vtest-new-release-pipeline") === undefined,
     `extractVersionTemplate=${ev}`,
   );
 }
@@ -178,6 +195,51 @@ check(
   ),
   JSON.stringify(extract(dockerMgr, read("image/grafana/image.yaml"))),
 );
+
+// --- grafana versioning: out-of-band security builds must sort as upgrades ---
+// Under plain semver, build metadata is IGNORED for precedence: 13.0.1 and
+// 13.0.1+security-01 rank equal, so Renovate would report us up to date right
+// through a security release — the exact failure this catalogue exists to
+// prevent. Asserted against renovate's own versioning implementation rather
+// than a reading of the docs, because the docs are easy to misread: the
+// `revision` capture group is only honoured when `build` is also present.
+{
+  let getVersioning;
+  try {
+    ({ get: getVersioning } = require("renovate/dist/modules/versioning/index.js"));
+  } catch (e) {
+    check("grafana versioning: renovate versioning module loadable", false, `${e.message} — path moved on a renovate major?`);
+  }
+  const scheme = grafanaMgr.versioningTemplate;
+  check("grafana: manager declares a versioningTemplate", !!scheme, `versioningTemplate=${scheme}`);
+  if (getVersioning && scheme) {
+    const api = getVersioning(scheme);
+    const gt = (b, a, want) =>
+      check(`grafana versioning: ${b} > ${a} === ${want}`, api.isGreaterThan(b, a) === want);
+
+    // the bug this scheme exists to fix
+    gt("13.0.1+security-01", "13.0.1", true);
+    // successive security builds on the same base
+    gt("13.0.1+security-02", "13.0.1+security-01", true);
+    gt("13.0.1+security-10", "13.0.1+security-09", true);
+    // a later regular patch supersedes a security build (grafana's real pattern:
+    // v13.0.1+security-01 was followed by v13.0.2)
+    gt("13.0.2", "13.0.1+security-01", true);
+    // and ordinary ordering is untouched
+    gt("13.1.1", "13.0.4", true);
+    gt("13.0.4", "13.1.1", false);
+    gt("13.0.1", "13.0.1+security-01", false);
+
+    for (const [v, want] of [
+      ["13.0.4", true],
+      ["13.0.1+security-01", true],
+      ["v13.0.1", false], // extractVersion has already stripped the prefix
+      ["vtest-new-release-pipeline", false],
+    ]) {
+      check(`grafana versioning: isValid(${v}) === ${want}`, api.isValid(v) === want);
+    }
+  }
+}
 
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed`);

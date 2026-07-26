@@ -131,5 +131,29 @@ mkdir -p "$SB/chart/app/templates"
 printf 'image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}@{{ .Values.image.digest }}"\n' > "$SB/chart/app/templates/deployment.yaml"
 run_case "helm-template image ref not flagged" 0
 
+# 18: release tags must be valid OCI references. An upstream that versions with
+# semver build metadata (grafana ships v13.0.1+security-01) yields a tag docker
+# refuses with "invalid reference format" — the build separator has to be '_'.
+fresh
+printf '%s\nimage: ghcr.io/mm-weber/dhc/app\ntags:\n  - 13.0.1+security-01-alpine3.23\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "tag with '+' fails" 1 "13.0.1+security-01-alpine3.23"
+run_case "tag with '+' cites OCI validity" 1 "not a valid OCI tag"
+
+# 19: the '_' form of the same tag is valid and passes
+fresh
+printf '%s\nimage: ghcr.io/mm-weber/dhc/app\ntags:\n  - 13.0.1_security-01-alpine3.23\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "tag with '_' passes" 0
+
+# 20: a tag may not start with '.' or '-' (OCI: first char is alnum or '_')
+fresh
+printf '%s\nimage: ghcr.io/mm-weber/dhc/app\ntags:\n  - .1.0.0-alpine3.23\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "tag starting with '.' fails" 1 "not a valid OCI tag"
+
+# 21: the tag check is scoped to the definition's own top-level tags: block —
+# a nested tags: (e.g. chart values) is not a release tag list
+fresh
+printf 'tags:\n  - not+a+release+tag\n' > "$SB/chart/app/config/values.yaml"
+run_case "chart-side tags: not treated as OCI tags" 0
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
