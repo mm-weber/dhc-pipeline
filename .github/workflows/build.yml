@@ -62,10 +62,20 @@ jobs:
             git fetch --no-tags --depth=1 origin "$BASE_REF"
             changed=$(git diff --name-only "origin/${BASE_REF}...HEAD")
             names=$(printf '%s\n' "$changed" | awk -F/ '$1=="image" && NF>=3 && $3=="image.yaml"{print $2}' | sort -u)
-            # Canary: a change to the gate itself (this workflow) or to the VEX
-            # inputs it consumes touches no definition — build+scan the simplest
-            # image so the gate is actually exercised on the PR that changes it.
-            if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/build\.yml$|^triage/vex/'; then
+            # A VEX change must be validated against the images its statements
+            # actually name — the whole point of the gate on such a PR is to
+            # prove the statement suppresses the finding it claims to. Derive
+            # them from the product purls (pkg:oci/<name>?...). Every statement
+            # is considered, not just the changed ones: trivy is handed the
+            # whole directory via --vex, so any edit changes the gate input for
+            # every image the directory covers.
+            if printf '%s\n' "$changed" | grep -q '^triage/vex/'; then
+              names="$names $(jq -r '.statements[]?.products[]?."@id" // empty' triage/vex/*.json 2>/dev/null \
+                | sed -nE 's#^pkg:oci/([^@?/]+).*#\1#p' | sort -u)"
+            fi
+            # Canary: a change to the gate itself touches no definition — build
+            # the simplest image so the gate is exercised on the PR changing it.
+            if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/build\.yml$'; then
               names="$names hardened-app"
             fi
             # An accepted-risk file names its image in its own filename, so a
@@ -350,6 +360,35 @@ jobs:
         env:
           REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
         run: cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$REF"
+
+      - name: attest OpenVEX to image (Req 6.4)
+        if: github.ref == 'refs/heads/main'
+        env:
+          REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+          NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          # A triage decision is only portable if it travels with the artifact:
+          # the statement in git is the source, the attestation is what a
+          # downstream consumer can actually verify against the digest they run.
+          #
+          # Only statements naming THIS image are attached. A VEX document is a
+          # claim about a specific product, so attaching grafana's statements to
+          # cert-manager would not be noise, it would be a false claim. Matching
+          # is anchored on the purl name so `grafana` cannot swallow a future
+          # `grafana-agent`.
+          shopt -s nullglob
+          n=0
+          for f in triage/vex/*.json; do
+            if jq -e --arg n "$NAME" \
+                 '[.statements[]?.products[]?."@id" // empty] | any(test("^pkg:oci/" + $n + "([@?]|$)"))' \
+                 "$f" >/dev/null; then
+              echo "attesting $(basename "$f")"
+              cosign attest --yes --type openvex --predicate "$f" "$REF"
+              n=$((n + 1))
+            fi
+          done
+          echo "${NAME}: ${n} OpenVEX statement(s) attested" >> "$GITHUB_STEP_SUMMARY"
 
       # Req 2.4: the pushed package must be private. Fail hard if public;
       # a private repo makes new packages private by construction, so an
