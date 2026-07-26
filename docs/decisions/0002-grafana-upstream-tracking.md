@@ -208,10 +208,16 @@ the release class that most needs to be automatic. Worth generalising: an
 upstream's documented download url is what it advertises, not necessarily the
 only one it serves.
 
-Residual unknowns, both fail-closed:
+The two follow-up checks came back clean as well: for a security build the
+`arm64` tarball and the `.sha256` sidecar both resolve. The whole per-arch
+flow — url, sidecar checksum, both architectures — is therefore confirmed
+against upstream, and an out-of-band security release needs no special handling
+anywhere in the pipeline.
 
-- The `arm64` security tarball and the `.sha256` sidecar for a security build
-  are unverified. `fetch_sha` rejects anything that is not 64 hex characters
-  and the definition re-verifies in-pipeline, so a missing artifact turns the
-  bump PR red rather than producing a bad pin. The sidecar is best-effort
-  already — it falls back to hashing the tarball.
+Nothing about that verification is load-bearing in the code: `fetch_sha` still
+falls back to hashing the tarball when a sidecar is missing, still rejects
+anything that is not 64 hex characters, and the definition still re-verifies
+the checksum in-pipeline. A missing artifact turns the bump PR red rather than
+producing a bad pin. The checks matter because they replaced three inferences
+with three measurements — and the one inference that went unmeasured longest
+(that the advertised url was the only one) was the one that was wrong.
