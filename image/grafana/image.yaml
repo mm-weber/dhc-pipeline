@@ -1,27 +1,27 @@
 # syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc
 
-name: Grafana 13.0.x
+name: Grafana 13.1.x
 image: ghcr.io/mm-weber/dhc/grafana
 variant: runtime
 tags:
   - 13-alpine3.23
-  - 13.0-alpine3.23
-  - 13.0.4-alpine3.23
+  - 13.1-alpine3.23
+  - 13.1.1-alpine3.23
 platforms:
   - linux/amd64
   - linux/arm64
 dates:
-  release: "2026-07-20"
+  release: "2026-07-21"
 vars:
   # Per-arch tarball SHA-256 (from https://dl.grafana.com/oss/release/
-  # grafana-13.0.4.linux-<arch>.tar.gz.sha256), selected by target arch the
+  # grafana-13.1.1.linux-<arch>.tar.gz.sha256), selected by target arch the
   # way the catalog does per-arch values — amd64 first, arm64 second. Pinned;
   # verified in-pipeline.
-  GRAFANA_SHA256: '#{ target.arch == "amd64" ? "cd8c8b31b0482f48f98018030c142919dab6debbe81f747f3521af6f6a6b4490" : "bcf8b9fbfac00bece5bccdda44512b9f7ba81d3105db1a255e0efd37a2fbf6df" }'
-  SEMVER_MAJOR_MINOR_VERSION: "13.0"
+  GRAFANA_SHA256: '#{ target.arch == "amd64" ? "0c07116968aea49768af8babd3c3f162d19012655a1a220cd7a9d97efe91da6c" : "8403dc0b5f50126fbe16d1a9c88f655823d104a8d9830335e572cd30dd0fffff" }'
+  SEMVER_MAJOR_MINOR_VERSION: "13.1"
   SEMVER_MAJOR_VERSION: "13"
-  SEMVER_VERSION: 13.0.4
-  VERSION: 13.0.4
+  SEMVER_VERSION: 13.1.1
+  VERSION: 13.1.1
 contents:
   repositories:
     - https://dhi.io/apk/alpine/v3.23/main
@@ -43,14 +43,14 @@ contents:
           - tar
           - ca-certificates-bundle
         files:
-          - url: https://dl.grafana.com/oss/release/grafana-13.0.4.linux-${target.arch}.tar.gz
+          - url: https://dl.grafana.com/oss/release/grafana-13.1.1.linux-${target.arch}.tar.gz
             path: ${source.dir}/grafana.tar.gz
             spdx:
               name: grafana
-              version: 13.0.4
+              version: 13.1.1
               packages:
                 - name: grafana
-                  purl: pkg:generic/grafana@13.0.4
+                  purl: pkg:generic/grafana@13.1.1
                   license: AGPL-3.0
             uid: 0
             gid: 0
@@ -104,7 +104,7 @@ os-release:
   bug-report-url: https://github.com/mm-weber/dhc-pipeline/issues
 work-dir: /var/lib/grafana
 environment:
-  GRAFANA_VERSION: 13.0.4
+  GRAFANA_VERSION: 13.1.1
   PATH: /usr/share/grafana/bin:/usr/sbin:/sbin:/usr/bin:/bin:/usr/local/bin
 # Writable-path inventory (Req 4.4 chart work): every path the runtime writes
 # to gets an emptyDir mount in the chart. Owned by nonroot 65532.

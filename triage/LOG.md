@@ -105,7 +105,7 @@ client secret in this image to leak.
 **Outcome: `not_affected`, `vulnerable_code_not_in_execute_path`.**
 → `vex/CVE-2026-42151.openvex.json`
 
-### AFFECTED, awaiting upstream — stdlib CVE-2026-27145 / -42504 / -39822 (#22, #24, #26)
+### FIX — stdlib CVE-2026-27145 / -42504 / -39822 (#22, #24, #26)
 
 `crypto/x509` DoS via DNS SAN processing, `mime` DoS via crafted headers, and
 `os.Root` symlink traversal, all in the Go **1.26.3** standard library that
@@ -118,11 +118,15 @@ upstream's build-time choice, and a repackage image inherits it. (Our own images
 are unaffected — they compile with `dhi.io/golang:1.26.5`, which is exactly why
 these three appear on grafana and nowhere else in the catalogue.)
 
-**Outcome: affected, accepted for now, tracked.** The fix is a Grafana release
-built on Go ≥ 1.26.4. **13.1.1 is available and untested against these** —
-Renovate now tracks grafana (ADR 0002) and will offer that bump; whether it
-clears these three is an empirical question the rescan answers, not a judgement
-call. Owner: catalogue maintainer. Revisit on the 13.1.1 bump PR.
+**Outcome: FIX — bumped 13.0.4 → 13.1.1 in this pass (Req 6.5).** The only
+lever on a repackage image is the whole release, and 13.1.1 is the first one
+past 13.0.x. Whether it actually clears these three is an empirical question,
+not a judgement call: the gate re-scans the rebuilt image on this PR and the
+daily rescan closes the issues that disappear. Any that survive come back here
+as accepted risk with an owner, not as a VEX.
+
+The bump was forced anyway — see the integrity entry below — but it is the
+right fix on its own merits.
 
 ### UNDER INVESTIGATION — GHSA-r277-6w6q-xmqw, `github.com/getkin/kin-openapi` (#30)
 
@@ -141,6 +145,52 @@ from "vulnerable symbol is called".
 **Outcome: none yet.** No VEX statement, because "probably not exploitable" is
 not a justification. Gate stays red on this finding until it is answered, which
 is the correct pressure. See the follow-up below.
+
+### SUPPLY CHAIN — grafana 13.0.4 artifact no longer matches upstream's own checksum
+
+Not a CVE, and the most serious thing this pass found.
+
+The build failed verifying the pinned tarball. Chasing it produced this:
+
+| | value |
+|---|---|
+| our pin, amd64 | `cd8c8b31…` |
+| upstream `.sha256` sidecar, amd64 | `cd8c8b31…` — **agrees with our pin** |
+| the actual `grafana-13.0.4.linux-amd64.tar.gz` | `54eceec7…` — **agrees with neither** |
+| `last-modified` on that object | Wed, 22 Jul 2026 05:36:05 GMT |
+
+The amd64 tarball behind a *stable version URL* was **silently replaced on
+2026-07-22**, one day after the coordinated 07-21 security release, and the
+`.sha256` sidecar beside it was never regenerated. Upstream now publishes an
+artifact its own checksum file disowns.
+
+Consequences, in order of how much they should bother you: anyone verifying
+against upstream's published checksum gets a hard failure; anyone *not*
+verifying silently receives different bits than the release advertised; and
+nothing about the version string changed to signal any of it.
+
+Two decisions follow.
+
+**We did not re-pin 13.0.4 to `54eceec7…`.** That would restore a green build
+by shipping bits that fail upstream's own published verification — laundering
+an unexplained substitution into a signed artifact of ours. The whole point of
+the pin is that it refuses to do that.
+
+**We moved to 13.1.1 instead**, pinned from its sidecar, which is also the fix
+for the stdlib findings above. If 13.1.1's artifact turns out to disagree with
+*its* sidecar too, the gate fails again and we will know the drift is
+systemic rather than a one-off — which is a far more valuable thing to learn
+than a green build.
+
+Separately: our **arm64** pin (`bcf8b9fb…`) never matched upstream's arm64
+sidecar (`591ac184…`), where file and sidecar do agree. That was a latent bug
+that would have failed the multi-arch release build on `main`. It stayed
+invisible because PR builds are amd64-only and grafana had not been rebuilt
+since it was added — the VEX canary (which now builds the images a statement
+names) is what exposed both of these.
+
+**Worth reporting upstream.** A stale `.sha256` beside a replaced artifact is a
+defect in Grafana's release process, not in ours.
 
 ---
 
