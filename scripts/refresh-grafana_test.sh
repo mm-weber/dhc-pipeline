@@ -20,6 +20,10 @@ SYNTAX="# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d81
 # real image/grafana/image.yaml: no git source ref, a per-arch checksum
 # expression, and the version echoed into tags, spdx, purl and annotations.
 grafana_def() { # ver majmin maj
+  # '+' is illegal in an OCI tag, so the full tag carries the build separator
+  # as '_' (the eclipse-temurin convention) while every other field keeps the
+  # upstream version verbatim.
+  local tagver="${1//+/_}"
   cat <<EOF
 $SYNTAX
 
@@ -29,7 +33,7 @@ variant: runtime
 tags:
   - $3-alpine3.23
   - $2-alpine3.23
-  - $1-alpine3.23
+  - $tagver-alpine3.23
 platforms:
   - linux/amd64
   - linux/arm64
@@ -113,6 +117,7 @@ assert "minor: spdx version"               "$F" "version: 13.1.1"
 assert "minor: purl"                       "$F" "purl: pkg:generic/grafana@13.1.1"
 assert "minor: annotation"                 "$F" "GRAFANA_VERSION: 13.1.1"
 assert "minor: checksum comment url"       "$F" "grafana-13.1.1.linux-<arch>"
+assert "minor: tarball url"                "$F" "url: https://dl.grafana.com/oss/release/grafana-13.1.1.linux-"
 refute "minor: no stale 13.0.4"            "$F" "13.0.4"
 refute "minor: no stale amd64 checksum"    "$F" "$OLD_AMD64"
 refute "minor: no stale arm64 checksum"    "$F" "$OLD_ARM64"
@@ -134,7 +139,52 @@ assert "major: minor alias tag"            "$F" "- 14.0-alpine3.23"
 assert "major: full tag"                   "$F" "- 14.0.0-alpine3.23"
 assert "major: display name"               "$F" "name: Grafana 14.0.x"
 
-# 4: a definition with no dl.grafana.com tarball must fail loudly, not silently
+# 4: out-of-band security build 13.0.4 -> 13.0.4+security-01. Upstream serves
+# these from the SAME templatable /oss/release/ path (verified against
+# dl.grafana.com), so the refresh is fully automatic. Two things still bite:
+# '+' is an ERE metacharacter, and '+' is ILLEGAL in an OCI tag — docker rejects
+# "13.0.4+security-01-alpine3.23" as an invalid reference — so the full tag
+# carries the build separator as '_' while every other field keeps the version
+# verbatim.
+run_bump 13.0.4 13.0.4+security-01
+assert "security: VERSION keeps the suffix"     "$F" "VERSION: 13.0.4+security-01"
+assert "security: SEMVER_VERSION"               "$F" "SEMVER_VERSION: 13.0.4+security-01"
+# Anchored on the `url:` key on purpose: the checksum-provenance comment names
+# the same tarball, so an unanchored match reports success off the comment while
+# the real url is wrong.
+assert "security: url keeps the suffix"         "$F" "url: https://dl.grafana.com/oss/release/grafana-13.0.4+security-01.linux-"
+refute "security: url suffix not doubled"       "$F" "security-01+security-01"
+assert "security: purl keeps the suffix"        "$F" "purl: pkg:generic/grafana@13.0.4+security-01"
+assert "security: full tag uses '_' separator"  "$F" "- 13.0.4_security-01-alpine3.23"
+assert "security: minor alias unchanged"        "$F" "- 13.0-alpine3.23"
+assert "security: major alias unchanged"        "$F" "- 13-alpine3.23"
+assert "security: SEMVER_MAJOR_MINOR kept"      "$F" 'SEMVER_MAJOR_MINOR_VERSION: "13.0"'
+assert "security: checksums re-pinned"          "$F" "\"amd64\" ? \"$NEW_AMD64\""
+# no tag line may contain '+' — that is precisely what docker rejects
+if awk '/^tags:/{t=1;next} /^[^[:space:]-]/{t=0} t&&/\+/{found=1} END{exit !found}' "$F"; then
+  echo "FAIL security: a tag line contains '+' (invalid OCI reference)"; FAILURES=$((FAILURES+1))
+else
+  echo "ok   security: no tag line contains '+'"
+fi
+
+# 5: the regular patch that supersedes a security build (grafana's real pattern:
+# v13.0.1+security-01 was followed by v13.0.2). The old version contains '+' and
+# its tag carries '_', so neither is found by the same pattern — the version
+# substitution and the tag rewrite have to be independent.
+run_bump 13.0.4+security-01 13.0.5
+assert "supersede: VERSION"               "$F" "VERSION: 13.0.5"
+assert "supersede: full tag"              "$F" "- 13.0.5-alpine3.23"
+assert "supersede: url"                   "$F" "url: https://dl.grafana.com/oss/release/grafana-13.0.5.linux-"
+refute "supersede: no stale security"     "$F" "security-01"
+refute "supersede: no stale '+' version"  "$F" "13.0.4+"
+# no tag line may contain '+' — that is precisely what docker rejects
+if awk '/^tags:/{t=1;next} /^[^[:space:]-]/{t=0} t&&/\+/{found=1} END{exit !found}' "$F"; then
+  echo "FAIL supersede: a tag line contains '+' (invalid OCI reference)"; FAILURES=$((FAILURES+1))
+else
+  echo "ok   supersede: no tag line contains '+'"
+fi
+
+# 6: a definition with no dl.grafana.com tarball must fail loudly, not silently
 SB=$(mktemp -d); mkdir -p "$SB/image/x"; git_def > "$SB/image/x/image.yaml"
 if REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" \
    "$SCRIPT" "$SB/image/x" >/dev/null 2>&1; then

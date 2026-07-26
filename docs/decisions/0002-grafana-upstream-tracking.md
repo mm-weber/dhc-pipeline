@@ -119,3 +119,105 @@ triaged.
 - `dates.release` is not regenerated — it is not derivable from the tarball url
   and would need a GitHub API call. It goes stale on a bump and is corrected by
   the reviewer. Worth automating if a second repackage image appears.
+
+## Amendment, 2026-07-26: out-of-band security builds
+
+Switching the datasource to GitHub Releases surfaced a release shape the
+original decision did not account for. Grafana ships out-of-band fixes as
+**semver build metadata** — `v13.0.1+security-01`, `v12.4.3+security-02`,
+`v12.3.6+security-04`, `v12.2.8+security-04`, `v11.6.14+security-04`, five in a
+single batch on the feed. The decision above stands; three implementation
+defects had to be fixed for it to hold.
+
+**They were invisible.** Semver ignores build metadata for precedence, so
+`13.0.1+security-01` does not rank above `13.0.1`. Measured against renovate's
+own versioning module rather than inferred from the docs:
+
+```
+semver          13.0.1+security-01 > 13.0.1 ? false
+semver-coerced  13.0.1+security-01 > 13.0.1 ? false
+loose           13.0.1+security-01 > 13.0.1 ? false
+docker          isValid('13.0.1+security-01') = false
+```
+
+Compounding it, the original `extractVersionTemplate` anchored at the patch
+digit and discarded those releases before any comparison happened. Net effect:
+Renovate would have reported us up to date straight through a security
+release — the precise failure this catalogue exists to prevent, in the one
+image carrying every open CVE.
+
+Fixed with an explicit `versioningTemplate` mapping the security counter onto a
+fourth release component. The capture group must be `build`, not `revision`:
+renovate's regex versioner only appends `revision` when `build` is also present
+(`modules/versioning/regex/index.js`). That is not obvious from the
+documentation, so the test asserts ordering against the module itself — a
+renovate upgrade that changes the semantics fails CI instead of silently
+restoring the bug.
+
+**They were unrepresentable.** `+` is illegal in an OCI reference, confirmed
+against the local daemon:
+
+```
+$ docker tag <id> probe:13.0.4+security-01-alpine3.23
+error parsing reference: ... is not a valid repository/tag: invalid reference format
+```
+
+The full release tag now carries the build separator as `_` (the
+eclipse-temurin convention) while every other field keeps the upstream version
+verbatim, and `lint-pins.sh` validates the whole `tags:` block against the OCI
+tag grammar so this class of error fails review rather than the registry push.
+
+**They broke the refresh.** `+` is an ERE metacharacter, so `esc()` had to
+escape it. More subtly, the global version pass rewrote a url Renovate had
+already bumped, and because the old version is a *prefix* of the new one it
+doubled the suffix (`grafana-13.0.4+security-01+security-01.linux-…`). The url
+line is now excluded from that pass — Renovate owns it. This one was caught by
+running the script against the real definition; the fixture had passed on an
+unanchored assertion that matched the checksum-provenance comment instead of
+the url. Both are now anchored on the `url:` key.
+
+**They download from the same templatable path — checked, not assumed.** The
+amendment first shipped on the opposite conclusion. Grafana's download page
+advertises security builds under a longer per-build url that embeds an opaque
+CI run id:
+
+```
+https://dl.grafana.com/grafana/release/13.0.1+security-01/grafana_13.0.1+security-01_25720641773_linux_amd64.tar.gz
+                                                                                     ^^^^^^^^^^^
+```
+
+That id is not derivable from the version — the same class of token as the
+`29751385932` in GitHub's `.deb` asset names — so the reasonable inference was
+that a security bump could not be automated at all, and the refresh task was
+built to refuse one and hand off to a human. The inference was wrong. The
+advertised url is not the only one that resolves; the plain templatable form
+does too:
+
+```
+https://dl.grafana.com/oss/release/grafana-13.0.1+security-01.linux-amd64.tar.gz   → 200
+```
+
+So security builds need no special download handling, the refusal path was
+deleted, and nothing in the manager or the refresh task has to know that the
+build-id form exists. What remains is purely a *version-shape* problem —
+ordering, extraction, and the tag separator — which is what the rest of this
+amendment covers.
+
+The cost of not checking would have been a permanent manual step for exactly
+the release class that most needs to be automatic. Worth generalising: an
+upstream's documented download url is what it advertises, not necessarily the
+only one it serves.
+
+The two follow-up checks came back clean as well: for a security build the
+`arm64` tarball and the `.sha256` sidecar both resolve. The whole per-arch
+flow — url, sidecar checksum, both architectures — is therefore confirmed
+against upstream, and an out-of-band security release needs no special handling
+anywhere in the pipeline.
+
+Nothing about that verification is load-bearing in the code: `fetch_sha` still
+falls back to hashing the tarball when a sidecar is missing, still rejects
+anything that is not 64 hex characters, and the definition still re-verifies
+the checksum in-pipeline. A missing artifact turns the bump PR red rather than
+producing a bad pin. The checks matter because they replaced three inferences
+with three measurements — and the one inference that went unmeasured longest
+(that the advertised url was the only one) was the one that was wrong.

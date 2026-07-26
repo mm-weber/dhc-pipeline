@@ -98,6 +98,18 @@ shape is covered:
   task cannot derive is called out in the ADR and fixed by the reviewer.
 - Repackage bumps are **never automerged** — they swap a binary we did not
   build. From-source patch/digest bumps automerge on green CI (Req 3.5).
+- **Check how the upstream versions its security releases before trusting the
+  default versioning.** Grafana ships out-of-band fixes as semver build
+  metadata (`v13.0.1+security-01`), and semver *ignores build metadata for
+  precedence* — under the default scheme those releases rank equal to their
+  base version and Renovate reports "up to date" straight through a security
+  fix. Where an upstream does this, set an explicit `versioningTemplate` that
+  maps the counter onto a comparable component (ADR 0002).
+- **Release tags must be valid OCI references** —
+  `[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}`, enforced by `lint-pins.sh`. `+` is
+  illegal, so a semver build separator becomes `_` in the tag
+  (`13.0.1+security-01` → `13.0.1_security-01-alpine3.23`, the eclipse-temurin
+  convention) while every other field keeps the upstream version verbatim.
 - Every manager is covered by `test/renovate/managers.test.mjs`, which asserts
   both that it captures its own definitions and that it does **not** capture
   the others. `renovate-config-validator --strict` proves the config parses;
