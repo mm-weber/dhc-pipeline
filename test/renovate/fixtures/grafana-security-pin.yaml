@@ -1,0 +1,27 @@
+# Synthetic fixture: the grafana definition as it looks while hand-pinned to an
+# out-of-band security build (Req 6.5 fix-forward). Upstream publishes these off
+# a different path with an opaque CI run id in the filename, so the url cannot be
+# generated — this proves the definition stays TRACKED anyway, which is the whole
+# point: a security pin must not drop out of Renovate's view.
+# Not a buildable definition — a parse fixture only.
+# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc
+
+name: Grafana 13.0.x
+image: ghcr.io/mm-weber/dhc/grafana
+tags:
+  - 13-alpine3.23
+  - 13.0-alpine3.23
+  - 13.0.1_security-01-alpine3.23
+vars:
+  GRAFANA_SHA256: '#{ target.arch == "amd64" ? "18cf05e98afb786ef9c2ad4cc77db628a1449672b262a7f1fc1d5211b780965c" : "0000000000000000000000000000000000000000000000000000000000000000" }'
+  SEMVER_MAJOR_MINOR_VERSION: "13.0"
+  SEMVER_MAJOR_VERSION: "13"
+  SEMVER_VERSION: 13.0.1+security-01
+  VERSION: 13.0.1+security-01
+contents:
+  builds:
+    - name: grafana
+      contents:
+        files:
+          - url: https://dl.grafana.com/grafana/release/13.0.1+security-01/grafana_13.0.1+security-01_25720641773_linux_${target.arch}.tar.gz
+            path: ${source.dir}/grafana.tar.gz

@@ -175,6 +175,22 @@ const gGrafana = extract(grafanaMgr, read("image/grafana/image.yaml"));
 }
 check("grafana: yields exactly one dep", gGrafana.length === 1, `${gGrafana.length}`);
 
+// A definition hand-pinned to an out-of-band security build sits on a different
+// url shape (…/grafana/release/<ver>/grafana_<ver>_<buildid>_linux_<arch>.tar.gz)
+// whose build id cannot be generated. It must stay TRACKED regardless — falling
+// out of Renovate's view while pinned to a security build is the same blindness
+// this manager was added to fix.
+{
+  const deps = extract(grafanaMgr, read("test/renovate/fixtures/grafana-security-pin.yaml"));
+  const d = dep(deps, { datasource: "github-releases", depName: "grafana/grafana" });
+  check(
+    "grafana: security-pinned definition stays tracked",
+    d?.currentValue === "13.0.1+security-01",
+    JSON.stringify(deps),
+  );
+  check("grafana: security pin yields exactly one dep", deps.length === 1, `${deps.length}`);
+}
+
 // no cross-talk in either direction: the git-source manager must ignore the
 // tarball url, and the grafana manager must ignore git-source definitions.
 check(

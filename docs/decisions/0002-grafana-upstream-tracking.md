@@ -176,10 +176,42 @@ running the script against the real definition; the fixture had passed on an
 unanchored assertion that matched the checksum-provenance comment instead of
 the url. Both are now anchored on the `url:` key.
 
-Still unverified, and unverifiable from the devcontainer: **whether
-`dl.grafana.com` publishes tarballs for `+security` builds at all**, and under
-what filename. If it does not, `refresh-grafana.sh` fails to fetch a checksum
-and the bump PR goes red. That is the intended failure mode — a loud red PR
-announcing a security release beats silence, and Req 6.5 already allows a hand
-fix-forward. Confirm on the first occurrence, or ahead of time with a
-`workflow_dispatch` dry run of `renovate.yml`.
+**They are not downloadable from the templatable path.** This was left open
+above as unverifiable from the devcontainer; the operator resolved it from the
+host. Upstream publishes security builds under a different path *and* embeds an
+opaque CI run id in the filename:
+
+```
+regular   https://dl.grafana.com/oss/release/grafana-13.0.4.linux-amd64.tar.gz
+security  https://dl.grafana.com/grafana/release/13.0.1+security-01/grafana_13.0.1+security-01_25720641773_linux_amd64.tar.gz
+                                                                                              ^^^^^^^^^^^
+```
+
+That build id is not derivable from the version — the same class of token as
+the `29751385932` in GitHub's `.deb` asset names. For a security build neither
+the download url nor its checksum can be constructed, so the automatic refresh
+is impossible in principle, not merely unimplemented.
+
+`refresh-grafana.sh` therefore **refuses** a security target and prints the url
+shape, the build-id problem, and the exact fields to hand-write — the
+alternative being a confusing 404 from a fabricated url. A security build is a
+**hand fix-forward (Req 6.5)**, and that is now a documented path rather than a
+surprise.
+
+Two consequences worth stating, because the naive version of this fix would
+reintroduce the blindness the ADR set out to remove:
+
+- The manager matches **both** url shapes. A definition sitting on a
+  hand-pinned security build would otherwise stop matching and drop out of
+  tracking — silent again, in exactly the state where visibility matters most.
+  Reading the version out of the path segment keeps the next release visible.
+- The refresh **canonicalises** the url back onto `/oss/release/` whenever the
+  target is a regular release, so a build-id url never outlives the security
+  build it belongs to. Grafana's real pattern — `v13.0.1+security-01` followed
+  by `v13.0.2` — makes that the common exit path, and it is covered by a test.
+
+Still unverified: whether
+`/oss/release/grafana-13.0.1+security-01.linux-amd64.tar.gz` *also* resolves.
+If it does, refuse-and-guide could be replaced by full automation. One
+`curl -I` from a host with egress settles it; the firewall blocks
+`dl.grafana.com` from the devcontainer.

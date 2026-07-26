@@ -139,41 +139,55 @@ assert "major: minor alias tag"            "$F" "- 14.0-alpine3.23"
 assert "major: full tag"                   "$F" "- 14.0.0-alpine3.23"
 assert "major: display name"               "$F" "name: Grafana 14.0.x"
 
-# 4: out-of-band security build 13.0.4 -> 13.0.4+security-01.
-# Grafana ships these as semver build metadata. Two things bite: '+' is an ERE
-# metacharacter, and '+' is ILLEGAL in an OCI tag — docker rejects
-# "13.0.4+security-01-alpine3.23" as an invalid reference — so the full tag has
-# to carry the build separator as '_'.
-run_bump 13.0.4 13.0.4+security-01
-assert "security: VERSION keeps the suffix"     "$F" "VERSION: 13.0.4+security-01"
-assert "security: SEMVER_VERSION"               "$F" "SEMVER_VERSION: 13.0.4+security-01"
-# Anchored on the `url:` key on purpose: the checksum-provenance comment names
-# the same tarball, so an unanchored match reports success off the comment while
-# the real url is wrong.
-assert "security: url keeps the suffix"         "$F" "url: https://dl.grafana.com/oss/release/grafana-13.0.4+security-01.linux-"
-refute "security: url suffix not doubled"       "$F" "security-01+security-01"
-assert "security: purl keeps the suffix"        "$F" "purl: pkg:generic/grafana@13.0.4+security-01"
-assert "security: full tag uses '_' separator"  "$F" "- 13.0.4_security-01-alpine3.23"
-assert "security: minor alias unchanged"        "$F" "- 13.0-alpine3.23"
-assert "security: major alias unchanged"        "$F" "- 13-alpine3.23"
-assert "security: SEMVER_MAJOR_MINOR kept"      "$F" 'SEMVER_MAJOR_MINOR_VERSION: "13.0"'
-assert "security: checksums re-pinned"          "$F" "\"amd64\" ? \"$NEW_AMD64\""
+# 4: an out-of-band security build CANNOT be refreshed automatically. Upstream
+# publishes it off a different path, with an opaque CI run id in the filename:
+#   https://dl.grafana.com/grafana/release/13.0.1+security-01/
+#     grafana_13.0.1+security-01_25720641773_linux_amd64.tar.gz
+# Neither that url nor its checksum is derivable from the version, so the task
+# must refuse and tell the reviewer exactly what to hand-write (Req 6.5).
+SB=$(mktemp -d); mkdir -p "$SB/image/grafana"
+grafana_def 13.0.4 13.0 13 > "$SB/image/grafana/image.yaml"
+sed -i -E "s@(url: https://dl\.grafana\.com/oss/release/grafana-)[0-9][^/]*(\.linux-)@\113.0.4+security-01\2@" \
+  "$SB/image/grafana/image.yaml"
+F="$SB/image/grafana/image.yaml"
+if out=$(REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" \
+         "$SCRIPT" "$SB/image/grafana" 2>&1); then
+  echo "FAIL security: must not claim success on a security build"; FAILURES=$((FAILURES+1))
+else
+  echo "ok   security: exits non-zero on a security build"
+fi
+for want in "out-of-band security build" "build id" "Req 6.5" "13.0.4_security-01-alpine3.23"; do
+  if grep -qF -- "$want" <<<"$out"; then echo "ok   security: guidance names '$want'"
+  else echo "FAIL security: guidance missing '$want'"; echo "$out" | sed 's/^/    /'; FAILURES=$((FAILURES+1)); fi
+done
+refute "security: derived fields left untouched" "$F" "SEMVER_VERSION: 13.0.4+security-01"
+
+# 5: the regular patch that supersedes a hand-pinned security build (grafana's
+# real pattern: v13.0.1+security-01 was followed by v13.0.2). The definition sits
+# on the build-id url with a '_' tag; the refresh must read the version out of
+# that shape and canonicalise back onto the templatable /oss/release/ url.
+SB=$(mktemp -d); mkdir -p "$SB/image/grafana"
+grafana_def 13.0.4+security-01 13.0 13 > "$SB/image/grafana/image.yaml"
+F="$SB/image/grafana/image.yaml"
+# shellcheck disable=SC2016  # ${target.arch} is a DHI template token, not a shell var
+sed -i -E 's@url: https://dl\.grafana\.com/oss/release/[^[:space:]]*@url: https://dl.grafana.com/grafana/release/13.0.4+security-01/grafana_13.0.4+security-01_25720641773_linux_${target.arch}.tar.gz@' "$F"
+assert "supersede: fixture starts on the build-id url" "$F" "grafana/release/13.0.4+security-01/"
+# Renovate bumps the version it captured — the path segment.
+sed -i -E 's@(/grafana/release/)13\.0\.4\+security-01/@\113.0.5/@' "$F"
+REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" "$SCRIPT" "$SB/image/grafana"
+assert "supersede: VERSION"               "$F" "VERSION: 13.0.5"
+assert "supersede: full tag"              "$F" "- 13.0.5-alpine3.23"
+# shellcheck disable=SC2016  # ${target.arch} is a DHI template token, not a shell var
+assert "supersede: url canonicalised"     "$F" 'url: https://dl.grafana.com/oss/release/grafana-13.0.5.linux-${target.arch}.tar.gz'
+refute "supersede: build id gone"         "$F" "25720641773"
+refute "supersede: no stale security"     "$F" "security-01"
+refute "supersede: no stale '+' version"  "$F" "13.0.4+"
 # no tag line may contain '+' — that is precisely what docker rejects
 if awk '/^tags:/{t=1;next} /^[^[:space:]-]/{t=0} t&&/\+/{found=1} END{exit !found}' "$F"; then
-  echo "FAIL security: a tag line contains '+' (invalid OCI reference)"; FAILURES=$((FAILURES+1))
+  echo "FAIL supersede: a tag line contains '+' (invalid OCI reference)"; FAILURES=$((FAILURES+1))
 else
-  echo "ok   security: no tag line contains '+'"
+  echo "ok   supersede: no tag line contains '+'"
 fi
-
-# 5: security build -> the regular patch that supersedes it (grafana's real
-# pattern: v13.0.1+security-01 was followed by v13.0.2). The old version now
-# contains '+' and its tag carries '_' — both shapes must be found to be replaced.
-run_bump 13.0.4+security-01 13.0.5
-assert "supersede: VERSION"             "$F" "VERSION: 13.0.5"
-assert "supersede: full tag"            "$F" "- 13.0.5-alpine3.23"
-assert "supersede: url"                 "$F" "grafana-13.0.5.linux-"
-refute "supersede: no stale security"   "$F" "security-01"
-refute "supersede: no stale '+' version" "$F" "13.0.4+"
 
 # 6: a definition with no dl.grafana.com tarball must fail loudly, not silently
 SB=$(mktemp -d); mkdir -p "$SB/image/x"; git_def > "$SB/image/x/image.yaml"

@@ -38,9 +38,46 @@ tagver() { printf '%s' "${1//+/_}"; }
 
 # New version from the (already bumped) tarball url. Anchored on the `url:` key
 # so the checksum-provenance comment, which names the same host, cannot match.
-new_ver=$(grep -oE '^[[:space:]]*-?[[:space:]]*url:[[:space:]]*https://dl\.grafana\.com/oss/release/grafana-[0-9][^[:space:]]*\.linux-' "$f" \
-  | head -1 | sed -E 's#.*grafana-##; s#\.linux-$##')
-[ -n "$new_ver" ] || { echo "refresh-grafana: no dl.grafana.com tarball url in $f" >&2; exit 1; }
+# Upstream publishes two url shapes and only one of them is templatable:
+#   regular   .../oss/release/grafana-<ver>.linux-<arch>.tar.gz
+#   security  .../grafana/release/<ver>/grafana_<ver>_<buildid>_linux_<arch>.tar.gz
+# Both are read here so a definition sitting on a hand-pinned security build is
+# still refreshable when the next regular release supersedes it.
+url_line=$(grep -E '^[[:space:]]*-?[[:space:]]*url:[[:space:]]*https://dl\.grafana\.com/' "$f" | head -1)
+[ -n "$url_line" ] || { echo "refresh-grafana: no dl.grafana.com tarball url in $f" >&2; exit 1; }
+new_ver=$(sed -nE 's#.*/oss/release/grafana-([^[:space:]]+)\.linux-.*#\1#p' <<<"$url_line")
+[ -n "$new_ver" ] || new_ver=$(sed -nE 's#.*/grafana/release/([^/[:space:]]+)/.*#\1#p' <<<"$url_line")
+[ -n "$new_ver" ] || { echo "refresh-grafana: could not read a version from: ${url_line}" >&2; exit 1; }
+
+# An out-of-band security build cannot be refreshed automatically. Upstream
+# publishes it under a different path AND embeds an opaque CI run id in the
+# filename that is not derivable from the version, so neither the download url
+# nor its checksum can be constructed here. Fail with the shape a human needs.
+case "$new_ver" in
+  *+*)
+    cat >&2 <<MSG
+refresh-grafana: ${new_ver} is an out-of-band security build — no automatic refresh.
+
+Upstream does not publish these under the templatable /oss/release/ path. They
+live at, e.g.:
+
+  https://dl.grafana.com/grafana/release/13.0.1+security-01/grafana_13.0.1+security-01_25720641773_linux_amd64.tar.gz
+                                                                                       ^^^^^^^^^^^
+an opaque build id that cannot be derived from the version.
+
+Fix forward by hand (Req 6.5) in ${dir}/image.yaml:
+  - url:            the full per-arch url including the build id
+  - GRAFANA_SHA256: both arch checksums, from upstream's download page
+  - tags:           full tag with '+' written as '_' (${new_ver//+/_}-alpine3.23)
+  - vars:           VERSION / SEMVER_VERSION = ${new_ver}
+MSG
+    exit 1 ;;
+esac
+
+# Canonicalise the url onto the templatable shape. Normally a no-op; it matters
+# when superseding a hand-pinned security build, whose build-id url must not
+# survive into a regular release.
+sed -i -E "s@^([[:space:]]*-?[[:space:]]*url:[[:space:]]*)https://dl\.grafana\.com/[^[:space:]]*@\1https://dl.grafana.com/oss/release/grafana-${new_ver}.linux-\${target.arch}.tar.gz@" "$f"
 
 new_maj="${new_ver%%.*}"
 new_rest="${new_ver#*.}"
