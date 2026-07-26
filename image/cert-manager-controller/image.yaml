@@ -53,6 +53,26 @@ contents:
             uid: 0
             gid: 0
       pipeline:
+        # CVE surgery between upstream releases (docs/concepts.md, Req 6.5).
+        # cert-manager v1.21.0 resolves google.golang.org/grpc v1.81.1, which
+        # carries GHSA-hrxh-6v49-42gf (issue #28). Upstream has not tagged a
+        # release pinning the fix, and forking is maintenance we do not want, so
+        # the definition overlays the patched dependency at build time: the
+        # shipped artifact is "cert-manager v1.21.0 with grpc v1.82.1", declared
+        # in reviewable YAML and reflected in the SBOM.
+        #
+        # `runs:` rather than a bump action: the catalog's Go dependency-bump
+        # action is not primary-verified in our research notes (data/
+        # docker_internal_build.md lists only go/build), and `go get` is the
+        # standard tool for exactly this. Retire this step when an upstream
+        # release resolves >= v1.82.1 — Renovate moves the source ref, this
+        # becomes a no-op, and it should be deleted in that same PR.
+        - name: patch grpc (GHSA-hrxh-6v49-42gf)
+          work-dir: /go/src/github.com/cert-manager/cert-manager/cmd/controller
+          runs: |
+            set -eux -o pipefail
+            go get google.golang.org/grpc@v1.82.1
+            go list -m google.golang.org/grpc
         # No test step: cmd/* submodules share the monorepo's suite, which
         # needs upstream's make tooling; functional verification is the e2e
         # suite's job (Req 5.5). Upstream ldflags recipe: make/00_mod.mk.
