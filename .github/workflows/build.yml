@@ -260,7 +260,7 @@ jobs:
               vexn=$(( ${#vex[@]} / 2 ))
               echo "_none_ — ${vexn} statement(s) on file."
               if [ "$vexn" -gt 0 ]; then
-                echo "> ⚠️ Statements exist but suppressed nothing here — check the product identifier."
+                echo "> ⚠️ Statements exist but suppressed nothing here — the product identifier below is what they must match."
               fi
             fi
             echo
@@ -292,6 +292,20 @@ jobs:
             else
               echo "_none_ ✓"
             fi
+            echo
+            # The identifier a statement's `products[].@id` has to match, taken
+            # from the same report the gate just used so it cannot drift from
+            # what Trivy actually saw. Emitted every run, not just on mismatch:
+            # it is what you copy when authoring the next statement, and a wrong
+            # product purl is the one VEX defect that produces no error at all.
+            # (Drop the @sha256 digest when writing it down — the digest changes
+            # every build, and a digestless purl still matches.)
+            trivy convert --format cyclonedx --output cdx.json trivy.json 2>/dev/null || true
+            echo "#### Product identifier for this image"
+            echo
+            echo '```'
+            jq -r '.metadata.component.purl // "<unavailable>"' cdx.json 2>/dev/null || echo "<unavailable>"
+            echo '```'
             echo
             # The surviving findings, named. A bare count means downloading an
             # artifact to learn what to triage; this is the list you act on.
