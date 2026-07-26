@@ -190,7 +190,15 @@ since it was added — the VEX canary (which now builds the images a statement
 names) is what exposed both of these.
 
 **Worth reporting upstream.** A stale `.sha256` beside a replaced artifact is a
-defect in Grafana's release process, not in ours.
+defect in Grafana's release process, not in ours. Drafted with the measurements
+and controls in
+[`upstream/2026-07-26-grafana-13.0.4-checksum-drift.md`](upstream/2026-07-26-grafana-13.0.4-checksum-drift.md).
+
+The controls matter as much as the finding: 13.0.4 **arm64** is self-consistent
+(file == sidecar), and **13.1.1 amd64** verified cleanly in CI against its own
+sidecar during this pass. So this is not a systemic checksum-generation failure
+— it is one artifact re-uploaded without regenerating its sidecar, which is a
+much more actionable thing to report.
 
 ---
 
