@@ -153,5 +153,50 @@ or a time-boxed entry in `accepted-risk/`.
 
 ## `LOG.md`
 
-Dated, human-readable decisions: *finding → EPSS / KEV → outcome → link*. Created
-with the first real triage decision (task 7.3).
+Dated, human-readable decisions: *finding → evidence → outcome → link*.
+
+It records **every** outcome, not just the excused ones — because the three
+things people conflate have to stay apart:
+
+| Outcome | Means | Where it goes |
+|---|---|---|
+| `not_affected` | The vulnerable code cannot execute here | OpenVEX statement + `LOG.md` |
+| prioritisation | Real, but low EPSS / not KEV, so it waits | `LOG.md` only |
+| accepted risk | Real and reachable; we ship anyway | `LOG.md` only, with an owner |
+
+Only the first is a VEX statement. Writing "low risk" or "we accept it" into a
+VEX is **VEX-washing** — it launders a business decision into a machine-readable
+claim of technical inapplicability, and every downstream consumer inherits it.
+EPSS and KEV order the queue; they never justify a status.
+
+## Authoring a statement
+
+Verified recipe — the product identifier is the usual silent failure, because
+getting it wrong means the statement simply never applies and nothing says so:
+
+```bash
+vexctl create \
+  --product="pkg:oci/<image>?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2F<image>" \
+  --subcomponents="pkg:golang/<vulnerable/module>" \
+  --vuln="CVE-…" --status="not_affected" \
+  --justification="vulnerable_code_not_in_execute_path" \
+  --impact-statement="why the code cannot execute here" \
+  --file=triage/vex/CVE-….openvex.json
+```
+
+- **No digest in the product purl.** Trivy's root component purl carries the
+  image digest, which changes on every build; a digestless purl matches any
+  version, which is what a committed statement needs.
+- **No version in the subcomponent purl** either — Go module versions move on
+  every rebuild, and a versionless subcomponent still scopes the suppression to
+  that one package rather than the whole image.
+- Both behaviours were confirmed against Trivy before being written down here,
+  not inferred from documentation.
+
+Statements are attached to the images they name as `openvex` attestations by
+`build.yml` on the main branch (Req 6.4), so a decision travels with the
+artifact and a consumer can verify it against the digest they actually run.
+Matching is anchored on the purl name, so a statement about `grafana` is never
+attached to some future `grafana-agent`. A PR touching `vex/` builds and
+rescans exactly the images its statements name, which is how a statement is
+proved to suppress what it claims.
