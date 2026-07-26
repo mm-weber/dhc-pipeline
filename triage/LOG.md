@@ -200,6 +200,46 @@ sidecar during this pass. So this is not a systemic checksum-generation failure
 — it is one artifact re-uploaded without regenerating its sidecar, which is a
 much more actionable thing to report.
 
+### Post-bump rescan — what 13.1.1 actually changed
+
+The empirical answer to "does bumping fix it", from the gate's scan of the
+rebuilt image. 16 findings (1 CRITICAL, 15 HIGH), and the shape matters more
+than the count:
+
+| Binary | Findings |
+|---|---|
+| `bin/grafana` (main) | kin-openapi **CRITICAL**, tempo ×2, grpc |
+| `plugins-bundled/elasticsearch/…` | grpc, stdlib ×3 |
+| `plugins-bundled/zipkin/…` | x/net ×4, grpc, stdlib ×3 |
+
+**The bump worked for the main binary.** The three stdlib findings
+(#22/#24/#26) are gone from `bin/grafana` — 13.1.1 was built with a patched Go
+toolchain, exactly the lever we predicted. Prometheus (#25) disappeared
+entirely; 13.1.1 carries a fixed version.
+
+**The residue is in bundled plugin binaries.** Grafana ships prebuilt datasource
+plugins, and those were *not* rebuilt with the new toolchain — they still report
+`stdlib v1.26.3` and older grpc (v1.80.0, v1.79.3 — older than the main
+binary's v1.81.1). Two consequences:
+
+- The stdlib findings are no longer a whole-image property. They are confined to
+  plugins that only execute when the matching datasource is configured, which is
+  a materially different exposure from "on the path of every TLS handshake".
+  That is a **reachability** distinction, and the right way to settle it is
+  govulncheck per binary, not an assertion.
+- **New findings appeared that no issue tracks**: `golang.org/x/net` ×4 in the
+  zipkin plugin (CVE-2026-25681, -27136, -33814, -39821). Bumping a repackage
+  image does not monotonically reduce findings — it swaps one dependency graph
+  for another. The daily rescan will file these; they are recorded here first so
+  the swap is not mistaken for a regression in the gate.
+
+**#25 (prometheus) — outcome corrected: fixed by the bump, not `not_affected`.**
+The statement in `vex/CVE-2026-42151.openvex.json` is retained because its
+reasoning is version-independent and would hold again if the module returned,
+but it is currently **inert**: the finding it excuses no longer exists. Logging
+this because "the VEX worked" and "the finding went away" look identical from a
+count, and only one of them is true here.
+
 ---
 
 ### Evidence gap, stated plainly
