@@ -117,6 +117,7 @@ assert "minor: spdx version"               "$F" "version: 13.1.1"
 assert "minor: purl"                       "$F" "purl: pkg:generic/grafana@13.1.1"
 assert "minor: annotation"                 "$F" "GRAFANA_VERSION: 13.1.1"
 assert "minor: checksum comment url"       "$F" "grafana-13.1.1.linux-<arch>"
+assert "minor: tarball url"                "$F" "url: https://dl.grafana.com/oss/release/grafana-13.1.1.linux-"
 refute "minor: no stale 13.0.4"            "$F" "13.0.4"
 refute "minor: no stale amd64 checksum"    "$F" "$OLD_AMD64"
 refute "minor: no stale arm64 checksum"    "$F" "$OLD_ARM64"
@@ -146,7 +147,11 @@ assert "major: display name"               "$F" "name: Grafana 14.0.x"
 run_bump 13.0.4 13.0.4+security-01
 assert "security: VERSION keeps the suffix"     "$F" "VERSION: 13.0.4+security-01"
 assert "security: SEMVER_VERSION"               "$F" "SEMVER_VERSION: 13.0.4+security-01"
-assert "security: url keeps the suffix"         "$F" "grafana-13.0.4+security-01.linux-"
+# Anchored on the `url:` key on purpose: the checksum-provenance comment names
+# the same tarball, so an unanchored match reports success off the comment while
+# the real url is wrong.
+assert "security: url keeps the suffix"         "$F" "url: https://dl.grafana.com/oss/release/grafana-13.0.4+security-01.linux-"
+refute "security: url suffix not doubled"       "$F" "security-01+security-01"
 assert "security: purl keeps the suffix"        "$F" "purl: pkg:generic/grafana@13.0.4+security-01"
 assert "security: full tag uses '_' separator"  "$F" "- 13.0.4_security-01-alpine3.23"
 assert "security: minor alias unchanged"        "$F" "- 13.0-alpine3.23"

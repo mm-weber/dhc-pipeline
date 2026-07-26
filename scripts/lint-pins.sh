@@ -77,6 +77,29 @@ while IFS= read -r -d '' file; do
     fi
   fi
 
+  # Release tags must be valid OCI references: [a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}.
+  # An upstream that versions with semver build metadata (grafana ships
+  # v13.0.1+security-01) otherwise yields a tag the daemon rejects outright —
+  # "invalid reference format" — at push time rather than at review time. The
+  # build separator becomes '_' (docs/CONVENTIONS.md, Upstream tracking).
+  # Scoped to a definition's own top-level tags: block; a nested tags: elsewhere
+  # is not a release tag list.
+  if [[ "$file" == "$ROOT"/image/*/image.yaml ]]; then
+    while IFS=$'\t' read -r line_no tag; do
+      if ! [[ "$tag" =~ ^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$ ]]; then
+        echo "::error file=${rel},line=${line_no}::pinning convention (docs/CONVENTIONS.md): release tag '${tag}' is not a valid OCI tag — must match [a-zA-Z0-9_][a-zA-Z0-9._-]{0,127} (a semver '+' build separator becomes '_')"
+        violations=$((violations + 1))
+      fi
+    done < <(awk '/^tags:/ { intags = 1; next }
+                  intags && /^[^[:space:]]/ { intags = 0 }
+                  intags && match($0, /^[[:space:]]*-[[:space:]]*/) {
+                    val = substr($0, RSTART + RLENGTH)
+                    sub(/[[:space:]]*#.*$/, "", val); sub(/[[:space:]]+$/, "", val)
+                    gsub(/^["'\'']|["'\'']$/, "", val)
+                    if (val != "") printf "%d\t%s\n", NR, val
+                  }' "$file")
+  fi
+
   # Every git+ source pins a commit checksum (Req 1.3)
   c_git=$(grep -cE 'url:[[:space:]]*["'\'']?git\+' "$file" || true)
   c_sum=$(grep -cE '^[[:space:]]*checksum:' "$file" || true)

@@ -26,7 +26,15 @@ dir="${1:?usage: refresh-grafana.sh <definition-dir>}"
 f="$dir/image.yaml"
 [ -f "$f" ] || { echo "refresh-grafana: no image.yaml in $dir" >&2; exit 1; }
 
-esc() { printf '%s' "$1" | sed 's/[.[\*^$/]/\\&/g'; }   # escape regex metachars
+# Escape ERE metachars. '+' is in the set because grafana ships out-of-band
+# fixes as semver build metadata (13.0.1+security-01) — unescaped it is a
+# quantifier and the substitution silently matches nothing.
+esc() { printf '%s' "$1" | sed 's/[.[\*^$/+]/\\&/g'; }
+
+# '+' is illegal in an OCI reference (docker: "invalid reference format"), so
+# the full release tag carries the build separator as '_', the way
+# eclipse-temurin does. Every other field keeps the upstream version verbatim.
+tagver() { printf '%s' "${1//+/_}"; }
 
 # New version from the (already bumped) tarball url. Anchored on the `url:` key
 # so the checksum-provenance comment, which names the same host, cannot match.
@@ -73,7 +81,10 @@ omm=$(esc "$old_majmin"); omaj=$(esc "$old_maj")
 
 # 1) full semver wherever it literally appears (VERSION, SEMVER_VERSION, full
 #    tag, spdx version, purl, annotation, checksum-provenance comment).
-sed -i -E "s/${ov}/${new_ver}/g" "$f"
+#    The tarball url is EXCLUDED: Renovate already wrote the new version there,
+#    and when the old version is a prefix of the new one — 13.0.4 inside
+#    13.0.4+security-01 — substituting again doubles the suffix.
+sed -i -E "\@url:[[:space:]]*https://dl\.grafana\.com@! s/${ov}/${new_ver}/g" "$f"
 
 # 2) truncated fields the full-semver pass cannot reach: major.minor + major
 #    vars, their alias tags, and the display name. Anchored so a patch bump is
@@ -86,7 +97,24 @@ sed -i -E \
   -e "s/^(name:[[:space:]]*Grafana[[:space:]]+)${omm}\.x/\1${new_majmin}.x/" \
   "$f"
 
-# 3) re-pin both arch checksums. Rebuilt whole rather than substituted, so the
+# 3) the full release tag. It differs from the version by the build separator
+#    ('+' in the version, '_' in the tag) so no single substitution reaches it
+#    in both directions — 13.0.4 -> 13.0.4+security-01 and back. Rewritten from
+#    the known new version instead: inside the top-level tags: block, any entry
+#    that is not one of the two alias tags IS the full tag.
+full_tag="$(tagver "$new_ver")-alpine3.23"
+awk -v maj="${new_maj}-alpine3.23" -v mm="${new_majmin}-alpine3.23" -v full="$full_tag" '
+  /^tags:/ { intags = 1; print; next }
+  intags && /^[^[:space:]]/ { intags = 0 }
+  intags && match($0, /^[[:space:]]*-[[:space:]]*/) {
+    pre = substr($0, RSTART, RLENGTH); val = substr($0, RSTART + RLENGTH)
+    sub(/[[:space:]]+$/, "", val)
+    if (val != maj && val != mm) { $0 = pre full }
+  }
+  { print }
+' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+
+# 4) re-pin both arch checksums. Rebuilt whole rather than substituted, so the
 #    expression shape stays exactly as authored.
 sed -i -E \
   "s|^([[:space:]]*GRAFANA_SHA256:[[:space:]]*).*|\1'#{ target.arch == \"amd64\" ? \"${amd64_sha}\" : \"${arm64_sha}\" }'|" \

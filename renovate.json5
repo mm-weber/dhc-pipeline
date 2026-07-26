@@ -65,7 +65,20 @@
       depNameTemplate: "grafana/grafana",
       datasourceTemplate: "github-releases",
       // Our pin is unprefixed (13.0.4); upstream tags its releases v13.0.4.
-      extractVersionTemplate: "^v(?<version>\\d+\\.\\d+\\.\\d+)$",
+      // The optional `+security-NN` tail matters: grafana ships out-of-band
+      // fixes as semver build metadata (v13.0.1+security-01), and anchoring at
+      // the patch digit would discard every one of them before Renovate ever
+      // compared versions. Still strict enough to reject grafana's stray
+      // `vtest-new-release-pipeline` tag.
+      extractVersionTemplate: "^v(?<version>\\d+\\.\\d+\\.\\d+(?:\\+security-\\d+)?)$",
+      // Plain semver IGNORES build metadata for precedence, so
+      // 13.0.1+security-01 would not rank above 13.0.1 and a security release
+      // would read as "up to date". Regex versioning fixes the ordering by
+      // mapping the security counter onto a fourth release component.
+      // The group MUST be `build`, not `revision`: renovate's regex versioner
+      // only appends `revision` when `build` is also present
+      // (modules/versioning/regex/index.js).
+      versioningTemplate: "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:\\+security-(?<build>\\d+))?$",
     },
   ],
 
