@@ -292,6 +292,21 @@ jobs:
             else
               echo "_none_ ✓"
             fi
+            echo
+            # The surviving findings, named. A bare count means downloading an
+            # artifact to learn what to triage; this is the list you act on.
+            echo "#### Still uncovered"
+            echo
+            if [ $((crit + high)) -gt 0 ]; then
+              echo "| CVE | Severity | Package | Installed | Fixed |"
+              echo "|---|---|---|---|---|"
+              jq -r '[.Results[]?.Vulnerabilities[]?]
+                     | sort_by(.Severity != "CRITICAL", .VulnerabilityID)[]
+                     | "| \(.VulnerabilityID) | \(.Severity) | \(.PkgName) | \(.InstalledVersion) | \(.FixedVersion // "-") |"' \
+                 trivy.json | sort -u
+            else
+              echo "_none_ ✓"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Grype second opinion (CRITICAL present)
