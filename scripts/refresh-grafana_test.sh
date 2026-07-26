@@ -14,6 +14,10 @@ OLD_AMD64=$(printf '1%.0s' $(seq 64))
 OLD_ARM64=$(printf '2%.0s' $(seq 64))
 NEW_AMD64=$(printf '3%.0s' $(seq 64))
 NEW_ARM64=$(printf '4%.0s' $(seq 64))
+# Build ids are opaque CI run ids in the artifact filename; not derivable from
+# the version, resolved from the GitHub release assets and stubbed here.
+OLD_BUILD=11111111111
+NEW_BUILD=22222222222
 SYNTAX="# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc"
 
 # grafana-shaped definition at a given version/major.minor/major. Mirrors the
@@ -38,8 +42,8 @@ platforms:
   - linux/amd64
   - linux/arm64
 vars:
-  # Per-arch tarball SHA-256 (from https://dl.grafana.com/oss/release/
-  # grafana-$1.linux-<arch>.tar.gz.sha256), selected by target arch.
+  # Per-arch tarball SHA-256, from the sidecar beside the per-build artifact
+  # (grafana_$1_<build-id>_linux_<arch>.tar.gz.sha256), selected by target arch.
   GRAFANA_SHA256: '#{ target.arch == "amd64" ? "$OLD_AMD64" : "$OLD_ARM64" }'
   SEMVER_MAJOR_MINOR_VERSION: "$2"
   SEMVER_MAJOR_VERSION: "$3"
@@ -50,7 +54,7 @@ contents:
     - name: grafana
       contents:
         files:
-          - url: https://dl.grafana.com/oss/release/grafana-$1.linux-\${target.arch}.tar.gz
+          - url: https://dl.grafana.com/grafana/release/$1/grafana_${1}_${OLD_BUILD}_linux_\${target.arch}.tar.gz
             path: \${source.dir}/grafana.tar.gz
             spdx:
               name: grafana
@@ -92,10 +96,11 @@ refute() { # label file 'grep-pattern'
 run_bump() { # old_ver new_ver
   SB=$(mktemp -d); mkdir -p "$SB/image/grafana"
   grafana_def "$1" "${1%.*}" "${1%%.*}" > "$SB/image/grafana/image.yaml"
-  # Renovate rewrites only the version inside the tarball url; every derived
-  # field still holds its old value when the postUpgradeTask runs.
-  sed -i -E "s@(url: https://dl\.grafana\.com/oss/release/grafana-)[0-9][^/]*(\.linux-)@\1${2}\2@" \
-    "$SB/image/grafana/image.yaml"
+  # Renovate rewrites only the version it captured — the path segment. The build
+  # id in the filename still belongs to the old release, and every derived field
+  # still holds its old value, when the postUpgradeTask runs.
+  sed -i -E "s@(/grafana/release/)[^/]+/@\1${2}/@" "$SB/image/grafana/image.yaml"
+  REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" \
   REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" \
     "$SCRIPT" "$SB/image/grafana"
   F="$SB/image/grafana/image.yaml"
@@ -116,8 +121,9 @@ assert "minor: display name"               "$F" "name: Grafana 13.1.x"
 assert "minor: spdx version"               "$F" "version: 13.1.1"
 assert "minor: purl"                       "$F" "purl: pkg:generic/grafana@13.1.1"
 assert "minor: annotation"                 "$F" "GRAFANA_VERSION: 13.1.1"
-assert "minor: checksum comment url"       "$F" "grafana-13.1.1.linux-<arch>"
-assert "minor: tarball url"                "$F" "url: https://dl.grafana.com/oss/release/grafana-13.1.1.linux-"
+assert "minor: checksum comment url"       "$F" "grafana_13.1.1_<build-id>_linux_<arch>"
+assert "minor: tarball url rebuilt"        "$F" "url: https://dl.grafana.com/grafana/release/13.1.1/grafana_13.1.1_${NEW_BUILD}_linux_"
+refute "minor: stale build id gone"        "$F" "$OLD_BUILD"
 refute "minor: no stale 13.0.4"            "$F" "13.0.4"
 refute "minor: no stale amd64 checksum"    "$F" "$OLD_AMD64"
 refute "minor: no stale arm64 checksum"    "$F" "$OLD_ARM64"
@@ -152,7 +158,7 @@ assert "security: SEMVER_VERSION"               "$F" "SEMVER_VERSION: 13.0.4+sec
 # Anchored on the `url:` key on purpose: the checksum-provenance comment names
 # the same tarball, so an unanchored match reports success off the comment while
 # the real url is wrong.
-assert "security: url keeps the suffix"         "$F" "url: https://dl.grafana.com/oss/release/grafana-13.0.4+security-01.linux-"
+assert "security: url keeps the suffix"         "$F" "url: https://dl.grafana.com/grafana/release/13.0.4+security-01/grafana_13.0.4+security-01_${NEW_BUILD}_linux_"
 refute "security: url suffix not doubled"       "$F" "security-01+security-01"
 assert "security: purl keeps the suffix"        "$F" "purl: pkg:generic/grafana@13.0.4+security-01"
 assert "security: full tag uses '_' separator"  "$F" "- 13.0.4_security-01-alpine3.23"
@@ -174,7 +180,7 @@ fi
 run_bump 13.0.4+security-01 13.0.5
 assert "supersede: VERSION"               "$F" "VERSION: 13.0.5"
 assert "supersede: full tag"              "$F" "- 13.0.5-alpine3.23"
-assert "supersede: url"                   "$F" "url: https://dl.grafana.com/oss/release/grafana-13.0.5.linux-"
+assert "supersede: url"                   "$F" "url: https://dl.grafana.com/grafana/release/13.0.5/grafana_13.0.5_${NEW_BUILD}_linux_"
 refute "supersede: no stale security"     "$F" "security-01"
 refute "supersede: no stale '+' version"  "$F" "13.0.4+"
 # no tag line may contain '+' — that is precisely what docker rejects
@@ -183,6 +189,21 @@ if awk '/^tags:/{t=1;next} /^[^[:space:]-]/{t=0} t&&/\+/{found=1} END{exit !foun
 else
   echo "ok   supersede: no tag line contains '+'"
 fi
+
+# 5b: a definition still pinned to the legacy /oss/release/ version alias is
+# MIGRATED to the per-build url, not merely refreshed in place. The alias is the
+# path whose contents were observed drifting from its own published checksum.
+SB=$(mktemp -d); mkdir -p "$SB/image/grafana"
+grafana_def 13.0.4 13.0 13 > "$SB/image/grafana/image.yaml"
+F="$SB/image/grafana/image.yaml"
+# shellcheck disable=SC2016  # ${target.arch} is a DHI template token, not a shell var
+sed -i -E 's@url: https://dl\.grafana\.com/[^[:space:]]*@url: https://dl.grafana.com/oss/release/grafana-13.0.4.linux-${target.arch}.tar.gz@' "$F"
+assert "migrate: fixture starts on the alias" "$F" "/oss/release/grafana-13.0.4.linux-"
+REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" \
+REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" \
+  "$SCRIPT" "$SB/image/grafana"
+assert "migrate: now on the per-build url" "$F" "url: https://dl.grafana.com/grafana/release/13.0.4/grafana_13.0.4_${NEW_BUILD}_linux_"
+refute "migrate: alias url gone"           "$F" "url: https://dl.grafana.com/oss/release/"
 
 # 6: a definition with no dl.grafana.com tarball must fail loudly, not silently
 SB=$(mktemp -d); mkdir -p "$SB/image/x"; git_def > "$SB/image/x/image.yaml"

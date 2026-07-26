@@ -146,59 +146,66 @@ from "vulnerable symbol is called".
 not a justification. Gate stays red on this finding until it is answered, which
 is the correct pressure. See the follow-up below.
 
-### SUPPLY CHAIN — grafana 13.0.4 artifact no longer matches upstream's own checksum
+### SUPPLY CHAIN — we pinned one artifact and downloaded another
 
-Not a CVE, and the most serious thing this pass found.
+Not a CVE, and the most serious thing this pass found. The first two diagnoses
+were wrong; the measurements that corrected them are below.
 
-The build failed verifying the pinned tarball. Chasing it produced this:
+Grafana publishes each release tarball at **two** paths:
 
-| | value |
+| Path | Shape |
 |---|---|
-| our pin, amd64 | `cd8c8b31…` |
-| upstream `.sha256` sidecar, amd64 | `cd8c8b31…` — **agrees with our pin** |
-| the actual `grafana-13.0.4.linux-amd64.tar.gz` | `54eceec7…` — **agrees with neither** |
-| `last-modified` on that object | Wed, 22 Jul 2026 05:36:05 GMT |
+| per-build | `…/grafana/release/<ver>/grafana_<ver>_<build-id>_linux_<arch>.tar.gz` |
+| version alias | `…/oss/release/grafana-<ver>.linux-<arch>.tar.gz` |
 
-The amd64 tarball behind a *stable version URL* was **silently replaced on
-2026-07-22**, one day after the coordinated 07-21 security release, and the
-`.sha256` sidecar beside it was never regenerated. Upstream now publishes an
-artifact its own checksum file disowns.
+They are **not the same bytes**. For 13.0.4:
 
-Consequences, in order of how much they should bother you: anyone verifying
-against upstream's published checksum gets a hard failure; anyone *not*
-verifying silently receives different bits than the release advertised; and
-nothing about the version string changed to signal any of it.
+| | amd64 | arm64 |
+|---|---|---|
+| per-build `.sha256` | `cd8c8b31…` | `bcf8b9fb…` |
+| alias `.sha256` | `cd8c8b31…` | `591ac184…` |
+| alias **actual content** | `54eceec7…` | `591ac184…` |
 
-Two decisions follow.
+Read the first column carefully. **Our original pins — `cd8c8b31…` and
+`bcf8b9fb…` — are exactly the per-build values.** They were correct when
+written and are still correct. What broke is that the definition *pinned* the
+per-build artifact while *downloading* the alias. Those agreed at authoring
+time and have since diverged.
 
-**We did not re-pin 13.0.4 to `54eceec7…`.** That would restore a green build
-by shipping bits that fail upstream's own published verification — laundering
-an unexplained substitution into a signed artifact of ours. The whole point of
-the pin is that it refuses to do that.
+On amd64 the alias content was replaced and its sidecar was not regenerated, so
+the alias now contradicts itself. On arm64 both moved together, so the alias is
+self-consistent but is a different build from the one we pinned. 13.1.1 splits
+the same way (`e4744321…` per-build vs `0c071169…` alias).
 
-**We moved to 13.1.1 instead**, pinned from its sidecar, which is also the fix
-for the stdlib findings above. If 13.1.1's artifact turns out to disagree with
-*its* sidecar too, the gate fails again and we will know the drift is
-systemic rather than a one-off — which is a far more valuable thing to learn
-than a green build.
+That also explains the flapping. Pinned to the alias' value, the same URL and
+digest **passed at 21:06Z, failed at 21:54Z, and passed again** on the next run
+— the alias does not serve stable bytes.
 
-Separately: our **arm64** pin (`bcf8b9fb…`) never matched upstream's arm64
-sidecar (`591ac184…`), where file and sidecar do agree. That was a latent bug
-that would have failed the multi-arch release build on `main`. It stayed
-invisible because PR builds are amd64-only and grafana had not been rebuilt
-since it was added — the VEX canary (which now builds the images a statement
-names) is what exposed both of these.
+**Two earlier conclusions in this log were wrong and are retracted:**
 
-**Worth reporting upstream.** A stale `.sha256` beside a replaced artifact is a
-defect in Grafana's release process, not in ours. Drafted with the measurements
-and controls in
-[`upstream/2026-07-26-grafana-13.0.4-checksum-drift.md`](upstream/2026-07-26-grafana-13.0.4-checksum-drift.md).
+- *"Upstream silently replaced the artifact and our pin caught it."* Partly. The
+  alias changed, but our pin was never describing the alias.
+- *"Our arm64 pin never matched upstream."* Wrong. It matches the per-build
+  artifact precisely. It only looked wrong when compared against the alias.
 
-The controls matter as much as the finding: 13.0.4 **arm64** is self-consistent
-(file == sidecar), and **13.1.1 amd64** verified cleanly in CI against its own
-sidecar during this pass. So this is not a systemic checksum-generation failure
-— it is one artifact re-uploaded without regenerating its sidecar, which is a
-much more actionable thing to report.
+**Fix: pin and download the per-build artifact.** The build id is not derivable
+from the version, but it is recoverable — it appears in the GitHub release asset
+names (`grafana_<ver>_<id>_linux_amd64.deb`), and GitHub is already this
+definition's Renovate datasource. So the version stays the single knob Renovate
+turns, `refresh-grafana.sh` resolves the id and rebuilds the url, and the
+artifact we verify is the artifact we fetch. A re-cut release lands at a new
+build-id URL rather than overwriting ours.
+
+**Still worth reporting upstream**, and the report is now much sharper than
+"a checksum is wrong": a version alias serving different bytes than the
+per-build artifact of the same release, with a stale sidecar on one arch. Draft
+in [`upstream/2026-07-26-grafana-13.0.4-checksum-drift.md`](upstream/2026-07-26-grafana-13.0.4-checksum-drift.md).
+
+**Method note.** Three diagnoses in a row, each overturned by the next
+measurement: "bad pin", then "upstream replaced the artifact", then "two paths,
+two artifacts". Each was consistent with the evidence available at the time.
+The one that survived came from asking what *else* upstream publishes rather
+than re-reasoning about the numbers already in hand.
 
 ### Post-bump rescan — what 13.1.1 actually changed
 
