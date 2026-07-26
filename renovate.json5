@@ -45,6 +45,28 @@
       ],
       datasourceTemplate: "docker",
     },
+    {
+      // Grafana is the tarball-repackage archetype: it ships a prebuilt
+      // release from dl.grafana.com, so there is no `git+https://…#vX.Y.Z`
+      // ref for the source manager above to latch onto and Renovate tracked
+      // nothing but its build layer. Read the version straight out of the
+      // download url and resolve it against upstream's GitHub Releases — the
+      // download host and the version datasource are separate concerns
+      // (ADR 0002: GitHub carries no linux tarball, only .deb/.rpm and a
+      // source archive, so the url itself must stay on dl.grafana.com).
+      // github-releases rather than github-tags is deliberate: it keeps
+      // grafana out of the git-source packageRules below, whose
+      // postUpgradeTask resolves a commit sha grafana does not have.
+      customType: "regex",
+      managerFilePatterns: ["/^image/.+/image\\.yaml$/"],
+      matchStrings: [
+        "url:\\s*https://dl\\.grafana\\.com/oss/release/grafana-(?<currentValue>[0-9][^\\s\"'/]*?)\\.linux-",
+      ],
+      depNameTemplate: "grafana/grafana",
+      datasourceTemplate: "github-releases",
+      // Our pin is unprefixed (13.0.4); upstream tags its releases v13.0.4.
+      extractVersionTemplate: "^v(?<version>\\d+\\.\\d+\\.\\d+)$",
+    },
   ],
 
   packageRules: [
@@ -79,6 +101,23 @@
         fileFilters: ["image/**/image.yaml"],
         executionMode: "update",
       },
+    },
+    {
+      // The repackage counterpart (ADR 0002): Renovate bumps only the version
+      // inside the tarball url, so this re-pins both per-arch checksums from
+      // dl.grafana.com and regenerates the version-derived fields. Scoped to
+      // github-releases, which only grafana uses. Allowlisted alongside
+      // refresh-definition.sh in renovate.yml.
+      matchDatasources: ["github-releases"],
+      postUpgradeTasks: {
+        commands: ["scripts/refresh-grafana.sh {{{packageFileDir}}}"],
+        fileFilters: ["image/**/image.yaml"],
+        executionMode: "update",
+      },
+      // Explicit, though the Req 3.5 automerge rule above is github-tags-only:
+      // a repackage bump swaps a binary artifact we did not build and re-pins
+      // its checksum, so it is always reviewed even on a patch.
+      automerge: false,
     },
     {
       // The build layer is our own stricter pin surface — a frontend/builder

@@ -39,6 +39,9 @@ jobs:
       - name: refresh-definition unit tests (postUpgradeTask, Req 3.2)
         run: scripts/refresh-definition_test.sh
 
+      - name: refresh-grafana unit tests (postUpgradeTask, ADR 0002)
+        run: scripts/refresh-grafana_test.sh
+
       # Renovate config: validate the schema, then prove the custom managers
       # actually extract the right deps from the definitions (Req 3.2).
       - name: renovate config + manager fixtures

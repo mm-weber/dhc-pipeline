@@ -45,10 +45,11 @@ jobs:
           RENOVATE_REPOSITORIES: ${{ github.repository }}
           LOG_LEVEL: ${{ inputs.logLevel || 'info' }}
           RENOVATE_DRY_RUN: ${{ inputs.dryRun && 'full' || '' }}
-          # postUpgradeTasks run scripts/refresh-definition.sh — self-hosted
-          # requires this command to be explicitly allowlisted.
+          # postUpgradeTasks run scripts/refresh-definition.sh (from-source
+          # archetype) and scripts/refresh-grafana.sh (tarball repackage,
+          # ADR 0002) — self-hosted requires each command to be allowlisted.
           RENOVATE_ALLOW_POST_UPGRADE_COMMAND_TEMPLATING: "true"
-          RENOVATE_ALLOWED_POST_UPGRADE_COMMANDS: '["^scripts/refresh-definition\\.sh .+$"]'
+          RENOVATE_ALLOWED_POST_UPGRADE_COMMANDS: '["^scripts/refresh-definition\\.sh .+$", "^scripts/refresh-grafana\\.sh .+$"]'
           # dhi.io credentials for the docker datasource (frontend + builder).
           RENOVATE_HOST_RULES: >-
             [{"hostType":"docker","matchHost":"dhi.io","username":"${{ secrets.DHI_USERNAME }}","password":"${{ secrets.DHI_TOKEN }}"}]
