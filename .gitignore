@@ -3,3 +3,7 @@
 
 # Spike scratch (host-side clones etc.)
 temp/
+
+# renovate-config-validator + json5 are installed on demand (validate.yml, and
+# locally to run test/renovate/managers.test.mjs) — never committed.
+node_modules/

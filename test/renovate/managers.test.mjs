@@ -32,7 +32,10 @@ function extract(manager, content) {
       const g = m.groups ?? {};
       deps.push({
         datasource: manager.datasourceTemplate,
-        depName: g.depName,
+        // A manager either captures depName from the file (the git-source and
+        // docker managers) or states it as a constant template (the grafana
+        // tarball manager, whose url carries no owner/repo).
+        depName: g.depName ?? manager.depNameTemplate,
         currentValue: g.currentValue,
         currentDigest: g.currentDigest,
       });
@@ -42,7 +45,7 @@ function extract(manager, content) {
 }
 
 const read = (rel) => readFileSync(join(root, rel), "utf8");
-const [sourceMgr, dockerMgr] = config.customManagers;
+const [sourceMgr, dockerMgr, grafanaMgr] = config.customManagers;
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -128,6 +131,52 @@ check(
   "docker: ignores upstream git source + go/build actions",
   dHardened.every((d) => !d.depName?.includes("github.com") && !d.depName?.startsWith("go/")),
   JSON.stringify(dHardened),
+);
+
+// --- grafana manager: the tarball-repackage archetype (ADR 0002) ---
+// Grafana ships a prebuilt tarball from dl.grafana.com, so there is no
+// `git+https://…#vX.Y.Z` ref for the source manager to latch onto and Renovate
+// tracked nothing. This manager reads the version out of the download url and
+// looks it up against grafana/grafana releases — download host and version
+// datasource are deliberately separate concerns.
+const gGrafana = extract(grafanaMgr, read("image/grafana/image.yaml"));
+{
+  const d = dep(gGrafana, { datasource: "github-releases", depName: "grafana/grafana" });
+  check(
+    "grafana: tarball url → github-releases grafana/grafana",
+    !!d && isTag(d.currentValue),
+    JSON.stringify(gGrafana),
+  );
+  // the pinned url has no leading 'v'; upstream tags do — extractVersionTemplate
+  // bridges that, so assert it is present and actually strips the prefix.
+  const ev = grafanaMgr.extractVersionTemplate;
+  check(
+    "grafana: extractVersionTemplate strips upstream 'v' prefix",
+    !!ev && new RegExp(ev).exec("v13.1.1")?.groups?.version === "13.1.1",
+    `extractVersionTemplate=${ev}`,
+  );
+}
+check("grafana: yields exactly one dep", gGrafana.length === 1, `${gGrafana.length}`);
+
+// no cross-talk in either direction: the git-source manager must ignore the
+// tarball url, and the grafana manager must ignore git-source definitions.
+check(
+  "grafana: source manager ignores the dl.grafana.com tarball",
+  extract(sourceMgr, read("image/grafana/image.yaml")).length === 0,
+  JSON.stringify(extract(sourceMgr, read("image/grafana/image.yaml"))),
+);
+for (const other of ["cert-manager-controller", "hardened-app", "valkey"]) {
+  const deps = extract(grafanaMgr, read(`image/${other}/image.yaml`));
+  check(`grafana: manager ignores ${other}`, deps.length === 0, JSON.stringify(deps));
+}
+// the build layer is still tracked in the grafana definition (it has a
+// `# syntax=` pin like every other image) — the new manager must not shadow it.
+check(
+  "grafana: docker manager still captures its dhi.io build layer",
+  extract(dockerMgr, read("image/grafana/image.yaml")).some(
+    (d) => d.depName === "dhi.io/build" && is64(d.currentDigest),
+  ),
+  JSON.stringify(extract(dockerMgr, read("image/grafana/image.yaml"))),
 );
 
 if (failures > 0) {
