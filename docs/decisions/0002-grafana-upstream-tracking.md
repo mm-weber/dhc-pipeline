@@ -176,42 +176,42 @@ running the script against the real definition; the fixture had passed on an
 unanchored assertion that matched the checksum-provenance comment instead of
 the url. Both are now anchored on the `url:` key.
 
-**They are not downloadable from the templatable path.** This was left open
-above as unverifiable from the devcontainer; the operator resolved it from the
-host. Upstream publishes security builds under a different path *and* embeds an
-opaque CI run id in the filename:
+**They download from the same templatable path — checked, not assumed.** The
+amendment first shipped on the opposite conclusion. Grafana's download page
+advertises security builds under a longer per-build url that embeds an opaque
+CI run id:
 
 ```
-regular   https://dl.grafana.com/oss/release/grafana-13.0.4.linux-amd64.tar.gz
-security  https://dl.grafana.com/grafana/release/13.0.1+security-01/grafana_13.0.1+security-01_25720641773_linux_amd64.tar.gz
-                                                                                              ^^^^^^^^^^^
+https://dl.grafana.com/grafana/release/13.0.1+security-01/grafana_13.0.1+security-01_25720641773_linux_amd64.tar.gz
+                                                                                     ^^^^^^^^^^^
 ```
 
-That build id is not derivable from the version — the same class of token as
-the `29751385932` in GitHub's `.deb` asset names. For a security build neither
-the download url nor its checksum can be constructed, so the automatic refresh
-is impossible in principle, not merely unimplemented.
+That id is not derivable from the version — the same class of token as the
+`29751385932` in GitHub's `.deb` asset names — so the reasonable inference was
+that a security bump could not be automated at all, and the refresh task was
+built to refuse one and hand off to a human. The inference was wrong. The
+advertised url is not the only one that resolves; the plain templatable form
+does too:
 
-`refresh-grafana.sh` therefore **refuses** a security target and prints the url
-shape, the build-id problem, and the exact fields to hand-write — the
-alternative being a confusing 404 from a fabricated url. A security build is a
-**hand fix-forward (Req 6.5)**, and that is now a documented path rather than a
-surprise.
+```
+https://dl.grafana.com/oss/release/grafana-13.0.1+security-01.linux-amd64.tar.gz   → 200
+```
 
-Two consequences worth stating, because the naive version of this fix would
-reintroduce the blindness the ADR set out to remove:
+So security builds need no special download handling, the refusal path was
+deleted, and nothing in the manager or the refresh task has to know that the
+build-id form exists. What remains is purely a *version-shape* problem —
+ordering, extraction, and the tag separator — which is what the rest of this
+amendment covers.
 
-- The manager matches **both** url shapes. A definition sitting on a
-  hand-pinned security build would otherwise stop matching and drop out of
-  tracking — silent again, in exactly the state where visibility matters most.
-  Reading the version out of the path segment keeps the next release visible.
-- The refresh **canonicalises** the url back onto `/oss/release/` whenever the
-  target is a regular release, so a build-id url never outlives the security
-  build it belongs to. Grafana's real pattern — `v13.0.1+security-01` followed
-  by `v13.0.2` — makes that the common exit path, and it is covered by a test.
+The cost of not checking would have been a permanent manual step for exactly
+the release class that most needs to be automatic. Worth generalising: an
+upstream's documented download url is what it advertises, not necessarily the
+only one it serves.
 
-Still unverified: whether
-`/oss/release/grafana-13.0.1+security-01.linux-amd64.tar.gz` *also* resolves.
-If it does, refuse-and-guide could be replaced by full automation. One
-`curl -I` from a host with egress settles it; the firewall blocks
-`dl.grafana.com` from the devcontainer.
+Residual unknowns, both fail-closed:
+
+- The `arm64` security tarball and the `.sha256` sidecar for a security build
+  are unverified. `fetch_sha` rejects anything that is not 64 hex characters
+  and the definition re-verifies in-pipeline, so a missing artifact turns the
+  bump PR red rather than producing a bad pin. The sidecar is best-effort
+  already — it falls back to hashing the tarball.

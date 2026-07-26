@@ -175,11 +175,9 @@ const gGrafana = extract(grafanaMgr, read("image/grafana/image.yaml"));
 }
 check("grafana: yields exactly one dep", gGrafana.length === 1, `${gGrafana.length}`);
 
-// A definition hand-pinned to an out-of-band security build sits on a different
-// url shape (…/grafana/release/<ver>/grafana_<ver>_<buildid>_linux_<arch>.tar.gz)
-// whose build id cannot be generated. It must stay TRACKED regardless — falling
-// out of Renovate's view while pinned to a security build is the same blindness
-// this manager was added to fix.
+// A definition pinned to an out-of-band security build must stay tracked — the
+// same one url shape carries it, so the manager keeps matching and the next
+// release stays visible.
 {
   const deps = extract(grafanaMgr, read("test/renovate/fixtures/grafana-security-pin.yaml"));
   const d = dep(deps, { datasource: "github-releases", depName: "grafana/grafana" });

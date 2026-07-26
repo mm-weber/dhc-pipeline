@@ -60,16 +60,12 @@
       customType: "regex",
       managerFilePatterns: ["/^image/.+/image\\.yaml$/"],
       matchStrings: [
-        // Regular release: the templatable shape the refresh task maintains.
+        // One shape covers both regular releases and out-of-band security
+        // builds: /oss/release/grafana-13.0.1+security-01.linux-amd64.tar.gz
+        // resolves, verified against upstream. Grafana's download page
+        // advertises a longer per-build url carrying an opaque CI run id, but
+        // that form is not required, so nothing here has to know about it.
         "url:\\s*https://dl\\.grafana\\.com/oss/release/grafana-(?<currentValue>[0-9][^\\s\"'/]*?)\\.linux-",
-        // Out-of-band security build, hand-pinned per Req 6.5. Upstream puts
-        // these on a different path with an opaque build id in the filename
-        // (…/grafana/release/13.0.1+security-01/grafana_13.0.1+security-01_25720641773_linux_amd64.tar.gz),
-        // so they cannot be generated — but the definition must not fall out of
-        // tracking while it sits on one, or we go blind again. Matching the
-        // version out of the path segment keeps the next release visible;
-        // refresh-grafana.sh then canonicalises back onto the /oss/release/ url.
-        "url:\\s*https://dl\\.grafana\\.com/grafana/release/(?<currentValue>[0-9][^\\s\"'/]*)/",
       ],
       depNameTemplate: "grafana/grafana",
       datasourceTemplate: "github-releases",

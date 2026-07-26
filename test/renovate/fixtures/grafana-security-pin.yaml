@@ -1,8 +1,9 @@
-# Synthetic fixture: the grafana definition as it looks while hand-pinned to an
-# out-of-band security build (Req 6.5 fix-forward). Upstream publishes these off
-# a different path with an opaque CI run id in the filename, so the url cannot be
-# generated — this proves the definition stays TRACKED anyway, which is the whole
-# point: a security pin must not drop out of Renovate's view.
+# Synthetic fixture: the grafana definition pinned to an out-of-band security
+# build. Upstream ships these as semver build metadata (13.0.1+security-01) and
+# serves them from the same templatable /oss/release/ path as a regular release,
+# so the one manager keeps matching and the pin never drops out of tracking —
+# which is the point: a security pin must not go invisible.
+# Note the tag: '+' is illegal in an OCI reference, so it carries '_'.
 # Not a buildable definition — a parse fixture only.
 # syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc
 
@@ -23,5 +24,5 @@ contents:
     - name: grafana
       contents:
         files:
-          - url: https://dl.grafana.com/grafana/release/13.0.1+security-01/grafana_13.0.1+security-01_25720641773_linux_${target.arch}.tar.gz
+          - url: https://dl.grafana.com/oss/release/grafana-13.0.1+security-01.linux-${target.arch}.tar.gz
             path: ${source.dir}/grafana.tar.gz
