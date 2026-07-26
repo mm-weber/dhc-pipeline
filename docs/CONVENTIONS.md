@@ -75,6 +75,34 @@ One file per component at `image/<name>/image.yaml`. Rules, all enforced by
 - Runtime images run as UID/GID **65532** (`nonroot`), declared in the definition's
   `accounts:` block. Only `-dev` variants run as root, and only at build time.
 
+## Upstream tracking (Req 3, ADR 0002)
+
+Renovate is driven entirely by custom regex managers over `image/*/image.yaml`
+— every built-in manager is disabled, so nothing opens a surprise PR. There is
+**one manager per archetype**, and adding an image means checking its source
+shape is covered:
+
+| Archetype | Source shape | Datasource | postUpgradeTask |
+|---|---|---|---|
+| compile-from-source | `url: git+https://…#vX.Y.Z` | `github-tags` | `refresh-definition.sh` |
+| tarball-repackage | `url: https://<vendor>/…-X.Y.Z.linux-…` | `github-releases` | `refresh-grafana.sh` |
+| build layer | `syntax=` / `uses:` / `GOLANG_REFERENCE:` | `docker` | none (reviewed by hand) |
+
+- **The download host and the version datasource are separate concerns.** A
+  vendor that ships prebuilt tarballs off its own CDN can still be tracked
+  against its GitHub releases; do not assume an untrackable download URL means
+  an untrackable dependency (ADR 0002).
+- A bump PR must leave the definition **coherent**: the postUpgradeTask
+  regenerates every version-derived field (tags, `SEMVER_*`, checksums, purl,
+  spdx version, annotations) from the one value Renovate changed. Anything the
+  task cannot derive is called out in the ADR and fixed by the reviewer.
+- Repackage bumps are **never automerged** — they swap a binary we did not
+  build. From-source patch/digest bumps automerge on green CI (Req 3.5).
+- Every manager is covered by `test/renovate/managers.test.mjs`, which asserts
+  both that it captures its own definitions and that it does **not** capture
+  the others. `renovate-config-validator --strict` proves the config parses;
+  only the fixtures prove the regexes still match.
+
 ## Chart override style (Req 4)
 
 - Upstream chart templates are never edited, forked, or patched (Req 4.1).
