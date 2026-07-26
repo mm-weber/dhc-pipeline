@@ -30,33 +30,57 @@ they never justify a status.
 Eight open findings from the daily rescan (issues #22–#28, #30). Sorted by what
 we can actually *do*, which is a property of the image's archetype:
 
-- **cert-manager-\*** compile from source in our own pipeline → we can patch a
-  vulnerable transitive dependency ahead of upstream.
+- **cert-manager-\*** compile from source in our own pipeline → in principle we
+  can patch a vulnerable transitive dependency ahead of upstream. In practice
+  that needs the frontend's bump action, not a shell step; see #28 below.
 - **grafana** is a tarball repackage of upstream's prebuilt binary → its
   dependency graph is fixed at upstream's build time. We can bump the whole
   release or we can reason about reachability. We cannot patch a single module.
 
 That asymmetry, not severity, drove every decision below.
 
-### FIX — GHSA-hrxh-6v49-42gf, `google.golang.org/grpc` v1.81.1 → v1.82.1 (#28)
+### AFFECTED, no fix mechanism — GHSA-hrxh-6v49-42gf, `google.golang.org/grpc` v1.81.1 (#28)
 
-*Images: cert-manager-controller, cert-manager-webhook (also grafana, see below).*
+*Images: cert-manager-controller, cert-manager-webhook, grafana.*
 
-cert-manager v1.21.0 resolves grpc v1.81.1; upstream has not tagged a release
-pinning the fix. Because we compile from source, the definition now overlays the
-patched dependency at build time (`go get google.golang.org/grpc@v1.82.1` before
-`go/build`) — the shipped artifact is "cert-manager v1.21.0 with grpc v1.82.1",
-declared in reviewable YAML and reflected in the SBOM. This is the
-`docs/concepts.md` "CVE surgery between upstream releases" path.
+This was triaged as a **fix** and attempted as one. Both assumptions behind that
+were wrong, and the build proved it — recorded here because the failed attempt
+is the useful part.
 
-**Outcome: fixed.** No VEX statement — there is nothing to excuse once the
-vulnerable version is not shipped. Retire the patch step when an upstream
-release resolves ≥ v1.82.1.
+**There is no upstream release to bump to.** cert-manager v1.21.0 is the newest
+release (2026-07-08, checked against the releases API), and its root `go.mod`
+carries `google.golang.org/grpc v1.81.1 // indirect`. Renovate is already on the
+newest tag; the version-bump path is closed.
 
-**Why not VEX it instead?** The xDS RBAC half of this advisory plausibly does not
-apply to cert-manager, and we could have argued that. We did not, because a free
-fix was available. *Exhaust the fix before you argue.* A VEX written to avoid a
-one-line dependency bump is technical debt with a signature on it.
+**And the dependency cannot be patched from a pipeline step.** The obvious move
+for a compile-from-source image — `go get google.golang.org/grpc@v1.82.1` before
+`go/build` — fails in the sandbox:
+
+```
++ go get google.golang.org/grpc@v1.82.1
+go: cel.dev/expr@v0.25.1: Get "https://proxy.golang.org/…":
+   dial tcp: lookup proxy.golang.org … network is unreachable
+```
+
+**The DHI pipeline sandbox has no egress.** That is a hardening property, not a
+misconfiguration: a build step cannot reach out and fetch something the
+definition did not declare. Which means dependency surgery has to happen in the
+frontend's *fetch* phase, and that is precisely why the catalog ships a Go bump
+action instead of leaving this to `runs:`. `runs:` is not an alternative to it.
+
+**Outcome: affected, accepted for now, tracked.** No VEX statement — grpc is
+reachable in all three images (cert-manager serves gRPC APIs; Grafana's plugin
+transport runs over gRPC via go-plugin), and the "we do not use xDS" argument
+covers only part of the advisory. A partial-inapplicability argument is not a
+`not_affected` status.
+
+**Next mechanism to try:** the frontend's Go bump action in the fetch phase. Its
+parameter schema is not primary-verified in our research notes
+(`data/docker_internal_build.md` lists `go/build`, `helm/rudder`, `helm/cmd`,
+`helm/package` as primary-verified; a Go bump action appears only via a
+secondary source), so establishing it costs a CI round trip against the
+frontend's error output. Worth doing — it is the mechanism that unblocks every
+future between-releases CVE on a from-source image.
 
 ### NOT AFFECTED — CVE-2026-28377, `github.com/grafana/tempo` (#27)
 
@@ -99,17 +123,6 @@ built on Go ≥ 1.26.4. **13.1.1 is available and untested against these** —
 Renovate now tracks grafana (ADR 0002) and will offer that bump; whether it
 clears these three is an empirical question the rescan answers, not a judgement
 call. Owner: catalogue maintainer. Revisit on the 13.1.1 bump PR.
-
-### AFFECTED (grafana half) — GHSA-hrxh-6v49-42gf, grpc (#28)
-
-The fix above covers the two cert-manager images. Grafana ships the same
-vulnerable grpc, and we cannot patch it — grpc is reachable there via Grafana's
-plugin transport (hashicorp go-plugin runs over grpc), so the "we do not use
-xDS" argument covers only part of the advisory.
-
-**Outcome: affected, accepted for now, tracked** — same 13.1.1 lever as the
-stdlib findings. Deliberately **not** VEXed: a partial-inapplicability argument
-is not a `not_affected` status.
 
 ### UNDER INVESTIGATION — GHSA-r277-6w6q-xmqw, `github.com/getkin/kin-openapi` (#30)
 
