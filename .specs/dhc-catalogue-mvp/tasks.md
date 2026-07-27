@@ -102,7 +102,7 @@
   - [ ] 7.3 First real triage decision
     - Author OpenVEX via vexctl for a real finding, attach with cosign attest, entry in `triage/LOG.md`; or fix-bump PR when a fix exists
     - _Requirements: Req 6.4, Req 6.5_
-  - [ ] 7.4 Risk treatment lane
+  - [x] 7.4 Risk treatment lane
     - `triage/accepted-risk/<image>.yaml` time-boxed exceptions (`accept` / `transfer`), consumed by the gate and the rescan as a Trivy `--ignorefile` so an expiry re-reds the gate on its own
     - `scripts/lint-accepted-risk.sh` (+ `_test.sh`, wired into `validate.yml`): required fields, 90-day ceiling, no ignore file outside `triage/accepted-risk/`
     - Job summary separates VEX suppression from risk acceptance and names expiring exceptions; `triage/README.md` gains the four-treatment model

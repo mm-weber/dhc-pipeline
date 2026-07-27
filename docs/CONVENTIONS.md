@@ -150,10 +150,23 @@ workloads non-root. Policy fixtures live in `policies/tests/` and run via
 
 Every image a PR builds is scanned by Trivy for `HIGH,CRITICAL` in
 `build.yml`; the gate fails on any finding **not** excused by an OpenVEX
-statement in `triage/vex/`, and a Grype second opinion runs on any surviving
-`CRITICAL`. Red gates are cleared by a recorded decision — an OpenVEX statement
-(`vexctl`, `cosign attest`) plus a `triage/LOG.md` entry, or a fix-bump PR —
-never by silencing the scanner.
+statement in `triage/vex/` or a time-boxed exception in
+`triage/accepted-risk/<image>.yaml`, and a Grype second opinion runs on any
+surviving `CRITICAL`. Red gates are cleared by a recorded decision — drop the
+component, a fix-bump PR, an OpenVEX statement (`vexctl`, `cosign attest`), or an
+accepted-risk entry — plus a `triage/LOG.md` entry, never by silencing the
+scanner.
+
+The two suppression lanes are **not** interchangeable. VEX states a vulnerability
+does not apply, is attested to the image, and never expires;
+`triage/accepted-risk/` records that it *does* apply and we ship anyway for a
+bounded time, stays internal, and **must never be written as a VEX** (Req 6.8) —
+that would launder a business decision into a machine-readable claim of technical
+inapplicability, and every consumer would inherit it. Exceptions carry a treatment
+(`accept` / `transfer`), an owner, the reason avoidance and remediation were
+unavailable, and an `expired_at` no more than 90 days out;
+`scripts/lint-accepted-risk.sh` enforces that and rejects any Trivy ignore file
+living anywhere else (Req 6.11, 6.12).
 
 A daily `rescan.yml` cron re-scans the published images for CVEs that land after
 merge; new HIGH/CRITICAL findings (not already tracked, VEX-aware) are enriched

@@ -68,6 +68,12 @@ jobs:
             if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/build\.yml$|^triage/vex/'; then
               names="$names hardened-app"
             fi
+            # An accepted-risk file names its image in its own filename, so a
+            # change to one rebuilds exactly that image. Without this the gate
+            # never re-runs against the exception, and "it suppresses what it
+            # claims" stays an assumption (Req 6.9).
+            names="$names $(printf '%s\n' "$changed" \
+              | sed -nE 's#^triage/accepted-risk/([^/]+)\.ya?ml$#\1#p')"
           else
             if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then range="HEAD~1...HEAD"; else range="${BEFORE}...${GITHUB_SHA}"; fi
             names=$(git diff --name-only $range -- image/ | awk -F/ 'NF>=3 && $3=="image.yaml"{print $2}' | sort -u)
@@ -171,27 +177,47 @@ jobs:
           trivy --version
           grype version
 
-      - name: Trivy scan (VEX-gated)
+      - name: Trivy scan (VEX + accepted risk)
         id: trivy
         if: github.event_name == 'pull_request'
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
+          NAME: ${{ matrix.name }}
         run: |
           set -euo pipefail
           ref=$(printf '%s\n' "$TAGS" | head -n1)
           echo "scanning $ref"
-          # Consume our OpenVEX statements when any exist. --vex is a slice of
-          # sources (each a file path), so pass one per statement; an empty
-          # triage/vex/ excuses nothing, so every HIGH/CRITICAL counts — correct
-          # until a triage decision lands (task 7.3).
+          # Two suppression inputs, deliberately different in kind:
+          #
+          #   --vex         applicability claims — the vulnerable code cannot
+          #                 execute here. Evidence-backed, published with the
+          #                 image, no expiry.
+          #   --ignorefile  risk decisions — it is real and we ship anyway, for a
+          #                 bounded time. Internal, never attested (Req 6.8), and
+          #                 it expires (Req 6.9).
+          #
+          # They compose in one scan and the report's Source field tells them
+          # apart, which is what lets the summary below keep them apart too.
+          # An empty triage/vex/ and a missing accepted-risk file excuse nothing,
+          # so every HIGH/CRITICAL counts — the correct default.
           vex=()
-          for f in triage/vex/*.json; do [ -e "$f" ] && vex+=(--vex "$f"); done
-          # One scan → JSON of the POST-VEX findings (suppressed ones drop out
-          # unless --show-suppressed). exit-code 0 keeps us in control: the Grype
-          # second opinion must still run when a CRITICAL is present.
-          trivy image "${vex[@]}" \
+          for f in triage/vex/*.json; do
+            if [ -e "$f" ]; then vex+=(--vex "$f"); fi
+          done
+          accepted="triage/accepted-risk/${NAME}.yaml"
+          ignore=()
+          if [ -f "$accepted" ]; then ignore=(--ignorefile "$accepted"); fi
+          # One scan → JSON of the POST-suppression findings. --show-suppressed
+          # keeps the suppressed ones in the report under
+          # ExperimentalModifiedFindings (verified: it does NOT put them back
+          # into .Vulnerabilities, so the gate counts below are unaffected).
+          # Without it, a statement or exception that silently fails to match
+          # looks exactly like one that worked. exit-code 0 keeps us in control:
+          # the Grype second opinion must still run when a CRITICAL is present.
+          trivy image "${vex[@]}" "${ignore[@]}" \
             --severity HIGH,CRITICAL \
             --pkg-types os,library \
+            --show-suppressed \
             --format json --output trivy.json \
             --no-progress --exit-code 0 "$ref"
           high=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")]     | length' trivy.json)
@@ -200,10 +226,59 @@ jobs:
           echo "crit=$crit" >> "$GITHUB_OUTPUT"
           {
             echo "### Trivy — ${ref}"
-            echo "Uncovered after VEX: **${crit} CRITICAL**, **${high} HIGH**"
-            echo '```'
-            trivy convert --format table trivy.json 2>/dev/null || true
-            echo '```'
+            echo
+            echo "Uncovered: **${crit} CRITICAL**, **${high} HIGH**"
+            echo
+            # Split by Source, not by eyeball: the two lanes answer different
+            # questions and conflating them in one "suppressed" count is how a
+            # business decision starts reading like a technical claim.
+            echo "#### Not affected — VEX (published with the image)"
+            echo
+            if jq -e '[.Results[]?.ExperimentalModifiedFindings[]?
+                       | select(.Source // "" | startswith("triage/vex/"))] | length > 0' \
+                 trivy.json >/dev/null; then
+              echo "| CVE | Status | Justification | Package |"
+              echo "|---|---|---|---|"
+              jq -r '.Results[]?.ExperimentalModifiedFindings[]?
+                     | select(.Source // "" | startswith("triage/vex/"))
+                     | "| \(.Finding.VulnerabilityID) | \(.Status) | \(.Statement // "-") | \(.Finding.PkgName) |"' \
+                 trivy.json | sort -u
+            else
+              vexn=$(ls triage/vex/*.json 2>/dev/null | wc -l)
+              echo "_none_ — ${vexn} statement(s) on file."
+              if [ "$vexn" -gt 0 ]; then
+                echo "> ⚠️ Statements exist but suppressed nothing here — check the product identifier."
+              fi
+            fi
+            echo
+            echo "#### Accepted risk — time-boxed, internal only"
+            echo
+            if jq -e '[.Results[]?.ExperimentalModifiedFindings[]?
+                       | select(.Source // "" | startswith("triage/accepted-risk/"))] | length > 0' \
+                 trivy.json >/dev/null; then
+              echo "| CVE | Decision | Package |"
+              echo "|---|---|---|"
+              jq -r '.Results[]?.ExperimentalModifiedFindings[]?
+                     | select(.Source // "" | startswith("triage/accepted-risk/"))
+                     | "| \(.Finding.VulnerabilityID) | \(.Statement // "-") | \(.Finding.PkgName) |"' \
+                 trivy.json | sort -u
+              echo
+              # Owner and expiry live in the file, not in Trivy's report. Shown
+              # verbatim so a reviewer sees who carries this and until when
+              # without leaving the summary.
+              echo "<details><summary><code>${accepted}</code></summary>"
+              echo
+              echo '```yaml'
+              cat "$accepted"
+              echo '```'
+              echo
+              echo "</details>"
+            elif [ -f "$accepted" ]; then
+              echo "_none_ — \`${accepted}\` exists but suppressed nothing here."
+              echo "> ⚠️ Either the findings it covers are already gone (drop the entries) or its \`purls\`/\`id\` do not match."
+            else
+              echo "_none_ ✓"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Grype second opinion (CRITICAL present)
@@ -232,7 +307,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${CRIT:-0}" -gt 0 ] || [ "${HIGH:-0}" -gt 0 ]; then
-            echo "::error::${NAME}: ${CRIT} CRITICAL / ${HIGH} HIGH not covered by a VEX statement in triage/vex/ (Req 6.1). Triage it: OpenVEX statement (task 7.3) or a fix-bump PR."
+            echo "::error::${NAME}: ${CRIT} CRITICAL / ${HIGH} HIGH uncovered (Req 6.1). Four ways out, strongest first: avoid (drop the component) · fix (version bump, Req 6.5) · prove it does not apply (OpenVEX in triage/vex/, Req 6.4) · accept or transfer for a bounded time (triage/accepted-risk/${NAME}.yaml, Req 6.7). An expired exception counts as uncovered."
             exit 1
           fi
           echo "${NAME}: no uncovered HIGH/CRITICAL ✓"
