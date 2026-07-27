@@ -244,7 +244,10 @@ jobs:
                      | "| \(.Finding.VulnerabilityID) | \(.Status) | \(.Statement // "-") | \(.Finding.PkgName) |"' \
                  trivy.json | sort -u
             else
-              vexn=$(ls triage/vex/*.json 2>/dev/null | wc -l)
+              # From the array already built above, not a fresh glob: an empty
+              # triage/vex/ makes `ls *.json` fail, and under `set -euo pipefail`
+              # that kills the step before the summary is ever written.
+              vexn=$(( ${#vex[@]} / 2 ))
               echo "_none_ — ${vexn} statement(s) on file."
               if [ "$vexn" -gt 0 ]; then
                 echo "> ⚠️ Statements exist but suppressed nothing here — check the product identifier."
