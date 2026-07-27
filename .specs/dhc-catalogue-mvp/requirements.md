@@ -93,6 +93,12 @@ registry images remain private until explicitly released.
 4. WHEN a triage decision concludes not-affected THE Triage Process SHALL record an OpenVEX statement under triage/ and attach it to affected images as an attestation.
 5. WHEN a triage decision concludes fix THE Triage Process SHALL produce a version-bump or rebuild pull request.
 6. WHERE a CRITICAL finding exists THE Scan Pipeline SHALL obtain a second-opinion scan with Grype.
+7. WHEN a triage decision concludes accepted risk or upstream transfer THE Triage Process SHALL record a time-boxed exception under triage/accepted-risk/ carrying a treatment, an owner, a reference to its reasoning in triage/LOG.md, a justification for why avoidance and remediation were unavailable, and an expiry date.
+8. THE Triage Process SHALL NOT record accepted risk or upstream transfer as a VEX statement.
+9. WHEN an accepted-risk exception has passed its expiry date THE Scan Gate SHALL count every finding it covers as uncovered.
+10. WHEN a daily rescan runs THE Scan Pipeline SHALL report every accepted-risk exception that has expired or that expires within 14 days.
+11. IF an accepted-risk exception omits its treatment, owner, reasoning reference, unavailability justification, or expiry date, or sets an expiry date more than 90 days ahead, THEN THE CI Pipeline SHALL fail validation.
+12. IF a Trivy ignore file exists outside triage/accepted-risk/ THEN THE CI Pipeline SHALL fail validation.
 
 ### Requirement 7: Conventions and Review Enforcement
 
