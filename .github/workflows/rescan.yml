@@ -72,8 +72,15 @@ jobs:
             img=$(yq '.image' "$f" | tr -d '"')
             tag=$(yq '.tags[0]' "$f" | tr -d '"')
             ref="${img}:${tag}"
+            # Accepted risk, same contract as the PR gate: without this the cron
+            # refiles an issue every day for a finding that was already decided,
+            # and the acceptance is defeated by noise. The expiry still ends it —
+            # Trivy stops honouring a lapsed entry on its own (Req 6.9).
+            accepted="triage/accepted-risk/${name}.yaml"
+            ignore=()
+            if [ -f "$accepted" ]; then ignore=(--ignorefile "$accepted"); fi
             echo "::group::scan ${ref}"
-            if trivy image "${vex[@]}" --severity HIGH,CRITICAL --pkg-types os,library \
+            if trivy image "${vex[@]}" "${ignore[@]}" --severity HIGH,CRITICAL --pkg-types os,library \
                --format json --output "$OUT/trivy/${name}.json" --no-progress --exit-code 0 "$ref"; then
               scanned=$((scanned + 1))
             else
@@ -87,6 +94,37 @@ jobs:
           jq -r '.Results[]?.Vulnerabilities[]?.VulnerabilityID' "$OUT"/trivy/*.json 2>/dev/null \
             | grep -E '^CVE-' | sort -u > "$OUT/cves.txt" || true
           echo "distinct HIGH/CRITICAL CVEs: $(grep -c . "$OUT/cves.txt" || echo 0)"
+
+      # Req 6.10 — an acceptance that lapses unnoticed is the failure mode this
+      # whole lane exists to prevent, and Trivy is silent about it: a lapsed
+      # entry simply stops suppressing. The daily cron is the right place to say
+      # so, because expiry happens with time rather than with a commit — reddening
+      # some unrelated PR instead would blame the wrong change.
+      #
+      # Reuses the linter rather than recomputing dates: one implementation of
+      # "expired" and "expiring", so the notice and the gate can never disagree.
+      - name: accepted-risk expiries (Req 6.10)
+        run: |
+          set -uo pipefail
+          # Explicit rather than transitive: unlike validate.yml this workflow
+          # installs no yamllint, so PyYAML is not already here by accident.
+          python3 -c 'import yaml' 2>/dev/null || pip install --quiet pyyaml
+          scripts/lint-accepted-risk.sh > "$OUT/accepted-risk.txt" 2>&1 || true
+          expiring=$(grep -E 'expires in|is in the past' "$OUT/accepted-risk.txt" || true)
+          {
+            echo "### Accepted risk — expiring"
+            echo
+            if [ -n "$expiring" ]; then
+              printf '%s\n' "$expiring" \
+                | sed -E 's/^::(warning|error) file=([^,:]+)[^:]*:://' \
+                | sed 's/^/- /'
+              echo
+              echo "_Each of these needs a fresh decision: fix, avoid, prove it does not apply, or re-accept with a new expiry and a reason it is still the right call._"
+            else
+              echo "_none_ ✓"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "$expiring"
 
       - name: enrich — EPSS + CISA KEV
         run: |

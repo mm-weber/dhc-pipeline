@@ -33,8 +33,19 @@ jobs:
             | tar -xz -C /usr/local/bin kyverno
           kyverno test policies/tests/
 
+      # The risk-treatment lane is the only sanctioned way to stop the scan gate
+      # failing on a real finding, so its own rules are enforced here rather than
+      # in the gate: a malformed exception should be rejected at review time, not
+      # discovered when some unrelated PR rebuilds the image it covers.
+      # Runs after yamllint, which installs PyYAML as a dependency.
+      - name: accepted-risk lint — risk treatment lane (Req 6.11, 6.12)
+        run: scripts/lint-accepted-risk.sh
+
       - name: pin-linter unit tests
         run: scripts/lint-pins_test.sh
+
+      - name: accepted-risk linter unit tests
+        run: scripts/lint-accepted-risk_test.sh
 
       - name: refresh-definition unit tests (postUpgradeTask, Req 3.2)
         run: scripts/refresh-definition_test.sh

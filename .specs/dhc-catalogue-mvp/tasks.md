@@ -102,6 +102,11 @@
   - [ ] 7.3 First real triage decision
     - Author OpenVEX via vexctl for a real finding, attach with cosign attest, entry in `triage/LOG.md`; or fix-bump PR when a fix exists
     - _Requirements: Req 6.4, Req 6.5_
+  - [x] 7.4 Risk treatment lane
+    - `triage/accepted-risk/<image>.yaml` time-boxed exceptions (`accept` / `transfer`), consumed by the gate and the rescan as a Trivy `--ignorefile` so an expiry re-reds the gate on its own
+    - `scripts/lint-accepted-risk.sh` (+ `_test.sh`, wired into `validate.yml`): required fields, 90-day ceiling, no ignore file outside `triage/accepted-risk/`
+    - Job summary separates VEX suppression from risk acceptance and names expiring exceptions; `triage/README.md` gains the four-treatment model
+    - _Requirements: Req 6.7, Req 6.8, Req 6.9, Req 6.10, Req 6.11, Req 6.12_
 
 - [ ] 8. Wrap-up (Day 3)
   - [ ] 8.1 valkey chart adaptation [CUT 1st if pressed]
@@ -121,6 +126,6 @@
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5 |
-| Req 6: CVE Triage | 7.1, 7.2, 7.3 |
+| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4 |
 | Req 7: Conventions and Review | 1.1, 1.2 |
 | Req 8: Operating Environment | 2.1, 3.3, 4.2, 6.5, 7.2 |

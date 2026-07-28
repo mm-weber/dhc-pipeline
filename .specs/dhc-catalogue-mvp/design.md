@@ -150,6 +150,34 @@ for install/upgrade, readiness, live securityContext assertion, functional probe
 `triage/vex/*.openvex.json` (authored via vexctl, attached with cosign attest),
 `triage/LOG.md` (dated decisions: finding → EPSS/KEV → outcome → link). Consumed by Trivy gate.
 
+`triage/accepted-risk/<image>.yaml` (Req 6.7–6.12) covers the two treatments VEX
+must never express. Risk has four treatments — avoid (drop the component),
+mitigate (bump/patch, Req 6.5), transfer (upstream owns the fix), accept (ship
+knowingly) — and before this the gate had machinery only for the first two plus
+`not_affected`, so a real-and-unfixable finding could block an image forever with
+VEX as the only pressure valve. That is VEX-washing, which Req 6.8 forbids.
+
+The split is by *question*: **VEX answers "does this apply?"** — a claim about the
+artifact, evidence-backed, attested, no expiry. **accepted-risk answers "what are
+we doing about it?"** — a decision about our exposure, internal, never attested,
+and it expires. Transfer gets no separate file: while waiting on upstream we are
+still carrying the risk, so it is an acceptance with an external owner.
+
+Mechanically these are native Trivy ignorefiles (`--ignorefile`, one per image so
+an acceptance for grafana never silently covers cert-manager), composed with
+`--vex` in the same scan. Verified against Trivy 0.72.0: a future `expired_at`
+suppresses, a past one is silently counted again, versionless `purls:` scope to
+one package, and suppressions surface in `ExperimentalModifiedFindings` with a
+`Source` that distinguishes VEX from acceptance. So **acceptance decays back to
+un-triaged on its own** (Req 6.9) — the property that makes it safe. Our glue is
+only what Trivy lacks: `scripts/lint-accepted-risk.sh` enforcing required fields,
+the 90-day ceiling, and that no ignorefile lives anywhere else (Req 6.11–6.12),
+plus expiry reporting (Req 6.10), since Trivy logs nothing when an entry lapses.
+
+Each entry carries a `blocked:` field stating why avoid and mitigate were
+unavailable — presence machine-enforced, content judged at review. It is what
+keeps the file from becoming the path of least resistance.
+
 ### .github/workflows/
 `validate.yml` (schema/yamllint/conventions), `build.yml` (PR build + gates; main: release),
 `e2e.yml` (kind matrix), `renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).
