@@ -36,12 +36,15 @@ cert-manager issues a Certificate, Grafana answers health.
 
 ## What running it for real turned up
 
-- **A supply-chain integrity incident.** A published release tarball was
-  overwritten about twenty hours after publication, so a pin taken on release day
-  broke five days later with nothing in the version to explain it. Our own build
-  record proved the original pin had verified on both architectures. Fixed by
-  pinning and fetching the immutable per-build artifact instead of the mutable
-  version alias.
+- **An upstream artifact that moves.** Grafana rewrites its `/oss/release/`
+  tarballs about twenty hours after a release — all four objects of the
+  2026-07-21 batch inside one six-minute window, so this is routine automation
+  rather than a one-off. A digest pinned on release day silently stops matching,
+  with nothing in the version to explain it. Our own build provenance proved the
+  original pin had verified on both architectures, which is what ruled out a bad
+  pin on our side. Fixed by pinning the build-scoped artifact, which has not
+  moved since release day, and by adding a CI check that fetches every pinned
+  architecture so an unexercised pin cannot enter again.
 - **An invisible class of security release.** Grafana ships out-of-band fixes as
   semver build metadata (`13.0.1+security-01`), which semver ignores for
   precedence, so it never ranks *above* the plain release. The tracker would have

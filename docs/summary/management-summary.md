@@ -60,12 +60,13 @@ technical inapplicability that every downstream consumer then inherits.
 
 ## What running it for real turned up
 
-- **A supply-chain integrity incident.** An upstream release tarball was replaced
-  in place after publication while its published checksum sidecar was not
-  regenerated. It was provable only because our own build record from five days
-  earlier showed the original pin verifying on both architectures. Fixed by
-  pinning and fetching the immutable per-build artifact instead of the mutable
-  version alias; report to upstream drafted.
+- **An upstream artifact that moves.** Grafana rewrites its `/oss/release/`
+  tarballs about twenty hours after a release — routine automation, not a
+  one-off. A digest pinned on release day silently stops matching. It was
+  provable only because our own build record from five days earlier showed the
+  original pin verifying on both architectures. Fixed by pinning the build-scoped
+  artifact, which has not moved since release day, and by adding a CI check that
+  fetches every pinned architecture; report to upstream drafted.
 - **An invisible class of security release.** Grafana ships out-of-band fixes as
   semver build metadata (`13.0.1+security-01`), which semver ranks *below* the
   plain release — the tracker would have reported us up to date straight through a

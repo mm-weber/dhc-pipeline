@@ -1,123 +1,140 @@
-# `/oss/release/` version alias serves different bytes than the per-build artifact, and its amd64 `.sha256` is stale
+# `/oss/release/` tarballs are overwritten ~20h after publication — is that intended?
 
 ## Summary
 
-Each release tarball appears at two paths on `dl.grafana.com`:
+For the 2026-07-21 release batch, every `…/oss/release/grafana-<ver>.linux-<arch>.tar.gz`
+object was **rewritten roughly twenty hours after the release went out**. The
+new bytes differ from what the same URL served on release day, so a consumer
+that pinned the digest published at release time breaks days later, with no
+version change to explain it.
 
-| | |
-|---|---|
-| per-build | `…/grafana/release/<ver>/grafana_<ver>_<build-id>_linux_<arch>.tar.gz` |
-| version alias | `…/oss/release/grafana-<ver>.linux-<arch>.tar.gz` |
+Everything Grafana publishes is internally consistent — each object matches the
+`.sha256` beside it, and always has. The question is whether `/oss/release/` is
+meant to be immutable, because tooling widely treats it that way.
 
-For **13.0.4** these are not the same bytes, and on **amd64** the alias also
-contradicts its own published checksum.
+## Evidence
 
-| | amd64 | arm64 |
+### Object creation times
+
+| | per-build object written | `/oss/release/` object written |
 |---|---|---|
-| per-build `.sha256` | `cd8c8b31b0482f48f98018030c142919dab6debbe81f747f3521af6f6a6b4490` | `bcf8b9fbfac00bece5bccdda44512b9f7ba81d3105db1a255e0efd37a2fbf6df` |
-| alias `.sha256` | `cd8c8b31…` *(same as per-build)* | `591ac184f85e17455d3251f617cdadd9403811add395c5245bf81d658d49bb1e` |
-| alias **actual bytes** | `54eceec74891dd49f992502eab506e0554c82903317fb50d82246946e46fe7ae` | `591ac184…` |
+| 13.0.4 amd64 | 2026-07-21 09:56:03Z | **2026-07-22 05:36:05Z** |
+| 13.0.4 arm64 | 2026-07-21 09:56:14Z | **2026-07-22 05:36:34Z** |
+| 13.1.1 amd64 | 2026-07-21 08:53:04Z | **2026-07-22 05:42:05Z** |
+| 13.1.1 arm64 | 2026-07-21 08:53:16Z | **2026-07-22 05:42:36Z** |
 
-Two distinct issues:
+(from `last-modified` / `x-goog-generation`.) All four alias objects were
+written within six minutes of each other, so this looks like a batch step
+rather than a one-off correction.
 
-1. **amd64: the alias serves content that its own `.sha256` disowns.** Anyone
-   verifying that download against the checksum published beside it gets a hard
-   failure.
-2. **Both arches: the alias is a different build from the per-build artifact of
-   the same release.** On arm64 the alias and its sidecar agree with each other,
-   but neither matches `…/grafana/release/13.0.4/…`.
+### The same URL served different bytes before and after
 
-13.1.1 splits the same way — per-build
-`e47443214da0de041ffb29633d0977ce31ba7c8c569f09974ef5294a8ce32f08` vs alias
-`0c07116968aea49768af8babd3c3f162d19012655a1a220cd7a9d97efe91da6c` on amd64 —
-so this is not specific to 13.0.4.
+We build container images from these tarballs, pinning the SHA-256 and
+verifying at fetch time. The pin was taken from
+`grafana-13.0.4.linux-<arch>.tar.gz.sha256`.
+
+**2026-07-21 20:57Z** — a release build fetched both arches from `/oss/release/`
+and verified them. SLSA provenance recorded:
+
+| | uri | sha256 |
+|---|---|---|
+| amd64 | `…/oss/release/grafana-13.0.4.linux-amd64.tar.gz` | `cd8c8b31b0482f48f98018030c142919dab6debbe81f747f3521af6f6a6b4490` |
+| arm64 | `…/oss/release/grafana-13.0.4.linux-arm64.tar.gz` | `bcf8b9fbfac00bece5bccdda44512b9f7ba81d3105db1a255e0efd37a2fbf6df` |
+
+**2026-07-26** — same URL, same pin, same definition; two runs on separate
+runners, both failing:
+
+```
+/src/grafana.tar.gz: FAILED
+sha256sum: WARNING: 1 of 1 computed checksums did NOT match
+```
+
+**Today** — that URL serves
+`54eceec74891dd49f992502eab506e0554c82903317fb50d82246946e46fe7ae`
+(three verified downloads, byte count matching `Content-Length`), and its
+`.sha256` agrees. The digest we recorded on release day is now only available
+at the per-build path.
+
+### The two paths are different artifacts, and stay that way
+
+| | `/oss/release/` | `/grafana/release/<ver>/` | size delta |
+|---|---|---|---|
+| 13.0.4 amd64 | `54eceec7…` 337 697 955 B | `cd8c8b31…` 337 694 041 B | +3 914 |
+| 13.0.4 arm64 | `591ac184…` 321 125 583 B | `bcf8b9fb…` 321 121 554 B | +4 029 |
+| 13.1.1 amd64 | `0c071169…` 363 257 098 B | `e4744321…` 363 255 678 B | +1 420 |
+| 13.1.1 arm64 | `8403dc0b…` 345 122 382 B | `28ef74a3…` 345 128 051 B | −5 669 |
+
+Each side matches its own sidecar. The deltas are ~0.001% and change sign
+between arches, which reads like repackaging (tar metadata, gzip framing)
+rather than different content — but a consumer verifying a digest cannot tell
+the difference, and neither can we from outside.
 
 ## Reproduction
 
 ```console
-$ curl -sSL https://dl.grafana.com/oss/release/grafana-13.0.4.linux-amd64.tar.gz | sha256sum
-54eceec74891dd49f992502eab506e0554c82903317fb50d82246946e46fe7ae  -
-
-$ curl -sSL https://dl.grafana.com/oss/release/grafana-13.0.4.linux-amd64.tar.gz.sha256
+# what the two paths serve today
+$ curl -fsSL https://dl.grafana.com/oss/release/grafana-13.0.4.linux-amd64.tar.gz.sha256
+54eceec74891dd49f992502eab506e0554c82903317fb50d82246946e46fe7ae
+$ curl -fsSL https://dl.grafana.com/grafana/release/13.0.4/grafana_13.0.4_29751385932_linux_amd64.tar.gz.sha256
 cd8c8b31b0482f48f98018030c142919dab6debbe81f747f3521af6f6a6b4490
 
-$ curl -sSL https://dl.grafana.com/grafana/release/13.0.4/grafana_13.0.4_29751385932_linux_amd64.tar.gz.sha256
-cd8c8b31b0482f48f98018030c142919dab6debbe81f747f3521af6f6a6b4490
-```
-
-Response headers for the alias object:
-
-```
+# when each object was written
+$ curl -sSI https://dl.grafana.com/oss/release/grafana-13.0.4.linux-amd64.tar.gz \
+    | grep -iE 'last-modified|content-length|x-goog-generation'
 last-modified: Wed, 22 Jul 2026 05:36:05 GMT
-etag: "597107c3e6188cba8f7342dd0999f42c"
 content-length: 337697955
-x-goog-stored-content-length: 337697955
-x-goog-metageneration: 1
+x-goog-generation: 1784698564953130
+
+$ curl -sSI https://dl.grafana.com/grafana/release/13.0.4/grafana_13.0.4_29751385932_linux_amd64.tar.gz \
+    | grep -iE 'last-modified|content-length|x-goog-generation'
+last-modified: Tue, 21 Jul 2026 09:56:03 GMT
+content-length: 337694041
+x-goog-generation: 1784627763097984
 ```
 
-v13.0.4 was published 2026-07-21 12:25 UTC as part of a coordinated release
-alongside v13.1.1, v12.4.6 and v12.3.9. The alias object was last modified the
-following day.
-
-## The alias also does not serve stable bytes
-
-Pinned to the alias' published digest, the *same URL* verified, then failed
-within one hour, then verified again:
-
-| Time (UTC) | Result |
-|---|---|
-| 2026-07-26 21:06 | ✅ digest matched |
-| 2026-07-26 21:54 | ❌ digest mismatched |
-| 2026-07-26 22:3x | ✅ digest matched |
-
-We cannot tell from outside whether that is edges holding different copies, an
-in-progress re-sync, or transport corruption on our side. It is included
-because it is consistent with the alias being rewritten, and because it is what
-made the problem intermittent rather than obvious. The digests in the tables
-above were all measured from a workstation with plain `curl`, not in CI.
+Verify content by downloading to a file, not by piping: the objects are
+~320–360 MiB, and `curl … | sha256sum` will hash a truncated body and print a
+plausible, wrong digest. Check the byte count against `Content-Length` first.
 
 ## Why this matters downstream
 
-We build container images that pin upstream artifacts by SHA-256 and verify at
-fetch time. Our pins were taken from the **per-build** `.sha256` and are still
-correct for that artifact — but the definition downloaded from the **alias**,
-and the two silently diverged after publication. A build that had been
-reproducible stopped being so, with no version change to explain it.
+- **Verifying consumers break** on a release that previously worked, with
+  nothing in the version to explain it.
+- **Non-verifying consumers silently receive different bytes** than the ones
+  the release shipped with.
+- **A reproducible build stops reproducing.** Ours did: the 13.0.4 image we
+  published on 2026-07-21 was built from bytes that no longer exist at the URL
+  it fetched them from.
 
-More generally:
-
-- **Verifying consumers break** on a version that previously worked.
-- **Non-verifying consumers silently receive a different build** than the
-  release advertised.
-- **Two consumers pinning "13.0.4" can end up with different bytes**, depending
-  only on which documented path they used.
-
-We deliberately did not re-pin to the alias' current digest, since that would
-mean shipping bytes that fail the checksum published beside them. We moved to
-the per-build URL instead.
+We did not re-pin to the new digest, since that would mean tracking a path that
+can move again. We moved to
+`…/grafana/release/<ver>/grafana_<ver>_<build-id>_linux_<arch>.tar.gz`, which is
+scoped to a single build and whose sidecar is written in the same job.
 
 ## Questions
 
-1. **Is the version alias intended to be immutable?** If so, the amd64 object
-   for 13.0.4 has drifted and its sidecar is stale. If not, saying so in the
-   download docs would help — it is the path most tooling has historically
-   pinned.
-2. **Which build is authoritative for 13.0.4** — the one at
-   `/grafana/release/13.0.4/…` (`cd8c8b31…` / `bcf8b9fb…`), or the one currently
-   behind the alias (`54eceec7…` / `591ac184…`)?
-3. **Were other releases affected?** 13.1.1 shows the same split, so a sweep
-   comparing alias digests against per-build digests across recent releases
-   would establish the blast radius.
-4. **Do all CDN edges serve identical bytes** for a given alias object?
+1. **Is `/oss/release/<ver>` intended to be immutable?** If yes, these rewrites
+   are a bug. If no, saying so in the download docs would help — it is the path
+   most tooling has historically pinned.
+2. **What is the 2026-07-22 batch step?** If it is a repackaging or promotion
+   pass, could it run *before* the release is announced, so the first published
+   bytes are the final ones?
+3. **Should pinning consumers prefer the per-build URL?** It is what the
+   download page emits and it is scoped to one build. If that is the
+   recommendation, stating it in the install docs would settle it for everyone.
+4. **Do all CDN edges serve the current generation?** On 2026-07-26 one build
+   failed against a pin that five neighbouring builds accepted, and a sidecar
+   read the same day returned the pre-rewrite value. Both are consistent with an
+   edge still holding the old generation. We have not tested this per-edge and
+   may be wrong about it.
 
 ## Suggestion
 
-- **Regenerate the alias sidecars**, so that at minimum each alias object agrees
-  with the checksum published next to it.
-- **Point the alias at the same bytes as the per-build artifact**, or document
-  it as a moving pointer and recommend the per-build URL for anything that pins.
-- **Write artifact and sidecar in one operation**, so they cannot drift apart if
-  a replacement does happen.
+- **Treat published release objects as immutable**, or document `/oss/release/`
+  as a mutable convenience path and point pinning consumers at the per-build URL.
+- If a rewrite must happen, **publish the final bytes first** rather than
+  replacing them after announcement.
 
-Happy to re-run any of these checks. The digest comparisons reproduce with the
-commands above; the intermittency, by nature, does not.
+Happy to re-run any of this, or to supply the full build logs and provenance for
+the runs cited. The host-side scripts that produced these tables are in
+[`checks/`](checks/).

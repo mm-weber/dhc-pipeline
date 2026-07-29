@@ -43,11 +43,13 @@ serves SET/GET.
 
 ## What running it for real turned up
 
-- **A supply-chain integrity incident.** An upstream release tarball was replaced
-  in place after publication while its published checksum sidecar was not
-  regenerated. Our own build record from five days earlier proved the original pin
-  had verified on both architectures. Fixed by pinning and fetching the immutable
-  per-build artifact instead of the mutable version alias.
+- **An upstream artifact that moves.** Grafana rewrites its `/oss/release/`
+  tarballs about twenty hours after a release — routine automation, not a
+  one-off. A digest pinned on release day silently stops matching. Our own build
+  record from five days earlier proved the original pin had verified on both
+  architectures, which is what ruled out a bad pin on our side. Fixed by pinning
+  the build-scoped artifact, which has not moved since release day, and by adding
+  a CI check that fetches every pinned architecture.
 - **An invisible class of security release.** Grafana ships out-of-band fixes as
   semver build metadata (`13.0.1+security-01`), which semver ranks *below* the
   plain release. The tracker would have reported us up to date straight through a

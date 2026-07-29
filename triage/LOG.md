@@ -146,10 +146,10 @@ from "vulnerable symbol is called".
 not a justification. Gate stays red on this finding until it is answered, which
 is the correct pressure. See the follow-up below.
 
-### SUPPLY CHAIN — we pinned one artifact and downloaded another
+### SUPPLY CHAIN — upstream overwrote a published release artifact
 
-Not a CVE, and the most serious thing this pass found. The first two diagnoses
-were wrong; the measurements that corrected them are below.
+Not a CVE, and the most serious thing this pass found. Six diagnoses; this is
+the one that survived every measurement we could make.
 
 Grafana publishes each release tarball at **two** paths:
 
@@ -158,35 +158,70 @@ Grafana publishes each release tarball at **two** paths:
 | per-build | `…/grafana/release/<ver>/grafana_<ver>_<build-id>_linux_<arch>.tar.gz` |
 | version alias | `…/oss/release/grafana-<ver>.linux-<arch>.tar.gz` |
 
-They are **not the same bytes**. For 13.0.4:
+**The alias objects are rewritten about a day after release.** Object creation
+times, from GCS metadata (`last-modified` / `x-goog-generation`):
 
-| | amd64 | arm64 |
+| | per-build written | alias written |
 |---|---|---|
-| per-build `.sha256` | `cd8c8b31…` | `bcf8b9fb…` |
-| alias `.sha256` | `cd8c8b31…` | `591ac184…` |
-| alias **actual content** | `54eceec7…` | `591ac184…` |
+| 13.0.4 amd64 | 2026-07-21 09:56:03Z | **2026-07-22 05:36:05Z** |
+| 13.0.4 arm64 | 2026-07-21 09:56:14Z | **2026-07-22 05:36:34Z** |
+| 13.1.1 amd64 | 2026-07-21 08:53:04Z | **2026-07-22 05:42:05Z** |
+| 13.1.1 arm64 | 2026-07-21 08:53:16Z | **2026-07-22 05:42:36Z** |
 
-Read the first column carefully. **Our original pins — `cd8c8b31…` and
-`bcf8b9fb…` — are exactly the per-build values.** They were correct when
-written and are still correct. What broke is that the definition *pinned* the
-per-build artifact while *downloading* the alias. Those agreed at authoring
-time and have since diverged.
+All four alias objects landed within six minutes of each other, ~20 hours after
+their per-build counterparts. That is a batch job re-publishing a coordinated
+release, not an incident.
 
-On amd64 the alias content was replaced and its sidecar was not regenerated, so
-the alias now contradicts itself. On arm64 both moved together, so the alias is
-self-consistent but is a different build from the one we pinned. 13.1.1 splits
-the same way (`e4744321…` per-build vs `0c071169…` alias).
+We were caught across the rewrite:
 
-That also explains the flapping. Pinned to the alias' value, the same URL and
-digest **passed at 21:06Z, failed at 21:54Z, and passed again** on the next run
-— the alias does not serve stable bytes.
+| UTC | Evidence | Result |
+|---|---|---|
+| 07-21 20:57 | run `29867929092`, SLSA provenance | alias fetched, `cd8c8b31…` / `bcf8b9fb…`, **OK** |
+| 07-22 05:36 | GCS object generation | alias **overwritten** |
+| 07-26 19:01 | run `30215944820` | alias amd64, `did NOT match` `cd8c8b31…` |
+| 07-26 20:49 | run `30219798190` | alias amd64, `did NOT match` `cd8c8b31…` |
 
-**Two earlier conclusions in this log were wrong and are retracted:**
+The 13.0.4 release we published was built from bytes that no longer exist at
+the URL it fetched them from. Nothing changed on our side — the artifact moved
+under a correct pin.
 
-- *"Upstream silently replaced the artifact and our pin caught it."* Partly. The
-  alias changed, but our pin was never describing the alias.
-- *"Our arm64 pin never matched upstream."* Wrong. It matches the per-build
-  artifact precisely. It only looked wrong when compared against the alias.
+**The two paths permanently serve different bytes.** Confirmed on all four
+objects, three verified passes each, every one internally consistent with its
+own sidecar:
+
+| | alias | per-build | delta |
+|---|---|---|---|
+| 13.0.4 amd64 | `54eceec7…` 337 697 955 B | `cd8c8b31…` 337 694 041 B | +3 914 |
+| 13.0.4 arm64 | `591ac184…` 321 125 583 B | `bcf8b9fb…` 321 121 554 B | +4 029 |
+| 13.1.1 amd64 | `0c071169…` 363 257 098 B | `e4744321…` 363 255 678 B | +1 420 |
+| 13.1.1 arm64 | `8403dc0b…` 345 122 382 B | `28ef74a3…` 345 128 051 B | −5 669 |
+
+A ~0.001% delta that changes sign between arches is repackaging — tar metadata,
+gzip framing — not different content.
+
+**There is no stale sidecar.** The 13.0.4 amd64 alias object was written at
+05:36:05Z and its `.sha256` at 05:36:08Z — three seconds apart. They have never
+disagreed. The 07-26 workstation read that returned the pre-rewrite value came
+from a stale cache, not from upstream publishing a contradiction.
+
+**Every earlier conclusion in this log about this finding was wrong and is
+retracted:**
+
+- *"Our pin was bad."* No. It verified on both arches on 2026-07-21.
+- *"Our arm64 pin never matched upstream."* No. Provenance records the alias
+  arm64 content hashing to exactly `bcf8b9fb…`, the value we had pinned.
+- *"We pinned the per-build artifact while downloading the alias."* No. The
+  pins came from the alias sidecar (`79a2bde`) and CI verified them against
+  alias content.
+- *"The alias serves content its own sidecar disowns."* No. Written three
+  seconds apart, consistent ever since.
+
+**The flapping** — 13.1.1 alias pinned `0c07116…`, passing 21:06Z, failing
+21:55Z, passing 22:16Z — is not upstream instability. That object has been
+stable since 07-22 05:42. The likeliest cause is a CDN edge still serving the
+pre-rewrite generation, which would also explain the stale sidecar read on the
+same day. Untested: `curl --resolve` against individual edge IPs would settle
+it.
 
 **Fix: pin and download the per-build artifact.** The build id is not derivable
 from the version, but it is recoverable — it appears in the GitHub release asset
@@ -196,16 +231,42 @@ turns, `refresh-grafana.sh` resolves the id and rebuilds the url, and the
 artifact we verify is the artifact we fetch. A re-cut release lands at a new
 build-id URL rather than overwriting ours.
 
-**Still worth reporting upstream**, and the report is now much sharper than
-"a checksum is wrong": a version alias serving different bytes than the
-per-build artifact of the same release, with a stale sidecar on one arch. Draft
-in [`upstream/2026-07-26-grafana-13.0.4-checksum-drift.md`](upstream/2026-07-26-grafana-13.0.4-checksum-drift.md).
+**Still worth reporting upstream**, but far narrower than the first draft: a
+published release artifact was overwritten ~20 hours after publication,
+breaking a consumer that pinned the digest served at release time. Not "your
+checksum is broken" — everything upstream publishes is internally consistent.
+Draft in
+[`upstream/2026-07-26-grafana-oss-release-alias-overwritten.md`](upstream/2026-07-26-grafana-oss-release-alias-overwritten.md).
 
-**Method note.** Three diagnoses in a row, each overturned by the next
-measurement: "bad pin", then "upstream replaced the artifact", then "two paths,
-two artifacts". Each was consistent with the evidence available at the time.
-The one that survived came from asking what *else* upstream publishes rather
-than re-reasoning about the numbers already in hand.
+**Method note.** Six diagnoses: "bad pin" → "upstream replaced the artifact" →
+"two paths, two artifacts" → "replaced, sidecar left stale" → and finally
+"rewritten on a schedule, sidecar always fine, and the two paths really are two
+artifacts." Diagnoses 2 and 3 were each partly right and each retracted in
+error. The cost was a wrong rationale committed to the definition, a stale
+comment left in `refresh-grafana.sh`, and two upstream drafts built on
+mechanisms we could not support.
+
+Three habits caused it, in increasing order of embarrassment:
+
+1. **Measuring by hand.** Every number in the early diagnoses came from
+   `curl -sSL <url> | sha256sum` — no `--fail`, no `-o`, no length check, on a
+   ~322 MiB object. That command hashes a truncated body without complaint. It
+   happened not to be wrong here, which is luck, not method.
+2. **Ignoring our own build record.** Every build logs its `sha256sum -c` line;
+   every release build records the source URL and digest in SLSA provenance.
+   Both sat in GitHub Actions the whole time and nobody read them until the
+   fourth pass.
+3. **Never asking the object what it was.** This was settled by two HTTP
+   headers — `last-modified` and `x-goog-generation` — on objects we had been
+   arguing about for a week. Four `curl -I` calls at any point would have ended
+   it.
+
+**Ask the artifact, then ask your own pipeline, then measure by hand.** We did
+it in exactly the wrong order. `scripts/verify-arch-pins.sh` closes the related
+gap: every pinned arch is now fetched and checked in CI, not just the one the
+PR gate happens to build. The host-side checks that produced the tables above
+are kept in [`upstream/checks/`](upstream/checks/) so any of this can be
+re-measured.
 
 ### Post-bump rescan — what 13.1.1 actually changed
 

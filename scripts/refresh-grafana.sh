@@ -54,11 +54,14 @@ tagver() { printf '%s' "${1//+/_}"; }
 
 # New version from the (already bumped) tarball url. Anchored on the `url:` key
 # so the checksum-provenance comment, which names the same host, cannot match.
-# Out-of-band security builds (13.0.1+security-01) are served from this same
-# templatable path, verified against upstream — grafana's download page
-# advertises a longer per-build url carrying an opaque CI run id
-# (.../grafana/release/<ver>/grafana_<ver>_<buildid>_linux_<arch>.tar.gz), but
-# that form is not required, so nothing here has to know about it.
+# Out-of-band security builds (13.0.1+security-01) are served from the same
+# templatable path, verified against upstream.
+#
+# The per-build url — .../grafana/release/<ver>/grafana_<ver>_<buildid>_linux_<arch>.tar.gz,
+# carrying an opaque CI run id — is now the shape we pin, so this script has to
+# know about it. The build id is not derivable from the version, so it is
+# resolved from the GitHub release assets below, and that resolution is
+# REQUIRED: it exits non-zero rather than falling back to a version-only url.
 url_line=$(grep -E '^[[:space:]]*-?[[:space:]]*url:[[:space:]]*https://dl\.grafana\.com/' "$f" | head -1)
 [ -n "$url_line" ] || { echo "refresh-grafana: no dl.grafana.com tarball url in $f" >&2; exit 1; }
 # Per-build shape (what we pin) first, then the legacy /oss/release/ alias so a

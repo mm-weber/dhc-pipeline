@@ -67,9 +67,9 @@
         "url:\\s*https://dl\\.grafana\\.com/grafana/release/(?<currentValue>[0-9][^\\s\"'/]*)/",
         // The legacy /oss/release/ version alias, matched only so a definition
         // not yet migrated stays tracked; its next bump moves it onto the
-        // per-build url. We deliberately do NOT pin this path — its contents
-        // were observed drifting from the per-build artifact of the same
-        // release and from its own published .sha256 (triage/LOG.md 2026-07-26).
+        // per-build url. We deliberately do NOT pin this path — its objects are
+        // rewritten roughly a day after release, so a digest taken at release
+        // time stops matching with no version change (triage/LOG.md 2026-07-26).
         "url:\\s*https://dl\\.grafana\\.com/oss/release/grafana-(?<currentValue>[0-9][^\\s\"'/]*?)\\.linux-",
       ],
       depNameTemplate: "grafana/grafana",
