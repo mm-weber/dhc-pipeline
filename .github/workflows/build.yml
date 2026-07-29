@@ -149,6 +149,18 @@ jobs:
             echo TAGS
           } >> "$GITHUB_OUTPUT"
 
+      # The build verifies the checksum only for the arch it builds, and the PR
+      # gate builds amd64 only (see `load:` below — it needs a single platform).
+      # So an arm64 pin can enter the repo unexercised and first be tested by a
+      # release build after merge. grafana 13.1.1 shipped exactly that: both pins
+      # hand-supplied, neither arch fetched. This checks every pinned arch
+      # against the bytes upstream actually serves (Req 1.3, Req 2.1).
+      # Definitions with no per-arch pin skip in milliseconds.
+      - name: verify per-arch pinned checksums
+        env:
+          NAME: ${{ matrix.name }}
+        run: scripts/verify-arch-pins.sh "image/${NAME}"
+
       - id: build
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
