@@ -201,15 +201,49 @@ jobs:
           scripts/install-scanners.sh "${RUNNER_TEMP}/bin"
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
-      - name: Trivy scan (VEX + accepted risk)
-        id: trivy
+      # Trivy builds the `pkg:oci/...` product purl a VEX statement has to match
+      # out of the image's RepoDigest. A buildx `load:` image has none — never
+      # pushed, never pulled — so on the PR path the CycloneDX root component
+      # came out with a random UUID and no purl at all, and EVERY OpenVEX
+      # statement silently matched nothing. Not the statement's shape: with no
+      # root purl, no product identifier in any form matches, verified across
+      # digest-pinned, registry-qualified and bare. Upstream: trivy#9399.
+      #
+      # A push is the only thing that mints a RepoDigest, and pushing also
+      # records it on the daemon's own copy — so the govulncheck step below
+      # keeps exporting the same image, untouched. Throwaway registry, dropped
+      # with the runner.
+      - name: local registry — give the image an identity VEX can match
+        id: localreg
         if: github.event_name == 'pull_request'
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           NAME: ${{ matrix.name }}
         run: |
           set -euo pipefail
-          ref=$(printf '%s\n' "$TAGS" | head -n1)
+          docker run -d --rm -p 5000:5000 --name dhc-localreg \
+            registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373 >/dev/null
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:5000/v2/ >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          src=$(printf '%s\n' "$TAGS" | head -n1)
+          ref="localhost:5000/mm-weber/dhc/${NAME}:scan"
+          docker tag "$src" "$ref"
+          docker push -q "$ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "scanning $ref (RepoDigest: $(docker image inspect "$ref" --format '{{index .RepoDigests 0}}'))"
+
+      - name: Trivy scan (VEX + accepted risk)
+        id: trivy
+        if: github.event_name == 'pull_request'
+        env:
+          REF: ${{ steps.localreg.outputs.ref }}
+          NAME: ${{ matrix.name }}
+          VEXDIR: .vexscan
+        run: |
+          set -euo pipefail
+          ref="$REF"
           echo "scanning $ref"
           # Two suppression inputs, deliberately different in kind:
           #
@@ -224,9 +258,30 @@ jobs:
           # apart, which is what lets the summary below keep them apart too.
           # An empty triage/vex/ and a missing accepted-risk file excuse nothing,
           # so every HIGH/CRITICAL counts — the correct default.
+          # The image now lives at localhost:5000, so its purl carries
+          # repository_url=localhost:5000/... while our statements name
+          # ghcr.io/... — and Trivy requires that qualifier to match exactly.
+          # So scan against copies with the qualifiers dropped: a bare
+          # `pkg:oci/<name>` matches any registry (verified), while the
+          # PUBLISHED statements stay precisely scoped and are what cosign
+          # attests on the release path.
+          #
+          # This blinds the gate to exactly one field, and nothing else —
+          # measured, not assumed: with qualifiers stripped it still catches a
+          # wrong image name, a near-miss name, a wrong purl type and a wrong
+          # subcomponent. scripts/lint-vex-product.sh is what covers the
+          # registry host, by exact string comparison against the definition's
+          # `image:` — a stronger check than "did a finding disappear".
+          #
+          # Delete this whole rewrite when trivy#9399 ships.
+          mkdir -p "$VEXDIR"
           vex=()
           for f in triage/vex/*.json; do
-            if [ -e "$f" ]; then vex+=(--vex "$f"); fi
+            if [ -e "$f" ]; then
+              out="${VEXDIR}/$(basename "$f")"
+              jq '(.statements[]?.products[]?."@id") |= split("?")[0]' "$f" > "$out"
+              vex+=(--vex "$out")
+            fi
           done
           accepted="triage/accepted-risk/${NAME}.yaml"
           ignore=()
@@ -258,13 +313,16 @@ jobs:
             # business decision starts reading like a technical claim.
             echo "#### Not affected — VEX (published with the image)"
             echo
-            if jq -e '[.Results[]?.ExperimentalModifiedFindings[]?
-                       | select(.Source // "" | startswith("triage/vex/"))] | length > 0' \
+            # Source names the rewritten copy, not triage/vex/ — match on the
+            # scan directory or this table silently reads empty even when the
+            # suppression worked, which is the failure mode it exists to expose.
+            if jq -e --arg vexdir "${VEXDIR}/" '[.Results[]?.ExperimentalModifiedFindings[]?
+                       | select(.Source // "" | startswith($vexdir))] | length > 0' \
                  trivy.json >/dev/null; then
               echo "| CVE | Status | Justification | Package |"
               echo "|---|---|---|---|"
-              jq -r '.Results[]?.ExperimentalModifiedFindings[]?
-                     | select(.Source // "" | startswith("triage/vex/"))
+              jq -r --arg vexdir "${VEXDIR}/" '.Results[]?.ExperimentalModifiedFindings[]?
+                     | select(.Source // "" | startswith($vexdir))
                      | "| \(.Finding.VulnerabilityID) | \(.Status) | \(.Statement // "-") | \(.Finding.PkgName) |"' \
                  trivy.json | sort -u
             else
@@ -441,6 +499,14 @@ jobs:
             govulncheck -mode=binary -format json "$f" > "$out" 2>/dev/null || true
             if [ -s "$out" ]; then args+=("${rel}=${out}"); fi
           done < <(find rootfs -type f -perm -u+x -size +1M 2>/dev/null)
+
+          # Drop the export before anything else runs. A repackage image is
+          # ~1.1 GB and this doubles it on disk; the first run left 94 MB free
+          # and the NEXT step died — grype could not write its vulnerability DB
+          # ("database or disk is full"). Non-gating means this step cannot fail
+          # the build, not that it cannot break the one after it.
+          rm -rf rootfs
+          df -h / | tail -1
 
           {
             echo "### govulncheck — ${ref}"

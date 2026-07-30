@@ -7,3 +7,6 @@ temp/
 # renovate-config-validator + json5 are installed on demand (validate.yml, and
 # locally to run test/renovate/managers.test.mjs) — never committed.
 node_modules/
+
+# Rewritten VEX copies the PR scan gate builds (trivy#9399 workaround).
+.vexscan/
