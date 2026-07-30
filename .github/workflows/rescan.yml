@@ -50,10 +50,10 @@ jobs:
       - name: install trivy + grype
         run: |
           set -euo pipefail
-          curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
-          curl -fsSL https://raw.githubusercontent.com/anchore/grype/main/install.sh           | sudo sh -s -- -b /usr/local/bin
-          trivy --version
-          grype version
+          # As the runner user into a temp dir on PATH — see build.yml.
+          mkdir -p "${RUNNER_TEMP}/bin"
+          scripts/install-scanners.sh "${RUNNER_TEMP}/bin"
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
       - name: scan published images
         id: scan

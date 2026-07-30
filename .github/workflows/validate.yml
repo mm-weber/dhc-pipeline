@@ -59,6 +59,9 @@ jobs:
       - name: govulncheck-report unit tests (Req 6.13)
         run: scripts/govulncheck-report_test.sh
 
+      - name: install-scanners unit tests (Req 7.5)
+        run: scripts/install-scanners_test.sh
+
       # Renovate config: validate the schema, then prove the custom managers
       # actually extract the right deps from the definitions (Req 3.2).
       - name: renovate config + manager fixtures

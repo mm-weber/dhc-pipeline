@@ -192,12 +192,14 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
-          # Latest by design: a scanner is only as good as its newest detection
-          # logic and advisory DB, so the gate tracks upstream rather than pinning.
-          curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
-          curl -fsSL https://raw.githubusercontent.com/anchore/grype/main/install.sh           | sudo sh -s -- -b /usr/local/bin
-          trivy --version
-          grype version
+          # Installed as the runner user into a temp dir on PATH, not as root
+          # into /usr/local/bin. The old form piped a remote script straight
+          # into `sudo sh`; fetching two pinned binaries never needed root, and
+          # dropping it removes the reason that install was dangerous rather
+          # than just the branch it came from.
+          mkdir -p "${RUNNER_TEMP}/bin"
+          scripts/install-scanners.sh "${RUNNER_TEMP}/bin"
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
       - name: Trivy scan (VEX + accepted risk)
         id: trivy

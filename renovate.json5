@@ -90,6 +90,40 @@
       // (modules/versioning/regex/index.js).
       versioningTemplate: "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:\\+security-(?<build>\\d+))?$",
     },
+    {
+      // The two CVE scanners the gate itself runs on (Req 7.5, 7.6). They used
+      // to be installed by `curl .../main/install.sh | sudo sh` — unpinned, from
+      // a mutable branch, as root. Now pinned by version + sha256 in
+      // scripts/install-scanners.sh.
+      //
+      // This manager is not optional garnish: a pinned scanner nobody bumps
+      // stops detecting new advisories and says nothing while it does. Pinning
+      // WITHOUT tracking trades a supply-chain risk for a silent-staleness one,
+      // so 7.5 and 7.6 only make sense together.
+      customType: "regex",
+      managerFilePatterns: ["/^scripts/install-scanners\\.sh$/"],
+      matchStrings: [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*\\w+_VERSION=\"(?<currentValue>[^\"]+)\"",
+      ],
+      // Both projects tag releases v-prefixed; the pins are bare so the URL
+      // template can add the `v` itself and the asset names (which are bare)
+      // stay derivable from one variable.
+      extractVersionTemplate: "^v(?<version>\\d+\\.\\d+\\.\\d+)$",
+      // NO postUpgradeTask, unlike the definition managers above — deliberate.
+      // Renovate bumps the version and leaves the sha256 behind, so the bump PR
+      // fails its own scan step on a checksum mismatch until a human records the
+      // new digest. That is the intended friction: an auto-recomputed checksum
+      // is whatever upstream serves at that instant, which is a hash of the
+      // thing rather than a decision about it.
+      //
+      // What the pin actually protects against is re-publication of a version
+      // we already adopted (CVE-2026-33634's shape), and that holds in every
+      // design here, because the digest only moves when the version does. These
+      // also never automerge: that rule is scoped to github-tags, and this
+      // manager is github-releases.
+      //
+      // Two tools, a handful of bumps a year. Cheap enough to keep manual.
+    },
   ],
 
   packageRules: [
