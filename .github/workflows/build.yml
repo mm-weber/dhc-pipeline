@@ -373,6 +373,67 @@ jobs:
           # already produced. The log is readable, so send it to both.
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # ---- PR-only: reachability evidence (Req 6.13) ----
+      # Trivy and Grype answer "is this module linked". govulncheck -mode=binary
+      # reads the binary's symbol table and answers "is the vulnerable code
+      # called" — the only question that can settle an advisory whose
+      # applicability turns on one wired-in symbol, and the one Req 6.14 hangs a
+      # prohibition on.
+      #
+      # continue-on-error is the declaration that this is EVIDENCE, NOT A GATE.
+      # Trivy is the only thing that fails a build. A reachability tool that can
+      # also break CI is a second gate nobody designed, and its false negatives
+      # would then be silently passing images.
+      - name: govulncheck reachability (Req 6.13)
+        id: govulncheck
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -uo pipefail
+          ref=$(printf '%s\n' "$TAGS" | head -n1)
+          go version
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          PATH="$(go env GOPATH)/bin:$PATH"; export PATH
+
+          # Export the image filesystem rather than guessing paths: which Go
+          # binaries an upstream tarball ships is exactly what we do not know in
+          # advance — bundled plugins are how the last three findings arrived.
+          cid=$(docker create "$ref")
+          mkdir -p rootfs gv
+          docker export "$cid" | tar -x --no-same-owner --no-same-permissions \
+            --exclude 'dev/*' --exclude 'proc/*' --exclude 'sys/*' -C rootfs || true
+          docker rm -f "$cid" >/dev/null
+
+          # -size +1M skips the shell utilities and keeps this to plausible Go
+          # binaries; `go version -m` is the actual test, and it fails fast on
+          # anything that is not one.
+          args=()
+          while IFS= read -r f; do
+            go version -m "$f" >/dev/null 2>&1 || continue
+            rel=${f#rootfs/}
+            out="gv/$(printf '%s' "$rel" | tr '/' '_').json"
+            # govulncheck exits non-zero when it FINDS something, so its exit
+            # status is not an error signal here.
+            govulncheck -mode=binary -format json "$f" > "$out" 2>/dev/null || true
+            if [ -s "$out" ]; then args+=("${rel}=${out}"); fi
+          done < <(find rootfs -type f -perm -u+x -size +1M 2>/dev/null)
+
+          {
+            echo "### govulncheck — ${ref}"
+            echo
+            if [ "${#args[@]}" -eq 0 ]; then
+              echo "_no Go binaries found in this image._"
+            else
+              scripts/govulncheck-report.sh "${args[@]}"
+              echo
+              echo "> \`symbol\` forbids a \`not_affected\` /"
+              echo "> \`vulnerable_code_not_in_execute_path\` statement (Req 6.14)."
+              echo "> \`not measured\` is silence, not absence — a stripped binary looks the same."
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Grype second opinion (CRITICAL present)
         if: github.event_name == 'pull_request' && steps.trivy.outputs.crit != '0'
         env:
