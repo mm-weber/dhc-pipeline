@@ -324,16 +324,30 @@ jobs:
             echo "#### Still uncovered"
             echo
             if [ $((crit + high)) -gt 0 ]; then
-              echo "| CVE | Severity | Package | Installed | Fixed |"
-              echo "|---|---|---|---|---|"
-              jq -r '[.Results[]?.Vulnerabilities[]?]
-                     | sort_by(.Severity != "CRITICAL", .VulnerabilityID)[]
-                     | "| \(.VulnerabilityID) | \(.Severity) | \(.PkgName) | \(.InstalledVersion) | \(.FixedVersion // "-") |"' \
-                 trivy.json | sort -u
+              # Target = the binary the finding is in, and on a repackage image
+              # that is the whole triage question: a module in the main
+              # entrypoint and the same module in a bundled plugin are different
+              # exposures with different treatments. It is in the report already
+              # — carrying it here is what stops the per-binary breakdown from
+              # being reassembled by hand every pass.
+              echo "| CVE | Severity | Package | Installed | Fixed | Binary |"
+              echo "|---|---|---|---|---|---|"
+              # Dedup in jq, not with a trailing `sort -u` — that re-sorted
+              # alphabetically and silently threw away the CRITICAL-first order
+              # this sort_by exists to produce.
+              jq -r '[.Results[]? | .Target as $t | .Vulnerabilities[]? | . + {Target: $t}]
+                     | unique_by([.VulnerabilityID, .Target, .PkgName])
+                     | sort_by(.Severity != "CRITICAL", .Target, .VulnerabilityID)[]
+                     | "| \(.VulnerabilityID) | \(.Severity) | \(.PkgName) | \(.InstalledVersion) | \(.FixedVersion // "-") | \(.Target) |"' \
+                 trivy.json
             else
               echo "_none_ ✓"
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          # tee, not >>: the job summary is the only place this table exists, and
+          # a summary is not readable through the API without Checks scope — the
+          # scan artifacts aren't either. Triage then waits on output the run
+          # already produced. The log is readable, so send it to both.
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Grype second opinion (CRITICAL present)
         if: github.event_name == 'pull_request' && steps.trivy.outputs.crit != '0'
