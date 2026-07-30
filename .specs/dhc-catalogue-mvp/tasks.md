@@ -119,6 +119,13 @@
     - Unblocks #30 (kin-openapi CRITICAL) and re-grounds both existing `not_affected` statements on a measurement rather than an argument
     - _Requirements: Req 6.13, Req 6.14, Req 6.15_
 
+  - [ ] 7.6 Make VEX suppression work on the PR gate (blocks 7.3)
+    - Trivy derives the `pkg:oci/` product purl from the image's RepoDigest; a buildx `load:` image has none, so the root component carries no purl and **no** OpenVEX statement matches in any form. Measured across digest-pinned, registry-qualified and bare product ids. Upstream: trivy#9399
+    - Push the built image to a throwaway local registry so it carries a digest; scan that ref
+    - The gate scans copies with the purl qualifiers stripped (the local registry host differs), so published statements stay precisely scoped
+    - `scripts/lint-vex-product.sh` (+ `_test.sh`) covers the one field stripping blinds the gate to: product names a real definition, `repository_url` equals its `image:`, subcomponents versionless
+    - _Requirements: Req 6.17, Req 6.18, Req 6.19_
+
 - [ ] 8. Wrap-up (Day 3)
   - [ ] 8.1 valkey chart adaptation [CUT 1st if pressed]
     - As 5.3 for valkey (stateful: probes, persistence off-by-default rationale)
@@ -137,6 +144,6 @@
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5 |
-| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5 |
+| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6 |
 | Req 7: Conventions and Review | 1.1, 1.2, 1.3 |
 | Req 8: Operating Environment | 2.1, 3.3, 4.2, 6.5, 7.2 |

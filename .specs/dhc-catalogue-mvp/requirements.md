@@ -103,6 +103,9 @@ registry images remain private until explicitly released.
 14. IF govulncheck reports a vulnerable symbol as reachable in a binary THEN THE Triage Process SHALL NOT record that finding as not_affected with justification vulnerable_code_not_in_execute_path for that image.
 15. WHERE a triage decision records not_affected with justification vulnerable_code_not_in_execute_path THE Triage Process SHALL cite in triage/LOG.md a govulncheck result for that binary at symbol or package level.
 16. IF govulncheck reports a finding at module level only THEN THE Triage Process SHALL treat that result as unmeasured and SHALL NOT cite it as evidence of unreachability.
+17. IF a VEX statement names a product that is not an OCI package URL for an existing image definition THEN THE CI Pipeline SHALL fail validation.
+18. IF a VEX statement's product identifier declares a repository other than that image definition's published repository THEN THE CI Pipeline SHALL fail validation.
+19. IF a VEX statement's subcomponent identifier carries a version THEN THE CI Pipeline SHALL fail validation.
 
 ### Requirement 7: Conventions and Review Enforcement
 
