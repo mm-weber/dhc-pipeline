@@ -101,7 +101,8 @@ registry images remain private until explicitly released.
 12. IF a Trivy ignore file exists outside triage/accepted-risk/ THEN THE CI Pipeline SHALL fail validation.
 13. WHEN a pull request builds an image THE Scan Pipeline SHALL run govulncheck in binary mode against every Go binary in that image and SHALL report, for each finding, whether the vulnerable symbol is reachable.
 14. IF govulncheck reports a vulnerable symbol as reachable in a binary THEN THE Triage Process SHALL NOT record that finding as not_affected with justification vulnerable_code_not_in_execute_path for that image.
-15. WHERE a triage decision records not_affected with justification vulnerable_code_not_in_execute_path THE Triage Process SHALL cite a govulncheck result for that binary in triage/LOG.md.
+15. WHERE a triage decision records not_affected with justification vulnerable_code_not_in_execute_path THE Triage Process SHALL cite in triage/LOG.md a govulncheck result for that binary at symbol or package level.
+16. IF govulncheck reports a finding at module level only THEN THE Triage Process SHALL treat that result as unmeasured and SHALL NOT cite it as evidence of unreachability.
 
 ### Requirement 7: Conventions and Review Enforcement
 
