@@ -312,13 +312,37 @@ jobs:
             # product purl is the one VEX defect that produces no error at all.
             # (Drop the @sha256 digest when writing it down — the digest changes
             # every build, and a digestless purl still matches.)
-            trivy convert --format cyclonedx --output cdx.json trivy.json 2>/dev/null || true
+            # Failure used to be swallowed by `2>/dev/null || true`, so a run
+            # that printed "<unavailable>" gave no way to find out why. Keep the
+            # step non-fatal, but say what went wrong.
+            if ! conv=$(trivy convert --format cyclonedx --output cdx.json trivy.json 2>&1); then
+              printf '%s\n' "$conv" > convert.err
+            fi
             echo "#### Product identifier for this image"
             echo
             echo '```'
-            jq -r '.metadata.component.purl // "<unavailable>"' cdx.json 2>/dev/null || echo "<unavailable>"
+            jq -r '.metadata.component.purl // "<unavailable>"' cdx.json 2>/dev/null || {
+              echo "<unavailable>"
+              echo "-- trivy convert said:"
+              head -5 convert.err 2>/dev/null || echo "-- (convert reported no error; cdx.json has no metadata.component.purl)"
+            }
             echo '```'
             echo
+            # The OTHER half of a VEX statement. A statement names a product and
+            # a subcomponent, and until now the gate printed only the product —
+            # so the subcomponent purl was still hand-written from the package
+            # name and could be wrong in exactly the same silent way. Taken from
+            # the same report, versionless, which is the form that survives a
+            # rebuild.
+            if [ $((crit + high)) -gt 0 ]; then
+              echo "#### Subcomponent identifiers (uncovered findings)"
+              echo
+              echo '```'
+              jq -r '[.Results[]?.Vulnerabilities[]?.PkgIdentifier.PURL // empty]
+                     | map(split("@")[0]) | unique[]' trivy.json
+              echo '```'
+              echo
+            fi
             # The surviving findings, named. A bare count means downloading an
             # artifact to learn what to triage; this is the list you act on.
             echo "#### Still uncovered"
