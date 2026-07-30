@@ -336,7 +336,7 @@ bump closes the gap for free: the rescan will then hold scans of both tags.
 
 ---
 
-### Evidence gap, stated plainly
+### Evidence gap, stated plainly — CLOSED 2026-07-30, see below
 
 The two `not_affected` statements rest on **architectural** analysis — what the
 shipped entrypoint is, and what the advisory's affected component is — not on
@@ -353,3 +353,118 @@ Grafana's binary is upstream's build and may fare differently.
 **Follow-up:** add a govulncheck reachability job to the PR scan path, and
 revisit #30 and both `not_affected` statements with it. Until then this
 paragraph is the honest caveat on the two statements above.
+
+*The follow-up landed. It cost one of the two statements.*
+
+---
+
+## 2026-07-30 — the gate could not suppress, and what that hid
+
+Two findings, and the second one only exists because of the first.
+
+### The scan gate has never applied a VEX statement, and could not have
+
+`triage/vex/` has been wired into the PR gate since 2026-07-22. It has
+suppressed nothing in that entire time, on any run. The gate's own
+"⚠️ statements exist but suppressed nothing here" warning fired correctly every
+time and pointed at the product identifier — which the same summary printed as
+`<unavailable>`, for the same underlying reason nobody connected.
+
+**Cause.** Trivy builds the `pkg:oci/...` product purl a statement has to match
+out of the image's **RepoDigest**. `docker/build-push-action` with
+`load: true, push: false` produces an image that has none — never pushed, never
+pulled — so Trivy's root component came out with a random UUID `bom-ref` and no
+`purl` field at all. There was nothing for a product identifier to match.
+
+This is not a defect in our statements' shape. With no root purl, **no** product
+identifier matches in any form:
+
+| Product `@id` | digest present | digest absent |
+|---|---|---|
+| `pkg:oci/grafana@sha256:…?arch&repository_url` | suppressed | 0 |
+| `pkg:oci/grafana?repository_url=…` (ours) | suppressed | 0 |
+| `pkg:oci/grafana` bare | suppressed | 0 |
+| `ghcr.io/mm-weber/dhc/grafana:13-alpine3.23` | — | 0 |
+
+Reproduced locally with `trivy image --input <docker-save tarball>`, which has
+the same empty-`RepoDigests` shape, and confirmed against a digest-bearing copy
+of the same image where every form suppresses. Upstream has this as
+[trivy#9399](https://github.com/aquasecurity/trivy/issues/9399) — "null PURL for
+local images breaks VEX matching" — agreed but unshipped as of 0.72.0, measured
+rather than assumed.
+
+**The asymmetry worth noticing:** the `accepted-risk` lane was never affected.
+`--ignorefile` matches on *package* purls, not the OCI root, so it works with or
+without a digest — verified. The weaker lane worked the whole time; the stronger
+one silently did not.
+
+**Fix.** A push is the only thing that mints a RepoDigest, so the PR path pushes
+to a throwaway local registry and scans that. Because the registry host is no
+longer ghcr.io, the gate scans copies with the purl qualifiers stripped;
+published statements stay precisely scoped and are what `cosign attest` attaches.
+That blinds the gate to exactly one field, which was measured, not assumed —
+with qualifiers stripped it still catches a wrong image name, a near-miss name,
+a wrong purl type and a wrong subcomponent. `scripts/lint-vex-product.sh`
+(Req 6.17–6.19) covers the registry host by exact string comparison, which is a
+stronger check than "did a finding disappear".
+
+**Method note, and it is the same one as last time.** Both symptoms — the inert
+statements and the `<unavailable>` identifier — were printed by our own job
+summary for over a week. The summary was written to `$GITHUB_STEP_SUMMARY` only,
+which needs a scope this repo's PAT does not have, so nobody could read it from
+where the work happens. *Ask your own pipeline first* was the lesson recorded on
+2026-07-26. It was recorded and then not applied.
+
+### RETRACTED — CVE-2026-28377, `github.com/grafana/tempo` (#27)
+
+The statement written on 2026-07-26 is **withdrawn**, and
+`vex/CVE-2026-28377.openvex.json` is deleted.
+
+It claimed `vulnerable_code_not_in_execute_path`. The govulncheck job that
+landed the same day measures the opposite, on the shipped binary:
+
+```
+symbol | GO-2026-5359 | CVE-2026-28377, GHSA-ffqx-q65f-36jf
+       | github.com/grafana/tempo v1.5.1-0.20260427112133-525d1bab07e0
+       | github.com/grafana/tempo/pkg/tempopb/resource/v1 | MarshalTo
+```
+
+**Req 6.14 forbids that combination** — a reachable symbol may not be excused as
+not-in-execute-path — and 6.14 was written the same week, by us, for exactly
+this case.
+
+There is an argument for the statement, and it is not good enough. `MarshalTo`
+is protobuf codegen, reached because Grafana speaks tempopb as a **client**;
+the advisory is about a Tempo *server's* `status/config` handler disclosing an
+S3 key. So a symbol from the affected module is called, but plausibly not the
+disclosing path. That is exactly the shape of reasoning the measurement exists
+to discipline: upstream lists the symbol as affected, we do not get to
+re-scope their advisory from the outside, and "plausibly not" is not evidence.
+
+**Outcome: no treatment. The gate stays red on #27**, alongside #23. It is
+triaged with the rest of the open findings rather than excused on its own.
+
+Note what nearly happened. The statement was wrong from the day it was written,
+and the broken gate hid that — a suppression that suppresses nothing is
+indistinguishable from one that is right. Fixing the plumbing is what made it
+falsifiable, and the first thing it did was falsify it.
+
+### Still open
+
+18 uncovered on grafana (1 CRITICAL, 17 HIGH), across three binaries:
+
+| Binary | Findings |
+|---|---|
+| `bin/grafana` | kin-openapi **CRITICAL**, tempo (#23), x/text (#39), grpc (#28) |
+| `data/plugins-bundled/elasticsearch/…` | stdlib ×3, x/text, grpc |
+| `data/plugins-bundled/zipkin/…` | x/net ×4, stdlib ×3, x/text, grpc |
+
+**govulncheck cannot answer #30.** Zero mentions of kin-openapi across all 37 of
+its findings, and it does report module-level results when it cannot resolve
+symbols — so the advisory is simply not in the Go vulnerability database. It is
+GHSA-only. The tool built to settle our one CRITICAL cannot see it, and that
+needs saying plainly rather than being read as a clean result.
+
+govulncheck also found **8 findings Trivy missed** (x/net CVE-2026-46600,
+-42506, -42502, -25680; otel; klauspost/compress; aws-sdk-go). Three scanners,
+three different answers, and the union is larger than any one of them.
