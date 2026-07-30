@@ -328,6 +328,26 @@ jobs:
             }
             echo '```'
             echo
+            # When the identifier above is unavailable, a `pkg:oci/...` product
+            # has nothing to match against and every VEX statement silently
+            # misses — one cause, two symptoms. Trivy builds that purl from what
+            # it thinks the artifact IS, so print that: an image built with
+            # `load: true` and never pushed has no RepoDigest, which is the
+            # first thing to rule in or out.
+            echo "<details><summary>what Trivy matched against</summary>"
+            echo
+            echo '```'
+            jq -r '{ArtifactName, ArtifactType,
+                    RepoTags: (.Metadata.RepoTags // []),
+                    RepoDigests: (.Metadata.RepoDigests // []),
+                    ImageID: (.Metadata.ImageID // "")}
+                   | to_entries[] | "\(.key): \(.value | tostring)"' trivy.json
+            echo "--- cyclonedx root component ---"
+            jq -r '.metadata.component // "<no root component>"' cdx.json 2>/dev/null || echo "<cdx.json unreadable>"
+            echo '```'
+            echo
+            echo "</details>"
+            echo
             # The OTHER half of a VEX statement. A statement names a product and
             # a subcomponent, and until now the gate printed only the product —
             # so the subcomponent purl was still hand-written from the package
