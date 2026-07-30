@@ -308,6 +308,32 @@ but it is currently **inert**: the finding it excuses no longer exists. Logging
 this because "the VEX worked" and "the finding went away" look identical from a
 count, and only one of them is true here.
 
+**Where these numbers come from, and what the second tool says.** The table
+above is Trivy's, taken from the gate's job summary. Grype ran on the same image
+as the CRITICAL second opinion (Req 6.6) and reports **six** HIGH/CRITICAL where
+Trivy reports sixteen. The gap is stdlib ×6 and x/net ×4, which grype either
+does not flag or rates lower: it sees a single x/net advisory
+(`GHSA-5cv4-jp36-h3mw`) and calls it Medium, not four HIGH. That is not a
+contradiction, since the two databases split advisories differently, but the
+per-binary attribution above has exactly one source and should be read that way.
+
+Grype did corroborate the central claim without being asked for it. Its output
+lists `google.golang.org/grpc` at **three different versions in one image**:
+v1.79.3, v1.80.0 and v1.81.1. A single Go binary links one version of a module,
+so three versions means three binaries, compiled at different times. That is the
+bundled-plugin thesis falling out of an independent tool that was only present
+to double-check a CRITICAL.
+
+**"New in 13.1.1" rests on absence of evidence.** There is no CI scan of grafana
+at 13.0.4 to diff against: the scan gate landed 2026-07-22, after that image was
+built, and every grafana PR build since has either failed before the scan or run
+on 13.1.1. What stands in for a diff is the daily rescan, which still scans the
+*published* 13.0.4 image and has filed no x/net issue across 07-27, 07-28 and
+07-29 (7 distinct HIGH/CRITICAL over all images). Three passes with current
+advisory data would have filed them if they were present. Good evidence, but not
+a before/after diff, and the table above should not be read as one. Merging the
+bump closes the gap for free: the rescan will then hold scans of both tags.
+
 ---
 
 ### Evidence gap, stated plainly
