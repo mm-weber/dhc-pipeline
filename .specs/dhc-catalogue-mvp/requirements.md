@@ -99,6 +99,9 @@ registry images remain private until explicitly released.
 10. WHEN a daily rescan runs THE Scan Pipeline SHALL report every accepted-risk exception that has expired or that expires within 14 days.
 11. IF an accepted-risk exception omits its treatment, owner, reasoning reference, unavailability justification, or expiry date, or sets an expiry date more than 90 days ahead, THEN THE CI Pipeline SHALL fail validation.
 12. IF a Trivy ignore file exists outside triage/accepted-risk/ THEN THE CI Pipeline SHALL fail validation.
+13. WHEN a pull request builds an image THE Scan Pipeline SHALL run govulncheck in binary mode against every Go binary in that image and SHALL report, for each finding, whether the vulnerable symbol is reachable.
+14. IF govulncheck reports a vulnerable symbol as reachable in a binary THEN THE Triage Process SHALL NOT record that finding as not_affected with justification vulnerable_code_not_in_execute_path for that image.
+15. WHERE a triage decision records not_affected with justification vulnerable_code_not_in_execute_path THE Triage Process SHALL cite a govulncheck result for that binary in triage/LOG.md.
 
 ### Requirement 7: Conventions and Review Enforcement
 

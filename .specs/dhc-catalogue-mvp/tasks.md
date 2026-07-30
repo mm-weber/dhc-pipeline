@@ -107,6 +107,11 @@
     - `scripts/lint-accepted-risk.sh` (+ `_test.sh`, wired into `validate.yml`): required fields, 90-day ceiling, no ignore file outside `triage/accepted-risk/`
     - Job summary separates VEX suppression from risk acceptance and names expiring exceptions; `triage/README.md` gains the four-treatment model
     - _Requirements: Req 6.7, Req 6.8, Req 6.9, Req 6.10, Req 6.11, Req 6.12_
+  - [ ] 7.5 Reachability evidence (blocks 7.3)
+    - `govulncheck -mode=binary` on the PR path over every Go binary in the built image; **non-gating** — evidence, not a second gate
+    - `scripts/govulncheck-report.sh` (+ `_test.sh` on committed fixture JSON, wired into `validate.yml`): govulncheck JSON → per-binary OSV / module / `symbol`-`package`-`module` level
+    - Unblocks #30 (kin-openapi CRITICAL) and re-grounds both existing `not_affected` statements on a measurement rather than an argument
+    - _Requirements: Req 6.13, Req 6.14, Req 6.15_
 
 - [ ] 8. Wrap-up (Day 3)
   - [ ] 8.1 valkey chart adaptation [CUT 1st if pressed]
@@ -126,6 +131,6 @@
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5 |
-| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4 |
+| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5 |
 | Req 7: Conventions and Review | 1.1, 1.2 |
 | Req 8: Operating Environment | 2.1, 3.3, 4.2, 6.5, 7.2 |

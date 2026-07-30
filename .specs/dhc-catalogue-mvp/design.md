@@ -178,6 +178,31 @@ Each entry carries a `blocked:` field stating why avoid and mitigate were
 unavailable — presence machine-enforced, content judged at review. It is what
 keeps the file from becoming the path of least resistance.
 
+**Reachability evidence (Req 6.13–6.15).** Trivy and Grype answer "is this
+module linked", never "is the vulnerable code called". Every `not_affected`
+statement in this catalogue rested on architectural argument instead — sound and
+checkable, but weaker than a measurement, and useless against an advisory like
+kin-openapi's fail-open `ValidationHandler`, where applicability turns entirely
+on whether one symbol is wired in. `govulncheck -mode=binary` reads the Go
+binary's symbol table and distinguishes the two, so it runs on the PR path
+against every Go binary in the built image.
+
+It is **evidence, not a gate** — Trivy remains the only thing that fails a
+build. A reachability tool that can also break CI is a second gate nobody
+designed, and its false negatives would then silently pass images.
+
+Split like `triage/rescan/`: `scripts/govulncheck-report.sh` is the pure,
+unit-tested part (govulncheck JSON → per-binary table of OSV, module and
+`symbol` / `package` / `module` level) and the workflow is the I/O around it
+(export the container rootfs, find Go binaries, run govulncheck, print). The
+level is the discriminator: a finding whose trace names a function is reachable;
+one reported at module level only proves nothing either way — which is also what
+a stripped binary looks like, so the report says which it was.
+
+Req 6.14 makes the direction one-way on purpose. A reachable symbol *forbids*
+`not_affected`; an unreachable one does not compel it, because govulncheck sees
+only Go call graphs and not reflection, plugins or `exec`.
+
 ### .github/workflows/
 `validate.yml` (schema/yamllint/conventions), `build.yml` (PR build + gates; main: release),
 `e2e.yml` (kind matrix), `renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).
