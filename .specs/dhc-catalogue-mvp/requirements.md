@@ -114,6 +114,8 @@ registry images remain private until explicitly released.
 2. WHEN a pull request opens THE CI Pipeline SHALL run yamllint and definition validation on changed YAML files.
 3. THE Repository SHALL provide a pull request template prompting for requirement references and convention compliance.
 4. IF a pull request violates a codified convention THEN THE CI Pipeline SHALL fail with a message identifying that convention.
+5. WHEN a workflow installs a third-party executable THE CI Pipeline SHALL pin that executable to an exact version and SHALL verify its download against a checksum recorded in this repository.
+6. IF a pinned third-party executable has a newer released version THEN THE Upstream Tracking SHALL open a pull request updating that pin.
 
 ### Requirement 8: Operating Environment Constraints
 

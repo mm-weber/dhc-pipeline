@@ -30,6 +30,17 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
 - Every upstream source is `git+https://...#<ref>` plus a `checksum:` line.
 - Every upstream chart is pinned to an exact version in `chart/<name>/chart.yaml`.
 - Floating tags (`latest`, bare majors like `:1`, digestless tags) fail CI.
+- Every GitHub Action is pinned to a full commit SHA, and **every third-party
+  executable a workflow installs is pinned to an exact version and verified
+  against a checksum recorded here** (Req 7.5). `curl … | sh` from a branch is a
+  floating tag with a shell attached: the tag can be repointed and the script
+  re-published under the same URL. That is not hypothetical for this toolchain —
+  CVE-2026-33634 (March 2026) repointed 76 of 77 `aquasecurity/trivy-action`
+  tags to a credential stealer and published a malicious trivy release.
+- Pinning a **scanner** is only safe if something bumps it, because a stale
+  scanner is a silent failure. The pins carry a Renovate manager (Req 7.6); the
+  advisory **database** still updates on every run. Version and DB are
+  separately versioned, and only the version gets pinned.
 - Humans never bump pins by hand when Renovate is able to; hand-bumps are reserved
   for CVE fix-forwards (Req 6.5) and say so in the PR description.
 

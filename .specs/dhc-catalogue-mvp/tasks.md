@@ -14,6 +14,12 @@
     - PR template prompting for requirement refs and convention compliance
     - _Requirements: Req 7.2, Req 7.3, Req 7.4, Req 1.6_
 
+  - [ ] 1.3 Pin and verify the scanners the gate runs on
+    - `scripts/install-scanners.sh` (+ `_test.sh`): trivy and grype pinned to an exact version, downloads checksum-verified against values recorded in-repo; replaces `curl … main/install.sh | sudo sh` in `build.yml` and `rescan.yml`
+    - Renovate manager over the pins so a pinned scanner cannot go stale (a stale scanner fails silently, which is why pinning without tracking is not an improvement)
+    - Context: CVE-2026-33634 repointed 76 of 77 `aquasecurity/trivy-action` tags to a credential stealer in March 2026; our install path was the same class of exposure, on a runner holding registry tokens and cosign signing permissions
+    - _Requirements: Req 7.5, Req 7.6_
+
 - [ ] 2. Build-layer decision (Day 1, 3h timebox) [OPERATOR: host + dhi.io login]
   - [x] 2.1 Spike the real `dhi.io/build` frontend on operator host
     - `docker login dhi.io` (Community tier), clone `docker-hardened-images/catalog`
@@ -132,5 +138,5 @@
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5 |
 | Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5 |
-| Req 7: Conventions and Review | 1.1, 1.2 |
+| Req 7: Conventions and Review | 1.1, 1.2, 1.3 |
 | Req 8: Operating Environment | 2.1, 3.3, 4.2, 6.5, 7.2 |
