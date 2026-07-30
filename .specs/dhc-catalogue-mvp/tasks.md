@@ -99,7 +99,7 @@
   - [x] 7.2 `rescan.yml` daily cron
     - Rescan published images; new HIGH/CRITICAL → templated issue (severity, EPSS, KEV, affected images)
     - _Requirements: Req 6.2, Req 6.3_
-  - [x] 7.3 First real triage decision
+  - [ ] 7.3 First real triage decision
     - Author OpenVEX via vexctl for a real finding, attach with cosign attest, entry in `triage/LOG.md`; or fix-bump PR when a fix exists
     - _Requirements: Req 6.4, Req 6.5_
   - [x] 7.4 Risk treatment lane
