@@ -62,7 +62,7 @@ jobs:
       - name: install-scanners unit tests (Req 7.5)
         run: scripts/install-scanners_test.sh
 
-      - name: VEX product identity lint (Req 6.17, 6.18, 6.19)
+      - name: VEX product identity lint (Req 6.17-6.21)
         run: scripts/lint-vex-product.sh
 
       - name: VEX product identity lint unit tests
