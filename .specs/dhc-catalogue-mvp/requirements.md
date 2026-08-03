@@ -106,6 +106,9 @@ registry images remain private until explicitly released.
 17. IF a VEX statement names a product that is not an OCI package URL for an existing image definition THEN THE CI Pipeline SHALL fail validation.
 18. IF a VEX statement's product identifier declares a repository other than that image definition's published repository THEN THE CI Pipeline SHALL fail validation.
 19. IF a VEX statement's subcomponent identifier carries a version THEN THE CI Pipeline SHALL fail validation.
+20. IF a VEX statement does not record status fixed AND its product identifier carries a version THEN THE CI Pipeline SHALL fail validation.
+21. IF a VEX statement records status fixed AND its product identifier carries no version THEN THE CI Pipeline SHALL fail validation.
+22. WHEN a triage decision supersedes an earlier VEX statement THE Triage Process SHALL retain that earlier statement in its document and SHALL add a superseding statement carrying a later timestamp.
 
 ### Requirement 7: Conventions and Review Enforcement
 

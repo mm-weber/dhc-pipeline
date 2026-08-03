@@ -203,6 +203,32 @@ Req 6.14 makes the direction one-way on purpose. A reachable symbol *forbids*
 `not_affected`; an unreachable one does not compel it, because govulncheck sees
 only Go call graphs and not reflection, plugins or `exec`.
 
+**Statement identity (Req 6.17–6.22).** A VEX statement that matches nothing is
+indistinguishable from one that worked, so `scripts/lint-vex-product.sh` checks
+the identifiers Trivy compares: the product is a `pkg:oci/` purl naming a real
+definition (6.17), its `repository_url` equals that definition's `image:` (6.18),
+and subcomponents are versionless so they survive an upstream bump (6.19).
+
+Whether the *product* carries a version depends on the status, because the two
+statuses make different kinds of claim:
+
+- `not_affected` is a claim about **code structure** — the vulnerable path is not
+  reachable in this image. That stays true across rebuilds, so the product is
+  versionless (6.20). Pinning the digest would make the statement suppress until
+  the next build and then silently stop.
+- `fixed` is a claim about **specific versions** containing a remedy. Stated
+  versionless it asserts every image we publish under that name is fixed, which
+  is false the moment an older tag remains in the registry — so the product
+  carries a version (6.21).
+
+One rule for both would be wrong for one of them. The distinction only became
+visible when a `not_affected` finding was later resolved by an upstream bump.
+
+Req 6.22 keeps that transition on the record. OpenVEX documents hold multiple
+timestamped statements and consumers take the latest per (vulnerability,
+product), so a superseded claim is retained rather than deleted: the artifact
+carries what we argued, when, and what replaced it.
+
 ### .github/workflows/
 `validate.yml` (schema/yamllint/conventions), `build.yml` (PR build + gates; main: release),
 `e2e.yml` (kind matrix), `renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).

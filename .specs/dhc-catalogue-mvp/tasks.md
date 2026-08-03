@@ -126,6 +126,13 @@
     - `scripts/lint-vex-product.sh` (+ `_test.sh`) covers the one field stripping blinds the gate to: product names a real definition, `repository_url` equals its `image:`, subcomponents versionless
     - _Requirements: Req 6.17, Req 6.18, Req 6.19_
 
+  - [ ] 7.7 Status-dependent product versioning, so a superseded decision stays on the record
+    - `lint-vex-product.sh` forbade a version on *every* product purl. Correct for `not_affected` — a claim about code structure, true across rebuilds, where a pinned digest would suppress until the next build and then silently stop. Wrong for `fixed` — a version-scoped claim that, stated versionless, asserts every published image under that name carries the remedy, which is false while an older tag remains in the registry
+    - Surfaced by CVE-2026-42151 (#25): a `not_affected` statement written against grafana 13.0.4, superseded when the 13.1.1 bump moved prometheus past the fix. Deleting the statement would have lost the reasoning; keeping it unchanged would have described an image we no longer build
+    - Lint reads each statement's `status`: `fixed` requires a versioned product, every other status forbids one
+    - `triage/README.md` gains the convention with its reason; `triage/LOG.md` carries the transition
+    - _Requirements: Req 6.20, Req 6.21, Req 6.22_
+
 - [ ] 8. Wrap-up (Day 3)
   - [ ] 8.1 valkey chart adaptation [CUT 1st if pressed]
     - As 5.3 for valkey (stateful: probes, persistence off-by-default rationale)
@@ -144,6 +151,6 @@
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5 |
-| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6 |
+| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7 |
 | Req 7: Conventions and Review | 1.1, 1.2, 1.3 |
 | Req 8: Operating Environment | 2.1, 3.3, 4.2, 6.5, 7.2 |
