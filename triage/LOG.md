@@ -468,3 +468,83 @@ needs saying plainly rather than being read as a clean result.
 govulncheck also found **8 findings Trivy missed** (x/net CVE-2026-46600,
 -42506, -42502, -25680; otel; klauspost/compress; aws-sdk-go). Three scanners,
 three different answers, and the union is larger than any one of them.
+
+## 2026-08-03 — a fix that arrived on its own, and the lint rule it broke
+
+### FIXED — CVE-2026-42151, `github.com/prometheus/prometheus` (#25)
+
+The statement written on 2026-07-26 argued `vulnerable_code_not_in_execute_path`.
+It is now **superseded** rather than withdrawn: the finding is gone, because the
+13.0.4 → 13.1.1 bump carried a fixed Prometheus.
+
+Four points, two of them independent of any scanner:
+
+| | |
+|---|---|
+| Issue #25 | `prometheus/prometheus` **v0.305.3**, fixed in **0.311.3** |
+| grafana **13.0.4** `go.mod` | `replace prometheus/prometheus => v0.305.3` — where the vulnerable version came from |
+| grafana **13.1.1** `go.mod` | requires **v0.312.0**, replace directive gone |
+| our 13.1.1 scan | reports CVE-2026-42151 nowhere — not uncovered, not suppressed |
+
+The middle two are upstream source. They say the same thing the scanner says,
+without depending on it.
+
+**Outcome: `fixed`, scoped to `13.1.1-alpine3.23`.** The 2026-07-26
+`not_affected` statement is **kept verbatim**, timestamp untouched, and the
+`fixed` statement is appended with a later one; the document goes to `version: 2`
+with `last_updated` set (Req 6.22). OpenVEX consumers take the latest statement
+per (vulnerability, product), so nothing is lost and nothing is stale.
+
+Deleting it would have left only the outcome. The argument we made in July — and
+whether it was any good — is the part worth being able to re-read.
+
+→ `vex/CVE-2026-42151.openvex.json`
+
+### The lint forbade the only honest way to say it
+
+Writing that statement failed `scripts/lint-vex-product.sh`, which rejected a
+version on **every** product purl and reported it as Req 6.17 — a rule the spec
+never actually stated.
+
+The rule was half right, and had looked entirely right because until now every
+statement in this repo had the same status:
+
+- **`not_affected`** claims the vulnerable code cannot execute *in this image*.
+  That holds across rebuilds, so the product must stay versionless. A pinned
+  digest would suppress until the next build and then silently stop matching —
+  the failure mode this whole lane exists to prevent.
+- **`fixed`** claims that *particular versions* carry the remedy. Stated
+  versionless it excuses the CVE on every image ever published under that name,
+  including `13.0.4-alpine3.23`, which is still in the registry and still
+  vulnerable. That is not a scoping detail; it is a false claim.
+
+Now Req 6.20/6.21 split on the status, and the linter reads it. A `fixed` product
+names the published **tag**, not a digest: every build of 13.1.1 carries the fix,
+so a digest would be wrong by being narrower than the claim. `vexctl`'s own
+examples do the same — versioned product for `fixed`, bare for `not_affected`.
+
+Two gaps left open on purpose, so they are not mistaken for covered: nothing
+checks that `status` is one of OpenVEX's four labels, so a `"Fixed"` typo lints
+clean and suppresses nothing with any consumer; and nothing checks that a
+superseding statement's timestamp is actually later than the one it supersedes.
+The tests guard 6.22's shape, not its semantics.
+
+### Measured, not predicted: 19 uncovered
+
+The 2026-07-30 entry above projected 18 (1 CRITICAL, 17 HIGH). The run on
+`ccae635` measured **1 CRITICAL + 18 HIGH**: retracting #27 returned tempo
+`CVE-2026-28377` to `bin/grafana`, which now carries five findings, not four.
+
+| Binary | Findings |
+|---|---|
+| `bin/grafana` | kin-openapi **CRITICAL** (#30), tempo ×2 (#23, #27), x/text (#39), grpc (#28) |
+| `data/plugins-bundled/elasticsearch/…` | stdlib ×3, x/text, grpc |
+| `data/plugins-bundled/zipkin/…` | x/net ×4, stdlib ×3, x/text, grpc |
+
+**All 18 HIGH are `symbol`-level reachable**, so Req 6.14 forecloses
+`not_affected` on every one of them. The remaining exits are fix, transfer,
+accept and avoid. `fix` is spent at the image level — 13.1.1 is the newest
+grafana release, nothing since 2026-07-21.
+
+None of these are treated yet. They are triaged one at a time, from
+`bin/grafana` down.
