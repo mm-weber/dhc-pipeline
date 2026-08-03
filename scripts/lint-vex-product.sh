@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # lint-vex-product.sh [root] — check the product identifiers of every OpenVEX
-# statement under triage/vex/ (Req 6.17, 6.18, 6.19).
+# statement under triage/vex/ (Req 6.17, 6.18, 6.19, 6.20, 6.21).
 #
 #   Req 6.17 — the product is an OCI purl naming an image this repo defines
 #   Req 6.18 — its repository_url is that definition's published repository
 #   Req 6.19 — the suppression is scoped by versionless subcomponent purls
+#   Req 6.20 — a statement that is not 'fixed' carries no product version
+#   Req 6.21 — a 'fixed' statement does carry one
 #
 # A wrong product identifier produces no error of any kind. Trivy suppresses a
 # finding only when the product AND the subcomponent match, and a statement that
@@ -66,9 +68,9 @@ published_repository() { # definition path
        }' "$1"
 }
 
-check_product() { # rel, cve, product purl, subcomponent count
-  local rel="$1" cve="$2" purl="$3" nsubs="$4"
-  local rest type name version quals qrest q k v repo expected def
+check_product() { # rel, cve, product purl, subcomponent count, statement status
+  local rel="$1" cve="$2" purl="$3" nsubs="$4" status="$5"
+  local rest type name version quals qrest q k v repo expected def shown
 
   # Rule 4 first, so a defect in the identifier cannot mask it: every recipe in
   # triage/README.md scopes the suppression to the one package that was
@@ -109,8 +111,18 @@ check_product() { # rel, cve, product purl, subcomponent count
     return
   fi
 
-  if [ -n "$version" ]; then
-    report "$rel" 6.17 "$cve product '$purl' pins version '$version' — Trivy's root component purl carries the digest of the build being scanned, so this suppresses until the next rebuild and then silently stops. Drop it (triage/README.md: no digest in the product purl)"
+  # Whether a version belongs here is the statement's claim, not the purl's
+  # shape, so one rule for both statuses is wrong for one of them. Compared
+  # case-sensitively: OpenVEX status labels are a closed set of lower-case
+  # strings, so no consumer reads 'Fixed' as the fixed label, and blessing a
+  # pinned product on one would bless a document that suppresses nothing.
+  if [ "$status" = "fixed" ]; then
+    if [ -z "$version" ]; then
+      report "$rel" 6.21 "$cve product '$purl' records status 'fixed' but carries no version — a fixed claim is about the versions that carry the remedy, and stated versionless it excuses this CVE on every image ever published under that name, including the older tag still pullable from the registry. Name the version the fix shipped in, published tag or digest"
+    fi
+  elif [ -n "$version" ]; then
+    if [ -n "$status" ]; then shown="records status '$status'"; else shown="records no status at all"; fi
+    report "$rel" 6.20 "$cve product '$purl' pins version '$version' while the statement $shown — only a 'fixed' claim is about particular versions. Every other claim is about this image's code and holds across rebuilds, so a pinned product suppresses until the next rebuild and then silently stops matching. Drop the version (triage/README.md: no digest in the product purl)"
   fi
 
   # The purl name is the image; there is no "does this image exist" check
@@ -167,15 +179,20 @@ check_subcomponent() { # rel, cve, product purl, subcomponent purl
 # and an empty field stays an empty field (tab would collapse). Kinds:
 #   D — the document declares no statements
 #   N — a statement declares no products
-#   P — a product, with its subcomponent count
+#   P — a product, with its subcomponent count and its statement's status
 #   S — one subcomponent of a product
-# shellcheck disable=SC2016  # $e/$cve/$p/$subs are jq bindings, not shell vars
+# shellcheck disable=SC2016  # $e/$cve/$p/$subs/$st are jq bindings, not shell vars
 JQ='
 def vulnid:
   if (.vulnerability | type) == "string" then .vulnerability
   elif (.vulnerability | type) == "object" then (.vulnerability.name // .vulnerability["@id"] // "")
   else "" end;
 def ident: if type == "object" then (.["@id"] // "") else tostring end;
+# The status decides the product-version rule, and only the literal string
+# "fixed" is that label: a missing status arrives as the empty string, and any
+# other type arrives as its JSON rendering, which no shell comparison can
+# mistake for a label the way a bare tostring of ["fixed"] might.
+def statuslabel: if type == "string" then . elif . == null then "" else tojson end;
 def rec: map(tostring) | join("\u001f");
 
 if (.statements | type) != "array" or (.statements | length) == 0 then
@@ -189,11 +206,12 @@ else
        or ($e.value.products | length) == 0 then
       ["N", $cve, "", ""] | rec
     else
-      ($e.value.products[]) as $p
+      ($e.value.status | statuslabel) as $st
+      | ($e.value.products[]) as $p
       | ($p | ident) as $pid
       | (($p | if type == "object" then (.subcomponents // []) else [] end)
          | if type == "array" then . else [] end) as $subs
-      | (["P", $cve, $pid, ($subs | length)] | rec),
+      | (["P", $cve, $pid, ($subs | length), $st] | rec),
         ($subs[] | ["S", $cve, $pid, ident] | rec)
     end
 end
@@ -214,11 +232,11 @@ if [ -d "$ROOT/$LANE" ]; then
 
     file_products=0
     file_subs=0
-    while IFS=$'\x1f' read -r kind cve pid sub; do
+    while IFS=$'\x1f' read -r kind cve pid sub status; do
       case "$kind" in
         D) report "$rel" 6.17 "document declares no 'statements' — committed weight that excuses nothing" ;;
         N) report "$rel" 6.17 "$cve declares no products — it names nothing, so it suppresses nothing" ;;
-        P) file_products=$((file_products + 1)); check_product "$rel" "$cve" "$pid" "$sub" ;;
+        P) file_products=$((file_products + 1)); check_product "$rel" "$cve" "$pid" "$sub" "$status" ;;
         S) file_subs=$((file_subs + 1)); check_subcomponent "$rel" "$cve" "$pid" "$sub" ;;
       esac
     done <<<"$records"

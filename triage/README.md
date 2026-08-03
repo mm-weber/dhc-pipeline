@@ -184,14 +184,29 @@ vexctl create \
   --file=triage/vex/CVE-….openvex.json
 ```
 
-- **No digest in the product purl.** Trivy's root component purl carries the
-  image digest, which changes on every build; a digestless purl matches any
-  version, which is what a committed statement needs.
+- **No version in the product purl — unless the status is `fixed`.** Trivy's
+  root component purl carries the image digest, which changes on every build, so
+  a versionless purl matches any build, which is what a committed `not_affected`
+  statement needs. `fixed` is the exception, and Req 6.20/6.21 split on it:
+  `not_affected` claims the vulnerable code cannot execute *in this image*, which
+  holds across rebuilds; `fixed` claims *particular versions* carry the remedy,
+  and stated versionless it excuses the CVE on every image ever published under
+  that name — including the older tag still pullable from the registry.
+- **A `fixed` product names a released version, not a build.** Prefer the
+  published tag (`pkg:oci/grafana@13.1.1-alpine3.23?repository_url=…`) over a
+  digest: every build of 13.1.1 carries the fix, so a digest would be wrong by
+  being narrower than the claim. The lint accepts either.
 - **No version in the subcomponent purl** either — Go module versions move on
   every rebuild, and a versionless subcomponent still scopes the suppression to
   that one package rather than the whole image.
-- Both behaviours were confirmed against Trivy before being written down here,
-  not inferred from documentation.
+- **A superseded statement is kept, not deleted** (Req 6.22). OpenVEX documents
+  hold several timestamped statements and consumers take the latest per
+  (vulnerability, product), so when a bump resolves a finding the `not_affected`
+  claim stays in the document and a `fixed` statement is appended with a later
+  timestamp and the document `version` bumped. The artifact then carries what we
+  argued, when, and what replaced it — deleting it would leave only the outcome.
+- Every behaviour above was confirmed against Trivy before being written down
+  here, not inferred from documentation.
 
 Statements are attached to the images they name as `openvex` attestations by
 `build.yml` on the main branch (Req 6.4), so a decision travels with the
