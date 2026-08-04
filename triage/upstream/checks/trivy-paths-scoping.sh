@@ -77,7 +77,18 @@ matches nothing, suppresses nothing, warns nobody and exits 0, which is
 indistinguishable from an untriaged finding unless the lane file is compared
 against the report. scripts/accepted-risk-report.sh is that comparison.
 
-Globs are load-bearing, not cosmetic: the binaries carry an arch suffix
-(_linux_amd64 / _linux_arm64), so an exact path matches the arch the PR gate
-builds and silently stops matching the other one on the release path.
+Globs are load-bearing, not cosmetic. Measured on the published index
+ghcr.io/mm-weber/dhc/grafana:13-alpine3.23, the same finding sits at
+  .../elasticsearch/gpx_grafana_elasticsearch_datasource_linux_amd64  on amd64
+  .../elasticsearch/gpx_grafana_elasticsearch_datasource_linux_arm64  on arm64
+The catalogue publishes amd64 only (Req 2.1), so an exact path is correct for
+every scan that runs today and goes silently wrong when arm64 returns (task 8.3)
+or when a consumer scans an arm64 image themselves. A glob costs nothing now and
+removes that as a future discovery.
+
+Measuring per-platform yourself needs --image-src remote, not just --platform.
+Trivy's default source order is docker,containerd,podman,remote, and a daemon
+copy is single-arch, so --platform is silently ignored against it:
+`--platform linux/arm64` returned architecture=amd64 in 0s until the daemon was
+bypassed. Same silent-failure family as the typo'd path above.
 NOTE
