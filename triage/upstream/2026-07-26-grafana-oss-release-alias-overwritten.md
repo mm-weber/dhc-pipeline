@@ -1,4 +1,4 @@
-# `/oss/release/` tarballs are overwritten ~20h after publication — is that intended?
+# `/oss/release/` tarballs are overwritten ~20h after publication: is that intended?
 
 ## Summary
 
@@ -8,7 +8,7 @@ new bytes differ from what the same URL served on release day, so a consumer
 that pinned the digest published at release time breaks days later, with no
 version change to explain it.
 
-Everything Grafana publishes is internally consistent — each object matches the
+Everything Grafana publishes is internally consistent, and each object matches the
 `.sha256` beside it, and always has. The question is whether `/oss/release/` is
 meant to be immutable, because tooling widely treats it that way.
 
@@ -33,7 +33,7 @@ We build container images from these tarballs, pinning the SHA-256 and
 verifying at fetch time. The pin was taken from
 `grafana-13.0.4.linux-<arch>.tar.gz.sha256`.
 
-**2026-07-21 20:57Z** — a release build fetched both arches from `/oss/release/`
+**2026-07-21 20:57Z.** A release build fetched both arches from `/oss/release/`
 and verified them. SLSA provenance recorded:
 
 | | uri | sha256 |
@@ -41,7 +41,7 @@ and verified them. SLSA provenance recorded:
 | amd64 | `…/oss/release/grafana-13.0.4.linux-amd64.tar.gz` | `cd8c8b31b0482f48f98018030c142919dab6debbe81f747f3521af6f6a6b4490` |
 | arm64 | `…/oss/release/grafana-13.0.4.linux-arm64.tar.gz` | `bcf8b9fbfac00bece5bccdda44512b9f7ba81d3105db1a255e0efd37a2fbf6df` |
 
-**2026-07-26** — same URL, same pin, same definition; two runs on separate
+**2026-07-26.** Same URL, same pin, same definition; two runs on separate
 runners, both failing:
 
 ```
@@ -49,7 +49,7 @@ runners, both failing:
 sha256sum: WARNING: 1 of 1 computed checksums did NOT match
 ```
 
-**Today** — that URL serves
+**Today.** That URL serves
 `54eceec74891dd49f992502eab506e0554c82903317fb50d82246946e46fe7ae`
 (three verified downloads, byte count matching `Content-Length`), and its
 `.sha256` agrees. The digest we recorded on release day is now only available
@@ -66,7 +66,7 @@ at the per-build path.
 
 Each side matches its own sidecar. The deltas are ~0.001% and change sign
 between arches, which reads like repackaging (tar metadata, gzip framing)
-rather than different content — but a consumer verifying a digest cannot tell
+rather than different content, but a consumer verifying a digest cannot tell
 the difference, and neither can we from outside.
 
 ## Reproduction
@@ -93,7 +93,7 @@ x-goog-generation: 1784627763097984
 ```
 
 Verify content by downloading to a file, not by piping: the objects are
-~320–360 MiB, and `curl … | sha256sum` will hash a truncated body and print a
+~320-360 MiB, and `curl … | sha256sum` will hash a truncated body and print a
 plausible, wrong digest. Check the byte count against `Content-Length` first.
 
 ## Why this matters downstream
@@ -114,7 +114,7 @@ scoped to a single build and whose sidecar is written in the same job.
 ## Questions
 
 1. **Is `/oss/release/<ver>` intended to be immutable?** If yes, these rewrites
-   are a bug. If no, saying so in the download docs would help — it is the path
+   are a bug. If no, saying so in the download docs would help, since it is the path
    most tooling has historically pinned.
 2. **What is the 2026-07-22 batch step?** If it is a repackaging or promotion
    pass, could it run *before* the release is announced, so the first published
