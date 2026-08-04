@@ -1,7 +1,11 @@
 # `go.mod` pins Go 1.26.3, so every release, including v12.8.0, ships five stdlib advisories
 
 **Target repo:** `grafana/grafana-elasticsearch-datasource`
-**Drafted:** 2026-08-04, not filed
+**Drafted:** 2026-08-04
+**Filed:** 2026-08-04 as
+[grafana/grafana-elasticsearch-datasource#410](https://github.com/grafana/grafana-elasticsearch-datasource/issues/410)
+(label `type/bug`). The issue body is this file from `## Summary` down,
+unmodified.
 
 ---
 
@@ -152,22 +156,15 @@ signature, which is a poor trade for standard-library advisories.
 Passing `go-version: "1.26.5"` explicitly to the CD workflow would also work
 (rule 1 above), but moving `go.mod` keeps CI, dev and release on one number.
 
-## Questions
+## Question
 
-1. **Should the toolchain be covered by dependency automation here?** Renovate
-   detects `go 1.26.3` in #32 but proposes no update for it, and its
-   vulnerability check does not cover `stdlib` at all. So the repo can be fully
-   green on dependencies, as it very nearly is, while every released binary
-   carries five advisories. Whether the shared preset this repo extends is meant
-   to bump the `go` directive we could not tell, since
-   `grafana/grafana-renovate-config` is not public.
-2. **Should `DEFAULT_GO_VERSION` in `plugin-ci-workflows` track the current
-   patch release?** It does not fire here, but note that the backend check
-   (`[ -f Magefile.go ]`) and the toolchain check (`go.mod`) read two different
-   files from the same directory. A plugin whose `Magefile.go` is in the plugin
-   directory while its `go.mod` is rooted above it therefore builds a backend on
-   the default, which at `1.26.3` predates all five fixes. We have not surveyed
-   how many plugins are laid out that way.
+**Should the toolchain be covered by dependency automation here?** Renovate
+detects `go 1.26.3` in #32 but proposes no update for it, and its vulnerability
+check does not cover `stdlib` at all. So the repo can be fully green on
+dependencies, as it very nearly is, while every released binary carries five
+advisories. Whether the shared preset this repo extends is meant to bump the
+`go` directive we could not tell, since `grafana/grafana-renovate-config` is not
+public.
 
 ## Related
 

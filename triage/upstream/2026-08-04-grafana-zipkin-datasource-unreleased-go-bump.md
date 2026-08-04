@@ -139,19 +139,12 @@ signature, which is a poor trade for standard-library advisories.
    clears CVE-2026-39822 and CVE-2026-42505, so all five.
    `grafana/grafana`'s own `go.mod` is already on 1.26.5.
 
-## Questions
+## Question
 
-1. **Is there a release cadence for bundled catalog plugins?** Because Grafana
-   bundles this plugin unpinned, its release schedule silently becomes part of
-   Grafana's image security posture, and a plugin can go months without a
-   release while the Grafana releases beside it keep shipping.
-2. **Should `DEFAULT_GO_VERSION` in `plugin-ci-workflows` track the current
-   patch release?** It does not fire here, but note that the backend check
-   (`[ -f Magefile.go ]`) and the toolchain check (`go.mod`) read two different
-   files from the same directory. A plugin whose `Magefile.go` is in the plugin
-   directory while its `go.mod` is rooted above it therefore builds a backend on
-   the default, which at `1.26.3` predates all five fixes. We have not surveyed
-   how many plugins are laid out that way.
+**Is there a release cadence for bundled catalog plugins?** Because Grafana
+bundles this plugin unpinned, its release schedule silently becomes part of
+Grafana's image security posture, and a plugin can go months without a release
+while the Grafana releases beside it keep shipping.
 
 ## Related
 
