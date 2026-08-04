@@ -200,9 +200,14 @@ from the real plugin release assets:
 | a path matching nothing | suppresses nothing, no warning, exit 0 |
 | suppression record | `Target` = binary, `Statement` = entry, `Source` = file |
 
-Globs matter because the binaries carry an arch suffix
-(`..._linux_amd64` / `..._linux_arm64`), so an exact path would match on the arch
-the PR gate builds and silently stop matching on the other.
+Globs matter because the binaries carry an arch suffix. Measured on the
+published index, the same finding sits at
+`.../elasticsearch/gpx_..._linux_amd64` on amd64 and at `..._linux_arm64` on
+arm64. The catalogue publishes amd64 only (Req 2.1), so an exact path is correct
+for every scan that runs today and goes silently wrong the moment arm64 returns
+(task 8.3) or a consumer scans an arm64 image themselves. A path matching
+nothing is completely silent, per the row above, so a glob is what keeps that
+from becoming a discovery.
 
 The last two rows are why Req 6.26/6.27 exist. The two failure modes are not
 symmetric: a *too narrow* path fails safe (nothing is suppressed, the gate stays
@@ -271,13 +276,28 @@ carries what we argued, when, and what replaced it.
 `validate.yml` (schema/yamllint/conventions), `build.yml` (PR build + gates; main: release),
 `e2e.yml` (kind matrix), `renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).
 
-**Build cost split (validated on the first CI run):** the PR gate builds
-`linux/amd64` only — fast proof a definition compiles — while the release path
-(main) builds both arches per Req 2.1. arm64 through the frontend runs cross-
-compiled or QEMU-emulated on an amd64 runner; paying that once at merge, not on
-every PR, keeps PR feedback fast. Both paths use `type=gha` build cache
-(per-image scope) so repeat builds of a large upstream (cert-manager, ~30–40 min
-cold multi-arch) reuse the Go module + compile layers.
+**Platforms: `linux/amd64` only (Req 2.1, Req 2.6).** The catalogue built and
+published both arches until 2026-08-04, when measurement showed nothing ever
+scanned the arm64 half. Every scan step in `build.yml` is `pull_request`-gated
+and the PR gate builds amd64 only, while `rescan.yml` passes no `--platform`, so
+Trivy resolves the published index to the runner's own architecture. arm64 was
+therefore built, pushed, signed, SBOM'd and attested with no gate ever reading
+it, which is the concrete case in review finding 1.3. Shipping one platform is
+the cheap correction; scanning two is the larger change, deferred to task 8.3.
+
+Measured on the published `grafana:13-alpine3.23` index, both platforms carry an
+identical HIGH/CRITICAL set (11 each, same CVE, package and version), so nothing
+is known to be hiding in the arm64 image. That is one observation on one day
+rather than a property: apk metadata is per-arch and a fix can land on one arch
+before the other.
+
+Definitions keep `platforms: [linux/amd64, linux/arm64]` and their per-arch
+pins, and `verify-arch-pins.sh` keeps verifying both. The definitions do support
+arm64; the release path publishes one platform. Keeping the pins exercised is
+what makes task 8.3 a build-matrix change rather than archaeology.
+
+Both paths use `type=gha` build cache (per-image scope) so repeat builds of a
+large upstream (cert-manager) reuse the Go module + compile layers.
 
 ## Data Models
 

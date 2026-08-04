@@ -34,11 +34,12 @@ registry images remain private until explicitly released.
 
 #### Acceptance Criteria
 
-1. WHEN a definition change merges to main THE CI Pipeline SHALL build affected images for linux/amd64 and linux/arm64.
+1. WHEN a definition change merges to main THE CI Pipeline SHALL build affected images for linux/amd64.
 2. WHEN an image build succeeds THE CI Pipeline SHALL push resulting images to ghcr.io/mm-weber/dhc with a cosign keyless signature, an SPDX SBOM, and BuildKit provenance attached.
 3. THE CI Pipeline SHALL derive image tags from upstream semantic versions following DHI naming convention (semver, base OS, and variant segments).
 4. WHILE public release remains disabled THE Repository SHALL keep source and registry images private.
 5. IF an image build fails THEN THE CI Pipeline SHALL publish no artifacts from that run and report each failing step in pull request checks.
+6. WHILE an image for a platform remains published THE Catalogue SHALL scan that platform for HIGH and CRITICAL vulnerabilities.
 
 ### Requirement 3: Upstream Version Tracking
 

@@ -43,10 +43,12 @@
     - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6_
   - [x] 3.3 `build.yml`: PR build path and main release path
     - PR: build affected images (amd64 only, `type=gha` cache), no push
-    - main: multi-arch build → push to private `ghcr.io/mm-weber/dhc` + cosign keyless + Syft SPDX SBOM + BuildKit provenance
+    - main: amd64 build → push to private `ghcr.io/mm-weber/dhc` + cosign keyless + Syft SPDX SBOM + BuildKit provenance
     - Verify GHCR packages are private; failure publishes nothing and reports failing step
     - CI-validated: PR path green on all four definitions (amd64+arm64) before the
-      amd64-only/cache speed fix; arm64 only on release keeps PR feedback fast
+      amd64-only/cache speed fix
+    - Release path was multi-arch until 2026-08-04 and is now amd64 only, because
+      nothing scanned the arm64 half (Req 2.6). Restoring it is task 8.3
     - _Requirements: Req 2.1, Req 2.2, Req 2.3, Req 2.4, Req 2.5, Req 8.1_
 
 - [ ] 4. Upstream tracking live (Day 2)
@@ -148,13 +150,21 @@
     - README: lab → catalogue arc, verification walkthrough (cosign verify, SBOM/provenance inspect), triage story
     - Confirm crons active (Renovate, rescan); `/spec-validate` + coverage check against this plan; repo stays private
     - _Requirements: Req 2.4, All (verification)_
+  - [ ] 8.3 Restore `linux/arm64`, gated on scanning it first [DEFERRED 2026-08-04]
+    - Why it was dropped: arm64 was built, pushed, signed, SBOM'd and attested while every scan step in `build.yml` stayed `pull_request`-gated and the PR gate built amd64 only, and `rescan.yml` passed no `--platform` so Trivy resolved the published index to the runner's own arch. No gate ever read the arm64 image (review finding 1.3). Req 2.6 now forbids publishing a platform nothing scans, so that criterion is the gate this task has to satisfy before the platform returns
+    - Scan first, ship second. `rescan.yml` loops platforms with `--platform` **and** `--image-src remote`; the second flag is not optional (measured: Trivy prefers the local docker daemon, where the image is single-arch, and silently ignores `--platform` there — `--platform linux/arm64` returned `architecture=amd64` in 0s). Write `${name}-${arch}.json`; `rescan-report` needs no change, since it globs `*.json` and dedupes images by `ArtifactName`, which is identical across platforms (measured). Cost measured at ~35s per platform per image
+    - Then `build.yml`: `platforms: linux/amd64,linux/arm64` on main. A PR-side arm64 gate additionally needs `setup-qemu-action` and a multi-platform push to the local registry, because `load:` takes one platform. The cost there is the build, not the scan, and it falls on source-compiled archetypes (cert-manager) far harder than on tarball repackages (grafana)
+    - Definitions kept `platforms:` and their per-arch pins throughout, and `verify-arch-pins.sh` kept fetching and verifying both, so this is a build-matrix change rather than archaeology
+    - Already-published tags (`13.0.4-alpine3.23` and earlier) remain multi-arch indexes; they are private and pre-release, and are left as they are
+    - Accepted-risk `paths:` globs already tolerate the arch suffix (7.8), and Req 6.26's dead-entry report is the instrument that would catch any entry that does not
+    - _Requirements: Req 2.1, Req 2.6, Req 6.2_
 
 ## Requirements Coverage
 
 | Requirement | Covered By Tasks |
 |-------------|------------------|
 | Req 1: Image Definition Catalogue | 2.1, 2.2, 3.1, 3.2, 5.1, 5.2, 1.2 |
-| Req 2: Image Build and Private Release | 3.3, 8.2 |
+| Req 2: Image Build and Private Release | 3.3, 8.2, 8.3 |
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5 |
