@@ -252,25 +252,56 @@ the identifiers Trivy compares: the product is a `pkg:oci/` purl naming a real
 definition (6.17), its `repository_url` equals that definition's `image:` (6.18),
 and subcomponents are versionless so they survive an upstream bump (6.19).
 
-Whether the *product* carries a version depends on the status, because the two
-statuses make different kinds of claim:
+**Source is not what a scanner sees (Req 6.28-6.30).** `triage/vex/` holds
+hand-authored *source*, and `scripts/compile-vex.sh` renders it per build into
+what Trivy is actually given. The split exists because the two have
+irreconcilable requirements: source has to be reviewable by a human and stable
+in git, while a product identifier has to be a string Trivy matches, and Trivy
+builds that string from the image's **RepoDigest**.
 
-- `not_affected` is a claim about **code structure** — the vulnerable path is not
-  reachable in this image. That stays true across rebuilds, so the product is
-  versionless (6.20). Pinning the digest would make the statement suppress until
-  the next build and then silently stop.
-- `fixed` is a claim about **specific versions** containing a remedy. Stated
-  versionless it asserts every image we publish under that name is fixed, which
-  is false the moment an older tag remains in the registry — so the product
-  carries a version (6.21).
+Measured on `grafana:13-alpine3.23`, one real finding, one statement each:
 
-One rule for both would be wrong for one of them. The distinction only became
-visible when a `not_affected` finding was later resolved by an upstream bump.
+| Product identifier | Status | Suppressed |
+|---|---|---|
+| `pkg:oci/grafana@13.0.4-alpine3.23` (tag) | `fixed` | **no** |
+| `pkg:oci/grafana@sha256:b6987eb…` (digest) | `fixed` | yes |
+| `pkg:oci/grafana` (versionless) | `fixed` | yes |
+| `pkg:oci/grafana` (versionless) | `not_affected` | yes |
 
-Req 6.22 keeps that transition on the record. OpenVEX documents hold multiple
+So the tag form the earlier design prescribed matched nothing, silently. That
+went unnoticed because the one `fixed` statement written under it covers a
+finding that had already vanished from the scan, so it never had to suppress
+anything. Compilation is what makes the two requirements compatible: the author
+writes a tag, the compiler emits the digest.
+
+Version in *source* is therefore a scope, not an identifier:
+
+- **a published tag** means the claim is about that release. `fixed` must carry
+  one (6.21), because a remedy is always about particular versions.
+- **no version** means the claim holds for every build of that image.
+
+Only tags are admissible in source (6.20). A digest in source would be a claim
+nobody can review and would go stale at the next rebuild of the same release.
+
+The compiler then does two things per build: it drops any statement whose tag is
+not a tag of the image being scanned (6.30), and it rewrites every surviving
+product to that image's digest (6.29). Dropping is what stops a claim outliving
+the release it was argued about, which is review finding 2.4: under the old rules
+a versionless `not_affected` stayed the latest statement for its own product
+forever and suppressed on versions nobody had examined. Rewriting is what makes
+the statement match at all.
+
+It also subsumes the qualifier-stripping the gate did inline for trivy#9399,
+since the compiler already rewrites the identifier — one tested transform from
+source to scan input instead of a `jq` expression in YAML.
+
+Req 6.22 keeps a superseded claim on the record. OpenVEX documents hold multiple
 timestamped statements and consumers take the latest per (vulnerability,
 product), so a superseded claim is retained rather than deleted: the artifact
-carries what we argued, when, and what replaced it.
+carries what we argued, when, and what replaced it. Compilation is also what
+makes that work, because both statements now compile to the *same* product
+identity — the build's digest — so the later timestamp actually supersedes.
+Under the old split they named different products and superseded nothing.
 
 ### .github/workflows/
 `validate.yml` (schema/yamllint/conventions), `build.yml` (PR build + gates; main: release),

@@ -142,6 +142,14 @@
     - Trivy 0.72.0 behaviour measured first, on a two-binary tree from the real plugin assets: `paths` scopes, globs work (needed — the arch suffix differs per build), a path matching nothing is silent. Recorded in `design.md` and re-runnable from `triage/upstream/checks/`
     - _Requirements: Req 6.23, Req 6.24, Req 6.25, Req 6.26, Req 6.27_
 
+  - [ ] 7.9 Compile VEX per build, so a statement's product is one Trivy matches
+    - Measured on the published image, one real finding, one statement each: a tag-versioned product suppresses **nothing** (`pkg:oci/grafana@13.0.4-alpine3.23`, status `fixed` — reported 1, suppressed 0), while a digest-versioned one and a versionless one both work. Trivy builds the product identifier from the RepoDigest, so a tag never matches. Req 6.21 as written could not be satisfied by any statement that had to suppress, and `triage/vex/CVE-2026-42151.openvex.json` is inert today — unnoticed because its finding had already vanished from the scan
+    - Pulls the compilation half of the v2 requirements draft forward, scoped: source stays hand-authored in `triage/vex/`, and `scripts/compile-vex.sh` renders it per build. Not pulled forward: the `triage/ledger/` record model, the five-treatment vocabulary, committed compiler output
+    - `compile-vex.sh` drops statements whose product tag is not a tag of the image being scanned (6.30) and rewrites every surviving product to that image's digest (6.29). Dropping closes review finding 2.4 (a versionless claim outliving the release it was argued about); rewriting is what makes any of them match
+    - Subsumes the inline `jq` qualifier-strip in `build.yml` (trivy#9399) — one tested transform from source to scan input rather than an expression in YAML. `rescan.yml` passes source documents straight to Trivy today and needs the same treatment
+    - `lint-vex-product.sh`: 6.20 becomes "a source version must be a published tag" rather than "non-fixed carries no version", so a `not_affected` may be scoped to a release
+    - _Requirements: Req 6.20, Req 6.21, Req 6.28, Req 6.29, Req 6.30_
+
 - [ ] 8. Wrap-up (Day 3)
   - [ ] 8.1 valkey chart adaptation [CUT 1st if pressed]
     - As 5.3 for valkey (stateful: probes, persistence off-by-default rationale)
@@ -168,6 +176,6 @@
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5 |
-| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8 |
+| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9 |
 | Req 7: Conventions and Review | 1.1, 1.2, 1.3 |
 | Req 8: Operating Environment | 2.1, 3.3, 4.2, 6.5, 7.2 |
