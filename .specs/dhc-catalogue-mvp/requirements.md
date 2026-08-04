@@ -87,7 +87,7 @@ registry images remain private until explicitly released.
 
 #### Acceptance Criteria
 
-1. WHEN a pull request builds an image THE Scan Gate SHALL run Trivy and fail on HIGH or CRITICAL findings not covered by a VEX statement.
+1. WHEN a pull request builds an image THE Scan Gate SHALL run Trivy and fail on every HIGH or CRITICAL finding covered neither by a VEX statement recording status not_affected or fixed nor by an unexpired exception under triage/accepted-risk/.
 2. THE Scan Pipeline SHALL rescan published images at least once per day.
 3. WHEN a rescan finds a new HIGH or CRITICAL CVE THE Scan Pipeline SHALL open a GitHub issue containing severity, EPSS score, KEV status, and affected images.
 4. WHEN a triage decision concludes not-affected THE Triage Process SHALL record an OpenVEX statement under triage/ and attach it to affected images as an attestation.
@@ -95,7 +95,7 @@ registry images remain private until explicitly released.
 6. WHERE a CRITICAL finding exists THE Scan Pipeline SHALL obtain a second-opinion scan with Grype.
 7. WHEN a triage decision concludes accepted risk or upstream transfer THE Triage Process SHALL record a time-boxed exception under triage/accepted-risk/ carrying a treatment, an owner, a reference to its reasoning in triage/LOG.md, a justification for why avoidance and remediation were unavailable, and an expiry date.
 8. THE Triage Process SHALL NOT record accepted risk or upstream transfer as a VEX statement.
-9. WHEN an accepted-risk exception has passed its expiry date THE Scan Gate SHALL count every finding it covers as uncovered.
+9. WHEN an accepted-risk exception has passed its expiry date THE Scan Gate SHALL count every finding it names as uncovered.
 10. WHEN a daily rescan runs THE Scan Pipeline SHALL report every accepted-risk exception that has expired or that expires within 14 days.
 11. IF an accepted-risk exception omits its treatment, owner, reasoning reference, unavailability justification, or expiry date, or sets an expiry date more than 90 days ahead, THEN THE CI Pipeline SHALL fail validation.
 12. IF a Trivy ignore file exists outside triage/accepted-risk/ THEN THE CI Pipeline SHALL fail validation.
