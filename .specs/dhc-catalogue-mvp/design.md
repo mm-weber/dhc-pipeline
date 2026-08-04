@@ -283,6 +283,28 @@ Version in *source* is therefore a scope, not an identifier:
 Only tags are admissible in source (6.20). A digest in source would be a claim
 nobody can review and would go stale at the next rebuild of the same release.
 
+**Versionless is a decision, not a default (Req 6.31).** The two scopes answer
+different questions and neither is right for both kinds of `not_affected`:
+
+- *structural* claims do not depend on a version. "This image runs Grafana's
+  dashboard server, which never starts a Prometheus server, so the disclosing
+  handler is not routed" is as true of 14.0 as of 13.0.4. Re-arguing it every
+  release is churn that teaches nothing.
+- *dependency-graph* claims do. "This build does not reach the vulnerable
+  symbol" rests on what this release happens to link, and 14.0 may link
+  something else entirely.
+
+Left to a default, every statement drifts to versionless, because that is what
+suppresses most and costs least to write. So a versionless product must say in
+`status_notes` why its claim survives a version change, marked with the literal
+token `version-independent:` so the rule is checkable rather than a matter of
+taste. It is written into `status_notes` rather than a custom field because it
+stays inside standard OpenVEX and because a consumer reading the statement
+wants that sentence too.
+
+What this rejects is a versionless claim nobody defended. A tag-scoped claim
+needs no such note: its scope already says what it covers.
+
 The compiler then does two things per build: it drops any statement whose tag is
 not a tag of the image being scanned (6.30), and it rewrites every surviving
 product to that image's digest (6.29). Dropping is what stops a claim outliving

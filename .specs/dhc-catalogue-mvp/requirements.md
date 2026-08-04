@@ -118,6 +118,7 @@ registry images remain private until explicitly released.
 28. WHEN a scan applies VEX statements THE Scan Gate SHALL apply compiled documents in place of source documents.
 29. WHEN a VEX document is compiled THE VEX Compiler SHALL set every product identifier in that document to a sha256 digest of an image being scanned.
 30. IF a VEX source statement's product identifier carries a version that is not a tag of an image being scanned THEN THE VEX Compiler SHALL omit that statement from compiled output.
+31. IF a VEX source statement's product identifier carries no version AND that statement's status notes record no reason its claim holds for every release THEN THE CI Pipeline SHALL fail validation.
 
 ### Requirement 7: Conventions and Review Enforcement
 

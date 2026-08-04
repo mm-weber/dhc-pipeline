@@ -148,7 +148,8 @@
     - `compile-vex.sh` drops statements whose product tag is not a tag of the image being scanned (6.30) and rewrites every surviving product to that image's digest (6.29). Dropping closes review finding 2.4 (a versionless claim outliving the release it was argued about); rewriting is what makes any of them match
     - Subsumes the inline `jq` qualifier-strip in `build.yml` (trivy#9399) — one tested transform from source to scan input rather than an expression in YAML. `rescan.yml` passes source documents straight to Trivy today and needs the same treatment
     - `lint-vex-product.sh`: 6.20 becomes "a source version must be a published tag" rather than "non-fixed carries no version", so a `not_affected` may be scoped to a release
-    - _Requirements: Req 6.20, Req 6.21, Req 6.28, Req 6.29, Req 6.30_
+    - Scope splits by the kind of argument, not by status (6.31). A structural claim ("this image never starts a Prometheus server") is version-independent and stays versionless; a dependency-graph claim ("this build does not reach the symbol") is scoped to its tag. Left to a default every statement drifts versionless, since that suppresses most and costs least to write — so versionless requires a `version-independent:` note in `status_notes` saying why it survives a version change. Demonstrated on the live lane: compiled for a hypothetical 14.0.0, the July 2026 `not_affected` still applied, having been argued about 13.0.4
+    - _Requirements: Req 6.20, Req 6.21, Req 6.28, Req 6.29, Req 6.30, Req 6.31_
 
 - [ ] 8. Wrap-up (Day 3)
   - [ ] 8.1 valkey chart adaptation [CUT 1st if pressed]
