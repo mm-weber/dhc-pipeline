@@ -614,3 +614,39 @@ attested (Req 6.8), and expires. The realistic clearing event is a Grafana
 release that rebundles plugins built on go1.26.4 or newer, which is expected
 inside the window; the daily rescan reports the entry from 14 days out either
 way.
+
+### Scope, not status — the July CVE-2026-42151 statement keeps its claim (#25)
+
+Compiling per build made scope mean something, and the first thing it showed was
+that our own oldest statement had none. Compiled for a hypothetical grafana
+14.0.0, the `not_affected` written on 2026-07-26 about 13.0.4 still applied:
+
+```
+as-is    1 statement compiled   <- the July not_affected, on a release nobody examined
+scoped   0 statements compiled  <- finding surfaces, forces a fresh call
+```
+
+Req 6.31 makes versionless an argument rather than a default. Which scope is
+right turns on the kind of claim, not on the status: "this image never starts a
+Prometheus server" is as true of 14.0 as of 13.0.4, while "this build does not
+reach the symbol" rests on what the release links.
+
+This one is the first kind, and its own `impact_statement` already said so. So
+it stays versionless and its `status_notes` now records why, with the token the
+lint checks for. **Nothing about the claim, its justification, its impact
+statement or its timestamp changed** — Req 6.22 keeps the argument on the
+record, and this adds the scope that was previously implicit rather than
+restating what was argued.
+
+The alternative was to scope it to `13.0.4-alpine3.23` and leave the text
+untouched, which is more faithful to the letter of 6.22. It was not taken
+because it narrows a structural claim to one release and would have to be
+re-argued on every bump, which is the churn 6.31 exists to avoid. Recorded here
+because editing a retained statement at all is a thing that should be visible.
+
+A note on review finding 2.4's own example. It says suppressing on the
+still-pullable 13.0.4 is wrong because that image "genuinely carries
+prometheus/prometheus v0.305.3". Carrying a vulnerable version is not being
+affected — separating the two is what VEX is for — and this statement was
+argued about 13.0.4 and claims unreachability there. The defect is forward
+coverage only, which 2.4's next paragraph states correctly.

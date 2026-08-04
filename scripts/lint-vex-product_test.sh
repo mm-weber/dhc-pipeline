@@ -63,7 +63,10 @@ refute_case() { # name, expected_exit, forbidden_substring
 
 # Two definitions, so a statement can name the wrong one of a pair that both
 # exist — the copy-paste that no "does this image exist" check would catch.
+NOTES=""   # per-case override for status_notes; see stmt_status
+
 fresh() {
+  NOTES=""
   SB=$(mktemp -d)
   mkdir -p "$SB/image/grafana" "$SB/image/valkey" "$SB/triage/vex"
   # tags: is load-bearing since Req 6.20 — a product version has to be one of
@@ -108,16 +111,23 @@ stmt_status() { # status JSON (empty omits the key), CVE, [product JSON blobs…
   # to affected (OpenVEX §Status Justifications). Branching keeps every fixture
   # a document a VEX consumer would accept, so a case that passes here is not
   # passing on a shape only this lint tolerates.
+  # Req 6.31: a versionless product has to say why its claim survives a version
+  # change, and most fixtures here are versionless, so the default notes carry
+  # that token. $NOTES replaces them for the cases that test the rule itself.
+  local notes="${NOTES:-}"
   case "$status" in
     '"not_affected"')
-      extra='  "status_notes": "Architectural analysis of the shipped entrypoint; see triage/LOG.md 2026-07-26.",
-  "justification": "vulnerable_code_not_in_execute_path",
-  "impact_statement": "This image does not start the vulnerable server, so the disclosing handler is never routed or invoked.",' ;;
+      [ -n "$notes" ] || notes="version-independent: this image never starts the vulnerable server, which is a property of what it runs rather than of a release. Architectural analysis; see triage/LOG.md 2026-07-26."
+      extra="  \"status_notes\": \"$notes\",
+  \"justification\": \"vulnerable_code_not_in_execute_path\",
+  \"impact_statement\": \"This image does not start the vulnerable server, so the disclosing handler is never routed or invoked.\"," ;;
     '"affected"')
-      extra='  "status_notes": "Reachable from the shipped entrypoint; see triage/LOG.md 2026-07-26.",
-  "action_statement": "Upgrade to grafana 13.1.1-alpine3.23 or later.",' ;;
+      [ -n "$notes" ] || notes="version-independent: reachable from the shipped entrypoint in every release. See triage/LOG.md 2026-07-26."
+      extra="  \"status_notes\": \"$notes\",
+  \"action_statement\": \"Upgrade to grafana 13.1.1-alpine3.23 or later.\"," ;;
     *)
-      extra='  "status_notes": "See triage/LOG.md 2026-07-26.",' ;;
+      [ -n "$notes" ] || notes="version-independent: see triage/LOG.md 2026-07-26."
+      extra="  \"status_notes\": \"$notes\"," ;;
   esac
   cat <<EOF
 {
@@ -447,6 +457,57 @@ run_case "a version against a definition with no tags fails" 1 "Req 6.20"
 # 36: and versionless it is the shape this repo ships
 fresh; vex "$CVE1" "$GRAFANA_PRODUCT" "$TEMPO"
 refute_case "not_affected with a versionless product is not reported" 0 "::error"
+
+# --- Req 6.31: versionless is an argument, not a default --------------------
+#
+# Compilation made scope meaningful and immediately made the default wrong.
+# A versionless product claims every build of the image, forever, so a
+# structural argument written about 13.0.4 keeps excusing the CVE on a 14.0
+# nobody examined — demonstrated on the live lane, where compiling for a
+# hypothetical 14.0.0 kept a statement argued in July 2026.
+#
+# Neither scope is right for both kinds of not_affected. "This image never
+# starts a Prometheus server" is as true of 14.0 as of 13.0.4; "this build does
+# not reach the symbol" rests on what this release links. Left to a default
+# every statement drifts versionless, since that suppresses most and costs
+# least to write, so the note is what turns it back into a decision.
+
+# 38: versionless with notes that argue nothing about versions
+fresh; NOTES="Architectural analysis of the shipped entrypoint; see triage/LOG.md 2026-07-26."
+vex "$CVE1" "$GRAFANA_PRODUCT" "$TEMPO"
+run_case "versionless without a version-independence note fails" 1
+run_case "it is reported under Req 6.31" 1 "Req 6.31"
+run_case "the message quotes the product" 1 "$GRAFANA_PRODUCT"
+run_case "the message says what to write" 1 "version-independent:"
+# The author needs the reason, not the rule: what a versionless claim covers is
+# every future release, which is what makes an undefended one dangerous.
+run_case "the message says why: it covers releases nobody examined" 1 "every"
+run_case "the message names the file" 1 "triage/vex/$CVE1.openvex.json"
+
+# 39: with the note it is the claim the author means to make
+fresh; vex "$CVE1" "$GRAFANA_PRODUCT" "$TEMPO"
+run_case "versionless with a version-independence note passes" 0
+refute_case "a defended versionless claim emits no annotation" 0 "::error"
+
+# 40: a tag-scoped claim needs no note — its scope already says what it covers,
+#     and requiring one would be busywork on the safer of the two forms.
+fresh; NOTES="Architectural analysis of the shipped entrypoint; see triage/LOG.md 2026-07-26."
+vex "$CVE1" "$GRAFANA_TAGGED" "$TEMPO"
+run_case "a tag-scoped claim needs no note" 0
+
+# 41: no status_notes key at all is the same defect, not a different one
+fresh
+write_doc "$SB/triage/vex/$CVE1.openvex.json" "$(cat <<EOF
+{
+  "vulnerability": { "name": "$CVE1" },
+  "products": [$(prod "$GRAFANA_PRODUCT" "$TEMPO")],
+  "status": "not_affected",
+  "justification": "vulnerable_code_not_in_execute_path",
+  "timestamp": "2026-07-26T00:00:00Z"
+}
+EOF
+)"
+run_case "versionless with no status_notes at all fails" 1 "Req 6.31"
 
 # 37: the version rule no longer depends on the status at all. What a version
 # may be is a property of the source format — compilation looks a tag up

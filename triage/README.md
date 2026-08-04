@@ -207,9 +207,22 @@ vexctl create \
   image. A digest belongs in compiler output and never in source: nobody can
   review it, and it goes stale at the next rebuild of the same release.
 - **`fixed` must carry one** (Req 6.21), because a remedy is always about
-  particular versions. Every other status may, and scoping one to the release it
-  was actually argued about is usually the honest thing — a versionless
-  `not_affected` keeps suppressing on versions nobody examined.
+  particular versions.
+- **Versionless is an argument, not a default** (Req 6.31). It claims every
+  build of the image, including releases nobody has examined, so `status_notes`
+  has to say why the claim survives a version change, marked with the literal
+  token `version-independent:`. Which scope is right depends on the kind of
+  argument, not on the status:
+
+  | Claim | Scope | Why |
+  |---|---|---|
+  | "this image never starts a Prometheus server" | versionless + note | structural: as true of 14.0 as of 13.0.4 |
+  | "this build does not reach the vulnerable symbol" | published tag | rests on what this release links |
+
+  A tag-scoped claim needs no note; its scope already says what it covers. The
+  note is written into `status_notes` rather than a custom field because it
+  stays inside standard OpenVEX, and because a consumer reading the statement
+  wants that sentence too.
 - **A `fixed` product names a released version, not a build.** Prefer the
   published tag (`pkg:oci/grafana@13.1.1-alpine3.23?repository_url=…`) over a
   digest: every build of 13.1.1 carries the fix, so a digest would be wrong by
