@@ -1,7 +1,11 @@
 # v12.4.5 ships a Go 1.26.3 binary; the 1.26.4 bump has been on `main` since June
 
 **Target repo:** `grafana/grafana-zipkin-datasource`
-**Drafted:** 2026-08-04, not filed
+**Drafted:** 2026-08-04
+**Filed:** 2026-08-04 as
+[grafana/grafana-zipkin-datasource#94](https://github.com/grafana/grafana-zipkin-datasource/issues/94)
+(no label applied). The issue body is this file from `## Summary` down,
+unmodified.
 
 ---
 

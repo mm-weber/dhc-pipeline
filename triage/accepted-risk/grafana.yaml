@@ -1,0 +1,52 @@
+# Time-boxed risk decisions for the grafana image (Req 6.7-6.12, 6.23-6.27).
+#
+# A native Trivy ignorefile, handed to the same scan as --ignorefile. It answers
+# "what are we doing about it?", never "does this apply?" — that second question
+# is VEX, and it lives in triage/vex/ and is published with the image. Nothing
+# here is ever attested (Req 6.8).
+#
+# The filename is the image scope; `paths:` is the binary scope. Both matter:
+# one file per image stops grafana covering cert-manager, and one entry per
+# binary stops one plugin's upstream covering another's (Req 6.23).
+#
+# Globs, not exact paths. The bundled plugin binaries carry an arch suffix, and
+# a path matching nothing is silent in Trivy — no warning, exit 0, nothing
+# suppressed. See docs in triage/README.md and the measurements in
+# triage/upstream/checks/trivy-paths-scoping.sh.
+vulnerabilities:
+  # CVE-2026-27145 — crypto/x509 quadratic DNS-name parsing (GO-2026-5037).
+  # symbol-level reachable in both binaries, so Req 6.14 forecloses not_affected.
+  # Split per binary because two upstreams on two release schedules own the two
+  # halves; deciding one must not decide the other.
+  - id: CVE-2026-27145
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/elasticsearch/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-elasticsearch-datasource/issues/410"
+    ref: "LOG.md#transfer--stdlib-cve-2026-27145-two-bundled-plugin-binaries-22"
+    blocked: "avoidance is available and declined, not unavailable: dropping
+              plugins-bundled/elasticsearch/ would remove the datasource and the
+              image would stop being a drop-in Grafana. Remediation is measured
+              closed — the newest release, v12.8.0, is itself built with
+              go1.26.3, so no bump reaches a fixed toolchain"
+    statement: "transfer: waiting on a grafana-elasticsearch-datasource release built with go1.26.4+"
+    expired_at: 2026-11-02
+
+  # Same CVE, different binary, different upstream, different ask. Here the fix
+  # already landed (PR #79, 2026-06-22) and has never been released, so this half
+  # waits on a release rather than on a toolchain decision.
+  - id: CVE-2026-27145
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer--stdlib-cve-2026-27145-two-bundled-plugin-binaries-22"
+    blocked: "avoidance is available and declined, not unavailable: dropping
+              plugins-bundled/zipkin/ would remove the datasource and the image
+              would stop being a drop-in Grafana. Remediation is measured closed
+              — the newest release, v12.4.5, is built with go1.26.3, and the
+              go1.26.4 bump on main has not been released since 2026-05-18"
+    statement: "transfer: waiting on a grafana-zipkin-datasource release cut from main (go1.26.4)"
+    expired_at: 2026-11-02

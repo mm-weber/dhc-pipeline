@@ -548,3 +548,69 @@ grafana release, nothing since 2026-07-21.
 
 None of these are treated yet. They are triaged one at a time, from
 `bin/grafana` down.
+
+## 2026-08-04 — first treatment: CVE-2026-27145 (#22)
+
+### TRANSFER — stdlib CVE-2026-27145, two bundled plugin binaries (#22)
+
+`crypto/x509` quadratic complexity parsing DNS names in a certificate
+(GO-2026-5037, CWE-407, HIGH). Fixed in Go 1.25.11 and 1.26.4. EPSS 0.0094 as of
+2026-07-23, not on the CISA KEV catalogue. Neither number changes the treatment;
+they order the queue.
+
+**Where it is, after the bump.** The 2026-07-26 entry above classified this as
+FIX and bumped 13.0.4 → 13.1.1. That worked for `bin/grafana`, which upstream
+rebuilt on go1.26.5 and which no longer carries the finding. It did not work for
+the two bundled plugin binaries, which upstream ships prebuilt into the release
+tarball and which are still go1.26.3:
+
+| Binary | Toolchain | Reachability |
+|---|---|---|
+| `usr/share/grafana/bin/grafana` | go1.26.5 | finding gone |
+| `…/plugins-bundled/elasticsearch/gpx_…` | go1.26.3 | `symbol` |
+| `…/plugins-bundled/zipkin/gpx_…` | go1.26.3 | `symbol` |
+
+`symbol` level forecloses `not_affected` under Req 6.14, and correctly so: the
+vulnerable function is not merely linked, govulncheck resolved a call path to
+it.
+
+**Why the four treatments land where they do.**
+
+*Mitigate* is measured closed, not assumed closed. 13.1.1 is the newest Grafana
+release. The newest plugin releases are elasticsearch v12.8.0 and zipkin
+v12.4.5, and `go version -m` on the release assets themselves puts both on
+go1.26.3, the same toolchain as the bundled copies. There is no version of
+anything we could bump to that clears this today.
+
+*Not affected* is foreclosed by the reachability above.
+
+*Avoid* is genuinely available and is being declined, which is worth stating
+plainly rather than dressing up as unavailability. The image definition could
+exclude both `plugins-bundled/` directories. That would drop the Elasticsearch
+and Zipkin datasources from the image, so it would no longer be a drop-in
+Grafana, and the catalogue's premise is that these images substitute for the
+upstream ones. Declining avoidance is a product judgement, not a technical
+constraint, and it is the reason an acceptance is needed at all.
+
+*Transfer* is where it lands. The fix belongs in the plugin repositories: they
+resolve their own toolchain through `plugin-ci-workflows` rule 2, from the
+`go.mod` in the plugin directory. Grafana's own `go.mod` is already `go 1.26.5`,
+and `scripts/catalog-plugins-defaults` in `grafana/grafana` lists both plugins
+unpinned, so nothing in the core repository can move them.
+
+**Outcome: TRANSFER, per binary, expiring 2026-11-02.** Two entries rather than
+one, because two upstreams on two release schedules own the two halves and
+deciding one must not silently decide the other (Req 6.23). The elasticsearch
+half waits on
+[grafana/grafana-elasticsearch-datasource#410](https://github.com/grafana/grafana-elasticsearch-datasource/issues/410).
+The zipkin half waits on
+[grafana/grafana-zipkin-datasource#94](https://github.com/grafana/grafana-zipkin-datasource/issues/94),
+whose ask is the narrower of the two: the go1.26.4 bump already landed there in
+PR #79 on 2026-06-22 and simply has not been released.
+
+Transfer is not absolution. We are still shipping the finding, so it is an
+acceptance with an external owner: it lives in `accepted-risk/`, is never
+attested (Req 6.8), and expires. The realistic clearing event is a Grafana
+release that rebundles plugins built on go1.26.4 or newer, which is expected
+inside the window; the daily rescan reports the entry from 14 days out either
+way.
