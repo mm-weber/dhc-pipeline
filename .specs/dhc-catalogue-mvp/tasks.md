@@ -133,6 +133,13 @@
     - `triage/README.md` gains the convention with its reason; `triage/LOG.md` carries the transition
     - _Requirements: Req 6.20, Req 6.21, Req 6.22_
 
+  - [ ] 7.8 Per-binary scope for acceptances, so deciding one binary does not decide another
+    - One file per image stops grafana covering cert-manager; nothing stopped one binary inside grafana covering another. CVE-2026-27145 (#22) sits in both `plugins-bundled/elasticsearch/` and `plugins-bundled/zipkin/`, built by different upstreams on different schedules and now tracked by two different issues — an entry keyed on `id` + `purls` alone matches `stdlib` in both, so deciding one silently decides the other
+    - `lint-accepted-risk.sh`: `paths` joins the required set (6.24), and two entries sharing a vulnerability id may not name the same path (6.25)
+    - `build.yml`: report any exception that suppressed nothing (6.26) and add the binary to the suppression table (6.27). A too-narrow path fails safe but reads as untriaged; a too-broad one fails green over a binary nobody argued. Report, never fail — an exception that suppresses nothing leaves nothing uncovered, so Req 6.1 is the wrong lever
+    - Trivy 0.72.0 behaviour measured first, on a two-binary tree from the real plugin assets: `paths` scopes, globs work (needed — the arch suffix differs per build), a path matching nothing is silent. Recorded in `design.md` and re-runnable from `triage/upstream/checks/`
+    - _Requirements: Req 6.23, Req 6.24, Req 6.25, Req 6.26, Req 6.27_
+
 - [ ] 8. Wrap-up (Day 3)
   - [ ] 8.1 valkey chart adaptation [CUT 1st if pressed]
     - As 5.3 for valkey (stateful: probes, persistence off-by-default rationale)
@@ -151,6 +158,6 @@
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5 |
-| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7 |
+| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8 |
 | Req 7: Conventions and Review | 1.1, 1.2, 1.3 |
 | Req 8: Operating Environment | 2.1, 3.3, 4.2, 6.5, 7.2 |

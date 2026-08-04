@@ -109,6 +109,11 @@ registry images remain private until explicitly released.
 20. IF a VEX statement does not record status fixed AND its product identifier carries a version THEN THE CI Pipeline SHALL fail validation.
 21. IF a VEX statement records status fixed AND its product identifier carries no version THEN THE CI Pipeline SHALL fail validation.
 22. WHEN a triage decision supersedes an earlier VEX statement THE Triage Process SHALL retain that earlier statement in its document and SHALL add a superseding statement carrying a later timestamp.
+23. WHEN a triage decision records an accepted-risk exception THE Triage Process SHALL record in that exception every binary path to which that exception applies.
+24. IF an accepted-risk exception records no binary path THEN THE CI Pipeline SHALL fail validation.
+25. IF two accepted-risk exceptions in one file record an identical vulnerability identifier AND name an identical binary path THEN THE CI Pipeline SHALL fail validation.
+26. WHEN a scan applies accepted-risk exceptions THE Scan Gate SHALL report every exception that suppressed no finding.
+27. WHEN a scan reports a suppressed finding THE Scan Gate SHALL identify which binary that finding was suppressed in.
 
 ### Requirement 7: Conventions and Review Enforcement
 

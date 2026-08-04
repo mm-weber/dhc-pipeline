@@ -178,6 +178,44 @@ Each entry carries a `blocked:` field stating why avoid and mitigate were
 unavailable — presence machine-enforced, content judged at review. It is what
 keeps the file from becoming the path of least resistance.
 
+**Per-binary scope (Req 6.23–6.27).** One file per image stops an acceptance for
+grafana covering cert-manager. It does not stop an acceptance for *one binary
+inside* grafana covering another, and a repackage image is exactly where that
+bites: CVE-2026-27145 is in both `plugins-bundled/elasticsearch/` and
+`plugins-bundled/zipkin/`, compiled at different times, fixed by different
+upstreams, on different schedules. An entry keyed only on `id` + `purls` matches
+`stdlib` wherever it appears, so deciding elasticsearch silently decides zipkin
+— the same failure the per-image filename was introduced to prevent, one level
+down. Req 6.23/6.24 push the scope into the entry via Trivy's `paths:`, so an
+exception names the binary whose exposure was actually argued.
+
+Verified against Trivy 0.72.0 rather than inferred, on a two-binary tree built
+from the real plugin release assets:
+
+| Behaviour | Result |
+|---|---|
+| `paths:` scoping one binary | 12 findings → 11; only that binary suppressed |
+| no `paths:` key | 12 → 10; **every** instance suppressed |
+| globs `dir/*`, `**/dir/**`, `dir/gpx_*` | all scope correctly |
+| a path matching nothing | suppresses nothing, no warning, exit 0 |
+| suppression record | `Target` = binary, `Statement` = entry, `Source` = file |
+
+Globs matter because the binaries carry an arch suffix
+(`..._linux_amd64` / `..._linux_arm64`), so an exact path would match on the arch
+the PR gate builds and silently stop matching on the other.
+
+The last two rows are why Req 6.26/6.27 exist. The two failure modes are not
+symmetric: a *too narrow* path fails safe (nothing is suppressed, the gate stays
+red) but is indistinguishable from an untriaged finding, while a *too broad* or
+absent path fails dangerous (the gate goes green over a binary nobody decided
+about). Req 6.26 catches the first by reporting any exception that suppressed
+nothing, which is also the instrument that would catch Trivy ceasing to honour
+`paths:` at all. Req 6.27 catches the second by naming the binary in the
+suppression table, so over-broad scope is visible in review rather than inferred
+from a count. Neither fails the build: an exception that suppresses nothing
+leaves nothing uncovered, so Req 6.1 is not the right lever, and the precedent is
+the VEX canary warning — make it visible, do not redden an unrelated PR.
+
 **Reachability evidence (Req 6.13–6.15).** Trivy and Grype answer "is this
 module linked", never "is the vulnerable code called". Every `not_affected`
 statement in this catalogue rested on architectural argument instead — sound and
