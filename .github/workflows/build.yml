@@ -338,15 +338,15 @@ jobs:
             echo
             echo "#### Accepted risk — time-boxed, internal only"
             echo
-            if jq -e '[.Results[]?.ExperimentalModifiedFindings[]?
-                       | select(.Source // "" | startswith("triage/accepted-risk/"))] | length > 0' \
-                 trivy.json >/dev/null; then
-              echo "| CVE | Decision | Package |"
-              echo "|---|---|---|"
-              jq -r '.Results[]?.ExperimentalModifiedFindings[]?
-                     | select(.Source // "" | startswith("triage/accepted-risk/"))
-                     | "| \(.Finding.VulnerabilityID) | \(.Statement // "-") | \(.Finding.PkgName) |"' \
-                 trivy.json | sort -u
+            if [ -f "$accepted" ]; then
+              # Req 6.26/6.27. The table gains the binary each suppression
+              # applied to, because an entry scoped to one binary and one
+              # scoped to the whole image produce identical counts, and any
+              # entry that suppressed nothing is called out — a paths: value
+              # matching no file is accepted by Trivy silently, matches
+              # nothing and exits 0. Unit-tested in
+              # scripts/accepted-risk-report_test.sh; reports, never fails.
+              scripts/accepted-risk-report.sh trivy.json "$accepted"
               echo
               # Owner and expiry live in the file, not in Trivy's report. Shown
               # verbatim so a reviewer sees who carries this and until when
@@ -358,9 +358,6 @@ jobs:
               echo '```'
               echo
               echo "</details>"
-            elif [ -f "$accepted" ]; then
-              echo "_none_ — \`${accepted}\` exists but suppressed nothing here."
-              echo "> ⚠️ Either the findings it covers are already gone (drop the entries) or its \`purls\`/\`id\` do not match."
             else
               echo "_none_ ✓"
             fi

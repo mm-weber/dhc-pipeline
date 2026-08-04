@@ -47,6 +47,9 @@ jobs:
       - name: accepted-risk linter unit tests
         run: scripts/lint-accepted-risk_test.sh
 
+      - name: accepted-risk report unit tests (Req 6.26, 6.27)
+        run: scripts/accepted-risk-report_test.sh
+
       - name: refresh-definition unit tests (postUpgradeTask, Req 3.2)
         run: scripts/refresh-definition_test.sh
 
