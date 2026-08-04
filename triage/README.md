@@ -184,14 +184,32 @@ vexctl create \
   --file=triage/vex/CVE-….openvex.json
 ```
 
-- **No version in the product purl — unless the status is `fixed`.** Trivy's
-  root component purl carries the image digest, which changes on every build, so
-  a versionless purl matches any build, which is what a committed `not_affected`
-  statement needs. `fixed` is the exception, and Req 6.20/6.21 split on it:
-  `not_affected` claims the vulnerable code cannot execute *in this image*, which
-  holds across rebuilds; `fixed` claims *particular versions* carry the remedy,
-  and stated versionless it excuses the CVE on every image ever published under
-  that name — including the older tag still pullable from the registry.
+- **What you write here is source. A scanner never sees it.** `scripts/compile-vex.sh`
+  renders these documents per build: it replaces the product version with the
+  digest of the image being scanned (Req 6.29) and drops any statement scoped to
+  a tag that build is not (Req 6.30). Write the tag; the compiler writes the
+  digest.
+
+  That split exists because the two forms cannot be the same string. Trivy builds
+  its product identifier from the image's **RepoDigest**, so a tag matches
+  nothing — measured, one real finding, one statement each:
+
+  | Product identifier | Status | Suppressed |
+  |---|---|---|
+  | `pkg:oci/grafana@13.0.4-alpine3.23` | `fixed` | **no** |
+  | `pkg:oci/grafana@sha256:b6987eb…` | `fixed` | yes |
+  | `pkg:oci/grafana` | `fixed` | yes |
+  | `pkg:oci/grafana` | `not_affected` | yes |
+
+- **A version in the product purl is a published tag, or nothing** (Req 6.20).
+  A tag means the claim is about that release, and the compiler applies it only
+  when building it. No version means the claim holds for every build of that
+  image. A digest belongs in compiler output and never in source: nobody can
+  review it, and it goes stale at the next rebuild of the same release.
+- **`fixed` must carry one** (Req 6.21), because a remedy is always about
+  particular versions. Every other status may, and scoping one to the release it
+  was actually argued about is usually the honest thing — a versionless
+  `not_affected` keeps suppressing on versions nobody examined.
 - **A `fixed` product names a released version, not a build.** Prefer the
   published tag (`pkg:oci/grafana@13.1.1-alpine3.23?repository_url=…`) over a
   digest: every build of 13.1.1 carries the fix, so a digest would be wrong by

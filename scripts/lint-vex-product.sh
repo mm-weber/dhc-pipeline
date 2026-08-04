@@ -68,6 +68,19 @@ published_repository() { # definition path
        }' "$1"
 }
 
+# The tags a definition publishes. A source product version has to be one of
+# them (Req 6.20), because compile-vex.sh looks it up against the tags of the
+# build and drops the statement when it does not match (Req 6.30).
+published_tags() { # definition path
+  awk '/^tags:[[:space:]]*$/ { intags = 1; next }
+       intags && sub(/^[[:space:]]*-[[:space:]]*/, "") {
+         sub(/[[:space:]]*#.*$/, ""); sub(/[[:space:]]+$/, "")
+         gsub(/^["'\'']|["'\'']$/, "")
+         print; next
+       }
+       intags && /^[^[:space:]]/ { intags = 0 }' "$1"
+}
+
 check_product() { # rel, cve, product purl, subcomponent count, statement status
   local rel="$1" cve="$2" purl="$3" nsubs="$4" status="$5"
   local rest type name version quals qrest q k v repo expected def shown
@@ -111,18 +124,11 @@ check_product() { # rel, cve, product purl, subcomponent count, statement status
     return
   fi
 
-  # Whether a version belongs here is the statement's claim, not the purl's
-  # shape, so one rule for both statuses is wrong for one of them. Compared
-  # case-sensitively: OpenVEX status labels are a closed set of lower-case
-  # strings, so no consumer reads 'Fixed' as the fixed label, and blessing a
-  # pinned product on one would bless a document that suppresses nothing.
-  if [ "$status" = "fixed" ]; then
-    if [ -z "$version" ]; then
-      report "$rel" 6.21 "$cve product '$purl' records status 'fixed' but carries no version — a fixed claim is about the versions that carry the remedy, and stated versionless it excuses this CVE on every image ever published under that name, including the older tag still pullable from the registry. Name the version the fix shipped in, published tag or digest"
-    fi
-  elif [ -n "$version" ]; then
-    if [ -n "$status" ]; then shown="records status '$status'"; else shown="records no status at all"; fi
-    report "$rel" 6.20 "$cve product '$purl' pins version '$version' while the statement $shown — only a 'fixed' claim is about particular versions. Every other claim is about this image's code and holds across rebuilds, so a pinned product suppresses until the next rebuild and then silently stops matching. Drop the version (triage/README.md: no digest in the product purl)"
+  # A remedy is always about particular versions, so a fixed claim has to name
+  # one. Compared case-sensitively: OpenVEX status labels are a closed set of
+  # lower-case strings, so no consumer reads 'Fixed' as the fixed label.
+  if [ "$status" = "fixed" ] && [ -z "$version" ]; then
+    report "$rel" 6.21 "$cve product '$purl' records status 'fixed' but carries no version — a fixed claim is about the versions that carry the remedy, and stated versionless it excuses this CVE on every image ever published under that name, including the older tag still pullable from the registry. Name the published tag the fix shipped in"
   fi
 
   # The purl name is the image; there is no "does this image exist" check
@@ -132,6 +138,21 @@ check_product() { # rel, cve, product purl, subcomponent count, statement status
   if [ ! -f "$ROOT/$def" ]; then
     report "$rel" 6.17 "$cve product '$purl' names image '$name', but this repo has no definition '$def' — the statement is about an image nothing here builds"
     return
+  fi
+
+  # A version in source is a scope, not an identifier: compile-vex.sh replaces
+  # it with the digest of the image being scanned (6.29) and drops the statement
+  # when the tag is not one of that build's (6.30). So a version that is not a
+  # published tag is dropped on every build — it suppresses nothing and says
+  # nothing, which is the inert case this lint exists to catch.
+  if [ -n "$version" ]; then
+    tags="$(published_tags "$ROOT/$def")"
+    if [ -z "$tags" ]; then
+      report "$rel" 6.20 "$cve product '$purl' pins version '$version', but '$def' declares no 'tags:' — there is no published tag this could scope to, so compilation drops it on every build"
+    elif ! grep -qxF "$version" <<<"$tags"; then
+      shown="$(tr '\n' ' ' <<<"$tags" | sed 's/ $//')"
+      report "$rel" 6.20 "$cve product '$purl' pins version '$version', which '$def' does not publish — a source version is a published tag, and compilation looks it up against the build. A digest belongs in compiler output, never in source: it is unreviewable and goes stale at the next rebuild of the same release. Tags '$def' publishes: $shown"
+    fi
   fi
 
   expected="$(published_repository "$ROOT/$def")"

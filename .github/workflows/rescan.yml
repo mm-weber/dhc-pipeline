@@ -62,8 +62,6 @@ jobs:
           # not abort the whole rescan (Req 6 soft-fail).
           set -uo pipefail
           mkdir -p "$OUT/trivy"
-          # VEX sources: one --vex per statement (same contract as the PR gate).
-          vex=(); for f in triage/vex/*.json; do [ -e "$f" ] && vex+=(--vex "$f"); done
           scanned=0
           for d in image/*/; do
             name=$(basename "$d")
@@ -79,6 +77,27 @@ jobs:
             accepted="triage/accepted-risk/${name}.yaml"
             ignore=()
             if [ -f "$accepted" ]; then ignore=(--ignorefile "$accepted"); fi
+            # Req 6.28-6.30, same contract as the PR gate: source is never handed
+            # to a scanner. Trivy builds its product identifier from the digest,
+            # so a statement carrying a tag matches nothing. Compiling needs the
+            # digest this tag resolves to, which for a published image comes from
+            # the registry rather than from a local daemon.
+            #
+            # Every declared tag is passed, not just the one being scanned: they
+            # all name this same build, so a statement scoped to any of them
+            # applies here.
+            vexdir="$OUT/vex/${name}"
+            vex=()
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{.Manifest.Digest}}' 2>/dev/null)
+            if [ -n "$digest" ]; then
+              mapfile -t all_tags < <(yq '.tags[]' "$f" | tr -d '"')
+              scripts/compile-vex.sh triage/vex "$vexdir" "$name" "$digest" "${all_tags[@]}" || true
+              for v in "$vexdir"/*.json; do [ -e "$v" ] && vex+=(--vex "$v"); done
+            else
+              # Over-reporting is the safe direction here: excused findings come
+              # back as issues rather than a real one being silently excused.
+              echo "::warning::could not resolve a digest for ${ref} — scanning it with no VEX applied, so already-decided findings may refile"
+            fi
             echo "::group::scan ${ref}"
             if trivy image "${vex[@]}" "${ignore[@]}" --severity HIGH,CRITICAL --pkg-types os,library \
                --format json --output "$OUT/trivy/${name}.json" --no-progress --exit-code 0 "$ref"; then

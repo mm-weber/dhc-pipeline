@@ -66,8 +66,10 @@ refute_case() { # name, expected_exit, forbidden_substring
 fresh() {
   SB=$(mktemp -d)
   mkdir -p "$SB/image/grafana" "$SB/image/valkey" "$SB/triage/vex"
-  printf 'name: Grafana 13.1.x\nimage: ghcr.io/mm-weber/dhc/grafana\n' > "$SB/image/grafana/image.yaml"
-  printf 'name: Valkey 9.0.x\nimage: ghcr.io/mm-weber/dhc/valkey\n' > "$SB/image/valkey/image.yaml"
+  # tags: is load-bearing since Req 6.20 — a product version has to be one of
+  # them, because compilation looks the tag up against the build (Req 6.30).
+  printf 'name: Grafana 13.1.x\nimage: ghcr.io/mm-weber/dhc/grafana\ntags:\n  - 13-alpine3.23\n  - 13.1-alpine3.23\n  - 13.1.1-alpine3.23\n' > "$SB/image/grafana/image.yaml"
+  printf 'name: Valkey 9.0.x\nimage: ghcr.io/mm-weber/dhc/valkey\ntags:\n  - 9-alpine3.23\n' > "$SB/image/valkey/image.yaml"
 }
 
 # --- fixture builders -------------------------------------------------------
@@ -370,23 +372,26 @@ fresh; vex "$CVE1" "pkg:oci/grafana?repository_url=quay.io%2Fmm-weber%2Fdhc%2Fgr
 run_case "the product defect is reported" 1 "quay.io/mm-weber/dhc/grafana"
 run_case "the subcomponent defect is reported in the same run" 1 "$TEMPO@v1.5.1"
 
-# --- Req 6.20 / 6.21: the product version depends on the status --------------
+# --- Req 6.20 / 6.21: a source version is a published tag --------------------
 #
-# One rule for both statuses is wrong for one of them, because they make
-# different kinds of claim:
+# Source is not what a scanner sees. scripts/compile-vex.sh renders these
+# documents per build, replacing the product version with the digest of the
+# image being scanned (6.29) and dropping any statement whose tag is not a tag
+# of that build (6.30). So in source the version is a *scope*, not an
+# identifier, and only a published tag can be one:
 #
-#   not_affected is a claim about code structure — the vulnerable path is not
-#   reachable in this image. That stays true across rebuilds, so a version
-#   makes the statement suppress until the next build and then silently stop
-#   matching (Req 6.20).
+#   a published tag  the claim is about that release. fixed must carry one
+#                    (6.21), since a remedy is always about particular versions.
+#   no version       the claim holds for every build of that image.
+#   a digest         rejected (6.20). It is unreviewable, and it goes stale at
+#                    the next rebuild of the same release.
 #
-#   fixed is a claim that specific versions carry a remedy. Stated versionless
-#   it asserts that every image published under that name carries the fix,
-#   which is false while an older tag is still pullable from the registry
-#   (Req 6.21).
+# Measured, and the reason the rule changed: a tag-versioned product suppresses
+# nothing at all when handed to Trivy directly, because Trivy builds the product
+# identifier from the RepoDigest. Compilation is what closes that, and it can
+# only look up a tag.
 #
-# The version is what follows '@' before any '?qualifiers' or '#subpath', so a
-# tag and a digest both count as one.
+# The version is what follows '@' before any '?qualifiers' or '#subpath'.
 
 # 32: the new rule. A fixed statement with no version excuses the finding on
 # images that do not have the fix.
@@ -408,28 +413,49 @@ run_case "fixed with a tag-shaped version passes" 0
 refute_case "a versioned fixed product emits no annotation" 0 "::error"
 run_case "a passing fixed run names the file it checked" 0 "triage/vex/$CVE1.openvex.json"
 
-# 34: byte for byte the product purl of case 19 — the one that must fail under
-# not_affected — and here it must pass. The purl alone cannot decide this.
+# 34: a digest in source is now the defect. The compiler puts the digest in;
+# an author writing one by hand pins a build nobody can look up and that is
+# stale the next time the same release is rebuilt.
 fresh; vex_status '"fixed"' "$CVE1" "$GRAFANA_PINNED" "$TEMPO"
-run_case "fixed with a digest-shaped version passes" 0
+run_case "fixed with a digest-shaped version fails" 1
+run_case "a digest in source is reported under Req 6.20" 1 "Req 6.20"
+run_case "the digest defect quotes the version found" 1 "$DIGEST"
+run_case "the digest defect says a published tag is expected" 1 "tag"
 
-# 35: the old rule, kept — now carried by the status it belongs to
+# 35: the inverse of the old rule. Scoping a not_affected to the release it was
+# argued about is now the point — it is what stops the claim outliving that
+# release (review finding 2.4), and the compiler drops it on any other build.
 fresh; vex "$CVE1" "$GRAFANA_TAGGED" "$TEMPO"
-run_case "not_affected with a tag-shaped version fails" 1 "13.1.1-alpine3.23"
-run_case "versioned not_affected product is reported under Req 6.20" 1 "Req 6.20"
-run_case "versioned not_affected product names the status that forbids one" 1 "not_affected"
-run_case "versioned not_affected product says why: the next rebuild" 1 "rebuild"
+run_case "not_affected scoped to a published tag passes" 0
+refute_case "a tag-scoped not_affected emits no annotation" 0 "::error"
+
+# 35b: a version that looks like a tag but is not one this definition publishes
+# would be dropped by the compiler on every build, so it suppresses nothing
+# and says nothing. That is the inert case this lint exists to catch.
+fresh; vex "$CVE1" "pkg:oci/grafana@99.9.9-alpine3.23?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" "$TEMPO"
+run_case "a version that is not a published tag fails" 1 "Req 6.20"
+run_case "the unknown tag is quoted" 1 "99.9.9-alpine3.23"
+run_case "the definition's real tags are listed" 1 "13.1.1-alpine3.23"
+
+# 35c: a definition that publishes no tags at all can scope nothing, so any
+# version on it is unmatchable rather than merely wrong.
+fresh
+printf 'name: Grafana\nimage: ghcr.io/mm-weber/dhc/grafana\n' > "$SB/image/grafana/image.yaml"
+vex "$CVE1" "$GRAFANA_TAGGED" "$TEMPO"
+run_case "a version against a definition with no tags fails" 1 "Req 6.20"
 
 # 36: and versionless it is the shape this repo ships
 fresh; vex "$CVE1" "$GRAFANA_PRODUCT" "$TEMPO"
 refute_case "not_affected with a versionless product is not reported" 0 "::error"
 
-# 37: the rule is "not fixed", not "not_affected" — every other status forbids
-# a version for the same reason, and none of them requires one
+# 37: the version rule no longer depends on the status at all. What a version
+# may be is a property of the source format — compilation looks a tag up
+# against the build regardless of what the statement claims. Only 6.21's
+# "fixed must carry one" is status-dependent.
 fresh; vex_status '"under_investigation"' "$CVE1" "$GRAFANA_PINNED" "$TEMPO"
-run_case "under_investigation with a versioned product fails" 1 "Req 6.20"
+run_case "a digest fails on a status other than fixed too" 1 "Req 6.20"
 fresh; vex_status '"affected"' "$CVE1" "$GRAFANA_TAGGED" "$TEMPO"
-run_case "affected with a versioned product fails" 1 "Req 6.20"
+run_case "a published tag passes on a status other than fixed too" 0
 fresh; vex_status '"affected"' "$CVE1" "$GRAFANA_PRODUCT" "$TEMPO"
 run_case "affected with a versionless product passes" 0
 

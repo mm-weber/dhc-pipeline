@@ -71,6 +71,9 @@ jobs:
       - name: VEX product identity lint unit tests
         run: scripts/lint-vex-product_test.sh
 
+      - name: VEX compiler unit tests (Req 6.28-6.30)
+        run: scripts/compile-vex_test.sh
+
       # Renovate config: validate the schema, then prove the custom managers
       # actually extract the right deps from the definitions (Req 3.2).
       - name: renovate config + manager fixtures

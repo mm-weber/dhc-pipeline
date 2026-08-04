@@ -236,14 +236,21 @@ jobs:
           ref="localhost:5000/mm-weber/dhc/${NAME}:scan"
           docker tag "$src" "$ref"
           docker push -q "$ref"
+          # The digest this push minted is what Trivy puts in its product purl,
+          # so it is also what every VEX statement has to carry to match
+          # (Req 6.29). Read from the daemon rather than re-derived.
+          repodigest="$(docker image inspect "$ref" --format '{{index .RepoDigests 0}}')"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
-          echo "scanning $ref (RepoDigest: $(docker image inspect "$ref" --format '{{index .RepoDigests 0}}'))"
+          echo "digest=${repodigest##*@}" >> "$GITHUB_OUTPUT"
+          echo "scanning $ref (RepoDigest: $repodigest)"
 
       - name: Trivy scan (VEX + accepted risk)
         id: trivy
         if: github.event_name == 'pull_request'
         env:
           REF: ${{ steps.localreg.outputs.ref }}
+          DIGEST: ${{ steps.localreg.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
           NAME: ${{ matrix.name }}
           VEXDIR: .vexscan
         run: |
@@ -263,31 +270,33 @@ jobs:
           # apart, which is what lets the summary below keep them apart too.
           # An empty triage/vex/ and a missing accepted-risk file excuse nothing,
           # so every HIGH/CRITICAL counts — the correct default.
-          # The image now lives at localhost:5000, so its purl carries
-          # repository_url=localhost:5000/... while our statements name
-          # ghcr.io/... — and Trivy requires that qualifier to match exactly.
-          # So scan against copies with the qualifiers dropped: a bare
-          # `pkg:oci/<name>` matches any registry (verified), while the
-          # PUBLISHED statements stay precisely scoped and are what cosign
+          # Req 6.28-6.30. triage/vex/ is source and is never handed to a
+          # scanner. Trivy builds its product identifier from the RepoDigest, so
+          # a statement carrying a published tag matches nothing at all —
+          # measured, one real finding, one statement each:
+          #
+          #   pkg:oci/grafana@13.0.4-alpine3.23  fixed -> reported 1, suppressed 0
+          #   pkg:oci/grafana@sha256:b6987eb...  fixed -> reported 0, suppressed 1
+          #
+          # compile-vex.sh stamps this build's digest into every product (6.29)
+          # and drops any statement scoped to a tag this build is not (6.30),
+          # so a claim argued about 13.0.4 cannot suppress on 13.1.1.
+          #
+          # It also drops the purl qualifiers, which is what a jq rewrite did
+          # here before: the image lives at localhost:5000 while our statements
+          # name ghcr.io, and Trivy compares repository_url exactly (upstream
+          # #9399). That blinds the gate to exactly one field and nothing else —
+          # measured: it still catches a wrong image name, a near-miss name, a
+          # wrong purl type and a wrong subcomponent. lint-vex-product.sh is
+          # what covers the registry host, by exact comparison against the
+          # definition's `image:`, which beats "did a finding disappear".
+          #
+          # The PUBLISHED statements stay precisely scoped and are what cosign
           # attests on the release path.
-          #
-          # This blinds the gate to exactly one field, and nothing else —
-          # measured, not assumed: with qualifiers stripped it still catches a
-          # wrong image name, a near-miss name, a wrong purl type and a wrong
-          # subcomponent. scripts/lint-vex-product.sh is what covers the
-          # registry host, by exact string comparison against the definition's
-          # `image:` — a stronger check than "did a finding disappear".
-          #
-          # Delete this whole rewrite when trivy#9399 ships.
-          mkdir -p "$VEXDIR"
+          mapfile -t built_tags < <(printf '%s\n' "$TAGS" | sed 's|.*:||' | sort -u)
+          scripts/compile-vex.sh triage/vex "$VEXDIR" "$NAME" "$DIGEST" "${built_tags[@]}"
           vex=()
-          for f in triage/vex/*.json; do
-            if [ -e "$f" ]; then
-              out="${VEXDIR}/$(basename "$f")"
-              jq '(.statements[]?.products[]?."@id") |= split("?")[0]' "$f" > "$out"
-              vex+=(--vex "$out")
-            fi
-          done
+          for f in "$VEXDIR"/*.json; do [ -e "$f" ] && vex+=(--vex "$f"); done
           accepted="triage/accepted-risk/${NAME}.yaml"
           ignore=()
           if [ -f "$accepted" ]; then ignore=(--ignorefile "$accepted"); fi
