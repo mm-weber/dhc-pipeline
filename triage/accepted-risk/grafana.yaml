@@ -50,3 +50,73 @@ vulnerabilities:
               go1.26.4 bump on main has not been released since 2026-05-18"
     statement: "transfer: waiting on a grafana-zipkin-datasource release cut from main (go1.26.4)"
     expired_at: 2026-11-02
+
+  # CVE-2026-42504 — mime DoS decoding crafted encoded-words (GHSA-h524-452v-82p9,
+  # CWE-407). Same two binaries, same toolchain and same trackers as
+  # CVE-2026-27145: fixed in go1.25.11/1.26.4, so a release from zipkin's main
+  # (already go1.26.4) clears it, and elasticsearch has to move off go1.26.3.
+  - id: CVE-2026-42504
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/elasticsearch/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-elasticsearch-datasource/issues/410"
+    ref: "LOG.md#transfer--stdlib-cve-2026-42504-two-bundled-plugin-binaries-24"
+    blocked: "avoidance is available and declined, not unavailable: dropping
+              plugins-bundled/elasticsearch/ would remove the datasource and the
+              image would stop being a drop-in Grafana. Remediation is measured
+              closed — the newest release, v12.8.0, is itself built with
+              go1.26.3, and go.mod on main still declares go 1.26.3"
+    statement: "transfer: waiting on a grafana-elasticsearch-datasource release built with go1.26.4+"
+    expired_at: 2026-11-02
+
+  - id: CVE-2026-42504
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer--stdlib-cve-2026-42504-two-bundled-plugin-binaries-24"
+    blocked: "avoidance is available and declined, not unavailable: dropping
+              plugins-bundled/zipkin/ would remove the datasource and the image
+              would stop being a drop-in Grafana. Remediation is measured closed
+              — the newest release, v12.4.5, is built with go1.26.3, and the
+              go1.26.4 bump on main has not been released since 2026-05-18"
+    statement: "transfer: waiting on a grafana-zipkin-datasource release cut from main (go1.26.4)"
+    expired_at: 2026-11-02
+
+  # CVE-2026-39822 — os.Root symlink escape on Unix (GHSA-xcgv-8mv7-v8c7,
+  # CWE-61, AV:L). Same binaries and trackers, DIFFERENT exit: fixed in
+  # go1.25.12/1.26.5, one step past the go1.26.4 that zipkin's main already
+  # declares. No upstream has landed a toolchain that clears this one, so the
+  # expiry is 60 days rather than the 90 the others carry — an acceptance whose
+  # exit is not yet visible in anyone's tree is closer to indefinite, and the
+  # ceiling is for decisions that at least have a route out.
+  - id: CVE-2026-39822
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/elasticsearch/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-elasticsearch-datasource/issues/410"
+    ref: "LOG.md#transfer--stdlib-cve-2026-39822-needs-a-toolchain-nobody-has-landed-26"
+    blocked: "avoidance is available and declined, not unavailable: dropping
+              plugins-bundled/elasticsearch/ would remove the datasource. Unlike
+              the other two stdlib findings this needs go1.26.5, and go.mod on
+              main declares go 1.26.3, so no landed change anywhere clears it"
+    statement: "transfer: needs a grafana-elasticsearch-datasource release built with go1.26.5+"
+    expired_at: 2026-10-04
+
+  - id: CVE-2026-39822
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer--stdlib-cve-2026-39822-needs-a-toolchain-nobody-has-landed-26"
+    blocked: "avoidance is available and declined, not unavailable: dropping
+              plugins-bundled/zipkin/ would remove the datasource. Unlike the
+              other two stdlib findings this needs go1.26.5, and go.mod on main
+              declares go 1.26.4, so even a release cut from main today would
+              not clear it"
+    statement: "transfer: needs a grafana-zipkin-datasource release built with go1.26.5+"
+    expired_at: 2026-10-04

@@ -762,3 +762,62 @@ four statements in the lane apply. Compiled for the published 13.0.4, both
 tempo claims are dropped by name and only the structural `not_affected` for
 CVE-2026-42151 survives — which is correct, since 13.0.4 genuinely carries both
 tempo findings.
+
+## 2026-08-05 — the other two stdlib findings (#24, #26)
+
+Both sit in the same two bundled plugin binaries as #22, both at `symbol` level,
+so Req 6.14 forecloses `not_affected` on each. Measured on the real release
+assets rather than read off the earlier table:
+
+| Binary | #22 CVE-2026-27145 | #24 CVE-2026-42504 | #26 CVE-2026-39822 |
+|---|---|---|---|
+| `plugins-bundled/elasticsearch/…` | ✓ | ✓ | ✓ |
+| `plugins-bundled/zipkin/…` | ✓ | ✓ | ✓ |
+| `bin/grafana` | — | — | — |
+
+`bin/grafana` carries none of them: upstream rebuilt it on go1.26.5. Every one
+of these is a property of the go1.26.3 toolchain the two plugin binaries were
+built with, which is why one tracker per plugin covers all of them.
+
+### TRANSFER — stdlib CVE-2026-42504, two bundled plugin binaries (#24)
+
+`mime` DoS decoding a crafted header full of invalid encoded-words
+(GHSA-h524-452v-82p9, CWE-407, `AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H`, EPSS
+0.0056, not KEV). Fixed in go1.25.11 and 1.26.4 — the same fix line as #22.
+
+**Outcome: TRANSFER, per binary, expiring 2026-11-02.** Identical to #22 in
+every respect, including the trackers: both upstream issues were written about
+the *toolchain* rather than about one advisory, so neither needs amending.
+
+### TRANSFER — stdlib CVE-2026-39822, needs a toolchain nobody has landed (#26)
+
+`os.Root` improperly follows symlinks out of the root on Unix
+(GHSA-xcgv-8mv7-v8c7, CWE-61, `AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H`, EPSS
+0.0018, not KEV). Local vector, unlike the other two, and the only one of the
+three whose exit is different.
+
+**Fixed in go1.25.12 / 1.26.5 / 1.27.0-rc.2 — one step past the others.**
+Checked against both upstreams' current `go.mod` rather than assumed:
+
+| Repo | `go.mod` on `main` | Clears #22 / #24 | Clears #26 |
+|---|---|---|---|
+| grafana-zipkin-datasource | `go 1.26.4` | yes, on any release | **no** |
+| grafana-elasticsearch-datasource | `go 1.26.3` | no, needs a bump first | **no** |
+
+So a zipkin release cut from `main` today — exactly what issue #94 asks for —
+would clear #22 and #24 and leave this one standing. No upstream has landed a
+toolchain that fixes it.
+
+**Outcome: TRANSFER, per binary, expiring 2026-10-04 — 60 days, not the 90 the
+others carry.** The ceiling is for an acceptance that at least has a route out;
+this one's exit is not yet visible in anyone's tree, which is closer to
+indefinite and earns an earlier re-decision rather than a later one. The daily
+rescan reports it from 14 days out, so the notice lands around 2026-09-20.
+
+Worth saying plainly: a release from `main` will make #22 and #24 disappear and
+this entry will still be there. That is the expiry doing its job rather than a
+failure — but if the zipkin release lands and nobody re-reads this, it will look
+like an entry that stopped mattering. It has not.
+
+Verified before committing: 12 findings on the two-binary tree drop to 6, each
+of the six exceptions suppressing in its own binary and none silent.
