@@ -317,6 +317,23 @@ It also subsumes the qualifier-stripping the gate did inline for trivy#9399,
 since the compiler already rewrites the identifier — one tested transform from
 source to scan input instead of a `jq` expression in YAML.
 
+**Compilation reports itself (Req 6.32, 6.33).** The rescan resolves the digest
+from the registry, and that lookup can fail — a credential problem, a tag that
+moved. It fails soft, scanning with no VEX applied, because over-reporting is
+the safe direction. But the two outcomes are observationally identical from
+outside: an unresolved digest suppresses nothing, and the findings it should
+have excused are deduped away by their own already-open issues, so the run is
+green with an empty issue set either way. That is the inert-versus-correct
+problem again, one level up from the statements themselves.
+
+So `COMPILE_VEX_REPORT` makes the compiler emit JSON beside its prose — image,
+digest, counts, and one record per drop with its reason — and the rescan renders
+it into the run summary. JSON rather than grepping the log, because a summary
+built on prose breaks the first time the wording changes. A drop is usually
+correct, being a claim scoped to another release or a statement about another
+image, but it is still what a reviewer has to see: from counts alone a
+wrongly-scoped claim and a correctly-scoped one look the same.
+
 Req 6.22 keeps a superseded claim on the record. OpenVEX documents hold multiple
 timestamped statements and consumers take the latest per (vulnerability,
 product), so a superseded claim is retained rather than deleted: the artifact
