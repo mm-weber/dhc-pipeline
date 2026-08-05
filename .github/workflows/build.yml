@@ -604,6 +604,8 @@ jobs:
         if: github.ref == 'refs/heads/main'
         env:
           REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
           NAME: ${{ matrix.name }}
         run: |
           set -euo pipefail
@@ -611,21 +613,30 @@ jobs:
           # the statement in git is the source, the attestation is what a
           # downstream consumer can actually verify against the digest they run.
           #
-          # Only statements naming THIS image are attached. A VEX document is a
-          # claim about a specific product, so attaching grafana's statements to
-          # cert-manager would not be noise, it would be a false claim. Matching
-          # is anchored on the purl name so `grafana` cannot swallow a future
-          # `grafana-agent`.
+          # Req 6.34. What is attested is COMPILED, never the source. A consumer
+          # feeds this predicate to their own scanner, and a product carrying a
+          # published tag matches nothing there — measured, so attesting source
+          # would publish a document that is inert for exactly the audience it
+          # exists for. Attestation is the ideal case for a digest: it is bound
+          # to one immutable artifact, so this predicate stays correct for it
+          # forever, with none of the staleness that makes a hand-written digest
+          # wrong in source.
+          #
+          # Compiling also decides which documents belong to this image, which
+          # this step used to do with its own jq name-match. Same rule, tested
+          # (compile-vex.sh drops another image's products and never writes an
+          # emptied document), so what lands in $VEXATTEST is what to attest —
+          # and attaching grafana's statements to cert-manager would not be
+          # noise, it would be a false claim.
+          VEXATTEST=.vexattest
+          mapfile -t built_tags < <(printf '%s\n' "$TAGS" | sed 's|.*:||' | sort -u)
+          scripts/compile-vex.sh triage/vex "$VEXATTEST" "$NAME" "$DIGEST" "${built_tags[@]}"
           shopt -s nullglob
           n=0
-          for f in triage/vex/*.json; do
-            if jq -e --arg n "$NAME" \
-                 '[.statements[]?.products[]?."@id" // empty] | any(test("^pkg:oci/" + $n + "([@?]|$)"))' \
-                 "$f" >/dev/null; then
-              echo "attesting $(basename "$f")"
-              cosign attest --yes --type openvex --predicate "$f" "$REF"
-              n=$((n + 1))
-            fi
+          for f in "$VEXATTEST"/*.json; do
+            echo "attesting $(basename "$f")"
+            cosign attest --yes --type openvex --predicate "$f" "$REF"
+            n=$((n + 1))
           done
           echo "${NAME}: ${n} OpenVEX statement(s) attested" >> "$GITHUB_STEP_SUMMARY"
 

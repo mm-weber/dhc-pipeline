@@ -73,12 +73,17 @@ def parse(pid):
 compiled = dropped = 0
 drops = []
 
-def drop(cve, pid, reason):
+def drop(kind, cve, pid, reason):
     """Req 6.32. Printed for a human reading the log AND kept structured, so a
-    job summary never has to grep prose that changes wording."""
+    job summary never has to grep prose that changes wording.
+
+    `kind` classifies rather than filters, because the caller is what knows
+    which drops are worth rendering: 'image' is a statement for another
+    catalogue image and is pure noise, 'tag' is a claim scoped to another
+    release and is the one a reviewer has to see."""
     global dropped
     print(f"compile-vex: dropped {cve} product '{pid}' — {reason}")
-    drops.append({"cve": cve, "product": pid, "reason": reason})
+    drops.append({"kind": kind, "cve": cve, "product": pid, "reason": reason})
     dropped += 1
 
 for path in sorted(glob.glob(os.path.join(src, "*.json"))):
@@ -94,14 +99,14 @@ for path in sorted(glob.glob(os.path.join(src, "*.json"))):
             pid = str(product.get("@id", ""))
             name, version = parse(pid)
             if name is None:
-                drop(cve, pid, "not a pkg:oci purl, so it identifies nothing this scan contains")
+                drop("malformed", cve, pid, "not a pkg:oci purl, so it identifies nothing this scan contains")
                 continue
             if name != image:
-                drop(cve, pid, f"names image '{name}', building '{image}'")
+                drop("image", cve, pid, f"names image '{name}', building '{image}'")
                 continue
             if version and version not in tags:
                 built = ", ".join(sorted(tags)) or "(none)"
-                drop(cve, pid, f"tag '{version}' is not a tag of this build ({built})")
+                drop("tag", cve, pid, f"tag '{version}' is not a tag of this build ({built})")
                 continue
             # Req 6.29. Everything else is the claim and carries through
             # untouched: subcomponents scope it to one package, and timestamp

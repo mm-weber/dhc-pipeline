@@ -194,7 +194,22 @@ check "the drop names its CVE"      "CVE-2026-00001"   "$(rjq '.drops[0].cve')"
 contains "the drop quotes the product" "$(rjq '.drops[0].product')" "13.0.4-alpine3.23"
 contains "the drop gives a reason"     "$(rjq '.drops[0].reason')" "not a tag of this build"
 
-# 17: no report is asked for, none is written, and nothing complains
+# 17: drops are classified, because they are not equally interesting. A
+#     statement for another catalogue image was never going to apply and is
+#     noise; a statement scoped to another release is the one a reviewer has to
+#     see. Classifying here rather than filtering means the report keeps
+#     everything and the caller decides what to render.
+fresh
+src a.json "pkg:oci/grafana@13.0.4-alpine3.23?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" fixed
+src b.json "pkg:oci/valkey?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fvalkey" not_affected
+src c.json "pkg:golang/github.com/grafana/tempo" not_affected
+run_report >/dev/null
+check "a wrong tag is kind=tag"        "tag"       "$(rjq '.drops[] | select(.product|test("13.0.4")) | .kind')"
+check "another image is kind=image"    "image"     "$(rjq '.drops[] | select(.product|test("valkey")) | .kind')"
+check "a non-oci purl is kind=malformed" "malformed" "$(rjq '.drops[] | select(.product|test("golang")) | .kind')"
+check "all three are still recorded"   "3"         "$(rjq '.dropped')"
+
+# 18: no report is asked for, none is written, and nothing complains
 fresh
 src a.json "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" not_affected
 run >/dev/null; rc=$?
