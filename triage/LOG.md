@@ -650,3 +650,57 @@ prometheus/prometheus v0.305.3". Carrying a vulnerable version is not being
 affected — separating the two is what VEX is for — and this statement was
 argued about 13.0.4 and claims unreachability there. The defect is forward
 coverage only, which 2.4's next paragraph states correctly.
+
+## 2026-08-05 — CVE-2026-21728 is fixed in what we ship (#23)
+
+### FIXED — `github.com/grafana/tempo`, scoped to 13.1.1-alpine3.23 (#23)
+
+Tempo DoS via unbounded search result limits (GHSA-p4r4-xvrq-gvmc, CWE-400,
+`AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H`, EPSS 0.0065, not KEV). One binary,
+`usr/share/grafana/bin/grafana`.
+
+**The scanner is comparing versions, not code.** `github.com/grafana/tempo` has
+no `/v2` module path while its releases are v2.x and v3.x, so those tags are not
+consumable through that path and Grafana tracks `main` by commit on the v1 line:
+
+| | |
+|---|---|
+| grafana 13.1.1 `go.mod` | `github.com/grafana/tempo v1.5.1-0.20260427112133-525d1bab07e0` |
+| advisory affected range | `>= 1.3.0, < 2.8.4` (plus the 2.9 and 2.10 branch ranges) |
+| fix | `650eb1985a07`, PR #6525, 2026-02-20 |
+
+Every `v1.5.1-0.<anything>` sorts below `2.8.4` by semver, permanently, however
+recent the commit. So this reports on a build that carries the remedy, and will
+keep reporting on every future one.
+
+**The fix is in the tree we ship**, by ancestry rather than by version string.
+GitHub's compare of the fix commit against grafana's pin: `ahead_by 337,
+behind_by 0`. The pinned commit contains it.
+
+**Why `symbol`-level reachability does not contradict that.** The fix changed a
+*default value*, it did not remove a function, so the symbol is still linked and
+still called. govulncheck draws its ranges from the same advisory data and
+inherits the same mismatch. Req 6.14 forecloses `vulnerable_code_not_in_execute_path`
+for a reachable symbol — this is a different claim with different evidence, and
+6.14 does not reach it.
+
+**Outcome: `fixed`, scoped to `13.1.1-alpine3.23`.** Not versionless, and the
+scoping is the load-bearing part: the published `13.0.4-alpine3.23` pins
+`cbe5f845dc7b`, which the same comparison puts `behind_by 483`. **That image is
+genuinely affected**, and a versionless claim would have excused it.
+→ `vex/CVE-2026-21728.openvex.json`
+
+Verified in both directions before committing: compiled for a 13.1.1 build the
+statement applies and its product becomes that build's digest; compiled for the
+published 13.0.4 it is dropped, naming the tag and the build it did not match.
+
+This is also the first statement that could not have worked before today. Until
+Req 6.28-6.30 it would have carried a tag straight to Trivy and suppressed
+nothing, silently — which is exactly how the CVE-2026-42151 `fixed` statement
+sat inert for two days without anyone noticing.
+
+**Not treated here: #27**, `CVE-2026-28377`, same module and the same artifact.
+Its fix `bb8ca663` (2026-03-17) is also an ancestor of the same pin,
+`behind_by 0`, so it resolves the same way. It needs its own statement rather
+than a superseding one, because the 2026-07-26 document was *deleted* during
+that retraction rather than retained — Req 6.22 postdates it.
