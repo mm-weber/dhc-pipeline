@@ -704,3 +704,61 @@ Its fix `bb8ca663` (2026-03-17) is also an ancestor of the same pin,
 `behind_by 0`, so it resolves the same way. It needs its own statement rather
 than a superseding one, because the 2026-07-26 document was *deleted* during
 that retraction rather than retained — Req 6.22 postdates it.
+
+### FIXED — CVE-2026-28377, `github.com/grafana/tempo`, scoped to 13.1.1-alpine3.23 (#27)
+
+Information disclosure of an S3 SSE-C encryption key through Tempo's
+`status/config` handler (GHSA-ffqx-q65f-36jf, CWE-326,
+`AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N`, EPSS 0.0015, not KEV).
+
+Mechanically this is #23 again — same module, same artifact. Advisory range
+`< 2.10.3` sorts every v1-line pseudo-version below the fix by semver,
+permanently, so the scanner reports on a build carrying the remedy:
+
+| Comparison | Result |
+|---|---|
+| fix `bb8ca663` (PR #6711, 2026-03-17) → 13.1.1 pin `525d1bab07e0` | `ahead_by 218, behind_by 0` — fix present |
+| fix `bb8ca663` → published 13.0.4 pin `cbe5f845dc7b` | `behind_by 602` — genuinely affected |
+
+**Outcome: `fixed`, scoped to `13.1.1-alpine3.23`.**
+→ `vex/CVE-2026-28377.openvex.json`
+
+### This does not reopen the 2026-07-30 retraction
+
+#27 is the finding whose `not_affected` was withdrawn, and the withdrawal was
+firm: *"upstream lists the symbol as affected, we do not get to re-scope their
+advisory from the outside, and 'plausibly not' is not evidence."* That stands.
+The two claims are not the same claim:
+
+| | Retracted 2026-07-30 | Written today |
+|---|---|---|
+| Says | the vulnerable code is here but cannot execute | the vulnerable code is not here |
+| Rests on | an argument about which routes Grafana registers | commit ancestry against the pinned tree |
+| Justification | `vulnerable_code_not_in_execute_path` | status `fixed`, no justification field |
+| Measured? | no, and govulncheck contradicted it | yes, `behind_by 0` |
+
+Req 6.14 is untouched: it forecloses `vulnerable_code_not_in_execute_path` for a
+reachable symbol, and this is not that justification. The symbol is still linked
+and still called — `bb8ca663` changed how a config value is *handled*, it did not
+remove a function — which is precisely why a reachability tool cannot settle
+this and ancestry can.
+
+Hindsight makes the retraction look better, not worse. The July statement was
+written while **13.0.4** was the shipped image, and 13.0.4 is `behind_by 602`.
+It was wrong twice: wrong justification, and wrong about the very image it was
+written for. Today's claim is true only of 13.1.1, which is why it carries that
+tag rather than being stated for every release.
+
+**Supersession does not apply here.** The 2026-07-26 document was *deleted*
+during the retraction rather than retained, so there is no earlier statement to
+carry a later timestamp against; Req 6.22 postdates that decision. This is a
+fresh document, and the record of what was argued lives in this log rather than
+in the artifact. Nothing was published and then withdrawn either: 13.0.4's
+attestations were created 2026-07-21, five days before that statement was
+written, and grafana has not been released since.
+
+Verified both directions before committing. Compiled for a 13.1.1 build, all
+four statements in the lane apply. Compiled for the published 13.0.4, both
+tempo claims are dropped by name and only the structural `not_affected` for
+CVE-2026-42151 survives — which is correct, since 13.0.4 genuinely carries both
+tempo findings.
