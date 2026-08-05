@@ -334,6 +334,31 @@ correct, being a claim scoped to another release or a statement about another
 image, but it is still what a reviewer has to see: from counts alone a
 wrongly-scoped claim and a correctly-scoped one look the same.
 
+**What is attested is compiled too (Req 6.34).** Publishing VEX exists for
+consumers, and a consumer feeds the attested predicate to their own scanner. A
+source document attested raw carries a tag, which matches nothing — so the
+artifact we publish for other people would be inert for exactly the audience it
+is for. The release path compiles against `steps.build.outputs.digest` before
+`cosign attest`. Attestation is the ideal case for a digest: it is bound to one
+immutable artifact, so a compiled predicate stays correct for it forever, with
+none of the staleness that makes a hand-written digest wrong in *source*.
+
+Compiling there also replaces the `jq` name-match that step used to decide which
+documents belong to this image. That is the compiler's image filter, already
+tested — an emptied document is never written, so what lands in the output
+directory is exactly what should be attested.
+
+**Which tags count (Req 6.30).** "A tag of an image being scanned" is a property
+of the artifact, never of the definition. The two drift by design: a definition
+describes the release it would build *now*, while the registry holds the release
+published *last*. The rescan therefore resolves each declared tag against the
+registry and keeps only those pointing at the digest it scanned. Passing the
+definition's tags instead suppressed a `fixed` claim written for 13.1.1 on a
+published 13.0.4, which is the exact failure 6.30 exists to prevent, arriving
+through the caller rather than the compiler. `build.yml` is not exposed to it:
+it scans the image it just built, so its `meta.outputs.tags` really are that
+image's tags.
+
 Req 6.22 keeps a superseded claim on the record. OpenVEX documents hold multiple
 timestamped statements and consumers take the latest per (vulnerability,
 product), so a superseded claim is retained rather than deleted: the artifact
@@ -341,6 +366,21 @@ carries what we argued, when, and what replaced it. Compilation is also what
 makes that work, because both statements now compile to the *same* product
 identity — the build's digest — so the later timestamp actually supersedes.
 Under the old split they named different products and superseded nothing.
+
+That ordering is measured, not assumed, against the published image with one
+real finding:
+
+| Document | Result |
+|---|---|
+| earlier `not_affected`, later `affected` | reported, not suppressed |
+| same, array order reversed | reported, not suppressed |
+| earlier `affected`, later `not_affected` | suppressed |
+
+So Trivy orders by `timestamp` — not by array position, and not "affected always
+wins". Which means supersession is load-bearing rather than decorative: on the
+published 13.0.4 image the later `fixed` statement won over the earlier
+`not_affected`, and suppressed the finding under a claim that is false for that
+release. Getting 6.30's tag set right is what stops that.
 
 ### .github/workflows/
 `validate.yml` (schema/yamllint/conventions), `build.yml` (PR build + gates; main: release),
