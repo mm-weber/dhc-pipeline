@@ -33,6 +33,11 @@
 #
 # Dropping is reported, never silent. A statement that vanished and a statement
 # that worked look identical in a scan report.
+#
+# Set COMPILE_VEX_REPORT=<path> to also get that as JSON (Req 6.32): image,
+# digest, tags, counts, and one record per drop with its reason. A caller
+# rendering a job summary reads that rather than grepping the prose above,
+# which would break the first time the wording changes.
 set -euo pipefail
 
 if [ "$#" -lt 4 ]; then
@@ -66,6 +71,15 @@ def parse(pid):
     return rest, ""
 
 compiled = dropped = 0
+drops = []
+
+def drop(cve, pid, reason):
+    """Req 6.32. Printed for a human reading the log AND kept structured, so a
+    job summary never has to grep prose that changes wording."""
+    global dropped
+    print(f"compile-vex: dropped {cve} product '{pid}' — {reason}")
+    drops.append({"cve": cve, "product": pid, "reason": reason})
+    dropped += 1
 
 for path in sorted(glob.glob(os.path.join(src, "*.json"))):
     with open(path) as fh:
@@ -80,17 +94,14 @@ for path in sorted(glob.glob(os.path.join(src, "*.json"))):
             pid = str(product.get("@id", ""))
             name, version = parse(pid)
             if name is None:
-                print(f"compile-vex: dropped {cve} product '{pid}' — not a pkg:oci purl, so it identifies nothing this scan contains")
-                dropped += 1
+                drop(cve, pid, "not a pkg:oci purl, so it identifies nothing this scan contains")
                 continue
             if name != image:
-                print(f"compile-vex: dropped {cve} product '{pid}' — names image '{name}', building '{image}'")
-                dropped += 1
+                drop(cve, pid, f"names image '{name}', building '{image}'")
                 continue
             if version and version not in tags:
                 built = ", ".join(sorted(tags)) or "(none)"
-                print(f"compile-vex: dropped {cve} product '{pid}' — tag '{version}' is not a tag of this build ({built})")
-                dropped += 1
+                drop(cve, pid, f"tag '{version}' is not a tag of this build ({built})")
                 continue
             # Req 6.29. Everything else is the claim and carries through
             # untouched: subcomponents scope it to one package, and timestamp
@@ -110,4 +121,14 @@ for path in sorted(glob.glob(os.path.join(src, "*.json"))):
             fh.write("\n")
 
 print(f"compile-vex: {compiled} statement(s) compiled for {image}@{digest}, {dropped} product(s) dropped")
+
+# Req 6.32. Optional, so every existing caller is unaffected: a workflow that
+# wants to render this in a summary asks for it by naming a path.
+report = os.environ.get("COMPILE_VEX_REPORT", "")
+if report:
+    with open(report, "w") as fh:
+        json.dump({"image": image, "digest": digest, "tags": sorted(tags),
+                   "compiled": compiled, "dropped": dropped, "drops": drops},
+                  fh, indent=2)
+        fh.write("\n")
 PY

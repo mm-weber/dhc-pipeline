@@ -86,17 +86,26 @@ jobs:
             # Every declared tag is passed, not just the one being scanned: they
             # all name this same build, so a statement scoped to any of them
             # applies here.
+            # Req 6.32/6.33: every path writes a report, so the summary can tell
+            # "compiled nothing" from "never compiled". Those two produce an
+            # identical green run and an identical empty issue set, which is the
+            # inert-versus-correct problem one level up.
+            mkdir -p "$OUT/vex"
             vexdir="$OUT/vex/${name}"
+            report="$OUT/vex/${name}.report.json"
             vex=()
             digest=$(docker buildx imagetools inspect "$ref" --format '{{.Manifest.Digest}}' 2>/dev/null)
             if [ -n "$digest" ]; then
               mapfile -t all_tags < <(yq '.tags[]' "$f" | tr -d '"')
-              scripts/compile-vex.sh triage/vex "$vexdir" "$name" "$digest" "${all_tags[@]}" || true
+              COMPILE_VEX_REPORT="$report" \
+                scripts/compile-vex.sh triage/vex "$vexdir" "$name" "$digest" "${all_tags[@]}" || true
               for v in "$vexdir"/*.json; do [ -e "$v" ] && vex+=(--vex "$v"); done
             else
               # Over-reporting is the safe direction here: excused findings come
               # back as issues rather than a real one being silently excused.
               echo "::warning::could not resolve a digest for ${ref} — scanning it with no VEX applied, so already-decided findings may refile"
+              jq -n --arg image "$name" --arg ref "$ref" \
+                '{image: $image, digest: "", ref: $ref, compiled: 0, dropped: 0, drops: []}' > "$report"
             fi
             echo "::group::scan ${ref}"
             if trivy image "${vex[@]}" "${ignore[@]}" --severity HIGH,CRITICAL --pkg-types os,library \
@@ -228,6 +237,40 @@ jobs:
             echo "### Daily rescan"
             echo "- images scanned: ${{ steps.scan.outputs.scanned || 0 }}"
             echo "- new CVE issues filed: ${{ steps.report.outputs.count || 0 }}"
+            echo
+            # Req 6.33. Without this the run is green whether every statement
+            # applied or none of them did: an unresolved digest suppresses
+            # nothing, and the findings it should have excused are deduped away
+            # by their own already-open issues. Green, empty issue set, both
+            # ways. The counts are what tell those apart.
+            echo "#### VEX compilation (Req 6.28-6.30)"
+            echo
+            if compgen -G "$OUT/vex/*.report.json" > /dev/null; then
+              echo "| Image | Scanned digest | Applied | Dropped |"
+              echo "|---|---|---|---|"
+              jq -r 'if .digest == "" then
+                       "| \(.image) | **unresolved — no VEX applied** | – | – |"
+                     else
+                       "| \(.image) | `\(.digest[0:19])…` | \(.compiled) | \(.dropped) |"
+                     end' "$OUT"/vex/*.report.json
+              echo
+              # A drop is usually correct — a claim scoped to another release,
+              # or a statement about another image. It is still the thing a
+              # reviewer has to see, because a wrongly-scoped claim looks
+              # exactly like a correctly-scoped one from the counts alone.
+              if jq -e -s '[.[].drops[]] | length > 0' "$OUT"/vex/*.report.json >/dev/null; then
+                echo "<details><summary>statements not applied, and why</summary>"
+                echo
+                jq -r -s '.[] | .image as $i | .drops[]
+                          | "- **\($i)** — `\(.cve)` \(.reason)"' "$OUT"/vex/*.report.json
+                echo
+                echo "</details>"
+              else
+                echo "_every statement applied_ ✓"
+              fi
+            else
+              echo "_no image reached compilation_"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: upload rescan artifacts

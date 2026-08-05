@@ -162,5 +162,45 @@ out=$(run)
 contains "a non-oci product is dropped as such" "$out" "not a pkg:oci purl"
 check "a non-oci product does not reach the output" "pkg:oci/grafana@$DIGEST" "$(products)"
 
+# --- Req 6.32: what was dropped has to be readable by something -------------
+#
+# The drop lines above are prose on stdout, which is fine for a human reading a
+# log and useless to a job summary. A workflow that greps prose breaks the first
+# time the wording changes, so the counts and reasons are also emitted as JSON
+# when COMPILE_VEX_REPORT names a path. This is what stops the rescan's
+# fail-soft path being indistinguishable from its success path — the same
+# defect as an inert statement, one level up.
+
+run_report() { COMPILE_VEX_REPORT="$SB/report.json" run; }
+rjq() { jq -r "$1" "$SB/report.json" 2>/dev/null; }
+
+# 15: the report records what compiled and against what
+fresh
+src a.json "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" not_affected
+run_report >/dev/null
+check "report names the image"     "grafana"  "$(rjq '.image')"
+check "report names the digest"    "$DIGEST"  "$(rjq '.digest')"
+check "report counts compiled"     "1"        "$(rjq '.compiled')"
+check "report counts dropped"      "0"        "$(rjq '.dropped')"
+
+# 16: a drop is recorded with the reason, not just counted. A count says
+#     something vanished; only the reason says whether that was correct.
+fresh
+src a.json "pkg:oci/grafana@13.0.4-alpine3.23?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" fixed
+src b.json "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" not_affected
+run_report >/dev/null
+check "report counts the drop"      "1"                "$(rjq '.dropped')"
+check "the drop names its CVE"      "CVE-2026-00001"   "$(rjq '.drops[0].cve')"
+contains "the drop quotes the product" "$(rjq '.drops[0].product')" "13.0.4-alpine3.23"
+contains "the drop gives a reason"     "$(rjq '.drops[0].reason')" "not a tag of this build"
+
+# 17: no report is asked for, none is written, and nothing complains
+fresh
+src a.json "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" not_affected
+run >/dev/null; rc=$?
+check "no report requested, exit still 0" "0" "$rc"
+if [ ! -e "$SB/report.json" ]; then echo "ok   no report requested, none written"
+else echo "FAIL no report requested, none written"; FAILURES=$((FAILURES+1)); fi
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
