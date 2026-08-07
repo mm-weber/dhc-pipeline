@@ -62,8 +62,10 @@
       matchStrings: [
         // The per-build artifact, which is what we pin: the version is the path
         // segment. Renovate turns that one knob; refresh-grafana.sh resolves the
-        // matching build id from the GitHub release assets — the same release
-        // this manager already tracks — and rebuilds the whole url.
+        // matching build id and rebuilds the whole url. That resolution reads
+        // apt.grafana.com AND this release, cross-checked — releases publish
+        // with zero GitHub assets often enough that either index alone misses
+        // bumps (ADR 0002, amendment 2026-08-07).
         "url:\\s*https://dl\\.grafana\\.com/grafana/release/(?<currentValue>[0-9][^\\s\"'/]*)/",
         // The legacy /oss/release/ version alias, matched only so a definition
         // not yet migrated stays tracked; its next bump moves it onto the
