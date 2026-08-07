@@ -64,6 +64,7 @@ valid_body() { # $1 = expiry
   cat <<YAML
   - id: CVE-2026-33186
     purls: ["pkg:golang/google.golang.org/grpc"]
+    paths: ["usr/share/grafana/bin/grafana"]
     treatment: accept
     owner: mm-weber
     ref: "triage/LOG.md#2026-07-27-grpc"
@@ -213,6 +214,52 @@ fresh
   valid_body "$OK_DATE" | sed 's/CVE-2026-33186/CVE-2026-99999/;s/^    owner: .*//'; } \
   > "$SB/triage/accepted-risk/grafana.yaml"
 run_case "bad entry among good ones is caught" 1 "CVE-2026-99999"
+
+# --- Req 6.24: an exception names the binaries it covers --------------------
+
+# 22: without paths, an entry keyed on id + purls matches its package in EVERY
+#     binary of the image, so deciding one binary silently decides the rest
+fresh
+{ echo "vulnerabilities:"; valid_body "$OK_DATE" | grep -v "^    paths:"; } \
+  > "$SB/triage/accepted-risk/grafana.yaml"
+run_case "missing 'paths' fails" 1 "Req 6.24"
+
+# 23: an empty list names no binary, so it scopes nothing
+fresh
+{ echo "vulnerabilities:"; valid_body "$OK_DATE" | sed 's|^    paths: .*|    paths: []|'; } \
+  > "$SB/triage/accepted-risk/grafana.yaml"
+run_case "empty 'paths' fails" 1 "Req 6.24"
+
+# 24: a paths value that is not a list cannot scope anything either
+fresh
+{ echo "vulnerabilities:"; valid_body "$OK_DATE" \
+    | sed 's|^    paths: .*|    paths: "usr/share/grafana/bin/grafana"|'; } \
+  > "$SB/triage/accepted-risk/grafana.yaml"
+run_case "scalar 'paths' fails" 1 "Req 6.24"
+
+# --- Req 6.25: two entries for one CVE may not claim the same binary --------
+
+# 25: the same CVE on the same binary twice is one decision written twice.
+#     Trivy applies one of them; the other is invisible and unreviewable.
+fresh
+{ echo "vulnerabilities:"; valid_body "$OK_DATE"; valid_body "$OK_DATE"; } \
+  > "$SB/triage/accepted-risk/grafana.yaml"
+run_case "same id, same path fails" 1 "Req 6.25"
+
+# 26: the case the whole rule exists to permit — one CVE, two binaries, two
+#     upstreams, two decisions. CVE-2026-27145 (#22) is exactly this shape.
+fresh
+{ echo "vulnerabilities:"; valid_body "$OK_DATE"
+  valid_body "$OK_DATE" | sed 's|usr/share/grafana/bin/grafana|usr/share/grafana/data/plugins-bundled/zipkin/*|'; } \
+  > "$SB/triage/accepted-risk/grafana.yaml"
+run_case "same id, different paths passes" 0
+
+# 27: different CVEs on the same binary are unrelated decisions
+fresh
+{ echo "vulnerabilities:"; valid_body "$OK_DATE"
+  valid_body "$OK_DATE" | sed 's/CVE-2026-33186/CVE-2026-99999/'; } \
+  > "$SB/triage/accepted-risk/grafana.yaml"
+run_case "different ids, same path passes" 0
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

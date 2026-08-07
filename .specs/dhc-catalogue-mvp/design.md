@@ -178,17 +178,236 @@ Each entry carries a `blocked:` field stating why avoid and mitigate were
 unavailable — presence machine-enforced, content judged at review. It is what
 keeps the file from becoming the path of least resistance.
 
+**Per-binary scope (Req 6.23–6.27).** One file per image stops an acceptance for
+grafana covering cert-manager. It does not stop an acceptance for *one binary
+inside* grafana covering another, and a repackage image is exactly where that
+bites: CVE-2026-27145 is in both `plugins-bundled/elasticsearch/` and
+`plugins-bundled/zipkin/`, compiled at different times, fixed by different
+upstreams, on different schedules. An entry keyed only on `id` + `purls` matches
+`stdlib` wherever it appears, so deciding elasticsearch silently decides zipkin
+— the same failure the per-image filename was introduced to prevent, one level
+down. Req 6.23/6.24 push the scope into the entry via Trivy's `paths:`, so an
+exception names the binary whose exposure was actually argued.
+
+Verified against Trivy 0.72.0 rather than inferred, on a two-binary tree built
+from the real plugin release assets:
+
+| Behaviour | Result |
+|---|---|
+| `paths:` scoping one binary | 12 findings → 11; only that binary suppressed |
+| no `paths:` key | 12 → 10; **every** instance suppressed |
+| globs `dir/*`, `**/dir/**`, `dir/gpx_*` | all scope correctly |
+| a path matching nothing | suppresses nothing, no warning, exit 0 |
+| suppression record | `Target` = binary, `Statement` = entry, `Source` = file |
+
+Globs matter because the binaries carry an arch suffix. Measured on the
+published index, the same finding sits at
+`.../elasticsearch/gpx_..._linux_amd64` on amd64 and at `..._linux_arm64` on
+arm64. The catalogue publishes amd64 only (Req 2.1), so an exact path is correct
+for every scan that runs today and goes silently wrong the moment arm64 returns
+(task 8.3) or a consumer scans an arm64 image themselves. A path matching
+nothing is completely silent, per the row above, so a glob is what keeps that
+from becoming a discovery.
+
+The last two rows are why Req 6.26/6.27 exist. The two failure modes are not
+symmetric: a *too narrow* path fails safe (nothing is suppressed, the gate stays
+red) but is indistinguishable from an untriaged finding, while a *too broad* or
+absent path fails dangerous (the gate goes green over a binary nobody decided
+about). Req 6.26 catches the first by reporting any exception that suppressed
+nothing, which is also the instrument that would catch Trivy ceasing to honour
+`paths:` at all. Req 6.27 catches the second by naming the binary in the
+suppression table, so over-broad scope is visible in review rather than inferred
+from a count. Neither fails the build: an exception that suppresses nothing
+leaves nothing uncovered, so Req 6.1 is not the right lever, and the precedent is
+the VEX canary warning — make it visible, do not redden an unrelated PR.
+
+**Reachability evidence (Req 6.13–6.15).** Trivy and Grype answer "is this
+module linked", never "is the vulnerable code called". Every `not_affected`
+statement in this catalogue rested on architectural argument instead — sound and
+checkable, but weaker than a measurement, and useless against an advisory like
+kin-openapi's fail-open `ValidationHandler`, where applicability turns entirely
+on whether one symbol is wired in. `govulncheck -mode=binary` reads the Go
+binary's symbol table and distinguishes the two, so it runs on the PR path
+against every Go binary in the built image.
+
+It is **evidence, not a gate** — Trivy remains the only thing that fails a
+build. A reachability tool that can also break CI is a second gate nobody
+designed, and its false negatives would then silently pass images.
+
+Split like `triage/rescan/`: `scripts/govulncheck-report.sh` is the pure,
+unit-tested part (govulncheck JSON → per-binary table of OSV, module and
+`symbol` / `package` / `module` level) and the workflow is the I/O around it
+(export the container rootfs, find Go binaries, run govulncheck, print). The
+level is the discriminator: a finding whose trace names a function is reachable;
+one reported at module level only proves nothing either way — which is also what
+a stripped binary looks like, so the report says which it was.
+
+Req 6.14 makes the direction one-way on purpose. A reachable symbol *forbids*
+`not_affected`; an unreachable one does not compel it, because govulncheck sees
+only Go call graphs and not reflection, plugins or `exec`.
+
+**Statement identity (Req 6.17–6.22).** A VEX statement that matches nothing is
+indistinguishable from one that worked, so `scripts/lint-vex-product.sh` checks
+the identifiers Trivy compares: the product is a `pkg:oci/` purl naming a real
+definition (6.17), its `repository_url` equals that definition's `image:` (6.18),
+and subcomponents are versionless so they survive an upstream bump (6.19).
+
+**Source is not what a scanner sees (Req 6.28-6.30).** `triage/vex/` holds
+hand-authored *source*, and `scripts/compile-vex.sh` renders it per build into
+what Trivy is actually given. The split exists because the two have
+irreconcilable requirements: source has to be reviewable by a human and stable
+in git, while a product identifier has to be a string Trivy matches, and Trivy
+builds that string from the image's **RepoDigest**.
+
+Measured on `grafana:13-alpine3.23`, one real finding, one statement each:
+
+| Product identifier | Status | Suppressed |
+|---|---|---|
+| `pkg:oci/grafana@13.0.4-alpine3.23` (tag) | `fixed` | **no** |
+| `pkg:oci/grafana@sha256:b6987eb…` (digest) | `fixed` | yes |
+| `pkg:oci/grafana` (versionless) | `fixed` | yes |
+| `pkg:oci/grafana` (versionless) | `not_affected` | yes |
+
+So the tag form the earlier design prescribed matched nothing, silently. That
+went unnoticed because the one `fixed` statement written under it covers a
+finding that had already vanished from the scan, so it never had to suppress
+anything. Compilation is what makes the two requirements compatible: the author
+writes a tag, the compiler emits the digest.
+
+Version in *source* is therefore a scope, not an identifier:
+
+- **a published tag** means the claim is about that release. `fixed` must carry
+  one (6.21), because a remedy is always about particular versions.
+- **no version** means the claim holds for every build of that image.
+
+Only tags are admissible in source (6.20). A digest in source would be a claim
+nobody can review and would go stale at the next rebuild of the same release.
+
+**Versionless is a decision, not a default (Req 6.31).** The two scopes answer
+different questions and neither is right for both kinds of `not_affected`:
+
+- *structural* claims do not depend on a version. "This image runs Grafana's
+  dashboard server, which never starts a Prometheus server, so the disclosing
+  handler is not routed" is as true of 14.0 as of 13.0.4. Re-arguing it every
+  release is churn that teaches nothing.
+- *dependency-graph* claims do. "This build does not reach the vulnerable
+  symbol" rests on what this release happens to link, and 14.0 may link
+  something else entirely.
+
+Left to a default, every statement drifts to versionless, because that is what
+suppresses most and costs least to write. So a versionless product must say in
+`status_notes` why its claim survives a version change, marked with the literal
+token `version-independent:` so the rule is checkable rather than a matter of
+taste. It is written into `status_notes` rather than a custom field because it
+stays inside standard OpenVEX and because a consumer reading the statement
+wants that sentence too.
+
+What this rejects is a versionless claim nobody defended. A tag-scoped claim
+needs no such note: its scope already says what it covers.
+
+The compiler then does two things per build: it drops any statement whose tag is
+not a tag of the image being scanned (6.30), and it rewrites every surviving
+product to that image's digest (6.29). Dropping is what stops a claim outliving
+the release it was argued about, which is review finding 2.4: under the old rules
+a versionless `not_affected` stayed the latest statement for its own product
+forever and suppressed on versions nobody had examined. Rewriting is what makes
+the statement match at all.
+
+It also subsumes the qualifier-stripping the gate did inline for trivy#9399,
+since the compiler already rewrites the identifier — one tested transform from
+source to scan input instead of a `jq` expression in YAML.
+
+**Compilation reports itself (Req 6.32, 6.33).** The rescan resolves the digest
+from the registry, and that lookup can fail — a credential problem, a tag that
+moved. It fails soft, scanning with no VEX applied, because over-reporting is
+the safe direction. But the two outcomes are observationally identical from
+outside: an unresolved digest suppresses nothing, and the findings it should
+have excused are deduped away by their own already-open issues, so the run is
+green with an empty issue set either way. That is the inert-versus-correct
+problem again, one level up from the statements themselves.
+
+So `COMPILE_VEX_REPORT` makes the compiler emit JSON beside its prose — image,
+digest, counts, and one record per drop with its reason — and the rescan renders
+it into the run summary. JSON rather than grepping the log, because a summary
+built on prose breaks the first time the wording changes. A drop is usually
+correct, being a claim scoped to another release or a statement about another
+image, but it is still what a reviewer has to see: from counts alone a
+wrongly-scoped claim and a correctly-scoped one look the same.
+
+**What is attested is compiled too (Req 6.34).** Publishing VEX exists for
+consumers, and a consumer feeds the attested predicate to their own scanner. A
+source document attested raw carries a tag, which matches nothing — so the
+artifact we publish for other people would be inert for exactly the audience it
+is for. The release path compiles against `steps.build.outputs.digest` before
+`cosign attest`. Attestation is the ideal case for a digest: it is bound to one
+immutable artifact, so a compiled predicate stays correct for it forever, with
+none of the staleness that makes a hand-written digest wrong in *source*.
+
+Compiling there also replaces the `jq` name-match that step used to decide which
+documents belong to this image. That is the compiler's image filter, already
+tested — an emptied document is never written, so what lands in the output
+directory is exactly what should be attested.
+
+**Which tags count (Req 6.30).** "A tag of an image being scanned" is a property
+of the artifact, never of the definition. The two drift by design: a definition
+describes the release it would build *now*, while the registry holds the release
+published *last*. The rescan therefore resolves each declared tag against the
+registry and keeps only those pointing at the digest it scanned. Passing the
+definition's tags instead suppressed a `fixed` claim written for 13.1.1 on a
+published 13.0.4, which is the exact failure 6.30 exists to prevent, arriving
+through the caller rather than the compiler. `build.yml` is not exposed to it:
+it scans the image it just built, so its `meta.outputs.tags` really are that
+image's tags.
+
+Req 6.22 keeps a superseded claim on the record. OpenVEX documents hold multiple
+timestamped statements and consumers take the latest per (vulnerability,
+product), so a superseded claim is retained rather than deleted: the artifact
+carries what we argued, when, and what replaced it. Compilation is also what
+makes that work, because both statements now compile to the *same* product
+identity — the build's digest — so the later timestamp actually supersedes.
+Under the old split they named different products and superseded nothing.
+
+That ordering is measured, not assumed, against the published image with one
+real finding:
+
+| Document | Result |
+|---|---|
+| earlier `not_affected`, later `affected` | reported, not suppressed |
+| same, array order reversed | reported, not suppressed |
+| earlier `affected`, later `not_affected` | suppressed |
+
+So Trivy orders by `timestamp` — not by array position, and not "affected always
+wins". Which means supersession is load-bearing rather than decorative: on the
+published 13.0.4 image the later `fixed` statement won over the earlier
+`not_affected`, and suppressed the finding under a claim that is false for that
+release. Getting 6.30's tag set right is what stops that.
+
 ### .github/workflows/
 `validate.yml` (schema/yamllint/conventions), `build.yml` (PR build + gates; main: release),
 `e2e.yml` (kind matrix), `renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).
 
-**Build cost split (validated on the first CI run):** the PR gate builds
-`linux/amd64` only — fast proof a definition compiles — while the release path
-(main) builds both arches per Req 2.1. arm64 through the frontend runs cross-
-compiled or QEMU-emulated on an amd64 runner; paying that once at merge, not on
-every PR, keeps PR feedback fast. Both paths use `type=gha` build cache
-(per-image scope) so repeat builds of a large upstream (cert-manager, ~30–40 min
-cold multi-arch) reuse the Go module + compile layers.
+**Platforms: `linux/amd64` only (Req 2.1, Req 2.6).** The catalogue built and
+published both arches until 2026-08-04, when measurement showed nothing ever
+scanned the arm64 half. Every scan step in `build.yml` is `pull_request`-gated
+and the PR gate builds amd64 only, while `rescan.yml` passes no `--platform`, so
+Trivy resolves the published index to the runner's own architecture. arm64 was
+therefore built, pushed, signed, SBOM'd and attested with no gate ever reading
+it, which is the concrete case in review finding 1.3. Shipping one platform is
+the cheap correction; scanning two is the larger change, deferred to task 8.3.
+
+Measured on the published `grafana:13-alpine3.23` index, both platforms carry an
+identical HIGH/CRITICAL set (11 each, same CVE, package and version), so nothing
+is known to be hiding in the arm64 image. That is one observation on one day
+rather than a property: apk metadata is per-arch and a fix can land on one arch
+before the other.
+
+Definitions keep `platforms: [linux/amd64, linux/arm64]` and their per-arch
+pins, and `verify-arch-pins.sh` keeps verifying both. The definitions do support
+arm64; the release path publishes one platform. Keeping the pins exercised is
+what makes task 8.3 a build-matrix change rather than archaeology.
+
+Both paths use `type=gha` build cache (per-image scope) so repeat builds of a
+large upstream (cert-manager) reuse the Go module + compile layers.
 
 ## Data Models
 

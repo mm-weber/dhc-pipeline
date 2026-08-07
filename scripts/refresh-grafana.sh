@@ -11,15 +11,31 @@
 # Renovate bumps only the version inside the tarball url. Every other
 # version-derived field is then stale; this recomputes them so the bumped
 # definition is internally coherent:
+#   - the url itself                        ← rebuilt with the new build id
 #   - GRAFANA_SHA256, both arches           ← fetched for the new version
 #   - vars VERSION / SEMVER_VERSION         ← new semver
 #   - vars SEMVER_MAJOR_MINOR_VERSION / SEMVER_MAJOR_VERSION
 #   - tags (full, major.minor alias, major alias)
 #   - display name, spdx version, purl, GRAFANA_VERSION annotation
 #
-# Checksums come from dl.grafana.com; set REFRESH_GRAFANA_SHA256_AMD64 and
-# REFRESH_GRAFANA_SHA256_ARM64 to stub that (used by the test suite, and by
-# anyone iterating inside the devcontainer, whose firewall blocks that host).
+# We pin the PER-BUILD artifact, not the /oss/release/ version alias:
+#
+#   .../grafana/release/<ver>/grafana_<ver>_<build-id>_linux_<arch>.tar.gz
+#
+# The alias was observed serving content that differs from the per-build
+# artifact of the same release, and on amd64 differing from its own published
+# .sha256 — a pin against it verifies or fails depending on when you fetch.
+# The build-id path is scoped to a single build, so a re-cut lands at a new URL
+# instead of overwriting this one (triage/LOG.md, 2026-07-26).
+#
+# The build id is not derivable from the version, but it is recoverable: it
+# appears in the GitHub release asset names (grafana_<ver>_<id>_linux_amd64.deb),
+# and GitHub is already this definition's Renovate datasource. So the version
+# stays the single knob Renovate turns, and this task resolves the id.
+#
+# Network stubs for the test suite and for iterating inside the devcontainer,
+# whose firewall blocks both hosts: REFRESH_GRAFANA_BUILD_ID,
+# REFRESH_GRAFANA_SHA256_AMD64, REFRESH_GRAFANA_SHA256_ARM64.
 set -euo pipefail
 
 dir="${1:?usage: refresh-grafana.sh <definition-dir>}"
@@ -38,14 +54,65 @@ tagver() { printf '%s' "${1//+/_}"; }
 
 # New version from the (already bumped) tarball url. Anchored on the `url:` key
 # so the checksum-provenance comment, which names the same host, cannot match.
-# Out-of-band security builds (13.0.1+security-01) are served from this same
-# templatable path, verified against upstream — grafana's download page
-# advertises a longer per-build url carrying an opaque CI run id
-# (.../grafana/release/<ver>/grafana_<ver>_<buildid>_linux_<arch>.tar.gz), but
-# that form is not required, so nothing here has to know about it.
-new_ver=$(grep -oE '^[[:space:]]*-?[[:space:]]*url:[[:space:]]*https://dl\.grafana\.com/oss/release/grafana-[0-9][^[:space:]]*\.linux-' "$f" \
-  | head -1 | sed -E 's#.*grafana-##; s#\.linux-$##')
-[ -n "$new_ver" ] || { echo "refresh-grafana: no dl.grafana.com tarball url in $f" >&2; exit 1; }
+# Out-of-band security builds (13.0.1+security-01) are served from the same
+# templatable path, verified against upstream.
+#
+# The per-build url — .../grafana/release/<ver>/grafana_<ver>_<buildid>_linux_<arch>.tar.gz,
+# carrying an opaque CI run id — is now the shape we pin, so this script has to
+# know about it. The build id is not derivable from the version, so it is
+# resolved from the GitHub release assets below, and that resolution is
+# REQUIRED: it exits non-zero rather than falling back to a version-only url.
+url_line=$(grep -E '^[[:space:]]*-?[[:space:]]*url:[[:space:]]*https://dl\.grafana\.com/' "$f" | head -1)
+[ -n "$url_line" ] || { echo "refresh-grafana: no dl.grafana.com tarball url in $f" >&2; exit 1; }
+# Per-build shape (what we pin) first, then the legacy /oss/release/ alias so a
+# definition that has not been migrated yet is still refreshable.
+new_ver=$(sed -nE 's#.*/grafana/release/([^/[:space:]]+)/.*#\1#p' <<<"$url_line")
+[ -n "$new_ver" ] || new_ver=$(sed -nE 's#.*/oss/release/grafana-([^[:space:]]+)\.linux-.*#\1#p' <<<"$url_line")
+[ -n "$new_ver" ] || { echo "refresh-grafana: could not read a version from: ${url_line}" >&2; exit 1; }
+
+# Build id for this version, from two independent indexes.
+#
+# GitHub release assets alone are not a reliable source: v13.0.3, v12.4.5 and
+# v12.3.8 (2026-06-23) each published with ZERO assets, as did v13.0.5, v13.1.2
+# (2026-08-04) and v13.1.3 (2026-08-07) — while apt.grafana.com carries a build
+# id for v13.0.3 all the same. The reverse also happens: v13.0.6 had its 12
+# assets on GitHub hours before the apt index caught up. Neither index is
+# complete, and which one is ahead varies per release.
+#
+# So both are consulted. Where they disagree the refresh stops: two independent
+# indexes naming different builds for one version is a supply-chain signal, and
+# a checksum pinned against the wrong build verifies against nothing. Resolution
+# is REQUIRED either way — it exits non-zero rather than falling back to the
+# /oss/release/ alias, whose objects are rewritten after release.
+build_id="${REFRESH_GRAFANA_BUILD_ID:-}"
+if [ -z "$build_id" ]; then
+  # '.' and '+' are ERE metacharacters and grafana ships '+security-NN' builds.
+  ver_re=$(printf '%s' "$new_ver" | sed 's/[.+]/\\&/g')
+
+  # apt.grafana.com. The Packages index names the .deb verbatim in `Filename:`,
+  # which is the only field carrying the upstream version unmangled — apt
+  # rewrites 13.0.1+security-01 to 13.0.1-01 in `Version:`. Anchoring on
+  # `/grafana_` keeps grafana-enterprise, which ships the same version from a
+  # sibling pool dir, from satisfying the lookup.
+  apt_url="${REFRESH_GRAFANA_APT_URL:-https://apt.grafana.com/dists/stable/main/binary-amd64/Packages.gz}"
+  apt_id=$(curl -fsSL --max-time 120 "$apt_url" 2>/dev/null | gunzip -c 2>/dev/null \
+    | grep -oE '(^|/)grafana_'"$ver_re"'_[0-9]+_linux_amd64\.deb' \
+    | head -1 | sed -E 's/.*_([0-9]+)_linux_amd64\.deb$/\1/') || apt_id=""
+
+  gh_url="${REFRESH_GRAFANA_GH_URL:-https://api.github.com/repos/grafana/grafana/releases/tags}"
+  auth=()
+  [ -n "${GITHUB_TOKEN:-}" ] && auth=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+  gh_id=$(curl -fsSL --max-time 60 "${auth[@]}" "${gh_url}/v${new_ver}" 2>/dev/null \
+    | grep -oE '"grafana_'"$ver_re"'_[0-9]+_linux_amd64\.deb"' \
+    | head -1 | sed -E 's/.*_([0-9]+)_linux_amd64\.deb"/\1/') || gh_id=""
+
+  if [ -n "$apt_id" ] && [ -n "$gh_id" ] && [ "$apt_id" != "$gh_id" ]; then
+    echo "refresh-grafana: build id conflict for v${new_ver} — apt.grafana.com says ${apt_id}, the GitHub release assets say ${gh_id}. Refusing to pick one." >&2
+    exit 1
+  fi
+  build_id="${apt_id:-$gh_id}"
+fi
+[ -n "$build_id" ] || { echo "refresh-grafana: could not resolve a build id for v${new_ver} from apt.grafana.com or the GitHub release assets. Upstream has published neither; the release is not consumable through the per-build url yet." >&2; exit 1; }
 
 new_maj="${new_ver%%.*}"
 new_rest="${new_ver#*.}"
@@ -58,10 +125,33 @@ old_maj="${old_ver%%.*}"
 old_rest="${old_ver#*.}"
 old_majmin="${old_maj}.${old_rest%%.*}"
 
-# Per-arch tarball checksum for the new version.
+# dl.grafana.com is where the artifact and its sidecar come from, and it is the
+# authority on whether a build exists at all. The indexes that resolve a build
+# id — apt, GitHub releases — are populated by different pipelines than the
+# object store, so an id can name a build dl.grafana.com does not serve.
+# Overridable for the tests; the url written into the definition is always the
+# real host.
+dl_base="${REFRESH_GRAFANA_DL_BASE:-https://dl.grafana.com}"
+
+tarball_url() { # arch -> fetch url on stdout
+  printf '%s/grafana/release/%s/grafana_%s_%s_linux_%s.tar.gz' \
+    "$dl_base" "$new_ver" "$new_ver" "$build_id" "$1"
+}
+
+# Per-arch tarball checksum for the new version. Both arches are resolved before
+# anything is written, so a miss on either leaves the definition untouched.
 fetch_sha() { # arch -> 64-hex on stdout
   local arch="$1" base sha
-  base="https://dl.grafana.com/oss/release/grafana-${new_ver}.linux-${arch}.tar.gz"
+  base="$(tarball_url "$arch")"
+  # Confirm the build is actually served before trusting the id that named it.
+  # A single-byte ranged GET rather than HEAD: it is as cheap and it exercises
+  # the same path the build will take. Failing here names the host, where the
+  # alternative is a 350MB download that 404s and surfaces as a checksum
+  # complaint about an artifact that was never there.
+  curl -fsSL -o /dev/null --max-time 60 -r 0-0 "$base" 2>/dev/null || {
+    echo "refresh-grafana: dl.grafana.com does not serve ${base} — build id ${build_id} resolved for v${new_ver}, but no ${arch} artifact is published under it. Nothing written." >&2
+    return 1
+  }
   # Fast path: upstream publishes a .sha256 sidecar beside each tarball — that
   # is where the current pins came from. Fall back to hashing the tarball
   # itself if a release ever ships without one.
@@ -81,14 +171,20 @@ amd64_sha="${REFRESH_GRAFANA_SHA256_AMD64:-}"
 arm64_sha="${REFRESH_GRAFANA_SHA256_ARM64:-}"
 [ -n "$arm64_sha" ] || arm64_sha=$(fetch_sha arm64)
 
+# 0) the url. Renovate only changed the version in the path segment; the build
+#    id in the filename still belongs to the old release, so rebuild the whole
+#    line. Also migrates a definition still on the /oss/release/ alias.
+new_url="https://dl.grafana.com/grafana/release/${new_ver}/grafana_${new_ver}_${build_id}_linux_\${target.arch}.tar.gz"
+sed -i -E "s@^([[:space:]]*-?[[:space:]]*url:[[:space:]]*)https://dl\.grafana\.com/[^[:space:]]*@\1${new_url}@" "$f"
+
 ov=$(esc "$old_ver")
 omm=$(esc "$old_majmin"); omaj=$(esc "$old_maj")
 
 # 1) full semver wherever it literally appears (VERSION, SEMVER_VERSION, full
 #    tag, spdx version, purl, annotation, checksum-provenance comment).
-#    The tarball url is EXCLUDED: Renovate already wrote the new version there,
-#    and when the old version is a prefix of the new one — 13.0.4 inside
-#    13.0.4+security-01 — substituting again doubles the suffix.
+#    The tarball url is EXCLUDED: it was rebuilt whole in step 0, and a blind
+#    substitution would corrupt it anyway when the old version is a prefix of
+#    the new one (13.0.4 inside 13.0.4+security-01 doubles the suffix).
 sed -i -E "\@url:[[:space:]]*https://dl\.grafana\.com@! s/${ov}/${new_ver}/g" "$f"
 
 # 2) truncated fields the full-semver pass cannot reach: major.minor + major

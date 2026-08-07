@@ -4,6 +4,14 @@
 # Spike scratch (host-side clones etc.)
 temp/
 
+# Working scratch beside a triage lane: downloaded release assets, unpacked
+# binaries, govulncheck output. No leading slash, so it matches at any depth —
+# the one that prompted this was triage/upstream/tmp/, not a root tmp/.
+tmp/
+
 # renovate-config-validator + json5 are installed on demand (validate.yml, and
 # locally to run test/renovate/managers.test.mjs) — never committed.
 node_modules/
+
+# Rewritten VEX copies the PR scan gate builds (trivy#9399 workaround).
+.vexscan/

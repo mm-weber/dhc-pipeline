@@ -100,6 +100,9 @@ def as_date(value):
         return None
 
 
+# (id, path) already claimed, so Req 6.25 can name the entry that claimed it.
+seen_scopes = {}
+
 for index, entry in enumerate(entries):
     if not isinstance(entry, dict):
         print(f"::error file={rel}::risk treatment (Req 6.11): entry {index} is not a mapping")
@@ -115,6 +118,24 @@ for index, entry in enumerate(entries):
         if value is None or (isinstance(value, str) and not value.strip()):
             print(f"::error file={rel},line={line}::risk treatment (Req 6.11): {label} is missing '{field}' ({WHY[field]})")
             errors += 1
+
+    # Req 6.24. purls scope to a package, never to a binary, so an entry
+    # without paths matches its package wherever it appears in the image.
+    paths = entry.get("paths")
+    clean_paths = [str(p).strip() for p in paths if str(p).strip()] if isinstance(paths, list) else []
+    if not clean_paths:
+        print(f"::error file={rel},line={line}::risk treatment (Req 6.24): {label} names no 'paths' — an entry keyed on id and purls alone matches its package in every binary of the image, so deciding one binary silently decides the rest")
+        errors += 1
+
+    # Req 6.25. Trivy applies one matching entry; a second claim on the same
+    # binary is never reported, so the duplicate is unreviewable.
+    for path in clean_paths:
+        scope = (str(ident), path)
+        if scope in seen_scopes:
+            print(f"::error file={rel},line={line}::risk treatment (Req 6.25): {label} claims path '{path}', already claimed by entry {seen_scopes[scope]} — one decision written twice, and only one of them is ever applied")
+            errors += 1
+        else:
+            seen_scopes[scope] = index
 
     treatment = entry.get("treatment")
     if treatment is not None and treatment not in TREATMENTS:

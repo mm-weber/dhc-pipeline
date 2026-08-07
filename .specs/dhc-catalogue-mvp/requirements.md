@@ -34,11 +34,12 @@ registry images remain private until explicitly released.
 
 #### Acceptance Criteria
 
-1. WHEN a definition change merges to main THE CI Pipeline SHALL build affected images for linux/amd64 and linux/arm64.
+1. WHEN a definition change merges to main THE CI Pipeline SHALL build affected images for linux/amd64.
 2. WHEN an image build succeeds THE CI Pipeline SHALL push resulting images to ghcr.io/mm-weber/dhc with a cosign keyless signature, an SPDX SBOM, and BuildKit provenance attached.
 3. THE CI Pipeline SHALL derive image tags from upstream semantic versions following DHI naming convention (semver, base OS, and variant segments).
 4. WHILE public release remains disabled THE Repository SHALL keep source and registry images private.
 5. IF an image build fails THEN THE CI Pipeline SHALL publish no artifacts from that run and report each failing step in pull request checks.
+6. WHILE an image for a platform remains published THE Catalogue SHALL scan that platform for HIGH and CRITICAL vulnerabilities.
 
 ### Requirement 3: Upstream Version Tracking
 
@@ -87,7 +88,7 @@ registry images remain private until explicitly released.
 
 #### Acceptance Criteria
 
-1. WHEN a pull request builds an image THE Scan Gate SHALL run Trivy and fail on HIGH or CRITICAL findings not covered by a VEX statement.
+1. WHEN a pull request builds an image THE Scan Gate SHALL run Trivy and fail on every HIGH or CRITICAL finding covered neither by a VEX statement recording status not_affected or fixed nor by an unexpired exception under triage/accepted-risk/.
 2. THE Scan Pipeline SHALL rescan published images at least once per day.
 3. WHEN a rescan finds a new HIGH or CRITICAL CVE THE Scan Pipeline SHALL open a GitHub issue containing severity, EPSS score, KEV status, and affected images.
 4. WHEN a triage decision concludes not-affected THE Triage Process SHALL record an OpenVEX statement under triage/ and attach it to affected images as an attestation.
@@ -95,10 +96,32 @@ registry images remain private until explicitly released.
 6. WHERE a CRITICAL finding exists THE Scan Pipeline SHALL obtain a second-opinion scan with Grype.
 7. WHEN a triage decision concludes accepted risk or upstream transfer THE Triage Process SHALL record a time-boxed exception under triage/accepted-risk/ carrying a treatment, an owner, a reference to its reasoning in triage/LOG.md, a justification for why avoidance and remediation were unavailable, and an expiry date.
 8. THE Triage Process SHALL NOT record accepted risk or upstream transfer as a VEX statement.
-9. WHEN an accepted-risk exception has passed its expiry date THE Scan Gate SHALL count every finding it covers as uncovered.
+9. WHEN an accepted-risk exception has passed its expiry date THE Scan Gate SHALL count every finding it names as uncovered.
 10. WHEN a daily rescan runs THE Scan Pipeline SHALL report every accepted-risk exception that has expired or that expires within 14 days.
 11. IF an accepted-risk exception omits its treatment, owner, reasoning reference, unavailability justification, or expiry date, or sets an expiry date more than 90 days ahead, THEN THE CI Pipeline SHALL fail validation.
 12. IF a Trivy ignore file exists outside triage/accepted-risk/ THEN THE CI Pipeline SHALL fail validation.
+13. WHEN a pull request builds an image THE Scan Pipeline SHALL run govulncheck in binary mode against every Go binary in that image and SHALL report, for each finding, whether the vulnerable symbol is reachable.
+14. IF govulncheck reports a vulnerable symbol as reachable in a binary THEN THE Triage Process SHALL NOT record that finding as not_affected with justification vulnerable_code_not_in_execute_path for that image.
+15. WHERE a triage decision records not_affected with justification vulnerable_code_not_in_execute_path THE Triage Process SHALL cite in triage/LOG.md a govulncheck result for that binary at symbol or package level.
+16. IF govulncheck reports a finding at module level only THEN THE Triage Process SHALL treat that result as unmeasured and SHALL NOT cite it as evidence of unreachability.
+17. IF a VEX statement names a product that is not an OCI package URL for an existing image definition THEN THE CI Pipeline SHALL fail validation.
+18. IF a VEX statement's product identifier declares a repository other than that image definition's published repository THEN THE CI Pipeline SHALL fail validation.
+19. IF a VEX statement's subcomponent identifier carries a version THEN THE CI Pipeline SHALL fail validation.
+20. IF a VEX source statement's product identifier carries a version that is not a published tag of that image definition THEN THE CI Pipeline SHALL fail validation.
+21. IF a VEX source statement records status fixed AND its product identifier carries no version THEN THE CI Pipeline SHALL fail validation.
+22. WHEN a triage decision supersedes an earlier VEX statement THE Triage Process SHALL retain that earlier statement in its document and SHALL add a superseding statement carrying a later timestamp.
+23. WHEN a triage decision records an accepted-risk exception THE Triage Process SHALL record in that exception every binary path to which that exception applies.
+24. IF an accepted-risk exception records no binary path THEN THE CI Pipeline SHALL fail validation.
+25. IF two accepted-risk exceptions in one file record an identical vulnerability identifier AND name an identical binary path THEN THE CI Pipeline SHALL fail validation.
+26. WHEN a scan applies accepted-risk exceptions THE Scan Gate SHALL report every exception that suppressed no finding.
+27. WHEN a scan reports a suppressed finding THE Scan Gate SHALL identify which binary that finding was suppressed in.
+28. WHEN a scan applies VEX statements THE Scan Gate SHALL apply compiled documents in place of source documents.
+29. WHEN a VEX document is compiled THE VEX Compiler SHALL set every product identifier in that document to a sha256 digest of an image being scanned.
+30. IF a VEX source statement's product identifier carries a version that is not a tag of an image being scanned THEN THE VEX Compiler SHALL omit that statement from compiled output.
+31. IF a VEX source statement's product identifier carries no version AND that statement's status notes record no reason its claim holds for every release THEN THE CI Pipeline SHALL fail validation.
+32. WHEN a VEX document is compiled THE VEX Compiler SHALL record every statement omitted from that document and a digest that compilation used.
+33. WHEN a scheduled rescan applies VEX statements THE Scan Pipeline SHALL report every statement that compilation omitted.
+34. WHEN a VEX document is attested to an image THE CI Pipeline SHALL attest a document compiled for that image's digest.
 
 ### Requirement 7: Conventions and Review Enforcement
 
@@ -110,6 +133,8 @@ registry images remain private until explicitly released.
 2. WHEN a pull request opens THE CI Pipeline SHALL run yamllint and definition validation on changed YAML files.
 3. THE Repository SHALL provide a pull request template prompting for requirement references and convention compliance.
 4. IF a pull request violates a codified convention THEN THE CI Pipeline SHALL fail with a message identifying that convention.
+5. WHEN a workflow installs a third-party executable THE CI Pipeline SHALL pin that executable to an exact version and SHALL verify its download against a checksum recorded in this repository.
+6. IF a pinned third-party executable has a newer released version THEN THE Upstream Tracking SHALL open a pull request updating that pin.
 
 ### Requirement 8: Operating Environment Constraints
 

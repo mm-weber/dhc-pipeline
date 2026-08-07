@@ -221,3 +221,109 @@ the checksum in-pipeline. A missing artifact turns the bump PR red rather than
 producing a bad pin. The checks matter because they replaced three inferences
 with three measurements — and the one inference that went unmeasured longest
 (that the advertised url was the only one) was the one that was wrong.
+
+## Amendment, 2026-08-07: the build id needs two sources, and 13.1.2 has none
+
+Moving the pin to the per-build url (`f5d75b4`) made an opaque CI run id part of
+every bump, and `refresh-grafana.sh` recovered it from one place: the GitHub
+release assets. **That single source is not reliable**, which only became
+visible when a bump needed it.
+
+### Evidence
+
+Asset counts on `grafana/grafana` releases, read from the API:
+
+| Published | Tag | GitHub assets | build id in apt |
+|---|---|---|---|
+| 2026-06-23 | v13.0.3 | **0** | ✅ `28022233908` |
+| 2026-07-21 | v13.1.1 | 12 | ✅ `29761037902` |
+| 2026-08-04 | v12.4.7 | 12 | ✅ `30647961040` |
+| 2026-08-04 | **v13.0.5** | **0** | ❌ |
+| 2026-08-04 | **v13.1.2** | **0** | ❌ |
+| 2026-08-07 | v13.0.6 | 12 | ❌ (indexed later) |
+| 2026-08-07 | **v13.1.3** | **0** | ❌ |
+
+Two independent gaps, in opposite directions. **v13.0.3 is the case against
+GitHub-only**: it published with zero assets and is nevertheless a complete
+release — `apt.grafana.com` carries its build id, and
+`…/grafana/release/13.0.3/grafana_13.0.3_28022233908_linux_amd64.tar.gz`
+returns 200. The old resolver could not have bumped to it. **v13.0.6 is the
+case against apt-only**: 12 assets on GitHub at 03:06Z, still absent from an
+apt index generated at 04:36Z.
+
+`apt.grafana.com`'s `Packages` index names the `.deb` verbatim in `Filename:`,
+which is also the only field carrying the version unmangled — apt rewrites
+`13.0.1+security-01` to `13.0.1-01` in `Version:`. `rpm.grafana.com` was checked
+too and is not usable: its filenames carry no build id.
+
+### Decision
+
+**Resolve the build id from both indexes and cross-check.** Whichever has it
+wins; where both have it they must agree. A disagreement stops the refresh
+rather than picking one — two independent indexes naming different builds for
+one version is a supply-chain signal, and a checksum pinned against the wrong
+build verifies against nothing. Resolution stays REQUIRED: no fallback to the
+`/oss/release/` alias, whose objects are rewritten after release.
+
+**And make `dl.grafana.com` the authority on what is fetchable.** An index and
+an object store are different pipelines: a build id can be indexed for a build
+the store does not serve, or for one arch and not the other. Both per-arch
+tarballs are now confirmed served — a ranged single-byte GET, which costs the
+same as a HEAD and exercises the path the build will take — *before* any field
+is written. A miss names the host and leaves the definition untouched. Without
+it the failure surfaced as a 350MB download that 404s, reported as a checksum
+complaint about an artifact that was never there, against a file already half
+rewritten.
+
+### The split, stated deliberately
+
+GitHub keeps exactly one job, and it is not an artifact job:
+
+> **GitHub Releases answers "does version X exist?"** — a tag list. Complete:
+> every release has an entry, including the six that published with no assets.
+>
+> **`dl.grafana.com` answers "can we have it, and what is its checksum?"** —
+> the binary, the sidecar, and the existence check. Nothing is pinned that it
+> does not serve.
+>
+> **`apt.grafana.com` answers "which build is version X?"** — the build id,
+> corroborated by GitHub's assets when it has them.
+
+This was reviewed against moving discovery to a Grafana-owned index too, and
+rejected on measurement. `dl.grafana.com` publishes no index at all — every
+listing path 404s, it is a pure object store. `apt.grafana.com` is missing four
+of the last seven releases (13.0.5, 13.0.6, 13.1.2, 13.1.3) and mangles
+`13.0.1+security-01` to `13.0.1-01` in `Version:`, so the pin and the datasource
+would no longer share a version scheme. `rpm.grafana.com` has the same gaps and
+carries no build id at all.
+
+The inversion is the point: **GitHub is the more complete source for discovery,
+and the unreliable one for artifacts.** Sourcing discovery from apt would trade
+a bump that fails loudly for one that never opens — and a release apt has not
+indexed yet is invisible, which is precisely the failure the amendment above
+was written to prevent, on the one image carrying every open CVE. A version we
+learn about but cannot yet build is the strictly safer error: it is visible.
+
+### Consequences
+
+- **13.1.2 is still not consumable, and that is upstream's state, not a gap in
+  the tooling.** Three days after release it has no GitHub assets and no apt
+  entry, so no public index carries its build id. Verified live: the resolver
+  bumps 13.1.1, 13.0.3 and 13.0.6 and refuses 13.1.2 by name. The same holds
+  for v13.0.5 and v13.1.3. Grafana's 13.x line has now published three releases
+  this way while 12.x completed normally in the same batches — worth a
+  `triage/upstream/` report, and worth knowing that **13.1.2 carries the fixes
+  for #30 (CRITICAL), #28 and #39**, so the wait is not free.
+- No artifact, checksum or existence claim comes from GitHub any more, which
+  also removes `GITHUB_TOKEN` from the critical path for public releases. What
+  remains is the version list, and a wrong answer there is a bump that does not
+  open — not a bad pin.
+- `dl.grafana.com` is **not** blocked by the devcontainer firewall — it is on
+  the allowlist (`init-firewall.sh:118`), along with `apt.grafana.com` and
+  `rpm.grafana.com`. The Consequences note above saying otherwise is stale; the
+  live checksum path can be exercised locally after all. `grafana.com` itself
+  is blocked, which is why the download page is not a usable source.
+- Tests stub both indexes through `REFRESH_GRAFANA_APT_URL` and
+  `REFRESH_GRAFANA_GH_URL` (`file://` fixtures), so the resolution logic — the
+  two gaps, the conflict, the enterprise near-miss, the security-build shape —
+  is covered without network.

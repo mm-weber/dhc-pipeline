@@ -153,5 +153,96 @@ or a time-boxed entry in `accepted-risk/`.
 
 ## `LOG.md`
 
-Dated, human-readable decisions: *finding → EPSS / KEV → outcome → link*. Created
-with the first real triage decision (task 7.3).
+Dated, human-readable decisions: *finding → evidence → outcome → link*.
+
+It records **every** outcome, not just the excused ones — because the three
+things people conflate have to stay apart:
+
+| Outcome | Means | Where it goes |
+|---|---|---|
+| `not_affected` | The vulnerable code cannot execute here | OpenVEX statement + `LOG.md` |
+| prioritisation | Real, but low EPSS / not KEV, so it waits | `LOG.md` only |
+| accepted risk | Real and reachable; we ship anyway | `LOG.md` only, with an owner |
+
+Only the first is a VEX statement. Writing "low risk" or "we accept it" into a
+VEX is **VEX-washing** — it launders a business decision into a machine-readable
+claim of technical inapplicability, and every downstream consumer inherits it.
+EPSS and KEV order the queue; they never justify a status.
+
+## Authoring a statement
+
+Verified recipe — the product identifier is the usual silent failure, because
+getting it wrong means the statement simply never applies and nothing says so:
+
+```bash
+vexctl create \
+  --product="pkg:oci/<image>?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2F<image>" \
+  --subcomponents="pkg:golang/<vulnerable/module>" \
+  --vuln="CVE-…" --status="not_affected" \
+  --justification="vulnerable_code_not_in_execute_path" \
+  --impact-statement="why the code cannot execute here" \
+  --file=triage/vex/CVE-….openvex.json
+```
+
+- **What you write here is source. A scanner never sees it.** `scripts/compile-vex.sh`
+  renders these documents per build: it replaces the product version with the
+  digest of the image being scanned (Req 6.29) and drops any statement scoped to
+  a tag that build is not (Req 6.30). Write the tag; the compiler writes the
+  digest.
+
+  That split exists because the two forms cannot be the same string. Trivy builds
+  its product identifier from the image's **RepoDigest**, so a tag matches
+  nothing — measured, one real finding, one statement each:
+
+  | Product identifier | Status | Suppressed |
+  |---|---|---|
+  | `pkg:oci/grafana@13.0.4-alpine3.23` | `fixed` | **no** |
+  | `pkg:oci/grafana@sha256:b6987eb…` | `fixed` | yes |
+  | `pkg:oci/grafana` | `fixed` | yes |
+  | `pkg:oci/grafana` | `not_affected` | yes |
+
+- **A version in the product purl is a published tag, or nothing** (Req 6.20).
+  A tag means the claim is about that release, and the compiler applies it only
+  when building it. No version means the claim holds for every build of that
+  image. A digest belongs in compiler output and never in source: nobody can
+  review it, and it goes stale at the next rebuild of the same release.
+- **`fixed` must carry one** (Req 6.21), because a remedy is always about
+  particular versions.
+- **Versionless is an argument, not a default** (Req 6.31). It claims every
+  build of the image, including releases nobody has examined, so `status_notes`
+  has to say why the claim survives a version change, marked with the literal
+  token `version-independent:`. Which scope is right depends on the kind of
+  argument, not on the status:
+
+  | Claim | Scope | Why |
+  |---|---|---|
+  | "this image never starts a Prometheus server" | versionless + note | structural: as true of 14.0 as of 13.0.4 |
+  | "this build does not reach the vulnerable symbol" | published tag | rests on what this release links |
+
+  A tag-scoped claim needs no note; its scope already says what it covers. The
+  note is written into `status_notes` rather than a custom field because it
+  stays inside standard OpenVEX, and because a consumer reading the statement
+  wants that sentence too.
+- **A `fixed` product names a released version, not a build.** Prefer the
+  published tag (`pkg:oci/grafana@13.1.1-alpine3.23?repository_url=…`) over a
+  digest: every build of 13.1.1 carries the fix, so a digest would be wrong by
+  being narrower than the claim. The lint accepts either.
+- **No version in the subcomponent purl** either — Go module versions move on
+  every rebuild, and a versionless subcomponent still scopes the suppression to
+  that one package rather than the whole image.
+- **A superseded statement is kept, not deleted** (Req 6.22). OpenVEX documents
+  hold several timestamped statements and consumers take the latest per
+  (vulnerability, product), so when a bump resolves a finding the `not_affected`
+  claim stays in the document and a `fixed` statement is appended with a later
+  timestamp and the document `version` bumped. The artifact then carries what we
+  argued, when, and what replaced it — deleting it would leave only the outcome.
+- Every behaviour above was confirmed against Trivy before being written down
+  here, not inferred from documentation.
+
+Statements are attached to the images they name as `openvex` attestations by
+`build.yml` on the main branch (Req 6.4), so a decision travels with the
+artifact and a consumer can verify it against the digest they actually run.
+Matching is anchored on the purl name, so a statement about `grafana` is never
+attached to some future `grafana-agent`. A PR touching `vex/` builds and
+rescans exactly the images its statements name, which is how a statement is
+proved to suppress what it claims.

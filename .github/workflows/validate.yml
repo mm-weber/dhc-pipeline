@@ -47,11 +47,32 @@ jobs:
       - name: accepted-risk linter unit tests
         run: scripts/lint-accepted-risk_test.sh
 
+      - name: accepted-risk report unit tests (Req 6.26, 6.27)
+        run: scripts/accepted-risk-report_test.sh
+
       - name: refresh-definition unit tests (postUpgradeTask, Req 3.2)
         run: scripts/refresh-definition_test.sh
 
       - name: refresh-grafana unit tests (postUpgradeTask, ADR 0002)
         run: scripts/refresh-grafana_test.sh
+
+      - name: verify-arch-pins unit tests (Req 1.3)
+        run: scripts/verify-arch-pins_test.sh
+
+      - name: govulncheck-report unit tests (Req 6.13)
+        run: scripts/govulncheck-report_test.sh
+
+      - name: install-scanners unit tests (Req 7.5)
+        run: scripts/install-scanners_test.sh
+
+      - name: VEX product identity lint (Req 6.17-6.21)
+        run: scripts/lint-vex-product.sh
+
+      - name: VEX product identity lint unit tests
+        run: scripts/lint-vex-product_test.sh
+
+      - name: VEX compiler unit tests (Req 6.28-6.30)
+        run: scripts/compile-vex_test.sh
 
       # Renovate config: validate the schema, then prove the custom managers
       # actually extract the right deps from the definitions (Req 3.2).

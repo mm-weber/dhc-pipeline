@@ -62,10 +62,20 @@ jobs:
             git fetch --no-tags --depth=1 origin "$BASE_REF"
             changed=$(git diff --name-only "origin/${BASE_REF}...HEAD")
             names=$(printf '%s\n' "$changed" | awk -F/ '$1=="image" && NF>=3 && $3=="image.yaml"{print $2}' | sort -u)
-            # Canary: a change to the gate itself (this workflow) or to the VEX
-            # inputs it consumes touches no definition — build+scan the simplest
-            # image so the gate is actually exercised on the PR that changes it.
-            if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/build\.yml$|^triage/vex/'; then
+            # A VEX change must be validated against the images its statements
+            # actually name — the whole point of the gate on such a PR is to
+            # prove the statement suppresses the finding it claims to. Derive
+            # them from the product purls (pkg:oci/<name>?...). Every statement
+            # is considered, not just the changed ones: trivy is handed the
+            # whole directory via --vex, so any edit changes the gate input for
+            # every image the directory covers.
+            if printf '%s\n' "$changed" | grep -q '^triage/vex/'; then
+              names="$names $(jq -r '.statements[]?.products[]?."@id" // empty' triage/vex/*.json 2>/dev/null \
+                | sed -nE 's#^pkg:oci/([^@?/]+).*#\1#p' | sort -u)"
+            fi
+            # Canary: a change to the gate itself touches no definition — build
+            # the simplest image so the gate is exercised on the PR changing it.
+            if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/build\.yml$'; then
               names="$names hardened-app"
             fi
             # An accepted-risk file names its image in its own filename, so a
@@ -100,9 +110,11 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      # QEMU is belt-and-suspenders: the DHI frontend cross-compiles (GOARCH),
-      # so arm64 image assembly runs no arm64 code — but multi-platform buildx
-      # expects it available.
+      # Currently unused: this builds linux/amd64 only (see `platforms:` below),
+      # so nothing is emulated. Kept because it costs a few seconds and is what
+      # task 8.3 needs back the moment arm64 returns. The DHI frontend
+      # cross-compiles (GOARCH) so arm64 assembly runs no arm64 code anyway;
+      # multi-platform buildx still expects binfmt to be registered.
       - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
       - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
@@ -139,20 +151,35 @@ jobs:
             echo TAGS
           } >> "$GITHUB_OUTPUT"
 
+      # The build verifies the checksum only for the arch it builds, and the PR
+      # gate builds amd64 only (see `load:` below — it needs a single platform).
+      # So an arm64 pin can enter the repo unexercised and first be tested by a
+      # release build after merge. grafana 13.1.1 shipped exactly that: both pins
+      # hand-supplied, neither arch fetched. This checks every pinned arch
+      # against the bytes upstream actually serves (Req 1.3, Req 2.1).
+      # Definitions with no per-arch pin skip in milliseconds.
+      - name: verify per-arch pinned checksums
+        env:
+          NAME: ${{ matrix.name }}
+        run: scripts/verify-arch-pins.sh "image/${NAME}"
+
       - id: build
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: image/${{ matrix.name }}
           file: image/${{ matrix.name }}/image.yaml
-          # PR gate builds amd64 only — fast feedback that the definition
-          # compiles. The release path (main) builds both arches per Req 2.1;
-          # arm64 there goes through the frontend cross-compile / emulation
-          # once, at merge, where the cost belongs.
-          platforms: ${{ github.ref == 'refs/heads/main' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          # linux/amd64 only (Req 2.1). The release path built arm64 too until
+          # 2026-08-04, and nothing ever scanned it: every scan step below is
+          # pull_request-gated, the PR gate builds amd64, and rescan.yml passes
+          # no --platform so Trivy resolves the published index to the runner's
+          # own arch. arm64 was signed, SBOM'd and attested unread (review
+          # finding 1.3). Req 2.6 forbids publishing a platform nothing scans,
+          # so arm64 comes back only after something scans it — task 8.3.
+          platforms: linux/amd64
           push: ${{ github.ref == 'refs/heads/main' }}
-          # PR builds single-arch amd64, so load it into the docker daemon for the
-          # scan gate below; a multi-arch main build can't be loaded, and there
-          # the rescan cron (task 7.2) covers the pushed image instead.
+          # Single-arch, so the PR path loads it into the docker daemon for the
+          # scan gate below. main pushes instead, and the rescan cron (task 7.2)
+          # is what scans the published image.
           load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           # Warm the Go module + compile layers across runs so repeat builds of
@@ -170,22 +197,65 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
-          # Latest by design: a scanner is only as good as its newest detection
-          # logic and advisory DB, so the gate tracks upstream rather than pinning.
-          curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
-          curl -fsSL https://raw.githubusercontent.com/anchore/grype/main/install.sh           | sudo sh -s -- -b /usr/local/bin
-          trivy --version
-          grype version
+          # Installed as the runner user into a temp dir on PATH, not as root
+          # into /usr/local/bin. The old form piped a remote script straight
+          # into `sudo sh`; fetching two pinned binaries never needed root, and
+          # dropping it removes the reason that install was dangerous rather
+          # than just the branch it came from.
+          mkdir -p "${RUNNER_TEMP}/bin"
+          scripts/install-scanners.sh "${RUNNER_TEMP}/bin"
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
-      - name: Trivy scan (VEX + accepted risk)
-        id: trivy
+      # Trivy builds the `pkg:oci/...` product purl a VEX statement has to match
+      # out of the image's RepoDigest. A buildx `load:` image has none — never
+      # pushed, never pulled — so on the PR path the CycloneDX root component
+      # came out with a random UUID and no purl at all, and EVERY OpenVEX
+      # statement silently matched nothing. Not the statement's shape: with no
+      # root purl, no product identifier in any form matches, verified across
+      # digest-pinned, registry-qualified and bare. Upstream: trivy#9399.
+      #
+      # A push is the only thing that mints a RepoDigest, and pushing also
+      # records it on the daemon's own copy — so the govulncheck step below
+      # keeps exporting the same image, untouched. Throwaway registry, dropped
+      # with the runner.
+      - name: local registry — give the image an identity VEX can match
+        id: localreg
         if: github.event_name == 'pull_request'
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           NAME: ${{ matrix.name }}
         run: |
           set -euo pipefail
-          ref=$(printf '%s\n' "$TAGS" | head -n1)
+          docker run -d --rm -p 5000:5000 --name dhc-localreg \
+            registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373 >/dev/null
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:5000/v2/ >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          src=$(printf '%s\n' "$TAGS" | head -n1)
+          ref="localhost:5000/mm-weber/dhc/${NAME}:scan"
+          docker tag "$src" "$ref"
+          docker push -q "$ref"
+          # The digest this push minted is what Trivy puts in its product purl,
+          # so it is also what every VEX statement has to carry to match
+          # (Req 6.29). Read from the daemon rather than re-derived.
+          repodigest="$(docker image inspect "$ref" --format '{{index .RepoDigests 0}}')"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "digest=${repodigest##*@}" >> "$GITHUB_OUTPUT"
+          echo "scanning $ref (RepoDigest: $repodigest)"
+
+      - name: Trivy scan (VEX + accepted risk)
+        id: trivy
+        if: github.event_name == 'pull_request'
+        env:
+          REF: ${{ steps.localreg.outputs.ref }}
+          DIGEST: ${{ steps.localreg.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          NAME: ${{ matrix.name }}
+          VEXDIR: .vexscan
+        run: |
+          set -euo pipefail
+          ref="$REF"
           echo "scanning $ref"
           # Two suppression inputs, deliberately different in kind:
           #
@@ -200,10 +270,33 @@ jobs:
           # apart, which is what lets the summary below keep them apart too.
           # An empty triage/vex/ and a missing accepted-risk file excuse nothing,
           # so every HIGH/CRITICAL counts — the correct default.
+          # Req 6.28-6.30. triage/vex/ is source and is never handed to a
+          # scanner. Trivy builds its product identifier from the RepoDigest, so
+          # a statement carrying a published tag matches nothing at all —
+          # measured, one real finding, one statement each:
+          #
+          #   pkg:oci/grafana@13.0.4-alpine3.23  fixed -> reported 1, suppressed 0
+          #   pkg:oci/grafana@sha256:b6987eb...  fixed -> reported 0, suppressed 1
+          #
+          # compile-vex.sh stamps this build's digest into every product (6.29)
+          # and drops any statement scoped to a tag this build is not (6.30),
+          # so a claim argued about 13.0.4 cannot suppress on 13.1.1.
+          #
+          # It also drops the purl qualifiers, which is what a jq rewrite did
+          # here before: the image lives at localhost:5000 while our statements
+          # name ghcr.io, and Trivy compares repository_url exactly (upstream
+          # #9399). That blinds the gate to exactly one field and nothing else —
+          # measured: it still catches a wrong image name, a near-miss name, a
+          # wrong purl type and a wrong subcomponent. lint-vex-product.sh is
+          # what covers the registry host, by exact comparison against the
+          # definition's `image:`, which beats "did a finding disappear".
+          #
+          # The PUBLISHED statements stay precisely scoped and are what cosign
+          # attests on the release path.
+          mapfile -t built_tags < <(printf '%s\n' "$TAGS" | sed 's|.*:||' | sort -u)
+          scripts/compile-vex.sh triage/vex "$VEXDIR" "$NAME" "$DIGEST" "${built_tags[@]}"
           vex=()
-          for f in triage/vex/*.json; do
-            if [ -e "$f" ]; then vex+=(--vex "$f"); fi
-          done
+          for f in "$VEXDIR"/*.json; do [ -e "$f" ] && vex+=(--vex "$f"); done
           accepted="triage/accepted-risk/${NAME}.yaml"
           ignore=()
           if [ -f "$accepted" ]; then ignore=(--ignorefile "$accepted"); fi
@@ -234,13 +327,16 @@ jobs:
             # business decision starts reading like a technical claim.
             echo "#### Not affected — VEX (published with the image)"
             echo
-            if jq -e '[.Results[]?.ExperimentalModifiedFindings[]?
-                       | select(.Source // "" | startswith("triage/vex/"))] | length > 0' \
+            # Source names the rewritten copy, not triage/vex/ — match on the
+            # scan directory or this table silently reads empty even when the
+            # suppression worked, which is the failure mode it exists to expose.
+            if jq -e --arg vexdir "${VEXDIR}/" '[.Results[]?.ExperimentalModifiedFindings[]?
+                       | select(.Source // "" | startswith($vexdir))] | length > 0' \
                  trivy.json >/dev/null; then
               echo "| CVE | Status | Justification | Package |"
               echo "|---|---|---|---|"
-              jq -r '.Results[]?.ExperimentalModifiedFindings[]?
-                     | select(.Source // "" | startswith("triage/vex/"))
+              jq -r --arg vexdir "${VEXDIR}/" '.Results[]?.ExperimentalModifiedFindings[]?
+                     | select(.Source // "" | startswith($vexdir))
                      | "| \(.Finding.VulnerabilityID) | \(.Status) | \(.Statement // "-") | \(.Finding.PkgName) |"' \
                  trivy.json | sort -u
             else
@@ -250,21 +346,21 @@ jobs:
               vexn=$(( ${#vex[@]} / 2 ))
               echo "_none_ — ${vexn} statement(s) on file."
               if [ "$vexn" -gt 0 ]; then
-                echo "> ⚠️ Statements exist but suppressed nothing here — check the product identifier."
+                echo "> ⚠️ Statements exist but suppressed nothing here — the product identifier below is what they must match."
               fi
             fi
             echo
             echo "#### Accepted risk — time-boxed, internal only"
             echo
-            if jq -e '[.Results[]?.ExperimentalModifiedFindings[]?
-                       | select(.Source // "" | startswith("triage/accepted-risk/"))] | length > 0' \
-                 trivy.json >/dev/null; then
-              echo "| CVE | Decision | Package |"
-              echo "|---|---|---|"
-              jq -r '.Results[]?.ExperimentalModifiedFindings[]?
-                     | select(.Source // "" | startswith("triage/accepted-risk/"))
-                     | "| \(.Finding.VulnerabilityID) | \(.Statement // "-") | \(.Finding.PkgName) |"' \
-                 trivy.json | sort -u
+            if [ -f "$accepted" ]; then
+              # Req 6.26/6.27. The table gains the binary each suppression
+              # applied to, because an entry scoped to one binary and one
+              # scoped to the whole image produce identical counts, and any
+              # entry that suppressed nothing is called out — a paths: value
+              # matching no file is accepted by Trivy silently, matches
+              # nothing and exits 0. Unit-tested in
+              # scripts/accepted-risk-report_test.sh; reports, never fails.
+              scripts/accepted-risk-report.sh trivy.json "$accepted"
               echo
               # Owner and expiry live in the file, not in Trivy's report. Shown
               # verbatim so a reviewer sees who carries this and until when
@@ -276,13 +372,166 @@ jobs:
               echo '```'
               echo
               echo "</details>"
-            elif [ -f "$accepted" ]; then
-              echo "_none_ — \`${accepted}\` exists but suppressed nothing here."
-              echo "> ⚠️ Either the findings it covers are already gone (drop the entries) or its \`purls\`/\`id\` do not match."
             else
               echo "_none_ ✓"
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo
+            # The identifier a statement's `products[].@id` has to match, taken
+            # from the same report the gate just used so it cannot drift from
+            # what Trivy actually saw. Emitted every run, not just on mismatch:
+            # it is what you copy when authoring the next statement, and a wrong
+            # product purl is the one VEX defect that produces no error at all.
+            # (Drop the @sha256 digest when writing it down — the digest changes
+            # every build, and a digestless purl still matches.)
+            # Failure used to be swallowed by `2>/dev/null || true`, so a run
+            # that printed "<unavailable>" gave no way to find out why. Keep the
+            # step non-fatal, but say what went wrong.
+            if ! conv=$(trivy convert --format cyclonedx --output cdx.json trivy.json 2>&1); then
+              printf '%s\n' "$conv" > convert.err
+            fi
+            echo "#### Product identifier for this image"
+            echo
+            echo '```'
+            jq -r '.metadata.component.purl // "<unavailable>"' cdx.json 2>/dev/null || {
+              echo "<unavailable>"
+              echo "-- trivy convert said:"
+              head -5 convert.err 2>/dev/null || echo "-- (convert reported no error; cdx.json has no metadata.component.purl)"
+            }
+            echo '```'
+            echo
+            # When the identifier above is unavailable, a `pkg:oci/...` product
+            # has nothing to match against and every VEX statement silently
+            # misses — one cause, two symptoms. Trivy builds that purl from what
+            # it thinks the artifact IS, so print that: an image built with
+            # `load: true` and never pushed has no RepoDigest, which is the
+            # first thing to rule in or out.
+            echo "<details><summary>what Trivy matched against</summary>"
+            echo
+            echo '```'
+            jq -r '{ArtifactName, ArtifactType,
+                    RepoTags: (.Metadata.RepoTags // []),
+                    RepoDigests: (.Metadata.RepoDigests // []),
+                    ImageID: (.Metadata.ImageID // "")}
+                   | to_entries[] | "\(.key): \(.value | tostring)"' trivy.json
+            echo "--- cyclonedx root component ---"
+            jq -r '.metadata.component // "<no root component>"' cdx.json 2>/dev/null || echo "<cdx.json unreadable>"
+            echo '```'
+            echo
+            echo "</details>"
+            echo
+            # The OTHER half of a VEX statement. A statement names a product and
+            # a subcomponent, and until now the gate printed only the product —
+            # so the subcomponent purl was still hand-written from the package
+            # name and could be wrong in exactly the same silent way. Taken from
+            # the same report, versionless, which is the form that survives a
+            # rebuild.
+            if [ $((crit + high)) -gt 0 ]; then
+              echo "#### Subcomponent identifiers (uncovered findings)"
+              echo
+              echo '```'
+              jq -r '[.Results[]?.Vulnerabilities[]?.PkgIdentifier.PURL // empty]
+                     | map(split("@")[0]) | unique[]' trivy.json
+              echo '```'
+              echo
+            fi
+            # The surviving findings, named. A bare count means downloading an
+            # artifact to learn what to triage; this is the list you act on.
+            echo "#### Still uncovered"
+            echo
+            if [ $((crit + high)) -gt 0 ]; then
+              # Target = the binary the finding is in, and on a repackage image
+              # that is the whole triage question: a module in the main
+              # entrypoint and the same module in a bundled plugin are different
+              # exposures with different treatments. It is in the report already
+              # — carrying it here is what stops the per-binary breakdown from
+              # being reassembled by hand every pass.
+              echo "| CVE | Severity | Package | Installed | Fixed | Binary |"
+              echo "|---|---|---|---|---|---|"
+              # Dedup in jq, not with a trailing `sort -u` — that re-sorted
+              # alphabetically and silently threw away the CRITICAL-first order
+              # this sort_by exists to produce.
+              jq -r '[.Results[]? | .Target as $t | .Vulnerabilities[]? | . + {Target: $t}]
+                     | unique_by([.VulnerabilityID, .Target, .PkgName])
+                     | sort_by(.Severity != "CRITICAL", .Target, .VulnerabilityID)[]
+                     | "| \(.VulnerabilityID) | \(.Severity) | \(.PkgName) | \(.InstalledVersion) | \(.FixedVersion // "-") | \(.Target) |"' \
+                 trivy.json
+            else
+              echo "_none_ ✓"
+            fi
+          # tee, not >>: the job summary is the only place this table exists, and
+          # a summary is not readable through the API without Checks scope — the
+          # scan artifacts aren't either. Triage then waits on output the run
+          # already produced. The log is readable, so send it to both.
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # ---- PR-only: reachability evidence (Req 6.13) ----
+      # Trivy and Grype answer "is this module linked". govulncheck -mode=binary
+      # reads the binary's symbol table and answers "is the vulnerable code
+      # called" — the only question that can settle an advisory whose
+      # applicability turns on one wired-in symbol, and the one Req 6.14 hangs a
+      # prohibition on.
+      #
+      # continue-on-error is the declaration that this is EVIDENCE, NOT A GATE.
+      # Trivy is the only thing that fails a build. A reachability tool that can
+      # also break CI is a second gate nobody designed, and its false negatives
+      # would then be silently passing images.
+      - name: govulncheck reachability (Req 6.13)
+        id: govulncheck
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -uo pipefail
+          ref=$(printf '%s\n' "$TAGS" | head -n1)
+          go version
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          PATH="$(go env GOPATH)/bin:$PATH"; export PATH
+
+          # Export the image filesystem rather than guessing paths: which Go
+          # binaries an upstream tarball ships is exactly what we do not know in
+          # advance — bundled plugins are how the last three findings arrived.
+          cid=$(docker create "$ref")
+          mkdir -p rootfs gv
+          docker export "$cid" | tar -x --no-same-owner --no-same-permissions \
+            --exclude 'dev/*' --exclude 'proc/*' --exclude 'sys/*' -C rootfs || true
+          docker rm -f "$cid" >/dev/null
+
+          # -size +1M skips the shell utilities and keeps this to plausible Go
+          # binaries; `go version -m` is the actual test, and it fails fast on
+          # anything that is not one.
+          args=()
+          while IFS= read -r f; do
+            go version -m "$f" >/dev/null 2>&1 || continue
+            rel=${f#rootfs/}
+            out="gv/$(printf '%s' "$rel" | tr '/' '_').json"
+            # govulncheck exits non-zero when it FINDS something, so its exit
+            # status is not an error signal here.
+            govulncheck -mode=binary -format json "$f" > "$out" 2>/dev/null || true
+            if [ -s "$out" ]; then args+=("${rel}=${out}"); fi
+          done < <(find rootfs -type f -perm -u+x -size +1M 2>/dev/null)
+
+          # Drop the export before anything else runs. A repackage image is
+          # ~1.1 GB and this doubles it on disk; the first run left 94 MB free
+          # and the NEXT step died — grype could not write its vulnerability DB
+          # ("database or disk is full"). Non-gating means this step cannot fail
+          # the build, not that it cannot break the one after it.
+          rm -rf rootfs
+          df -h / | tail -1
+
+          {
+            echo "### govulncheck — ${ref}"
+            echo
+            if [ "${#args[@]}" -eq 0 ]; then
+              echo "_no Go binaries found in this image._"
+            else
+              scripts/govulncheck-report.sh "${args[@]}"
+              echo
+              echo "> \`symbol\` forbids a \`not_affected\` /"
+              echo "> \`vulnerable_code_not_in_execute_path\` statement (Req 6.14)."
+              echo "> \`not measured\` is silence, not absence — a stripped binary looks the same."
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Grype second opinion (CRITICAL present)
         if: github.event_name == 'pull_request' && steps.trivy.outputs.crit != '0'
@@ -350,6 +599,46 @@ jobs:
         env:
           REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
         run: cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$REF"
+
+      - name: attest OpenVEX to image (Req 6.4)
+        if: github.ref == 'refs/heads/main'
+        env:
+          REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          # A triage decision is only portable if it travels with the artifact:
+          # the statement in git is the source, the attestation is what a
+          # downstream consumer can actually verify against the digest they run.
+          #
+          # Req 6.34. What is attested is COMPILED, never the source. A consumer
+          # feeds this predicate to their own scanner, and a product carrying a
+          # published tag matches nothing there — measured, so attesting source
+          # would publish a document that is inert for exactly the audience it
+          # exists for. Attestation is the ideal case for a digest: it is bound
+          # to one immutable artifact, so this predicate stays correct for it
+          # forever, with none of the staleness that makes a hand-written digest
+          # wrong in source.
+          #
+          # Compiling also decides which documents belong to this image, which
+          # this step used to do with its own jq name-match. Same rule, tested
+          # (compile-vex.sh drops another image's products and never writes an
+          # emptied document), so what lands in $VEXATTEST is what to attest —
+          # and attaching grafana's statements to cert-manager would not be
+          # noise, it would be a false claim.
+          VEXATTEST=.vexattest
+          mapfile -t built_tags < <(printf '%s\n' "$TAGS" | sed 's|.*:||' | sort -u)
+          scripts/compile-vex.sh triage/vex "$VEXATTEST" "$NAME" "$DIGEST" "${built_tags[@]}"
+          shopt -s nullglob
+          n=0
+          for f in "$VEXATTEST"/*.json; do
+            echo "attesting $(basename "$f")"
+            cosign attest --yes --type openvex --predicate "$f" "$REF"
+            n=$((n + 1))
+          done
+          echo "${NAME}: ${n} OpenVEX statement(s) attested" >> "$GITHUB_STEP_SUMMARY"
 
       # Req 2.4: the pushed package must be private. Fail hard if public;
       # a private repo makes new packages private by construction, so an

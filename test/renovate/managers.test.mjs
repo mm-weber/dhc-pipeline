@@ -31,7 +31,10 @@ function extract(manager, content) {
     while ((m = re.exec(content)) !== null) {
       const g = m.groups ?? {};
       deps.push({
-        datasource: manager.datasourceTemplate,
+        // A manager either captures the datasource from the file (the scanner
+        // manager, whose `# renovate:` comment states it the way Renovate's own
+        // inline convention does) or fixes it as a template.
+        datasource: g.datasource ?? manager.datasourceTemplate,
         // A manager either captures depName from the file (the git-source and
         // docker managers) or states it as a constant template (the grafana
         // tarball manager, whose url carries no owner/repo).
@@ -45,7 +48,7 @@ function extract(manager, content) {
 }
 
 const read = (rel) => readFileSync(join(root, rel), "utf8");
-const [sourceMgr, dockerMgr, grafanaMgr] = config.customManagers;
+const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr] = config.customManagers;
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -253,6 +256,46 @@ check(
       check(`grafana versioning: isValid(${v}) === ${want}`, api.isValid(v) === want);
     }
   }
+}
+
+// --- scanner pins (Req 7.5, 7.6) --------------------------------------------
+// The gate's own trivy and grype are pinned by version + sha256. If this manager
+// silently stops matching, nothing bumps them, and a stale scanner reports fewer
+// findings without ever reporting that it is stale — a green gate that means
+// less than it did last month. That is the exact silent failure Req 7.6 exists
+// to prevent, which is why the pin format is asserted here as well as in
+// scripts/install-scanners_test.sh.
+{
+  const pins = extract(scannerMgr, read("scripts/install-scanners.sh"));
+  check("scanner: yields exactly two deps", pins.length === 2, `${pins.length}`);
+
+  for (const [tool, depName] of [
+    ["trivy", "aquasecurity/trivy"],
+    ["grype", "anchore/grype"],
+  ]) {
+    const dep = pins.find((d) => d.depName === depName);
+    check(`scanner: ${tool} is tracked as ${depName}`, !!dep);
+    check(
+      `scanner: ${tool} resolves against github-releases`,
+      dep?.datasource === "github-releases",
+      dep?.datasource,
+    );
+    check(
+      `scanner: ${tool} pin is bare semver (no v prefix)`,
+      /^\d+\.\d+\.\d+$/.test(dep?.currentValue ?? ""),
+      dep?.currentValue,
+    );
+  }
+
+  // Upstream tags are v-prefixed and our pins are bare, so extractVersion has to
+  // bridge them. Get this wrong and Renovate compares "v0.73.0" against "0.72.0"
+  // as strings and either never bumps or bumps to a value the script cannot use.
+  const ev = new RegExp(scannerMgr.extractVersionTemplate);
+  check(
+    "scanner: extractVersion strips the v prefix",
+    ev.exec("v0.72.0")?.groups?.version === "0.72.0",
+  );
+  check("scanner: extractVersion rejects an unprefixed tag", ev.exec("0.72.0") === null);
 }
 
 if (failures > 0) {

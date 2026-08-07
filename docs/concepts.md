@@ -111,6 +111,25 @@ definition pins* via PRs (repo level, tracking releases); **go/bump** patches
 *upstream's dependency graph* inside the build (build level, patching between
 releases).
 
+**Why an action and not a shell step** — verified the hard way, 2026-07-26.
+Patching a dependency with `runs: go get …` looks equivalent and is not: the
+pipeline sandbox has **no egress**, so it fails outright.
+
+```
++ go get google.golang.org/grpc@v1.82.1
+go: cel.dev/expr@v0.25.1: Get "https://proxy.golang.org/…":
+   dial tcp: lookup proxy.golang.org … network is unreachable
+```
+
+That is the hardening property, not an obstacle to route around: a build step
+cannot reach out and pull something the definition never declared, so what
+lands in the image is exactly what was reviewed. Everything fetched — sources,
+packages, the module graph — is declared up front and resolved in the
+frontend's **fetch** phase, the only phase with network. Dependency surgery has
+to happen there, which is what the bump action is for. `runs:` is the escape
+hatch for *computation*, never for *acquisition*. (See `triage/LOG.md`,
+2026-07-26, GHSA-hrxh-6v49-42gf.)
+
 ## The trust chain: checksum → purl → SBOM → provenance → signature
 
 - **Checksums are verified facts** — enforced at fetch time (mismatch fails

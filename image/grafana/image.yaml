@@ -1,27 +1,40 @@
 # syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc
 
-name: Grafana 13.0.x
+name: Grafana 13.1.x
 image: ghcr.io/mm-weber/dhc/grafana
 variant: runtime
 tags:
   - 13-alpine3.23
-  - 13.0-alpine3.23
-  - 13.0.4-alpine3.23
+  - 13.1-alpine3.23
+  - 13.1.2-alpine3.23
 platforms:
   - linux/amd64
   - linux/arm64
 dates:
-  release: "2026-07-20"
+  release: "2026-08-04"
 vars:
-  # Per-arch tarball SHA-256 (from https://dl.grafana.com/oss/release/
-  # grafana-13.0.4.linux-<arch>.tar.gz.sha256), selected by target arch the
-  # way the catalog does per-arch values — amd64 first, arm64 second. Pinned;
-  # verified in-pipeline.
-  GRAFANA_SHA256: '#{ target.arch == "amd64" ? "cd8c8b31b0482f48f98018030c142919dab6debbe81f747f3521af6f6a6b4490" : "bcf8b9fbfac00bece5bccdda44512b9f7ba81d3105db1a255e0efd37a2fbf6df" }'
-  SEMVER_MAJOR_MINOR_VERSION: "13.0"
+  # Per-arch tarball SHA-256, from the sidecar beside the PER-BUILD artifact
+  # (…/grafana/release/<ver>/grafana_<ver>_<build-id>_linux_<arch>.tar.gz.sha256),
+  # selected by target arch the way the catalog does per-arch values — amd64
+  # first, arm64 second. Pinned; verified in-pipeline for the arch being built,
+  # and for EVERY arch by scripts/verify-arch-pins.sh in CI.
+  #
+  # Not the /oss/release/grafana-<ver>.linux-<arch>.tar.gz alias. Those objects
+  # are REWRITTEN about 20h after release: for the 2026-07-21 batch all four
+  # were replaced on 2026-07-22 05:36-05:42Z, changing their bytes and their
+  # published checksums. Our 07-21 build provenance records the alias serving
+  # the per-build digests; by 07-26 the same URLs no longer matched. Upstream
+  # stays self-consistent throughout — object and sidecar are written seconds
+  # apart — so nothing is detectably wrong at any single moment. It just moves.
+  #
+  # The build-id path has not been touched since it was written on release day,
+  # and a re-cut lands at a new URL instead of overwriting this one.
+  # See triage/LOG.md 2026-07-26.
+  GRAFANA_SHA256: '#{ target.arch == "amd64" ? "2215a38a59b573f114128e05f3836cb8708ac9b04b9283021ad28fdb88d71290" : "660cc31dbd159d98a3804ac5104b0aca0e0d95ee4e88a164ff63ddd72f9fda2e" }'
+  SEMVER_MAJOR_MINOR_VERSION: "13.1"
   SEMVER_MAJOR_VERSION: "13"
-  SEMVER_VERSION: 13.0.4
-  VERSION: 13.0.4
+  SEMVER_VERSION: 13.1.2
+  VERSION: 13.1.2
 contents:
   repositories:
     - https://dhi.io/apk/alpine/v3.23/main
@@ -43,14 +56,14 @@ contents:
           - tar
           - ca-certificates-bundle
         files:
-          - url: https://dl.grafana.com/oss/release/grafana-13.0.4.linux-${target.arch}.tar.gz
+          - url: https://dl.grafana.com/grafana/release/13.1.2/grafana_13.1.2_30900078095_linux_${target.arch}.tar.gz
             path: ${source.dir}/grafana.tar.gz
             spdx:
               name: grafana
-              version: 13.0.4
+              version: 13.1.2
               packages:
                 - name: grafana
-                  purl: pkg:generic/grafana@13.0.4
+                  purl: pkg:generic/grafana@13.1.2
                   license: AGPL-3.0
             uid: 0
             gid: 0
@@ -104,7 +117,7 @@ os-release:
   bug-report-url: https://github.com/mm-weber/dhc-pipeline/issues
 work-dir: /var/lib/grafana
 environment:
-  GRAFANA_VERSION: 13.0.4
+  GRAFANA_VERSION: 13.1.2
   PATH: /usr/share/grafana/bin:/usr/sbin:/sbin:/usr/bin:/bin:/usr/local/bin
 # Writable-path inventory (Req 4.4 chart work): every path the runtime writes
 # to gets an emptyDir mount in the chart. Owned by nonroot 65532.
