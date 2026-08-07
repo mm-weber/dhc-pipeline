@@ -898,3 +898,60 @@ advisory at all and Trivy is the only instrument that reports it. The bundled
 plugin binaries are a separate question: their x/net, x/text and grpc findings
 belong to two other upstreams, and whether a 13.1.2 tarball bundles newer plugin
 builds is unmeasured.
+
+### Measured on the real 13.1.2 tarball — 11 uncovered drop to 6
+
+The prediction above is now a measurement. Trivy 0.72.0 over the extracted
+release tarball, all three Go binaries:
+
+| Binary | 13.1.1 | 13.1.2 |
+|---|---|---|
+| `bin/grafana` | kin-openapi **CRITICAL**, tempo ×2, x/text, grpc | tempo ×2 |
+| `plugins-bundled/elasticsearch/…` | stdlib ×3, x/text, grpc | stdlib ×3 |
+| `plugins-bundled/zipkin/…` | x/net ×4, stdlib ×3, x/text, grpc | x/net ×4, stdlib ×3, x/text, grpc |
+
+**14 HIGH, 0 CRITICAL.** #30 is gone — kin-openapi appears nowhere, and the
+catalogue's only CRITICAL closed by *fix* rather than by exception. #28 and #39
+cleared from `bin/grafana` as predicted, and unpredicted, from the elasticsearch
+plugin too: 13.1.2 rebuilt that binary with current dependencies. It did not
+rebuild zipkin's, which is now the only stale binary in the image.
+
+The six existing exceptions still matched after the version change — checked
+rather than assumed, since a bump is exactly when a `paths:` glob or a purl
+could quietly stop matching and Req 6.26 would report a dead entry.
+
+### TRANSFER — the zipkin plugin's own dependencies, six findings (#28, #39)
+
+Everything still uncovered is in one binary and belongs to one upstream, and it
+is no longer about the toolchain: these are the plugin's own module versions.
+Upstream's `main` already fixes all six, and has gone unreleased since
+2026-05-18:
+
+| Module | in the shipped binary | zipkin `main` | Clears |
+|---|---|---|---|
+| `golang.org/x/net` | v0.49.0 | **v0.56.0** | -25681, -27136, -33814, -39821 |
+| `golang.org/x/text` | v0.33.0 | **v0.39.0** | CVE-2026-56852 (#39) |
+| `google.golang.org/grpc` | v1.79.3 | **v1.82.1** | GHSA-hrxh-6v49-42gf (#28) |
+
+So it is the same ask as the three stdlib entries already waiting: issue #94,
+a release cut from `main`. One release clears these six *and* two of those
+three. **Outcome: TRANSFER, six entries, expiring 2026-11-02** — aligned with
+the existing zipkin entries rather than dated from today, so one upstream has
+one re-decision date instead of two.
+
+**Reachability is not claimed for any of the six, and that is deliberate.**
+govulncheck could not be installed — `golang.org` and `proxy.golang.org` are
+both unreachable from the devcontainer — so unlike the stdlib entries above,
+no symbol-level measurement backs these. A transfer is the honest treatment for
+an unmeasured finding: it asserts the finding is real and that someone else owns
+the fix, which is the conservative reading. `not_affected` is what would require
+the measurement, and it is not being claimed. The PR's own govulncheck step
+(Req 6.13) produces this data in CI, where it can be read.
+
+Worth saying plainly about the four x/net findings: **no issue tracks them.**
+They were first seen in the 2026-07-30 scan and noted then as untracked; they
+have been untriaged rather than merely untreated ever since. These entries are
+the first decision anyone has recorded about them.
+
+Verified before committing: 12 of 12 exceptions suppress, none silent, and the
+only findings left standing are the two tempo ones the VEX statements cover.

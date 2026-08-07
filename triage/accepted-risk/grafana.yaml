@@ -120,3 +120,109 @@ vulnerabilities:
               not clear it"
     statement: "transfer: needs a grafana-zipkin-datasource release built with go1.26.5+"
     expired_at: 2026-10-04
+
+  # ---------------------------------------------------------------------------
+  # The zipkin plugin's OWN dependencies, not the toolchain it was built with.
+  # Six findings, one binary, one upstream, one ask — the same release request
+  # (#94) the three stdlib entries above already wait on. A release cut from
+  # main clears every one of them: main carries x/net v0.56.0, x/text v0.39.0
+  # and grpc v1.82.1, all past the fix.
+  #
+  # grafana 13.1.2 is what isolated these. It rebuilt bin/grafana AND the
+  # bundled elasticsearch plugin with current dependencies — x/text and grpc
+  # disappeared from both — while the zipkin plugin was shipped unchanged. What
+  # is left is a single stale binary rather than a property of the image.
+  #
+  # Reachability is NOT claimed for these six. govulncheck cannot be installed
+  # in the devcontainer (golang.org and proxy.golang.org are both unreachable),
+  # so no symbol-level measurement backs them the way it backs the stdlib
+  # entries above. That is precisely why they are transfers and not
+  # not_affected: a transfer asserts "real, and someone else owns the fix",
+  # which is the conservative reading of an unmeasured finding. Claiming
+  # not_affected without the measurement is the move Req 6.14 forecloses.
+  # The PR's own govulncheck step (Req 6.13) produces this data in CI.
+  - id: CVE-2026-25681
+    purls: ["pkg:golang/golang.org/x/net"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer--the-zipkin-plugins-own-dependencies-six-findings-28-39"
+    blocked: "avoidance is available and declined: dropping
+              plugins-bundled/zipkin/ removes the datasource and the image stops
+              being a drop-in Grafana. Remediation is closed to us — we
+              repackage a prebuilt tarball and do not build this binary. Fixed
+              upstream on main (x/net v0.56.0) and unreleased since 2026-05-18"
+    statement: "transfer: waiting on a grafana-zipkin-datasource release cut from main"
+    expired_at: 2026-11-02
+
+  - id: CVE-2026-27136
+    purls: ["pkg:golang/golang.org/x/net"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer--the-zipkin-plugins-own-dependencies-six-findings-28-39"
+    blocked: "as CVE-2026-25681: same binary, same upstream, same unreleased
+              fix on main (x/net v0.56.0)"
+    statement: "transfer: waiting on a grafana-zipkin-datasource release cut from main"
+    expired_at: 2026-11-02
+
+  - id: CVE-2026-33814
+    purls: ["pkg:golang/golang.org/x/net"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer--the-zipkin-plugins-own-dependencies-six-findings-28-39"
+    blocked: "as CVE-2026-25681: same binary, same upstream, same unreleased
+              fix on main. This one is fixed from x/net v0.53.0, so main's
+              v0.56.0 clears it with room"
+    statement: "transfer: waiting on a grafana-zipkin-datasource release cut from main"
+    expired_at: 2026-11-02
+
+  - id: CVE-2026-39821
+    purls: ["pkg:golang/golang.org/x/net"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer--the-zipkin-plugins-own-dependencies-six-findings-28-39"
+    blocked: "as CVE-2026-25681: same binary, same upstream, same unreleased
+              fix on main (x/net v0.56.0)"
+    statement: "transfer: waiting on a grafana-zipkin-datasource release cut from main"
+    expired_at: 2026-11-02
+
+  # #39. Cleared from bin/grafana and from the elasticsearch plugin by the
+  # 13.1.2 bump; this is the one binary it survives in, so the issue stays open
+  # and its scope narrows to zipkin.
+  - id: CVE-2026-56852
+    purls: ["pkg:golang/golang.org/x/text"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer--the-zipkin-plugins-own-dependencies-six-findings-28-39"
+    blocked: "avoidance is available and declined, as above. Remediation is
+              closed to us: we repackage a prebuilt tarball. grafana 13.1.2
+              already carries x/text v0.40.0 in bin/grafana and in the
+              elasticsearch plugin — only this binary is stale, and main's
+              v0.39.0 is past the v0.39.0 fix"
+    statement: "transfer: waiting on a grafana-zipkin-datasource release cut from main"
+    expired_at: 2026-11-02
+
+  # #28. Same story as #39: gone from bin/grafana and elasticsearch in 13.1.2,
+  # left standing only here.
+  - id: GHSA-hrxh-6v49-42gf
+    purls: ["pkg:golang/google.golang.org/grpc"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer--the-zipkin-plugins-own-dependencies-six-findings-28-39"
+    blocked: "avoidance is available and declined, as above. Remediation is
+              closed to us: we repackage a prebuilt tarball. main already
+              requires grpc v1.82.1, which is exactly the first patched version
+              for this advisory (vulnerable < 1.82.1)"
+    statement: "transfer: waiting on a grafana-zipkin-datasource release cut from main"
+    expired_at: 2026-11-02
