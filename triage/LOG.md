@@ -821,3 +821,80 @@ like an entry that stopped mattering. It has not.
 
 Verified before committing: 12 findings on the two-binary tree drop to 6, each
 of the six exceptions suppressing in its own binary and none silent.
+
+## 2026-08-07 — 13.1.2, and the index that had it all along
+
+### The bump that could not be resolved, and why that was our defect
+
+`refresh-grafana.sh` recovered the per-build id from GitHub release assets, and
+v13.1.2 published with **zero**. So did v13.0.5, v13.1.3, and v13.0.3 / v12.4.5 /
+v12.3.8 back in June. Adding `apt.grafana.com` as a second index fixed six of
+those — it carries a build id for v13.0.3, and
+`…/grafana/release/13.0.3/grafana_13.0.3_28022233908_linux_amd64.tar.gz` is
+served, so the old resolver could never have bumped to a release that was
+complete the whole time.
+
+It did **not** fix 13.1.2, and the conclusion drawn from that — "upstream has
+not published it, the release is not consumable" — was wrong. The artifact was
+there:
+
+```
+grafana_13.1.2_30900078095_linux_amd64.tar.gz  → 200  2215a38a59b5…
+grafana_13.1.2_30900078095_linux_arm64.tar.gz → 200  660cc31dbd15…
+```
+
+Grafana's own download page (`grafana.com/grafana/download/13.1.2`) carries that
+build id. Three indexes were consulted — apt, rpm, GitHub releases — and none of
+them was the one that had it. **An artifact absent from every index we happen to
+read is not an artifact that does not exist**, and the distinction decides what
+you do next: the first reading says "wait for upstream", the second says "widen
+the search". Three days were lost to the first.
+
+How long the download page has carried the id is not established here; it was
+found because it was checked, which is the only claim this entry makes about it.
+
+The pins were verified independently by `verify-arch-pins.sh` against upstream
+before anything was committed, and both sidecars match what the alias serves —
+so PR #36 had the right bytes all along, pinned to the path that gets rewritten.
+
+### Re-scoped, not restated — the three version-scoped statements
+
+13.1.2 does not publish `13.1.1-alpine3.23`, so `lint-vex-product.sh` failed the
+three statements pinned to it (Req 6.20). Checked before moving them rather than
+assumed: **both dependency pins the arguments rest on are byte-identical in
+13.1.2** — `github.com/grafana/tempo v1.5.1-0.20260427112133-525d1bab07e0` and
+`github.com/prometheus/prometheus v0.312.0`. The commit-ancestry evidence for
+#23 and #27, and the replace-directive evidence for #25, carry over untouched.
+
+| Statement | Scope | Change |
+|---|---|---|
+| CVE-2026-21728 (#23) | `13.1.2-alpine3.23` | product + the two sentences naming 13.1.1 |
+| CVE-2026-28377 (#27) | `13.1.2-alpine3.23` | product + the two sentences naming 13.1.1 |
+| CVE-2026-42151 (#25) `fixed` | `13.1.2-alpine3.23` | product + `status_notes` |
+| CVE-2026-42151 (#25) `not_affected` | versionless | **untouched** |
+
+The versionless one stays versionless: it is the structural claim, and Req 6.31
+is about the kind of argument rather than the release. Timestamps are unchanged
+throughout — they record when the argument was made, and Trivy orders
+supersession by them.
+
+Recorded because editing a retained statement is a thing that should be visible
+(same reason as the 2026-08-04 entry above).
+
+### What 13.1.2 is expected to settle
+
+It bumps every module under the three findings still uncovered on `bin/grafana`,
+onto exactly the first-patched version in each advisory:
+
+| Module | 13.1.1 | 13.1.2 | First patched | Finding |
+|---|---|---|---|---|
+| `getkin/kin-openapi` | 0.140.0 | 0.144.0 | 0.144.0 | **#30 CRITICAL** |
+| `google.golang.org/grpc` | 1.81.1 | 1.82.1 | 1.82.1 | #28 |
+| `golang.org/x/text` | 0.37.0 | 0.40.0 | unconfirmed | #39 |
+
+That is a prediction, not a measurement — the scan gate on this PR is what
+settles it, and #30 is the one worth watching, since govulncheck cannot see the
+advisory at all and Trivy is the only instrument that reports it. The bundled
+plugin binaries are a separate question: their x/net, x/text and grpc findings
+belong to two other upstreams, and whether a 13.1.2 tarball bundles newer plugin
+builds is unmeasured.
