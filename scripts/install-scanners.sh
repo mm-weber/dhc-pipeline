@@ -53,7 +53,7 @@ PINS_FILE="${INSTALL_SCANNERS_PINS:-}"
 ARCH="${INSTALL_SCANNERS_ARCH:-$(uname -m)}"
 
 # renovate: datasource=github-releases depName=aquasecurity/trivy
-TRIVY_VERSION="0.72.0"
+TRIVY_VERSION="0.73.0"
 TRIVY_SHA256="bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea"
 
 # renovate: datasource=github-releases depName=anchore/grype
