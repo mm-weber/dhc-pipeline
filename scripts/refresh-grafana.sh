@@ -28,13 +28,15 @@
 # The build-id path is scoped to a single build, so a re-cut lands at a new URL
 # instead of overwriting this one (triage/LOG.md, 2026-07-26).
 #
-# The build id is not derivable from the version, but it is recoverable: it
-# appears in the GitHub release asset names (grafana_<ver>_<id>_linux_amd64.deb),
-# and GitHub is already this definition's Renovate datasource. So the version
-# stays the single knob Renovate turns, and this task resolves the id.
+# The build id is not derivable from the version, but it is recoverable from
+# three sources: the grafana.com versions API (the JSON behind the download
+# page), apt.grafana.com's Packages index, and the GitHub release asset names.
+# The version stays the single knob Renovate turns; this task resolves the id
+# and refuses if the sources that answered disagree.
 #
-# Network stubs for the test suite and for iterating inside the devcontainer,
-# whose firewall blocks both hosts: REFRESH_GRAFANA_BUILD_ID,
+# Network stubs for the test suite and for iterating offline:
+# REFRESH_GRAFANA_BUILD_ID, REFRESH_GRAFANA_API_URL, REFRESH_GRAFANA_APT_URL,
+# REFRESH_GRAFANA_GH_URL, REFRESH_GRAFANA_DL_BASE,
 # REFRESH_GRAFANA_SHA256_AMD64, REFRESH_GRAFANA_SHA256_ARM64.
 set -euo pipefail
 
@@ -70,7 +72,7 @@ new_ver=$(sed -nE 's#.*/grafana/release/([^/[:space:]]+)/.*#\1#p' <<<"$url_line"
 [ -n "$new_ver" ] || new_ver=$(sed -nE 's#.*/oss/release/grafana-([^[:space:]]+)\.linux-.*#\1#p' <<<"$url_line")
 [ -n "$new_ver" ] || { echo "refresh-grafana: could not read a version from: ${url_line}" >&2; exit 1; }
 
-# Build id for this version, from two independent indexes.
+# Build id for this version, from three independent sources.
 #
 # GitHub release assets alone are not a reliable source: v13.0.3, v12.4.5 and
 # v12.3.8 (2026-06-23) each published with ZERO assets, as did v13.0.5, v13.1.2
@@ -79,15 +81,32 @@ new_ver=$(sed -nE 's#.*/grafana/release/([^/[:space:]]+)/.*#\1#p' <<<"$url_line"
 # assets on GitHub hours before the apt index caught up. Neither index is
 # complete, and which one is ahead varies per release.
 #
-# So both are consulted. Where they disagree the refresh stops: two independent
-# indexes naming different builds for one version is a supply-chain signal, and
-# a checksum pinned against the wrong build verifies against nothing. Resolution
-# is REQUIRED either way — it exits non-zero rather than falling back to the
-# /oss/release/ alias, whose objects are rewritten after release.
+# The third source is the grafana.com versions API — the JSON behind the
+# download page. It is closer to the object store than either index: 13.1.2's
+# build id sat on the download page for days while apt and GitHub carried
+# nothing (resolved by hand, triage/LOG.md 2026-08-07), and 13.1.3 repeated
+# that exact shape (API named 31135815010 on 2026-08-11; apt still frozen at
+# 13.1.1, GitHub still asset-less). Its packages[] urls carry the same
+# grafana_<ver>_<id>_linux_amd64.tar.gz filename dl.grafana.com serves.
+#
+# All present sources must agree. Where any two disagree the refresh stops:
+# independent sources naming different builds for one version is a
+# supply-chain signal, and a checksum pinned against the wrong build verifies
+# against nothing. Resolution is REQUIRED either way — it exits non-zero
+# rather than falling back to the /oss/release/ alias, whose objects are
+# rewritten after release.
 build_id="${REFRESH_GRAFANA_BUILD_ID:-}"
 if [ -z "$build_id" ]; then
   # '.' and '+' are ERE metacharacters and grafana ships '+security-NN' builds.
   ver_re=$(printf '%s' "$new_ver" | sed 's/[.+]/\\&/g')
+
+  # grafana.com versions API. Anchored on '/grafana_' for the same reason as
+  # the apt Filename: match — grafana-enterprise ships the same version with
+  # the same id under a sibling name, and it is a different artifact.
+  api_url="${REFRESH_GRAFANA_API_URL:-https://grafana.com/api/grafana/versions}"
+  api_id=$(curl -fsSL --max-time 60 "${api_url}/${new_ver}" 2>/dev/null \
+    | grep -oE '/grafana_'"$ver_re"'_[0-9]+_linux_amd64\.tar\.gz' \
+    | head -1 | sed -E 's@.*_([0-9]+)_linux_amd64\.tar\.gz$@\1@') || api_id=""
 
   # apt.grafana.com. The Packages index names the .deb verbatim in `Filename:`,
   # which is the only field carrying the upstream version unmangled — apt
@@ -106,13 +125,14 @@ if [ -z "$build_id" ]; then
     | grep -oE '"grafana_'"$ver_re"'_[0-9]+_linux_amd64\.deb"' \
     | head -1 | sed -E 's/.*_([0-9]+)_linux_amd64\.deb"/\1/') || gh_id=""
 
-  if [ -n "$apt_id" ] && [ -n "$gh_id" ] && [ "$apt_id" != "$gh_id" ]; then
-    echo "refresh-grafana: build id conflict for v${new_ver} — apt.grafana.com says ${apt_id}, the GitHub release assets say ${gh_id}. Refusing to pick one." >&2
+  distinct=$(printf '%s\n%s\n%s\n' "$api_id" "$apt_id" "$gh_id" | sed '/^$/d' | sort -u)
+  if [ "$(printf '%s\n' "$distinct" | sed '/^$/d' | wc -l)" -gt 1 ]; then
+    echo "refresh-grafana: build id conflict for v${new_ver} — the grafana.com versions API says '${api_id:-—}', apt.grafana.com says '${apt_id:-—}', the GitHub release assets say '${gh_id:-—}'. Refusing to pick one." >&2
     exit 1
   fi
-  build_id="${apt_id:-$gh_id}"
+  build_id="$distinct"
 fi
-[ -n "$build_id" ] || { echo "refresh-grafana: could not resolve a build id for v${new_ver} from apt.grafana.com or the GitHub release assets. Upstream has published neither; the release is not consumable through the per-build url yet." >&2; exit 1; }
+[ -n "$build_id" ] || { echo "refresh-grafana: could not resolve a build id for v${new_ver} from the grafana.com versions API, apt.grafana.com, or the GitHub release assets. Upstream has published none; the release is not consumable through the per-build url yet." >&2; exit 1; }
 
 new_maj="${new_ver%%.*}"
 new_rest="${new_ver#*.}"

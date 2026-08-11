@@ -327,3 +327,43 @@ learn about but cannot yet build is the strictly safer error: it is visible.
   `REFRESH_GRAFANA_GH_URL` (`file://` fixtures), so the resolution logic — the
   two gaps, the conflict, the enterprise near-miss, the security-build shape —
   is covered without network.
+
+## Amendment, 2026-08-11: the versions API is the third source
+
+The 2026-08-07 amendment closed with 13.1.2 unresolvable by either index and
+called the download page "not a usable source" because `grafana.com` was
+firewall-blocked. Both halves of that aged badly within a week:
+
+- 13.1.2's build id (`30900078095`) was read off the download page **by hand**
+  and fed in via `REFRESH_GRAFANA_BUILD_ID` — the artifact had existed on
+  `dl.grafana.com` the whole time. Only our indexes were blind.
+- 13.1.3 repeated the shape exactly: released 2026-08-07, zero GitHub assets,
+  apt still frozen at 13.1.1 four days later — while
+  `grafana.com/api/grafana/versions/13.1.3` named build `31135815010`, and
+  `dl.grafana.com` served both OSS arches under it, sidecars included.
+
+`grafana.com` is on the firewall allowlist as of 2026-08-11, which removed the
+only reason the source was off the table. And it is better than the page we
+almost scraped: the versions API returns structured JSON — `packages[]` with
+per-arch/os urls carrying the build id in the same
+`grafana_<ver>_<id>_linux_<arch>.tar.gz` filename `dl.grafana.com` serves,
+plus a `channels.stable` flag. No HTML parsing.
+
+So `refresh-grafana.sh` now consults three sources — the versions API,
+apt.grafana.com, the GitHub release assets — and requires every source that
+answered to agree. Any disagreement refuses, naming all three. The API is not
+*trusted* more than the indexes despite being more current: the id it yields
+is only an address, the pin is still the per-arch sha256 from the
+`dl.grafana.com` sidecar, and the existence check still gates before anything
+is written. A wrong or hijacked API answer therefore produces either a refusal
+(conflict, or artifact not served) or a pin against whatever `dl.grafana.com`
+actually serves at that address — the same trust anchor as before.
+
+The API also returns per-package `sha256` values. Deliberately **not** used as
+the pin source: the sidecar sits beside the object it describes, written by
+the same pipeline seconds apart, which is the property the alias incident made
+us value. Cross-checking API sha against sidecar sha would be a fourth
+consistency signal; deferred until a real incident argues for it.
+
+Stub for tests and offline work: `REFRESH_GRAFANA_API_URL` (`file://`
+fixtures), alongside the existing apt/GH/dl seams.

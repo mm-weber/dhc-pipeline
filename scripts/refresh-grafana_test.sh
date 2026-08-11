@@ -253,14 +253,29 @@ gh_fixture() { # dir version buildid|"" -> writes releases/tags/v<ver>, echoes b
   echo "file://$dir/tags"
 }
 
-# resolve a bump with both sources stubbed; no REFRESH_GRAFANA_BUILD_ID, so the
+api_fixture() { # dir ver id -> writes <ver> json, echoes base file:// url
+  # The real endpoint (grafana.com/api/grafana/versions/<ver>) returns a
+  # packages[] list whose per-arch urls carry the build id — the same
+  # grafana_<ver>_<id>_linux_amd64.tar.gz shape dl.grafana.com serves.
+  local dir="$1" ver="$2" id="$3"
+  mkdir -p "$dir"
+  printf '{"version":"%s","channels":{"stable":true},"packages":[{"arch":"amd64","os":"linux","url":"https://dl.grafana.com/grafana/release/%s/grafana_%s_%s_linux_amd64.tar.gz"}]}\n' \
+    "$ver" "$ver" "$ver" "$id" > "$dir/$ver"
+  echo "file://$dir"
+}
+
+# resolve a bump with all sources stubbed; no REFRESH_GRAFANA_BUILD_ID, so the
 # resolution path under test actually runs. Echoes nothing; sets F and RC.
-run_resolve() { # old_ver new_ver apt_url gh_url
+# The api url is ALWAYS stubbed (empty fixture by default): grafana.com is on
+# the firewall allowlist since 2026-08-11, and a test that fell through to the
+# real API would change verdict whenever upstream publishes.
+run_resolve() { # old_ver new_ver apt_url gh_url [api_url]
   SB=$(mktemp -d); mkdir -p "$SB/image/grafana"
   grafana_def "$1" "${1%.*}" "${1%%.*}" > "$SB/image/grafana/image.yaml"
   sed -i -E "s@(/grafana/release/)[^/]+/@\1${2}/@" "$SB/image/grafana/image.yaml"
   RESOLVE_ERR="$SB/err.txt"
   REFRESH_GRAFANA_APT_URL="$3" REFRESH_GRAFANA_GH_URL="$4" \
+  REFRESH_GRAFANA_API_URL="${5:-file://$FX/api-none}" \
   REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" \
     "$SCRIPT" "$SB/image/grafana" >/dev/null 2>"$RESOLVE_ERR"
   RC=$?
@@ -268,6 +283,7 @@ run_resolve() { # old_ver new_ver apt_url gh_url
 }
 
 FX=$(mktemp -d)
+mkdir -p "$FX/api-none"
 
 # 7: apt resolves what GitHub cannot — the v13.0.3 / v13.1.2 shape, a real
 # release whose GitHub entry carries no assets at all.
@@ -340,6 +356,54 @@ GH=$(gh_fixture "$FX/gh-sec" 13.0.4+security-01 "")
 run_resolve 13.0.4 13.0.4+security-01 "$APT" "$GH"
 assert "resolve: security build resolves from the filename" "$F" \
   "url: https://dl.grafana.com/grafana/release/13.0.4+security-01/grafana_13.0.4+security-01_31222333444_linux_"
+
+# 16: the grafana.com versions API resolves what neither index carries — the
+# v13.1.3 real state on 2026-08-11: apt frozen at 13.1.1, zero GitHub assets,
+# while grafana.com/api/grafana/versions/13.1.3 named build 31135815010 and
+# dl.grafana.com served it. Same lesson 13.1.2 taught by hand, automated: the
+# download site is closer to the object store than either index.
+D=$(mktemp -d); APT=$(apt_fixture "$D" 13.1.1:29761037902)
+GH=$(gh_fixture "$FX/gh-api16" 13.1.3 "")
+API=$(api_fixture "$FX/api16" 13.1.3 31135815010)
+run_resolve 13.1.2 13.1.3 "$APT" "$GH" "$API"
+assert "resolve: versions API covers what apt and github lack" "$F" \
+  "url: https://dl.grafana.com/grafana/release/13.1.3/grafana_13.1.3_31135815010_linux_"
+
+# 17: the API disagreeing with an index is the same supply-chain signal as the
+# indexes disagreeing with each other — refuse, naming the API as a source.
+D=$(mktemp -d); APT=$(apt_fixture "$D" 13.1.3:29999999999)
+GH=$(gh_fixture "$FX/gh-api17" 13.1.3 "")
+API=$(api_fixture "$FX/api17" 13.1.3 31135815010)
+run_resolve 13.1.2 13.1.3 "$APT" "$GH" "$API"
+if [ "$RC" -eq 0 ]; then
+  echo "FAIL resolve: api/apt disagreement should exit non-zero"; FAILURES=$((FAILURES+1))
+else
+  echo "ok   resolve: api/apt disagreement exits non-zero"
+fi
+assert "resolve: the conflict names the versions API" "$RESOLVE_ERR" "versions API"
+
+# 18: an enterprise url inside the API payload must not satisfy the lookup —
+# same anchoring rule as the apt Filename: match (test 12).
+mkdir -p "$FX/api18"
+printf '{"version":"13.1.4","packages":[{"arch":"amd64","os":"linux","url":"https://dl.grafana.com/grafana-enterprise/release/13.1.4/grafana-enterprise_13.1.4_31444555666_linux_amd64.tar.gz"}]}\n' \
+  > "$FX/api18/13.1.4"
+D=$(mktemp -d); APT=$(apt_fixture "$D" 13.1.1:29761037902)
+GH=$(gh_fixture "$FX/gh-api18" 13.1.4 "")
+run_resolve 13.1.1 13.1.4 "$APT" "$GH" "file://$FX/api18"
+if [ "$RC" -eq 0 ]; then
+  echo "FAIL resolve: enterprise-only API payload should not satisfy the lookup"; FAILURES=$((FAILURES+1))
+else
+  echo "ok   resolve: enterprise-only API payload does not satisfy the lookup"
+fi
+
+# 19: all three sources present and agreeing — the eventual steady state once
+# the indexes catch up — resolves like any two.
+D=$(mktemp -d); APT=$(apt_fixture "$D" 13.1.3:31135815010)
+GH=$(gh_fixture "$FX/gh-api19" 13.1.3 31135815010)
+API=$(api_fixture "$FX/api19" 13.1.3 31135815010)
+run_resolve 13.1.2 13.1.3 "$APT" "$GH" "$API"
+assert "resolve: three agreeing sources resolve" "$F" \
+  "url: https://dl.grafana.com/grafana/release/13.1.3/grafana_13.1.3_31135815010_linux_"
 
 # ---------------------------------------------------------------------------
 # dl.grafana.com is the authority on what is actually fetchable. An index can

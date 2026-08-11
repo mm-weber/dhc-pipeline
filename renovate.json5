@@ -63,9 +63,10 @@
         // The per-build artifact, which is what we pin: the version is the path
         // segment. Renovate turns that one knob; refresh-grafana.sh resolves the
         // matching build id and rebuilds the whole url. That resolution reads
-        // apt.grafana.com AND this release, cross-checked — releases publish
-        // with zero GitHub assets often enough that either index alone misses
-        // bumps (ADR 0002, amendment 2026-08-07).
+        // the grafana.com versions API, apt.grafana.com AND this release,
+        // cross-checked — 13.1.2 and 13.1.3 both published with zero GitHub
+        // assets and no apt entry while the API carried the id (ADR 0002,
+        // amendments 2026-08-07 and 2026-08-11).
         "url:\\s*https://dl\\.grafana\\.com/grafana/release/(?<currentValue>[0-9][^\\s\"'/]*)/",
         // The legacy /oss/release/ version alias, matched only so a definition
         // not yet migrated stays tracked; its next bump moves it onto the
