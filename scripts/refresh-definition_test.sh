@@ -16,6 +16,7 @@ SYNTAX="# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d81
 cert_def() { # ver majmin maj  -> stdout
   cat <<EOF
 $SYNTAX
+name: cert-manager controller $2.x
 image: ghcr.io/mm-weber/dhc/cert-manager-controller
 tags:
   - $3-alpine3.23
@@ -50,6 +51,7 @@ EOF
 hardened_def() { # ver majmin maj
   cat <<EOF
 $SYNTAX
+name: Hardened App $2.x
 image: ghcr.io/mm-weber/dhc/hardened-app
 tags:
   - $3-alpine3.23
@@ -83,6 +85,7 @@ EOF
 valkey_def() { # ver majmin maj
   cat <<EOF
 $SYNTAX
+name: Valkey $2.x
 image: ghcr.io/mm-weber/dhc/valkey
 tags:
   - $3-alpine3.23
@@ -137,6 +140,7 @@ assert "cert minor: full tag"                 "$F" "- 1.21.0-alpine3.23"
 assert "cert minor: minor alias tag"          "$F" "- 1.21-alpine3.23"
 assert "cert minor: major alias tag"          "$F" "- 1-alpine3.23"
 assert "cert minor: ldflags AppVersion (v)"   "$F" "AppVersion=v1.21.0"
+assert "cert minor: display name"             "$F" "name: cert-manager controller 1.21.x"
 refute "cert minor: no stale 1.20.3"          "$F" "1.20.3"
 refute "cert minor: no stale old sha"         "$F" "$OLD_SHA"
 
@@ -145,6 +149,7 @@ newtag="v1.20.4"; run_bump cert_def 1.20.3 "$newtag"
 assert "cert patch: full tag"                 "$F" "- 1.20.4-alpine3.23"
 assert "cert patch: minor alias unchanged"    "$F" "- 1.20-alpine3.23"
 assert "cert patch: SEMVER_MAJOR_MINOR kept"  "$F" 'SEMVER_MAJOR_MINOR_VERSION: "1.20"'
+assert "cert patch: display name unchanged"   "$F" "name: cert-manager controller 1.20.x"
 
 # 3: hardened-app minor bump 0.1.0 -> 0.2.0 (ldflags version has no 'v')
 newtag="v0.2.0"; run_bump hardened_def 0.1.0 "$newtag"
@@ -153,6 +158,7 @@ assert "hardened: SEMVER_MAJOR_MINOR"          "$F" 'SEMVER_MAJOR_MINOR_VERSION:
 assert "hardened: minor alias tag"             "$F" "- 0.2-alpine3.23"
 assert "hardened: ldflags main.version (no v)" "$F" "main.version=0.2.0"
 refute "hardened: no stray v0.2.0 in ldflags"  "$F" "main.version=v0.2.0"
+assert "hardened: display name"                "$F" "name: Hardened App 0.2.x"
 
 # 4: cert-manager major bump 1.20.3 -> 2.0.0 (dashboard-gated, but refresh must still be correct)
 newtag="v2.0.0"; run_bump cert_def 1.20.3 "$newtag"
@@ -160,6 +166,7 @@ assert "cert major: SEMVER_MAJOR"             "$F" 'SEMVER_MAJOR_VERSION: "2"'
 assert "cert major: SEMVER_MAJOR_MINOR"       "$F" 'SEMVER_MAJOR_MINOR_VERSION: "2.0"'
 assert "cert major: major alias tag"          "$F" "- 2-alpine3.23"
 assert "cert major: full tag"                 "$F" "- 2.0.0-alpine3.23"
+assert "cert major: display name"             "$F" "name: cert-manager controller 2.0.x"
 
 # 5: valkey-style no-v tag patch bump 9.0.5 -> 9.0.6 (ref extraction + rewrite)
 newtag="9.0.6"; run_bump valkey_def 9.0.5 "$newtag"
@@ -169,6 +176,7 @@ assert "valkey: VERSION"                 "$F" "VERSION: 9.0.6"
 assert "valkey: SEMVER_MAJOR_MINOR kept" "$F" 'SEMVER_MAJOR_MINOR_VERSION: "9.0"'
 assert "valkey: no-v url ref bumped"     "$F" ".git#9.0.6"
 refute "valkey: no stale 9.0.5"          "$F" "9.0.5"
+assert "valkey: display name unchanged"  "$F" "name: Valkey 9.0.x"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all refresh-definition tests passed"

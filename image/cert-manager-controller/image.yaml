@@ -1,6 +1,6 @@
 # syntax=dhi.io/build:2-alpine3.23@sha256:4c240813846eddcc650e8e4f3b416384c01cbf35336c8a75342f727de8867358
 
-name: cert-manager controller 1.20.x
+name: cert-manager controller 1.21.x
 image: ghcr.io/mm-weber/dhc/cert-manager-controller
 variant: runtime
 tags:
