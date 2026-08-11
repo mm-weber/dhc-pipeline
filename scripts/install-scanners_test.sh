@@ -30,7 +30,7 @@
 #       path, so with the override set the two fetches are:
 #
 #         $BASE/aquasecurity/trivy/releases/download/v0.72.0/trivy_0.72.0_Linux-64bit.tar.gz
-#         $BASE/anchore/grype/releases/download/v0.116.1/grype_0.116.1_linux_amd64.tar.gz
+#         $BASE/anchore/grype/releases/download/v0.117.0/grype_0.117.0_linux_amd64.tar.gz
 #
 #       The fixture tree below is laid out at exactly those paths and served
 #       over file://, so the real curl code path runs end to end and a wrong
@@ -82,13 +82,13 @@ FAILURES=0
 # The pins the script must ship with, verified by hand against the real
 # releases. Group 5 requires these exact strings to come back out of it.
 TRIVY_VER=0.72.0
-GRYPE_VER=0.116.1
+GRYPE_VER=0.117.0
 TRIVY_ASSET="trivy_${TRIVY_VER}_Linux-64bit.tar.gz"
 GRYPE_ASSET="grype_${GRYPE_VER}_linux_amd64.tar.gz"
 TRIVY_URLDIR="aquasecurity/trivy/releases/download/v${TRIVY_VER}"
 GRYPE_URLDIR="anchore/grype/releases/download/v${GRYPE_VER}"
 TRIVY_PIN=bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea
-GRYPE_PIN=0122df7b655981abe547ad3d2190d65551dac6a2bfc80b4dc2a989b5d0587458
+GRYPE_PIN=38525dab1e06f162ebaa02f94d82d1f807076b011a44180cf2777edf1a7b9c26
 TRIVY_DEP=aquasecurity/trivy
 GRYPE_DEP=anchore/grype
 
