@@ -20,9 +20,7 @@ type componentSpec struct {
 	Probe     probeFunc
 }
 
-// componentSpecs are the three components that currently have a hardened chart.
-// valkey's SET/GET probe waits on its chart (task 8.1); harness.Lookup already
-// errors on it, documenting the gap.
+// componentSpecs are the four components that have a hardened chart.
 var componentSpecs = []componentSpec{
 	{
 		Component: component("cert-manager"),
@@ -43,6 +41,12 @@ var componentSpecs = []componentSpec{
 		Selector:  "app.kubernetes.io/instance=hardened-app",
 		Replicas:  1,
 		Probe:     httpProbe("/healthz"),
+	},
+	{
+		Component: component("valkey"),
+		Selector:  "app.kubernetes.io/instance=valkey",
+		Replicas:  1,
+		Probe:     probeValkey,
 	},
 }
 

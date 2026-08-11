@@ -6,13 +6,14 @@ import (
 )
 
 // TestComponentsRegistry pins the exact set of components the e2e suite
-// provisions: three entries, each with its canonical name, chart dir,
+// provisions: four entries, each with its canonical name, chart dir,
 // ownership flag, release, and namespace.
 func TestComponentsRegistry(t *testing.T) {
 	want := map[string]Component{
 		"cert-manager": {Name: "cert-manager", ChartDir: "chart/cert-manager", Owned: false, Release: "cert-manager", Namespace: "cert-manager"},
 		"grafana":      {Name: "grafana", ChartDir: "chart/grafana", Owned: false, Release: "grafana", Namespace: "grafana"},
 		"hardened-app": {Name: "hardened-app", ChartDir: "chart/hardened-app", Owned: true, Release: "hardened-app", Namespace: "hardened-app"},
+		"valkey":       {Name: "valkey", ChartDir: "chart/valkey", Owned: false, Release: "valkey", Namespace: "valkey"},
 	}
 
 	if len(Components) != len(want) {
@@ -51,9 +52,10 @@ func TestLookupKnown(t *testing.T) {
 }
 
 // TestLookupUnknownErrors verifies unknown and empty --chart values are
-// rejected with an error. "valkey" documents a chart that does not exist yet.
+// rejected with an error. "redis" is the near-miss worth naming: the valkey
+// image ships redis-* symlinks, so the wrong --chart value is a plausible typo.
 func TestLookupUnknownErrors(t *testing.T) {
-	for _, name := range []string{"valkey", ""} {
+	for _, name := range []string{"redis", ""} {
 		t.Run("name="+name, func(t *testing.T) {
 			if _, err := Lookup(name); err == nil {
 				t.Errorf("Lookup(%q) returned nil error, want non-nil", name)

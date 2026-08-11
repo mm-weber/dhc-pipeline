@@ -158,7 +158,10 @@
 - [ ] 8. Wrap-up (Day 3)
   - [ ] 8.1 valkey chart adaptation [CUT 1st if pressed]
     - As 5.3 for valkey (stateful: probes, persistence off-by-default rationale)
-    - _Requirements: Req 4.1, Req 4.2, Req 4.3, Req 4.4, Req 4.7_
+    - Upstream is the valkey project's own chart, `valkey-io/valkey-helm` 0.11.0, whose appVersion 9.1.1 is the version `image/valkey/` builds — no version skew to argue, unlike grafana. It also arrives harder by default (drop-ALL, `readOnlyRootFilesystem`, `runAsNonRoot`, seccomp), so the overlay moves the UID to 65532, states `runAsNonRoot` at **pod** level where `require-nonroot.yaml` reads it, turns on the opt-in readiness probe, and states persistence off
+    - Forced a real Req 4.5 decision, the first in the catalogue: the chart renders an **unconditional** init container from the same image value as the main container and runs `/scripts/init.sh`, a `#!/bin/sh` script that generates the config the main container is started with. `extraInitContainers` appends rather than replaces and no flag disables it, so nothing in values reaches it. Answered with `image/valkey-compat/` — the runtime definition plus one package, busybox — and the cost (a shell in a deployed image, busybox on its CVE surface) is written down in `chart/valkey/README.md` rather than glossed
+    - **Pending the first main build**: a compat image publishes no digest until it lands on main, so `config/values-hardened.yaml` carries the tag unpinned and the chart gate fails on `require-image-digest`. Deliberate — a placeholder digest passes that gate (see 8.4). One edit closes it once `image/valkey-compat/` is published
+    - _Requirements: Req 4.1, Req 4.2, Req 4.3, Req 4.4, Req 4.5, Req 4.7_
   - [ ] 8.2 README narrative and operating handoff
     - README: lab → catalogue arc, verification walkthrough (cosign verify, SBOM/provenance inspect), triage story
     - Confirm crons active (Renovate, rescan); `/spec-validate` + coverage check against this plan; repo stays private
@@ -171,6 +174,11 @@
     - Already-published tags (`13.0.4-alpine3.23` and earlier) remain multi-arch indexes; they are private and pre-release, and are left as they are
     - Accepted-risk `paths:` globs already tolerate the arch suffix (7.8), and Req 6.26's dead-entry report is the instrument that would catch any entry that does not
     - _Requirements: Req 2.1, Req 2.6, Req 6.2_
+  - [ ] 8.4 A digest policy that reads the digest, not the word "sha256"
+    - `policies/require-image-digest.yaml` matches `*@sha256:*`, so a reference ending in a placeholder passes the gate. Measured while writing 8.1: `ghcr.io/mm-weber/dhc/valkey:9.1.1-alpine3.23-compat@sha256:PENDING-FIRST-MAIN-BUILD` rendered **pass 3, fail 0** across all three policies. A pin that resolves to nothing is exactly what Req 4.2 exists to forbid, and it fails green
+    - Kyverno `pattern:` has no character classes, so this wants a `foreach` + `deny` on `regex_match('^[^@]+@sha256:[a-f0-9]{64}$', …)` over containers and initContainers, with the rendered charts as the test corpus (all four must still pass once their digests are real)
+    - 8.1 works around it by leaving the tag unpinned instead, which fails the gate for the true reason — but the hole stays open for anyone who reaches for a placeholder
+    - _Requirements: Req 1.2, Req 4.2, Req 4.6_
   - [x] 8.5 Resolve a VEX product name through `image:`, not through the directory
     - Found reviewing 8.1. Every definition's directory name equalled the last segment of its `image:` until `image/valkey-compat/`, which publishes to `ghcr.io/mm-weber/dhc/valkey`. `compile-vex.sh` took the build-matrix name — the directory — as the product name, so a compat build stamped `pkg:oci/valkey-compat@<digest>` into every statement. Trivy builds its root component from the RepoDigest and reads `valkey`, so nothing would ever have matched
     - Both directions were broken, and both failed green. `lint-vex-product.sh` resolved a purl name to `image/<name>/image.yaml`, so the only spelling Trivy matches (`pkg:oci/valkey@9.1.1-alpine3.23-compat`) scored a Req 6.20 violation — the compat tags are not in the runtime definition's `tags:` — while `pkg:oci/valkey-compat`, which compilation turns into a product that matches nothing, passed
@@ -183,10 +191,10 @@
 
 | Requirement | Covered By Tasks |
 |-------------|------------------|
-| Req 1: Image Definition Catalogue | 2.1, 2.2, 3.1, 3.2, 5.1, 5.2, 1.2 |
+| Req 1: Image Definition Catalogue | 2.1, 2.2, 3.1, 3.2, 5.1, 5.2, 1.2, 8.1, 8.4 |
 | Req 2: Image Build and Private Release | 3.3, 8.2, 8.3 |
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
-| Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1 |
+| Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5 |
 | Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5 |
 | Req 7: Conventions and Review | 1.1, 1.2, 1.3 |

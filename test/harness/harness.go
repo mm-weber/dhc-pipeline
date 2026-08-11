@@ -22,6 +22,7 @@ var Components = []Component{
 	{Name: "cert-manager", ChartDir: "chart/cert-manager", Owned: false, Release: "cert-manager", Namespace: "cert-manager"},
 	{Name: "grafana", ChartDir: "chart/grafana", Owned: false, Release: "grafana", Namespace: "grafana"},
 	{Name: "hardened-app", ChartDir: "chart/hardened-app", Owned: true, Release: "hardened-app", Namespace: "hardened-app"},
+	{Name: "valkey", ChartDir: "chart/valkey", Owned: false, Release: "valkey", Namespace: "valkey"},
 }
 
 // Lookup resolves a --chart value to its Component, or errors on an unknown name.
