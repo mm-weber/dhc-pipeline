@@ -214,6 +214,17 @@ while IFS= read -r -d '' file; do
             # bundled second component under packages: needs indent scoping
             # here when one lands.
             if (val != want) report(NR, sprintf("SPDX version is %s", val))
+          } else if (key == "name" && $0 ~ /^name:/) {
+            # The display name (top-level only — builds, spdx packages and
+            # accounts carry their own name: keys). When it ends in the
+            # <major>.<minor>.x convention, that suffix answers to the
+            # declared version; refresh-{definition,grafana}.sh regenerate it
+            # (PR #47 — four shipped names had drifted with nothing checking).
+            if (match(val, /[0-9]+\.[0-9]+\.x$/)) {
+              nv = substr(val, RSTART, RLENGTH - 2)
+              if (nv != minor)
+                report(NR, sprintf("display name \"%s\" states %s, not %s", val, nv, minor))
+            }
           } else if (key == "purl") {
             if (match(val, /@[^@[:space:]]+$/)) {
               pv = substr(val, RSTART + 1, RLENGTH - 1)

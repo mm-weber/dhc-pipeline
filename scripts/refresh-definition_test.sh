@@ -16,6 +16,7 @@ SYNTAX="# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d81
 cert_def() { # ver majmin maj  -> stdout
   cat <<EOF
 $SYNTAX
+name: cert-manager controller $2.x
 image: ghcr.io/mm-weber/dhc/cert-manager-controller
 tags:
   - $3-alpine3.23
@@ -83,6 +84,7 @@ EOF
 valkey_def() { # ver majmin maj
   cat <<EOF
 $SYNTAX
+name: Valkey $2.x
 image: ghcr.io/mm-weber/dhc/valkey
 tags:
   - $3-alpine3.23
@@ -112,6 +114,10 @@ refute() { # label file 'grep-pattern'
   if grep -qF -- "$3" "$2"; then
     echo "FAIL $1: did NOT expect '$3' in $2"; FAILURES=$((FAILURES+1)); else echo "ok   $1"; fi
 }
+assert_line() { # label file 'exact-full-line' — substring matches don't count
+  if grep -qxF -- "$3" "$2"; then echo "ok   $1"; else
+    echo "FAIL $1: expected exact line '$3' in $2"; sed 's/^/    /' "$2"; FAILURES=$((FAILURES+1)); fi
+}
 
 # run the refresh on a sandbox dir after simulating a Renovate ref bump to $newtag
 run_bump() { # deffn old_ver newtag
@@ -137,6 +143,8 @@ assert "cert minor: full tag"                 "$F" "- 1.21.0-alpine3.23"
 assert "cert minor: minor alias tag"          "$F" "- 1.21-alpine3.23"
 assert "cert minor: major alias tag"          "$F" "- 1-alpine3.23"
 assert "cert minor: ldflags AppVersion (v)"   "$F" "AppVersion=v1.21.0"
+assert_line "cert minor: display name"        "$F" "name: cert-manager controller 1.21.x"
+refute "cert minor: no stale 1.20.x name"     "$F" "1.20.x"
 refute "cert minor: no stale 1.20.3"          "$F" "1.20.3"
 refute "cert minor: no stale old sha"         "$F" "$OLD_SHA"
 
@@ -145,6 +153,7 @@ newtag="v1.20.4"; run_bump cert_def 1.20.3 "$newtag"
 assert "cert patch: full tag"                 "$F" "- 1.20.4-alpine3.23"
 assert "cert patch: minor alias unchanged"    "$F" "- 1.20-alpine3.23"
 assert "cert patch: SEMVER_MAJOR_MINOR kept"  "$F" 'SEMVER_MAJOR_MINOR_VERSION: "1.20"'
+assert_line "cert patch: display name unchanged" "$F" "name: cert-manager controller 1.20.x"
 
 # 3: hardened-app minor bump 0.1.0 -> 0.2.0 (ldflags version has no 'v')
 newtag="v0.2.0"; run_bump hardened_def 0.1.0 "$newtag"
@@ -169,6 +178,22 @@ assert "valkey: VERSION"                 "$F" "VERSION: 9.0.6"
 assert "valkey: SEMVER_MAJOR_MINOR kept" "$F" 'SEMVER_MAJOR_MINOR_VERSION: "9.0"'
 assert "valkey: no-v url ref bumped"     "$F" ".git#9.0.6"
 refute "valkey: no stale 9.0.5"          "$F" "9.0.5"
+
+# 6: valkey-style no-v MINOR bump — the name moves through the no-v ref path
+# too (the live scenario: image/valkey went 9.0.x -> 9.1.x)
+newtag="9.1.0"; run_bump valkey_def 9.0.5 "$newtag"
+assert_line "valkey minor: display name"   "$F" "name: Valkey 9.1.x"
+refute "valkey minor: no stale 9.0.x name" "$F" "9.0.x"
+
+# 7: a name that had already drifted BEFORE the bump is healed, not skipped —
+# the rule anchors on the version shape, not the previous major.minor
+SB=$(mktemp -d); mkdir -p "$SB/image/x"
+cert_def 1.20.3 1.20 1 > "$SB/image/x/image.yaml"
+sed -i 's/^name: cert-manager controller 1.20.x$/name: cert-manager controller 1.19.x/' "$SB/image/x/image.yaml"
+sed -i -E "s@(url: git\\+https://github.com/[^#]+#).*@\\1v1.21.0@" "$SB/image/x/image.yaml"
+REFRESH_SHA_OVERRIDE="$NEW_SHA" "$SCRIPT" "$SB/image/x"
+F="$SB/image/x/image.yaml"
+assert_line "drifted name healed on bump" "$F" "name: cert-manager controller 1.21.x"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all refresh-definition tests passed"

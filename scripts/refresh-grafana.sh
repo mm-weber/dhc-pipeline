@@ -188,14 +188,15 @@ omm=$(esc "$old_majmin"); omaj=$(esc "$old_maj")
 sed -i -E "\@url:[[:space:]]*https://dl\.grafana\.com@! s/${ov}/${new_ver}/g" "$f"
 
 # 2) truncated fields the full-semver pass cannot reach: major.minor + major
-#    vars, their alias tags, and the display name. Anchored so a patch bump is
-#    a no-op.
+#    vars, their alias tags, and the display name. Vars and tags are anchored
+#    so a patch bump is a no-op; the name rule is the same shape-anchored
+#    expression as refresh-definition.sh, so it also heals a drifted name.
 sed -i -E \
   -e "s/^([[:space:]]*SEMVER_MAJOR_MINOR_VERSION:[[:space:]]*).*/\1\"${new_majmin}\"/" \
   -e "s/^([[:space:]]*SEMVER_MAJOR_VERSION:[[:space:]]*).*/\1\"${new_maj}\"/" \
   -e "s/- ${omm}-alpine3\.23/- ${new_majmin}-alpine3.23/" \
   -e "s/- ${omaj}-alpine3\.23/- ${new_maj}-alpine3.23/" \
-  -e "s/^(name:[[:space:]]*Grafana[[:space:]]+)${omm}\.x/\1${new_majmin}.x/" \
+  -e "s/^(name:[[:space:]]+.*[[:space:]])[0-9]+\.[0-9]+\.x[[:space:]]*$/\1${new_majmin}.x/" \
   "$f"
 
 # 3) the full release tag. It differs from the version by the build separator
