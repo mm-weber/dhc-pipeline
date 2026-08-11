@@ -29,7 +29,7 @@
 #       https://github.com). Everything after the host is the real download
 #       path, so with the override set the two fetches are:
 #
-#         $BASE/aquasecurity/trivy/releases/download/v0.72.0/trivy_0.72.0_Linux-64bit.tar.gz
+#         $BASE/aquasecurity/trivy/releases/download/v0.73.0/trivy_0.73.0_Linux-64bit.tar.gz
 #         $BASE/anchore/grype/releases/download/v0.117.0/grype_0.117.0_linux_amd64.tar.gz
 #
 #       The fixture tree below is laid out at exactly those paths and served
@@ -64,8 +64,8 @@
 #   (group 9 asserts its shape line by line):
 #
 #     # renovate: datasource=github-releases depName=aquasecurity/trivy
-#     TRIVY_VERSION="0.72.0"
-#     TRIVY_SHA256="bbb64b96…"
+#     TRIVY_VERSION="0.73.0"
+#     TRIVY_SHA256="2edd39da…"
 #
 #   The shape is load-bearing, not cosmetic. If it drifts, Renovate's manager
 #   stops matching, nothing ever bumps the scanner, and a stale scanner reports
@@ -81,13 +81,13 @@ FAILURES=0
 
 # The pins the script must ship with, verified by hand against the real
 # releases. Group 5 requires these exact strings to come back out of it.
-TRIVY_VER=0.72.0
+TRIVY_VER=0.73.0
 GRYPE_VER=0.117.0
 TRIVY_ASSET="trivy_${TRIVY_VER}_Linux-64bit.tar.gz"
 GRYPE_ASSET="grype_${GRYPE_VER}_linux_amd64.tar.gz"
 TRIVY_URLDIR="aquasecurity/trivy/releases/download/v${TRIVY_VER}"
 GRYPE_URLDIR="anchore/grype/releases/download/v${GRYPE_VER}"
-TRIVY_PIN=bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea
+TRIVY_PIN=2edd39da482bb4e9831962487b68f68e3928ec3137794757f54d00383d79547b
 GRYPE_PIN=38525dab1e06f162ebaa02f94d82d1f807076b011a44180cf2777edf1a7b9c26
 TRIVY_DEP=aquasecurity/trivy
 GRYPE_DEP=anchore/grype
