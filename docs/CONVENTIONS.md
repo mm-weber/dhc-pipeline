@@ -107,6 +107,11 @@ shape is covered:
   regenerates every version-derived field (tags, `SEMVER_*`, checksums, purl,
   spdx version, annotations) from the one value Renovate changed. Anything the
   task cannot derive is called out in the ADR and fixed by the reviewer.
+  Enforced by `scripts/lint-pins.sh` in `validate` (Req 7.4): every version a
+  definition states must be the version its `vars: VERSION` declares. The
+  reviewer is the fallback, not the mechanism — a postUpgradeTask that refuses
+  still leaves Renovate free to open the PR carrying the manager's partial
+  edit, and grafana 13.1.3 (#36) is what that costs when nothing checks.
 - Repackage bumps are **never automerged** — they swap a binary we did not
   build. From-source patch/digest bumps automerge on green CI (Req 3.5).
 - **Check how the upstream versions its security releases before trusting the

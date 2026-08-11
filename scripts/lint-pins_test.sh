@@ -155,5 +155,186 @@ fresh
 printf 'tags:\n  - not+a+release+tag\n' > "$SB/chart/app/config/values.yaml"
 run_case "chart-side tags: not treated as OCI tags" 0
 
+# --- version coherence (docs/CONVENTIONS.md "A bump PR must leave the
+#     definition coherent", Req 7.4) ---
+#
+# A definition states its upstream version in eight places: three release tags,
+# three SEMVER_* vars, the source url (twice, for a repackage), the SPDX
+# version, the purl, and an environment var. The Renovate regex managers turn
+# exactly ONE of them; scripts/refresh-{definition,grafana}.sh regenerate the
+# rest as a postUpgradeTask. When that task refuses — grafana 13.1.3 had no
+# resolvable build id, so refresh-grafana.sh exited 1 rather than invent a pin —
+# Renovate still opens the PR carrying the manager's partial edit. PR #36 is
+# what that looks like:
+#
+#     url: …/grafana/release/13.1.3/grafana_13.1.2_30900078095_linux_amd64.tar.gz
+#                            ^^^^^^          ^^^^^^
+#
+# with all seven other fields left on 13.1.2. Nothing caught it until `build`
+# fetched the tarball and its checksum did not match, which reads as a checksum
+# defect and costs a full image build to learn. Req 7.4 asks for the opposite:
+# a convention violation fails with a message identifying the convention.
+#
+# So: every version a definition states must be the version it declares.
+
+# A definition coherent at $1 — every version-bearing field agreeing. The cases
+# below each break exactly one, so a failure names the field that drifted.
+coherent_defn() { # version -> definition on stdout
+  local v="$1" tag="${1//+/_}" major minor
+  major="${v%%.*}"; minor="$(printf '%s' "$v" | cut -d. -f1,2)"
+  cat <<EOF
+$SYNTAX
+image: ghcr.io/mm-weber/dhc/app
+tags:
+  - ${major}-alpine3.23
+  - $(printf '%s' "$tag" | cut -d. -f1,2)-alpine3.23
+  - ${tag}-alpine3.23
+vars:
+  SEMVER_MAJOR_VERSION: "${major}"
+  SEMVER_MAJOR_MINOR_VERSION: "${minor}"
+  SEMVER_VERSION: ${v}
+  VERSION: ${v}
+contents:
+  builds:
+    - name: app
+      contents:
+        files:
+          - url: https://dl.example.com/app/release/${v}/app_${v}_30900078095_linux_amd64.tar.gz
+            spdx:
+              name: app
+              version: ${v}
+              packages:
+                - name: app
+                  purl: pkg:generic/app@${v}
+environment:
+  APP_VERSION: ${v}
+EOF
+}
+
+# 22: a coherent definition passes
+fresh
+coherent_defn 13.1.2 > "$SB/image/app/image.yaml"
+run_case "coherent definition passes" 0
+
+# 23: PR #36 exactly — the url path moved, its filename did not
+fresh
+coherent_defn 13.1.2 > "$SB/image/app/image.yaml"
+sed -i 's#release/13.1.2/#release/13.1.3/#' "$SB/image/app/image.yaml"
+run_case "partial url bump fails" 1 "13.1.3"
+run_case "partial url bump names the declared version" 1 "13.1.2"
+run_case "partial url bump cites the convention" 1 "CONVENTIONS.md"
+run_case "partial url bump names the file" 1 "image/app/image.yaml"
+
+# 24: the inverse — filename moved, path did not. Same defect, other half.
+fresh
+coherent_defn 13.1.2 > "$SB/image/app/image.yaml"
+sed -i 's#app_13.1.2_#app_13.1.3_#' "$SB/image/app/image.yaml"
+run_case "partial url filename bump fails" 1 "13.1.3"
+
+# 25: a release tag left behind
+fresh
+coherent_defn 13.1.2 > "$SB/image/app/image.yaml"
+sed -i 's#^  - 13.1.2-alpine3.23#  - 13.1.1-alpine3.23#' "$SB/image/app/image.yaml"
+run_case "stale release tag fails" 1 "13.1.1"
+
+# 26: SEMVER_VERSION left behind
+fresh
+coherent_defn 13.1.2 > "$SB/image/app/image.yaml"
+sed -i 's#^  SEMVER_VERSION: 13.1.2#  SEMVER_VERSION: 13.1.1#' "$SB/image/app/image.yaml"
+run_case "stale SEMVER_VERSION fails" 1 "SEMVER_VERSION"
+
+# 27: the SPDX version — what lands in the SBOM of a published image
+fresh
+coherent_defn 13.1.2 > "$SB/image/app/image.yaml"
+sed -i 's#^              version: 13.1.2#              version: 13.1.1#' "$SB/image/app/image.yaml"
+run_case "stale spdx version fails" 1 "13.1.1"
+
+# 28: the purl — what a VEX statement's subcomponent is matched against, so a
+# stale one silently re-scopes every triage decision written about this image
+fresh
+coherent_defn 13.1.2 > "$SB/image/app/image.yaml"
+sed -i 's#pkg:generic/app@13.1.2#pkg:generic/app@13.1.1#' "$SB/image/app/image.yaml"
+run_case "stale purl fails" 1 "13.1.1"
+
+# 29: an environment version var (grafana ships GRAFANA_VERSION)
+fresh
+coherent_defn 13.1.2 > "$SB/image/app/image.yaml"
+sed -i 's#^  APP_VERSION: 13.1.2#  APP_VERSION: 13.1.1#' "$SB/image/app/image.yaml"
+run_case "stale environment version fails" 1 "APP_VERSION"
+
+# 30: SEMVER_MAJOR_* are truncations, not disagreements — "13" and "13.1"
+# against VERSION 13.1.2 are correct, and a check that reads every dotted
+# number as a version would reject every definition in the catalogue.
+fresh
+coherent_defn 13.1.2 > "$SB/image/app/image.yaml"
+run_case "SEMVER_MAJOR_* truncations not flagged" 0
+
+# 31: a truncation that is genuinely wrong is still caught
+fresh
+coherent_defn 13.1.2 > "$SB/image/app/image.yaml"
+sed -i 's#^  SEMVER_MAJOR_MINOR_VERSION: "13.1"#  SEMVER_MAJOR_MINOR_VERSION: "13.0"#' "$SB/image/app/image.yaml"
+run_case "wrong SEMVER_MAJOR_MINOR fails" 1 "SEMVER_MAJOR_MINOR_VERSION"
+
+# 32: the variant segment is not a version. Every tag carries alpine3.23 and
+# every definition names v3.23 apk repositories; reading those as versions
+# would fail the whole catalogue.
+fresh
+coherent_defn 13.1.2 > "$SB/image/app/image.yaml"
+cat >> "$SB/image/app/image.yaml" <<'EOF'
+  repositories:
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/main
+os-release:
+  version-id: "3.23"
+ports:
+  - 3000/tcp
+EOF
+run_case "variant and unrelated numbers not flagged" 0
+
+# 33: git+ sources tag with and without a leading 'v' — cert-manager pins
+# '#v1.21.1', valkey pins '#9.1.1'. Both are the declared version.
+fresh
+coherent_defn 1.21.1 > "$SB/image/app/image.yaml"
+sed -i 's#^          - url: https://.*#          - url: git+https://github.com/x/app.git\#v1.21.1\n            checksum: 24e33194fb39488eff2bbf10c6dc640f407cad44#' "$SB/image/app/image.yaml"
+run_case "git+ source with 'v' prefix passes" 0
+
+fresh
+coherent_defn 9.1.1 > "$SB/image/app/image.yaml"
+sed -i 's#^          - url: https://.*#          - url: git+https://github.com/x/app.git\#9.1.1\n            checksum: d27f9ba65a04e80d9c417112a7621fc98a56f70d#' "$SB/image/app/image.yaml"
+run_case "git+ source without 'v' prefix passes" 0
+
+# 34: a git+ source pinning a version we do not declare is the same defect
+fresh
+coherent_defn 1.21.1 > "$SB/image/app/image.yaml"
+sed -i 's#^          - url: https://.*#          - url: git+https://github.com/x/app.git\#v1.21.0\n            checksum: 24e33194fb39488eff2bbf10c6dc640f407cad44#' "$SB/image/app/image.yaml"
+run_case "git+ source on another version fails" 1 "1.21.0"
+
+# 35: semver build metadata. grafana ships 13.0.1+security-01; the release tag
+# spells it 13.0.1_security-01 (case 18), the url keeps the '+'. Both state the
+# declared version, and the tag transform is not a disagreement.
+fresh
+coherent_defn '13.0.1+security-01' > "$SB/image/app/image.yaml"
+run_case "'+security' build metadata passes" 0
+
+# 35b: the closing summary counts violations of several conventions, so it may
+# not describe them all as floating references — a coherence failure sends the
+# reader looking for an unpinned digest that is not there.
+fresh
+coherent_defn 13.1.2 > "$SB/image/app/image.yaml"
+sed -i 's#release/13.1.2/#release/13.1.3/#' "$SB/image/app/image.yaml"
+run_case "summary does not call a coherence failure a floating reference" 1 "1 violation"
+
+# 36: only definitions are checked. Chart values carry their own versions
+# (appVersion, dependency pins) and answer to their chart, not to a definition.
+fresh
+printf 'appVersion: 9.9.9\nversion: 1.2.3\n' > "$SB/chart/app/config/values.yaml"
+run_case "chart values not version-checked" 0
+
+# 37: a definition with no VERSION declared has nothing to be coherent with —
+# skipped rather than failed, so the rule cannot block an archetype that does
+# not version this way.
+fresh
+printf '%s\nimage: ghcr.io/mm-weber/dhc/app\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "definition without VERSION skipped" 0
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
