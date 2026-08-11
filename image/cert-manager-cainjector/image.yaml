@@ -1,4 +1,4 @@
-# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc
+# syntax=dhi.io/build:2-alpine3.23@sha256:4c240813846eddcc650e8e4f3b416384c01cbf35336c8a75342f727de8867358
 
 name: cert-manager cainjector 1.20.x
 image: ghcr.io/mm-weber/dhc/cert-manager-cainjector
@@ -14,7 +14,7 @@ dates:
   release: "2026-06-25"
 vars:
   COMMIT_SHA: 24e33194fb39488eff2bbf10c6dc640f407cad44
-  GOLANG_REFERENCE: dhi.io/golang:1.26.5-alpine3.23-dev@sha256:e78e403fb96601ced77395843eaf3fd4763fcb43be7effcc6676d904845e4f7c
+  GOLANG_REFERENCE: dhi.io/golang:1.26.5-alpine3.23-dev@sha256:d9a9b4cb0c4aea8719d708092b43ae4f83072c4c53dbc2e9d5353764905ab004
   SEMVER_MAJOR_MINOR_VERSION: "1.21"
   SEMVER_MAJOR_VERSION: "1"
   SEMVER_VERSION: 1.21.1
@@ -32,7 +32,7 @@ contents:
     - tzdata
   builds:
     - name: cert-manager-cainjector
-      uses: dhi.io/golang:1.26.5-alpine3.23-dev@sha256:e78e403fb96601ced77395843eaf3fd4763fcb43be7effcc6676d904845e4f7c
+      uses: dhi.io/golang:1.26.5-alpine3.23-dev@sha256:d9a9b4cb0c4aea8719d708092b43ae4f83072c4c53dbc2e9d5353764905ab004
       work-dir: /go/src/github.com/cert-manager/cert-manager
       caches:
         - path: /go/pkg/mod
