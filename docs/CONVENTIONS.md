@@ -107,6 +107,14 @@ shape is covered:
   regenerates every version-derived field (tags, `SEMVER_*`, checksums, purl,
   spdx version, annotations) from the one value Renovate changed. Anything the
   task cannot derive is called out in the ADR and fixed by the reviewer.
+  Enforced by `scripts/lint-pins.sh` in `validate` (Req 7.4) for the fields
+  it can read: release tags, `vars:` (`SEMVER_*` and any `*_VERSION`), the
+  SPDX `version:` and `purl`, and semver tokens in `url:` values — spelled in
+  block style, which the lint enforces. The ldflags version stamp, display
+  `name:` and dotted annotation keys stay with the reviewer. The reviewer is
+  otherwise the fallback, not the mechanism — a postUpgradeTask that refuses
+  still leaves Renovate free to open the PR carrying the manager's partial
+  edit, and grafana 13.1.3 (#36) is what that costs when nothing checks.
 - Repackage bumps are **never automerged** — they swap a binary we did not
   build. From-source patch/digest bumps automerge on green CI (Req 3.5).
 - **Check how the upstream versions its security releases before trusting the

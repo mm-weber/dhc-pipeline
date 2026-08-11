@@ -53,12 +53,12 @@ PINS_FILE="${INSTALL_SCANNERS_PINS:-}"
 ARCH="${INSTALL_SCANNERS_ARCH:-$(uname -m)}"
 
 # renovate: datasource=github-releases depName=aquasecurity/trivy
-TRIVY_VERSION="0.72.0"
-TRIVY_SHA256="bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea"
+TRIVY_VERSION="0.73.0"
+TRIVY_SHA256="2edd39da482bb4e9831962487b68f68e3928ec3137794757f54d00383d79547b"
 
 # renovate: datasource=github-releases depName=anchore/grype
-GRYPE_VERSION="0.116.1"
-GRYPE_SHA256="0122df7b655981abe547ad3d2190d65551dac6a2bfc80b4dc2a989b5d0587458"
+GRYPE_VERSION="0.117.0"
+GRYPE_SHA256="38525dab1e06f162ebaa02f94d82d1f807076b011a44180cf2777edf1a7b9c26"
 
 err() { printf '::error::install-scanners: %s\n' "$1" >&2; }
 
