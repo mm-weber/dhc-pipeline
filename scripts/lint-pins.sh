@@ -3,6 +3,9 @@
 # every `image:` / `base:` reference under image/ and chart/ carries an
 # @sha256 digest. Tag-only, :latest, and bare (implicit latest) references
 # fail with a GitHub error annotation naming the reference (Req 1.6, 7.4).
+# Definitions additionally get a version-coherence check: every version a
+# definition states must be the one its `vars: VERSION` declares (Req 7.4,
+# docs/CONVENTIONS.md "Upstream tracking").
 #
 # Scope note: only whole-reference keys are checked. Split repository/tag/
 # digest keys in chart values are validated by their chart's own config
@@ -108,29 +111,51 @@ while IFS= read -r -d '' file; do
     violations=$((violations + 1))
   fi
 
-  # A bump PR must leave the definition coherent (docs/CONVENTIONS.md, Req 7.4).
-  # A definition states its upstream version in eight places; the Renovate regex
-  # managers turn exactly one and refresh-{definition,grafana}.sh regenerate the
-  # rest. When that postUpgradeTask refuses — grafana 13.1.3 had no resolvable
-  # build id — Renovate opens the PR anyway carrying the partial edit, and the
-  # only thing that noticed was `build` fetching a tarball whose checksum did
-  # not match. That reads as a checksum defect and costs an image build to
-  # learn. Here it is one version comparison, in validate, naming the field.
+  # A bump PR must leave the definition coherent (docs/CONVENTIONS.md
+  # "Upstream tracking", Req 7.4): Renovate turns one version field and the
+  # refresh postUpgradeTask regenerates the rest — but a task that refuses
+  # still lets the PR open half-edited (grafana 13.1.3, PR #36, found as a
+  # checksum mismatch one paid image build later). One comparison here names
+  # the drifted field in validate instead.
   #
   # Scope note: the declared version is `vars: VERSION`, and a definition
   # without one is skipped rather than failed — an archetype that does not
   # version this way has nothing to be incoherent with. Numbers outside the
-  # version-bearing keys below are not read as versions, which is what keeps
-  # alpine3.23, v3.23 apk repositories and 3000/tcp out of it.
+  # version-bearing keys below are not read as versions (v3.23 apk
+  # repositories, 3000/tcp), and tags are compared against the declared
+  # forms, which is what keeps the -alpine3.23 variant suffix out of it.
   if [[ "$file" == "$ROOT"/image/*/image.yaml ]]; then
-    declared=$(awk 'match($0, /^[[:space:]]+VERSION:[[:space:]]*/) {
-                      v = substr($0, RSTART + RLENGTH)
-                      sub(/[[:space:]]*#.*$/, "", v); sub(/[[:space:]]+$/, "", v)
-                      gsub(/^["'\'']|["'\'']$/, "", v)
-                      if (v != "") { print v; exit }
-                    }' "$file")
+    # Flow-style vars:/tags: would be invisible to this line-oriented parser
+    # and silently skip the checks below — fail loudly instead (yamllint's
+    # default config allows flow style, so nothing upstream blocks it).
+    while IFS=: read -r line_no rest; do
+      echo "::error file=${rel},line=${line_no}::coherence convention (docs/CONVENTIONS.md): ${rest%%:*}: uses flow style — this lint reads block style only"
+      violations=$((violations + 1))
+    done < <(grep -nE '^(vars:[[:space:]]*\{|tags:[[:space:]]*\[)' "$file" || true)
+
+    decl=$(awk '
+      invars && /^[^[:space:]]/ { invars = 0 }
+      /^vars:/ { invars = 1; next }
+      invars && match($0, /^[[:space:]]+VERSION:[[:space:]]*/) {
+        v = substr($0, RSTART + RLENGTH)
+        sub(/[[:space:]]*#.*$/, "", v); sub(/[[:space:]]+$/, "", v)
+        gsub(/^["'\'']|["'\'']$/, "", v)
+        printf "%d\t%s\n", NR, v
+        exit
+      }' "$file")
+    declared=""
+    if [ -n "$decl" ]; then
+      dline="${decl%%$'\t'*}"
+      declared="${decl#*$'\t'}"
+      if [ -z "$declared" ]; then
+        # Key present with an empty value is a bad edit, not an unversioned
+        # archetype — only a missing key takes the documented skip.
+        echo "::error file=${rel},line=${dline}::coherence convention (docs/CONVENTIONS.md): vars: VERSION is declared but empty"
+        violations=$((violations + 1))
+      fi
+    fi
     if [ -n "$declared" ]; then
-      incoherent=$(awk -v want="$declared" -v rel="$rel" '
+      incoherent=$(awk -v want="$declared" -v rel="$rel" -v dline="$dline" '
         function report(line, msg) {
           printf "::error file=%s,line=%d::coherence convention (docs/CONVENTIONS.md): %s — the definition declares VERSION %s\n", rel, line, msg, want
         }
@@ -145,22 +170,22 @@ while IFS= read -r -d '' file; do
           return s
         }
         BEGIN {
-          # A release tag spells semver build metadata with "_" (case 18 above),
-          # so the tag forms are derived from the transformed version, and the
-          # SEMVER_* vars from the untransformed one.
+          # A release tag spells semver build metadata with "_" (the OCI tag
+          # rule above; test cases 18-19), so tag comparisons use the
+          # transformed form. Its truncations equal major/minor unchanged —
+          # build metadata only ever follows the patch component.
           tagfull = want; gsub(/\+/, "_", tagfull)
           split(want, p, "."); major = p[1]; minor = p[1] "." p[2]
-          split(tagfull, q, "."); tagmajor = q[1]; tagminor = q[1] "." q[2]
         }
         /^tags:/ { intags = 1; next }
         intags && /^[^[:space:]]/ { intags = 0 }
         intags && match($0, /^[[:space:]]*-[[:space:]]*/) {
           t = clean(substr($0, RSTART + RLENGTH))
-          if (t != "" \
-              && index(t, tagmajor "-") != 1 \
-              && index(t, tagminor "-") != 1 \
+          if (t != "" && t != major && t != minor && t != tagfull \
+              && index(t, major "-") != 1 \
+              && index(t, minor "-") != 1 \
               && index(t, tagfull "-") != 1)
-            report(NR, sprintf("release tag \"%s\" states another version", t))
+            report(NR, sprintf("release tag \"%s\" does not state the declared version", t))
           next
         }
         match($0, /^[[:space:]]*(-[[:space:]]+)?[A-Za-z_][A-Za-z0-9_-]*:[[:space:]]*/) {
@@ -169,29 +194,44 @@ while IFS= read -r -d '' file; do
           val = clean(substr($0, RSTART + RLENGTH))
           if (val == "") next
 
-          if (key == "VERSION") next
-          if (key == "SEMVER_VERSION") {
-            if (val != want) report(NR, sprintf("SEMVER_VERSION is %s", val))
+          if (key == "VERSION") {
+            # Only the declaring line is the anchor; any other VERSION: is a
+            # version-bearing field like the rest and must agree.
+            if (NR != dline && val != want) report(NR, sprintf("VERSION is %s", val))
           } else if (key == "SEMVER_MAJOR_VERSION") {
             if (val != major) report(NR, sprintf("SEMVER_MAJOR_VERSION is %s, not %s", val, major))
           } else if (key == "SEMVER_MAJOR_MINOR_VERSION") {
             if (val != minor) report(NR, sprintf("SEMVER_MAJOR_MINOR_VERSION is %s, not %s", val, minor))
           } else if (key ~ /_VERSION$/) {
+            # SEMVER_VERSION lands here — same comparison, same message.
+            # ponytail: this reserves every *_VERSION var for the app version;
+            # a second component pin is spelled *_REFERENCE today (see
+            # GOLANG_REFERENCE) — split this branch if that ever changes.
             if (val != want) report(NR, sprintf("%s is %s", key, val))
           } else if (key == "version") {
             # The SPDX version — what lands in the SBOM of a published image.
+            # ponytail: reads ANY version: key as the document version; a
+            # bundled second component under packages: needs indent scoping
+            # here when one lands.
             if (val != want) report(NR, sprintf("SPDX version is %s", val))
           } else if (key == "purl") {
             if (match(val, /@[^@[:space:]]+$/)) {
               pv = substr(val, RSTART + 1, RLENGTH - 1)
-              if (pv != want) report(NR, sprintf("purl \"%s\" states %s", val, pv))
+              # purl grammar: qualifiers (?...) and subpath (#...) are not
+              # part of the version, and a leading v is canonical for
+              # pkg:golang — the same tolerance the url branch gives git refs.
+              sub(/[?#].*$/, "", pv)
+              if (pv != want && pv != ("v" want))
+                report(NR, sprintf("purl \"%s\" states %s", val, pv))
             }
           } else if (key == "url") {
             # Every full semver the url states, wherever it sits in the path —
             # the repackage archetype names the version twice (directory and
             # filename) and PR #36 moved only the first. A leading "v" is the
-            # git-ref spelling (cert-manager pins #v1.21.1, valkey pins #9.1.1)
-            # and not a disagreement.
+            # git-ref spelling and not a disagreement.
+            # ponytail: three-part tokens only, matched even mid-word — a
+            # 13.1.2-rc1 url passes as 13.1.2, and a two-part upstream (2.44)
+            # is never url-compared; tighten when either shape lands.
             s = val
             while (match(s, /[0-9]+\.[0-9]+\.[0-9]+(\+[A-Za-z0-9.-]+)?/)) {
               tok = substr(s, RSTART, RLENGTH)
