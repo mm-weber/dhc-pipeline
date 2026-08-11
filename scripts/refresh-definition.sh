@@ -58,15 +58,16 @@ sed -i -E \
   "$f"
 
 # 2) truncated fields the full-semver pass can't reach: major.minor + major
-#    vars, their alias tags, and the display name — the field
-#    refresh-grafana.sh already regenerates and this script did not, which is
-#    how four shipped names went stale. Anchored so a patch bump is a no-op.
+#    vars, their alias tags, and the display name. Vars and tags are anchored
+#    so a patch bump is a no-op; the name rule matches the version SHAPE
+#    (<digits>.<digits>.x at end of line), so it also heals a name that had
+#    already drifted before the bump.
 sed -i -E \
   -e "s/^([[:space:]]*SEMVER_MAJOR_MINOR_VERSION:[[:space:]]*).*/\1\"${new_majmin}\"/" \
   -e "s/^([[:space:]]*SEMVER_MAJOR_VERSION:[[:space:]]*).*/\1\"${new_maj}\"/" \
   -e "s/- ${omm}-alpine3\.23/- ${new_majmin}-alpine3.23/" \
   -e "s/- ${omaj}-alpine3\.23/- ${new_maj}-alpine3.23/" \
-  -e "s/^(name:[[:space:]].*[[:space:]])${omm}\.x$/\1${new_majmin}.x/" \
+  -e "s/^(name:[[:space:]]+.*[[:space:]])[0-9]+\.[0-9]+\.x[[:space:]]*$/\1${new_majmin}.x/" \
   "$f"
 
 echo "refresh: $dir -> ${new_ver} (${new_sha})"

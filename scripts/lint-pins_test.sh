@@ -412,5 +412,22 @@ coherent_defn 1.21.1 > "$SB/image/app/image.yaml"
 sed -i 's#pkg:generic/app@1.21.1#pkg:golang/github.com/x/app@v1.21.1#' "$SB/image/app/image.yaml"
 run_case "purl with v-prefixed version passes" 0
 
+# 50: the display name's version suffix answers to the declared version —
+# stale display names shipped four times before anything checked (PR #47)
+fresh
+printf '%s\nname: app 1.0.x\nimage: ghcr.io/mm-weber/dhc/app\nvars:\n  VERSION: 1.1.0\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "drifted display name fails" 1 "display name"
+
+# 51: a matching display name passes, and nested name: keys (builds, spdx,
+# accounts) are never read as display names even with a version-shaped tail
+fresh
+printf '%s\nname: app 1.1.x\nimage: ghcr.io/mm-weber/dhc/app\nvars:\n  VERSION: 1.1.0\ncontents:\n  builds:\n    - name: app-build 9.9.x\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "matching display name passes, nested names ignored" 0
+
+# 52: a display name without a version suffix states nothing — skipped
+fresh
+printf '%s\nname: app\nimage: ghcr.io/mm-weber/dhc/app\nvars:\n  VERSION: 1.1.0\n' "$SYNTAX" > "$SB/image/app/image.yaml"
+run_case "unversioned display name skipped" 0
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
