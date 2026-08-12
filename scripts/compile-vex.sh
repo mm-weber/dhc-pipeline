@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# compile-vex.sh <src-dir> <out-dir> <image-name> <digest> [tag ...]
+# compile-vex.sh <src-dir> <out-dir> <definition> <digest> [tag ...]
 #
 # Render the hand-authored OpenVEX source in triage/vex/ into the documents a
 # scanner is actually given (Req 6.28, 6.29, 6.30).
@@ -40,6 +40,17 @@
 # which would break the first time the wording changes.
 set -euo pipefail
 
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/definition-lib.sh
+. "$HERE/definition-lib.sh"
+# The definition tree this compiles against, rooted at the script rather than at
+# the caller's cwd. Keyed on cwd, a caller passing absolute src/out paths from
+# anywhere else found no definition and fell back to the directory name — the
+# inert product this file exists to prevent, reported as a clean compile. Same
+# seam lint-pins.sh and lint-vex-product.sh take as their first argument; here
+# every positional slot is spoken for, so it arrives as an environment variable.
+ROOT="${COMPILE_VEX_ROOT:-$(cd "$HERE/.." && pwd)}"
+
 if [ "$#" -lt 4 ]; then
   echo "usage: compile-vex.sh <src-dir> <out-dir> <definition> <digest> [tag ...]" >&2
   exit 2
@@ -65,23 +76,19 @@ mkdir -p "$OUT"
 # rows nothing tells apart. Falling back to the given name when no definition is
 # in reach is the pre-variant contract, which the tests rely on.
 IMAGE="$DEFINITION"
-DEF_FILE="image/${DEFINITION}/image.yaml"
+DEF_FILE="$ROOT/image/${DEFINITION}/image.yaml"
 if [ -f "$DEF_FILE" ]; then
-  repo="$(awk 'sub(/^image:[[:space:]]*/, "") {
-                 sub(/[[:space:]]*#.*$/, ""); sub(/[[:space:]]+$/, "")
-                 gsub(/^["'\'']|["'\'']$/, "")
-                 print; exit
-               }' "$DEF_FILE")"
+  repo="$(published_repository "$DEF_FILE")"
   [ -n "$repo" ] && IMAGE="${repo##*/}"
 fi
 
-VEX_DEFINITION="$DEFINITION" python3 - "$SRC" "$OUT" "$IMAGE" "$DIGEST" "$@" <<'PY'
+python3 - "$SRC" "$OUT" "$IMAGE" "$DIGEST" "$DEFINITION" "$@" <<'PY'
 import glob, json, os, sys
 
-src, out, image, digest = sys.argv[1:5]
-tags = set(sys.argv[5:])
-# What built this, as opposed to what it publishes as. They differ for a variant.
-definition = os.environ.get("VEX_DEFINITION") or image
+src, out, image, digest, definition = sys.argv[1:6]
+tags = set(sys.argv[6:])
+# `definition` is what built this, `image` what it publishes as. They differ for
+# a variant, and the report keeps both.
 
 def parse(pid):
     """(name, version) for a pkg:oci purl, or (None, None) if it is not one."""

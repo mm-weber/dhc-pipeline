@@ -252,6 +252,17 @@ the identifiers Trivy compares: the product is a `pkg:oci/` purl naming a real
 definition (6.17), its `repository_url` equals that definition's `image:` (6.18),
 and subcomponents are versionless so they survive an upstream bump (6.19).
 
+A product name is resolved through each definition's `image:`, never through its
+directory — Trivy builds the name from the scanned image's RepoDigest, and a
+built variant publishes under its runtime sibling's repository (Req 2.3;
+docs/CONVENTIONS.md, "Naming"). So one name can resolve to more than one
+definition, which is why 6.20 scopes a version against the tags of every
+definition publishing that repository; the tag is then what separates them, and
+`scripts/compile-vex.sh` is what enforces it per build (6.30). One reader for
+that mapping, `scripts/definition-lib.sh`, shared by the two lints, the compiler
+and `build.yml`'s affected-definitions step: a reader that misses resolves to the
+directory name, which Trivy never produces, and reports as a clean compile.
+
 **Source is not what a scanner sees (Req 6.28-6.30).** `triage/vex/` holds
 hand-authored *source*, and `scripts/compile-vex.sh` renders it per build into
 what Trivy is actually given. The split exists because the two have

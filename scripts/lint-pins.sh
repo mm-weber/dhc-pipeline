@@ -12,6 +12,9 @@
 # conventions once definitions exist; extend here when that lands.
 set -euo pipefail
 
+# shellcheck source=scripts/definition-lib.sh
+. "$(cd "$(dirname "$0")" && pwd)/definition-lib.sh"
+
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 violations=0
 
@@ -272,7 +275,10 @@ done < <(find "${scan_dirs[@]}" -type f -name '*.yaml' -print0)
 # so the three cert-manager definitions (one monorepo, three repositories) are
 # correctly not a pair.
 source_pins() { # definition path — the fields a pair must agree on
-  awk '/^# syntax=/ { print; next }
+  # The frontend pattern is the lenient one the pinning check above uses. Keyed
+  # on exactly one space, a `#syntax=` line — valid and digest-pinned by that
+  # check — dropped out of both sides here and a drifted frontend compared equal.
+  awk '/^#[[:space:]]*syntax=/ { print; next }
        /^vars:[[:space:]]*$/ { invars = 1; print; next }
        invars && /^[^[:space:]#]/ { invars = 0 }
        invars { print; next }
@@ -286,11 +292,7 @@ if [ -d "$ROOT/image" ]; then
   while IFS= read -r def; do
     [ -f "$def" ] || continue
     rel="${def#"$ROOT"/}"
-    repo="$(awk 'sub(/^image:[[:space:]]*/, "") {
-                   sub(/[[:space:]]*#.*$/, ""); sub(/[[:space:]]+$/, "")
-                   gsub(/^["'\'']|["'\'']$/, "")
-                   print; exit
-                 }' "$def")"
+    repo="$(published_repository "$def")"
     [ -n "$repo" ] || continue
     if [ -z "${first_def[$repo]:-}" ]; then
       first_def[$repo]="$def"

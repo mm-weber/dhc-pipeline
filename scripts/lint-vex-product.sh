@@ -29,6 +29,11 @@
 # triage/README.md (Authoring a statement).
 set -euo pipefail
 
+# published_repository() and definitions_publishing() — the directory-to-published-
+# name mapping this shares with compile-vex.sh, lint-pins.sh and build.yml.
+# shellcheck source=scripts/definition-lib.sh
+. "$(cd "$(dirname "$0")" && pwd)/definition-lib.sh"
+
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 LANE="triage/vex"
 violations=0
@@ -58,17 +63,6 @@ urldecode() { # percent-decode one purl qualifier value
   printf '%b' "${s//%/\\x}"
 }
 
-# The published repository is the definition's own `image:` — the bare publish
-# name (lint-pins.sh keeps it bare), which is exactly what Trivy's root
-# component purl carries in repository_url.
-published_repository() { # definition path
-  awk 'sub(/^image:[[:space:]]*/, "") {
-         sub(/[[:space:]]*#.*$/, ""); sub(/[[:space:]]+$/, "")
-         gsub(/^["'\'']|["'\'']$/, "")
-         print; exit
-       }' "$1"
-}
-
 # The tags a definition publishes. A source product version has to be one of
 # them (Req 6.20), because compile-vex.sh looks it up against the tags of the
 # build and drops the statement when it does not match (Req 6.30).
@@ -80,24 +74,6 @@ published_tags() { # definition path
          print; next
        }
        intags && /^[^[:space:]]/ { intags = 0 }' "$1"
-}
-
-# Definitions publishing a repository whose last path segment is $1, keyed on
-# each definition's own `image:` rather than on its directory name. Those were
-# the same string until image/valkey-compat/, which publishes to the repository
-# its runtime sibling names (docs/CONVENTIONS.md, "Naming"). Trivy builds the
-# product purl from the scanned image's RepoDigest, so both definitions are read
-# as `valkey` and only the tag separates them — keyed on the directory, the one
-# spelling Trivy matches was unwritable and the one it never produces passed.
-definitions_publishing() { # image name
-  local f repo
-  for f in "$ROOT"/image/*/image.yaml; do
-    if [ -f "$f" ]; then
-      repo="$(published_repository "$f")"
-      if [ "${repo##*/}" = "$1" ]; then printf '%s\n' "${f#"$ROOT"/}"; fi
-    fi
-  done
-  return 0
 }
 
 check_product() { # rel, cve, product purl, subcomponent count, status, status_notes
@@ -163,7 +139,7 @@ check_product() { # rel, cve, product purl, subcomponent count, status, status_n
   # The purl name is the image; there is no "does this image exist" check
   # anywhere else, and a near-miss spelling reads correct while suppressing
   # nothing.
-  mapfile -t defs < <(definitions_publishing "$name")
+  mapfile -t defs < <(definitions_publishing "$ROOT" "$name")
   if [ "${#defs[@]}" -eq 0 ]; then
     report "$rel" 6.17 "$cve product '$purl' names image '$name', but no definition under image/ publishes a repository named '$name' — there is no 'image/$name/image.yaml', and no other definition's 'image:' ends in it. A variant publishes under its runtime sibling's name, so a definition's directory is never the product name"
     return

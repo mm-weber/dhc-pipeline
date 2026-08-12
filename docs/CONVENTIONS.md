@@ -37,6 +37,12 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
     nothing. `scripts/compile-vex.sh` and `scripts/lint-vex-product.sh`
     therefore resolve the product name through the definition's `image:`, and
     the published tag is what separates the two (Req 6.29, 6.30).
+  - So a directory name is never an image name anywhere. Every reader of that
+    mapping goes through `scripts/definition-lib.sh` — the two lints above, the
+    compiler, and `build.yml`'s affected-definitions step, which derives its
+    matrix from the product purls on a VEX-only change. Add a caller there
+    rather than re-reading `image:` locally: the reader that misses a spelling
+    does not fail, it resolves to the directory name and reports clean.
 
 ## Pinning (Req 1.2, 1.3, 1.6)
 

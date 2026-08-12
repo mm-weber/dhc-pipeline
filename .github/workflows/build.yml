@@ -69,9 +69,19 @@ jobs:
             # is considered, not just the changed ones: trivy is handed the
             # whole directory via --vex, so any edit changes the gate input for
             # every image the directory covers.
+            #
+            # A purl name is the PUBLISHED repository, not a directory: a variant
+            # publishes under its runtime sibling's name (docs/CONVENTIONS.md,
+            # "Naming"), so `valkey` is two definitions. Taken as a directory it
+            # built only the one of that name, where compilation drops the
+            # variant's statements on the tag check (Req 6.30) — the claim never
+            # exercised, and nothing red to say so.
             if printf '%s\n' "$changed" | grep -q '^triage/vex/'; then
-              names="$names $(jq -r '.statements[]?.products[]?."@id" // empty' triage/vex/*.json 2>/dev/null \
-                | sed -nE 's#^pkg:oci/([^@?/]+).*#\1#p' | sort -u)"
+              . scripts/definition-lib.sh
+              for product in $(jq -r '.statements[]?.products[]?."@id" // empty' triage/vex/*.json 2>/dev/null \
+                               | sed -nE 's#^pkg:oci/([^@?/]+).*#\1#p' | sort -u); do
+                names="$names $(definitions_publishing . "$product" | cut -d/ -f2)"
+              done
             fi
             # Canary: a change to the gate itself touches no definition — build
             # the simplest image so the gate is exercised on the PR changing it.

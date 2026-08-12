@@ -435,7 +435,7 @@ run_case "unversioned display name skipped" 0
 # repository as different tags. So they have to build the same source: a drifted
 # `vars:` or checksum means the compat image is no longer the runtime image plus
 # a shell, and nothing anywhere would say so. image/valkey-compat/image.yaml's
-# own header promises this parity in prose; 177 of its 208 lines are byte-equal
+# own header promises this parity in prose; 180 of its 209 lines are byte-equal
 # to its sibling and nothing was checking that they stayed that way.
 
 # pair() writes a runtime/variant pair sharing one published repository.
@@ -490,6 +490,21 @@ mkdir -p "$SB/image/app" "$SB/image/other"
 printf '%s\nimage: ghcr.io/mm-weber/dhc/app\n%s' "$SYNTAX" "$BODY" > "$SB/image/app/image.yaml"
 printf '%s\nimage: ghcr.io/mm-weber/dhc/other\n%s' "$SYNTAX" "${BODY//1.1.0/2.0.0}" > "$SB/image/other/image.yaml"
 run_case "different repositories are not a pair" 0
+
+# 57: the frontend pin is compared under every spelling the pinning rule above
+#     accepts. `#syntax=` with no space is a valid digest-pinned frontend by that
+#     rule, so a pair whose frontends drifted has to fail on it too. Matched with
+#     exactly one space, the line dropped out of both sides of the comparison and
+#     two different frontend digests compared equal — a check that reports clean
+#     on the drift it exists to catch.
+fresh
+mkdir -p "$SB/image/app" "$SB/image/app-compat"
+DIGEST_B="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+printf '#syntax=dhi.io/build:2-alpine3.22@%s\nimage: ghcr.io/mm-weber/dhc/app\n%s' \
+  "$DIGEST" "$BODY" > "$SB/image/app/image.yaml"
+printf '#syntax=dhi.io/build:2-alpine3.22@%s\nimage: ghcr.io/mm-weber/dhc/app\n%s' \
+  "$DIGEST_B" "$BODY" > "$SB/image/app-compat/image.yaml"
+run_case "a drifted frontend pin fails under the unspaced spelling too" 1 "syntax="
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

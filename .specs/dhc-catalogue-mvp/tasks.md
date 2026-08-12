@@ -171,6 +171,13 @@
     - Already-published tags (`13.0.4-alpine3.23` and earlier) remain multi-arch indexes; they are private and pre-release, and are left as they are
     - Accepted-risk `paths:` globs already tolerate the arch suffix (7.8), and Req 6.26's dead-entry report is the instrument that would catch any entry that does not
     - _Requirements: Req 2.1, Req 2.6, Req 6.2_
+  - [x] 8.5 Resolve a VEX product name through `image:`, not through the directory
+    - Found reviewing 8.1. Every definition's directory name equalled the last segment of its `image:` until `image/valkey-compat/`, which publishes to `ghcr.io/mm-weber/dhc/valkey`. `compile-vex.sh` took the build-matrix name — the directory — as the product name, so a compat build stamped `pkg:oci/valkey-compat@<digest>` into every statement. Trivy builds its root component from the RepoDigest and reads `valkey`, so nothing would ever have matched
+    - Both directions were broken, and both failed green. `lint-vex-product.sh` resolved a purl name to `image/<name>/image.yaml`, so the only spelling Trivy matches (`pkg:oci/valkey@9.1.1-alpine3.23-compat`) scored a Req 6.20 violation — the compat tags are not in the runtime definition's `tags:` — while `pkg:oci/valkey-compat`, which compilation turns into a product that matches nothing, passed
+    - Latent rather than live: no valkey statement exists yet, and 7.3 is what would have written the first one. Landing the fix before that is the point — the same inert-statement failure as 7.6 and 7.9, arriving through the repo's own layout instead of through Trivy
+    - `compile-vex.sh` keeps the definition name as its reporting identity, because two definitions now share one repository and `rescan.yml` labels its VEX summary rows with it; the report gains a `product` field for the resolved name. `lint-vex-product.sh` resolves a name to every definition publishing that repository and unions their tags, so a variant's release tags are a valid scope and a tag neither publishes still fails. Req 6.20 was amended to say so — it scoped a version to "that image definition", singular, which stopped being a single definition here
+    - The mapping is one reader, `scripts/definition-lib.sh`, shared by both lints, the compiler, and `build.yml`'s affected-definitions step — which was the third consumer of the directory-equals-image-name assumption and derived its matrix for a VEX-only change straight from a purl name. Copies rather than a shared reader is how that one was missed: a reader that misses resolves to the directory name and reports as a clean compile
+    - _Requirements: Req 6.17, Req 6.20, Req 6.29, Req 6.30_
 
 ## Requirements Coverage
 
@@ -181,6 +188,6 @@
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5 |
-| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9 |
+| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5 |
 | Req 7: Conventions and Review | 1.1, 1.2, 1.3 |
 | Req 8: Operating Environment | 2.1, 3.3, 4.2, 6.5, 7.2 |

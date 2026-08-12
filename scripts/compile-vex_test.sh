@@ -227,14 +227,19 @@ else echo "FAIL no report requested, none written"; FAILURES=$((FAILURES+1)); fi
 # matched nothing at all, which is the inert case this whole lane exists to
 # catch, arriving through the caller.
 
-# defs() lays out a definition tree the compiler can resolve, and runs it from
-# there: the product name comes from the definition's `image:`, so the script
-# has to be able to find the definition.
+# defs() lays out a definition tree the compiler can resolve: the product name
+# comes from the definition's `image:`, so the script has to be able to find the
+# definition.
 defs() { # $1 = directory under image/, $2 = published repository
   mkdir -p "$SB/image/$1"
   printf 'image: %s\ntags:\n  - 9.1.1-alpine3.23-compat\n' "$2" > "$SB/image/$1/image.yaml"
 }
-run_in_root() { ( cd "$SB" && "$COMPILE" "$SB/src" "$SB/out" "$@" 2>&1 ); }
+# Rooted at the sandbox the way lint-pins.sh and lint-vex-product.sh take a root
+# argument, and run from an unrelated cwd on purpose: the definition lookup is
+# the script's own, not the caller's. Keyed on cwd it fell back to the directory
+# name from anywhere but the repo root — the inert product this lane exists to
+# prevent, wearing a clean compile.
+run_in_root() { ( cd / && COMPILE_VEX_ROOT="$SB" "$COMPILE" "$SB/src" "$SB/out" "$@" 2>&1 ); }
 
 # 19: the product name comes from `image:`, not from the directory. A statement
 #     written the way Trivy will read it survives a compat build.
