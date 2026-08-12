@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       component:
-        description: "Single component (cert-manager|grafana|hardened-app); empty = all"
+        description: "Single component (cert-manager|grafana|hardened-app|valkey); empty = all"
         required: false
         type: string
 

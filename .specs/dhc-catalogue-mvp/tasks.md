@@ -92,6 +92,7 @@
     - _Requirements: Req 5.3, Req 5.4, Req 5.7_
   - [x] 6.3 Per-component specs with functional probes
     - cert-manager issues a Certificate; grafana HTTP health; valkey SET/GET; hardened-app HTTP 200
+    - Checked off in phase 6 with three of the four probes written. valkey's SET/GET had no chart to run against until 8.1, and `componentSpecs` said so in a comment rather than here — so this box claimed a probe the suite did not have. Completed by 8.1; recorded because the checkbox, not the comment, is what this plan is read for
     - _Requirements: Req 5.5_
   - [x] 6.4 Upgrade-path spec [CUT 3rd if pressed: grafana depth only]
     - On bump PRs: install currently pinned version → upgrade to proposed → re-assert
@@ -161,7 +162,8 @@
     - Upstream is the valkey project's own chart, `valkey-io/valkey-helm` 0.11.0, whose appVersion 9.1.1 is the version `image/valkey/` builds — no version skew to argue, unlike grafana. It also arrives harder by default (drop-ALL, `readOnlyRootFilesystem`, `runAsNonRoot`, seccomp), so the overlay moves the UID to 65532, states `runAsNonRoot` at **pod** level where `require-nonroot.yaml` reads it, turns on the opt-in readiness probe, and states persistence off
     - Forced a real Req 4.5 decision, the first in the catalogue: the chart renders an **unconditional** init container from the same image value as the main container and runs `/scripts/init.sh`, a `#!/bin/sh` script that generates the config the main container is started with. `extraInitContainers` appends rather than replaces and no flag disables it, so nothing in values reaches it. Answered with `image/valkey-compat/` — the runtime definition plus one package, busybox — and the cost (a shell in a deployed image, busybox on its CVE surface) is written down in `chart/valkey/README.md` rather than glossed
     - A compat image publishes no digest until it lands on main, so this branch carried the tag unpinned and the chart gate failed on `require-image-digest` until `image/valkey-compat/` shipped ahead of it in #53. Deliberate — a placeholder digest passes that gate (see 8.4), so unpinned was the only spelling that failed for the true reason. Now pinned to the digest of that build, `sha256:e9bca4f5…`, and the gate renders all four charts at `fail: 0`. Nothing bumps it automatically: no Renovate manager reads chart values (`enabledManagers: ["custom.regex"]` over `image/` and `scripts/`), so a rebuild moves the digest and this line follows by hand
-    - _Requirements: Req 4.1, Req 4.2, Req 4.3, Req 4.4, Req 4.5, Req 4.7_
+    - `image/valkey-compat/` is the catalogue's first built variant, so it also introduces the directory convention for one: `image/<name>-<variant>/` publishing to its runtime sibling's repository, now written down in `docs/CONVENTIONS.md` ("Naming") with the byte-equal-source-pin rule that `scripts/lint-pins.sh` enforces over the pair. The consequence for the triage lane is 8.5
+    - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 4.1, Req 4.2, Req 4.3, Req 4.4, Req 4.5, Req 4.7_
   - [ ] 8.2 README narrative and operating handoff
     - README: lab → catalogue arc, verification walkthrough (cosign verify, SBOM/provenance inspect), triage story
     - Confirm crons active (Renovate, rescan); `/spec-validate` + coverage check against this plan; repo stays private
