@@ -11,16 +11,21 @@
 # a /bin/sh script from this same image value. See ../README.md, "Compat-variant
 # decision (Req 4.5)".
 #
-# PENDING: image/valkey-compat/ publishes on the first main build after it
-# merges, and there is no digest to pin before that. The tag is deliberately
-# left unpinned rather than filled with a placeholder: `@sha256:<anything>`
-# satisfies policies/require-image-digest.yaml (measured — its pattern is
-# `*@sha256:*`), so a placeholder would pass the gate green while pointing at
-# nothing. Unpinned, the gate fails on exactly the true reason.
+# The digest is the one image/valkey-compat/ published on the first main build
+# after #53 merged. Until then the tag was deliberately left unpinned rather
+# than filled with a placeholder: `@sha256:<anything>` satisfies
+# policies/require-image-digest.yaml (measured — its pattern is `*@sha256:*`),
+# so a placeholder would have passed the gate green while pointing at nothing,
+# whereas unpinned failed it for the true reason. Closing that hole is task 8.4.
+#
+# Nothing bumps this automatically: renovate.json5 is
+# `enabledManagers: ["custom.regex"]` over image/ and scripts/ only, so no
+# manager reads chart values. A rebuild of image/valkey-compat/ moves the digest
+# and this line has to follow it by hand.
 image:
   registry: ghcr.io
   repository: mm-weber/dhc/valkey
-  tag: 9.1.1-alpine3.23-compat
+  tag: 9.1.1-alpine3.23-compat@sha256:e9bca4f52dde8bf6bd3b83aae1c3f900c19115406aaa3c1f8282177117d51c6d
 
 # UID/GID 65532 (Req 4.3); the chart defaults to 1000, which no catalogue image
 # has an account for. runAsNonRoot is NOT a chart default at pod level and the
