@@ -86,11 +86,14 @@ for (const role of ["controller", "webhook", "cainjector"]) {
   check(`source: cert-manager-${role} → cert-manager/cert-manager`, !!d && isTag(d.currentValue), JSON.stringify(deps));
 }
 
-// valkey tags have no leading 'v' (#9.0.5) — proves the v-optional regex tracks it
-{
-  const deps = extract(sourceMgr, read("image/valkey/image.yaml"));
+// valkey tags have no leading 'v' (#9.0.5) — proves the v-optional regex tracks it.
+// Both definitions, because the compat variant carries a byte-equal source pin and
+// a bump has to move the pair: tracked separately they diverge, and the runtime
+// and compat images stop being the same valkey.
+for (const def of ["valkey", "valkey-compat"]) {
+  const deps = extract(sourceMgr, read(`image/${def}/image.yaml`));
   const d = dep(deps, { datasource: "github-tags", depName: "valkey-io/valkey" });
-  check("source: valkey → github-tags valkey-io/valkey (no-v tag)", !!d && isTag(d.currentValue), JSON.stringify(deps));
+  check(`source: ${def} → github-tags valkey-io/valkey (no-v tag)`, !!d && isTag(d.currentValue), JSON.stringify(deps));
 }
 
 // generic owner/repo + a two-digit-minor tag, via a frozen fixture (safe to pin exactly)
@@ -199,7 +202,7 @@ check(
   extract(sourceMgr, read("image/grafana/image.yaml")).length === 0,
   JSON.stringify(extract(sourceMgr, read("image/grafana/image.yaml"))),
 );
-for (const other of ["cert-manager-controller", "hardened-app", "valkey"]) {
+for (const other of ["cert-manager-controller", "hardened-app", "valkey", "valkey-compat"]) {
   const deps = extract(grafanaMgr, read(`image/${other}/image.yaml`));
   check(`grafana: manager ignores ${other}`, deps.length === 0, JSON.stringify(deps));
 }

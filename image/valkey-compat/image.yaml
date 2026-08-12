@@ -1,0 +1,209 @@
+# syntax=dhi.io/build:2-alpine3.23@sha256:4c240813846eddcc650e8e4f3b416384c01cbf35336c8a75342f727de8867358
+
+# The `-compat` variant of the valkey runtime (docs/CONVENTIONS.md "Naming",
+# docs/concepts.md "The variant taxonomy"): byte-identical to image/valkey/
+# except for one added package — busybox — and the tags that suffix.
+#
+# It exists because of an upstream chart, and the decision is recorded where a
+# reader meets it: chart/valkey/README.md, "Compat-variant decision (Req 4.5)".
+# In short: valkey-io/valkey-helm renders an unconditional init container from
+# the SAME image value as the main container and runs `/scripts/init.sh`, a
+# `#!/bin/sh` script that generates /data/conf/valkey.conf. No value overrides
+# it — `extraInitContainers` only appends. The shell-less runtime image cannot
+# execute it, so the chart deploys this variant instead.
+#
+# Rule from the taxonomy: deploy the least capable variant that works. The
+# runtime image stays the default for anything that does not need a shell.
+name: Valkey compat 9.1.x
+image: ghcr.io/mm-weber/dhc/valkey
+variant: compat
+tags:
+  - 9-alpine3.23-compat
+  - 9.1-alpine3.23-compat
+  - 9.1.1-alpine3.23-compat
+platforms:
+  - linux/amd64
+  - linux/arm64
+dates:
+  release: "2026-07-21"
+vars:
+  COMMIT_SHA: d27f9ba65a04e80d9c417112a7621fc98a56f70d
+  SEMVER_MAJOR_MINOR_VERSION: "9.1"
+  SEMVER_MAJOR_VERSION: "9"
+  SEMVER_VERSION: 9.1.1
+  VERSION: 9.1.1
+contents:
+  repositories:
+    - https://dhi.io/apk/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/community
+  keyring:
+    - https://dhi.io/keyring/dhi-apk@docker-0F81AD7700D99184.rsa.pub
+  # Runtime: as image/valkey/ plus busybox, which is the whole variant. busybox
+  # brings /bin/sh and the applets the chart's init script calls — date, tee,
+  # mkdir, rm, cat — in one ~800 KB binary of symlinks. That is the smallest
+  # shell userland Alpine packages; coreutils/bash would add more surface for
+  # nothing this script uses.
+  packages:
+    - alpine-baselayout-data
+    - busybox
+    - ca-certificates-bundle
+    - libssl3
+  builds:
+    # Build-then-repackage archetype: compile valkey from source (C, make) and
+    # copy the binaries onto the minimal runtime. git+checksum pins the source
+    # (Req 1.3). Byte-equal to image/valkey/, and the "valkey runtime and compat"
+    # rule in renovate.json5 moves both in one PR (docs/CONVENTIONS.md "Naming",
+    # Definitions bullet; Req 3.3). scripts/lint-pins.sh enforces the parity.
+    - name: valkey
+      work-dir: ${source.dir}/valkey
+      contents:
+        packages:
+          - busybox
+          - bash
+          - gcc
+          - make
+          - libc-dev
+          - linux-headers
+          - openssl-dev
+          - pkgconf
+        files:
+          - url: git+https://github.com/valkey-io/valkey.git#9.1.1
+            checksum: d27f9ba65a04e80d9c417112a7621fc98a56f70d
+            path: ${source.dir}/valkey
+            spdx:
+              name: valkey
+              version: 9.1.1
+              packages:
+                - name: valkey
+                  purl: pkg:github/valkey-io/valkey@9.1.1
+                  license: BSD-3-Clause
+            uid: 0
+            gid: 0
+      pipeline:
+        - name: build
+          runs: |
+            set -eux -o pipefail
+
+            make -j4 BUILD_TLS=yes
+
+            mkdir -p "${target.dir}/usr/local/bin"
+            for b in valkey-server valkey-cli valkey-benchmark; do
+              cp "src/${b}" "${target.dir}/usr/local/bin/${b}"
+            done
+      outputs:
+        - source: ${target.dir}/usr/local/bin/valkey-server
+          target: /usr/local/bin/valkey-server
+          uid: 0
+          gid: 0
+          mode: "0755"
+        - source: ${target.dir}/usr/local/bin/valkey-cli
+          target: /usr/local/bin/valkey-cli
+          uid: 0
+          gid: 0
+          mode: "0755"
+        - source: ${target.dir}/usr/local/bin/valkey-benchmark
+          target: /usr/local/bin/valkey-benchmark
+          uid: 0
+          gid: 0
+          mode: "0755"
+        - source: /opt/docker/sbom/valkey
+          target: /opt/docker/sbom/valkey
+          uid: 0
+          gid: 0
+accounts:
+  run-as: nonroot
+  users:
+    - name: nonroot
+      uid: 65532
+      gid: 65532
+  groups:
+    - name: nonroot
+      gid: 65532
+      members:
+        - nonroot
+os-release:
+  name: dhc hardened images (Alpine)
+  id: alpine
+  version-id: "3.23"
+  pretty-name: dhc hardened images/Alpine Linux v3.23
+  home-url: https://github.com/mm-weber/dhc-pipeline
+  bug-report-url: https://github.com/mm-weber/dhc-pipeline/issues
+work-dir: /data
+# Stateful archetype: valkey persists to /data (RDB/AOF). Writable dirs owned
+# by nonroot 65532 — the volume-mount surface for the chart. redis-* symlinks
+# give drop-in Redis compatibility (valkey-server dispatches on argv[0]).
+paths:
+  - type: symlink
+    path: /usr/local/bin/redis-server
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: symlink
+    path: /usr/local/bin/redis-cli
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-cli
+  - type: symlink
+    path: /usr/local/bin/redis-benchmark
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-benchmark
+  - type: symlink
+    path: /usr/local/bin/redis-sentinel
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: symlink
+    path: /usr/local/bin/redis-check-rdb
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: symlink
+    path: /usr/local/bin/redis-check-aof
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: symlink
+    path: /usr/local/bin/valkey-sentinel
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: symlink
+    path: /usr/local/bin/valkey-check-rdb
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: symlink
+    path: /usr/local/bin/valkey-check-aof
+    uid: 0
+    gid: 0
+    source: /usr/local/bin/valkey-server
+  - type: directory
+    path: /data
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /var/lib/valkey
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /var/log/valkey
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /run/valkey
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+annotations:
+  org.opencontainers.image.description: Minimal Valkey image plus a busybox shell, for charts that need one
+  org.opencontainers.image.source: https://github.com/mm-weber/dhc-pipeline
+  org.opencontainers.image.licenses: BSD-3-Clause
+entrypoint:
+  - valkey-server
+ports:
+  - 6379/tcp

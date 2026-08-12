@@ -41,6 +41,9 @@ jobs:
       - name: accepted-risk lint — risk treatment lane (Req 6.11, 6.12)
         run: scripts/lint-accepted-risk.sh
 
+      - name: definition-lib unit tests (directory vs published name)
+        run: scripts/definition-lib_test.sh
+
       - name: pin-linter unit tests
         run: scripts/lint-pins_test.sh
 
