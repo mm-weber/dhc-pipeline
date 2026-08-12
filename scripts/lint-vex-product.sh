@@ -82,9 +82,28 @@ published_tags() { # definition path
        intags && /^[^[:space:]]/ { intags = 0 }' "$1"
 }
 
+# Definitions publishing a repository whose last path segment is $1, keyed on
+# each definition's own `image:` rather than on its directory name. Those were
+# the same string until image/valkey-compat/, which publishes to the repository
+# its runtime sibling names (docs/CONVENTIONS.md, "Naming"). Trivy builds the
+# product purl from the scanned image's RepoDigest, so both definitions are read
+# as `valkey` and only the tag separates them — keyed on the directory, the one
+# spelling Trivy matches was unwritable and the one it never produces passed.
+definitions_publishing() { # image name
+  local f repo
+  for f in "$ROOT"/image/*/image.yaml; do
+    if [ -f "$f" ]; then
+      repo="$(published_repository "$f")"
+      if [ "${repo##*/}" = "$1" ]; then printf '%s\n' "${f#"$ROOT"/}"; fi
+    fi
+  done
+  return 0
+}
+
 check_product() { # rel, cve, product purl, subcomponent count, status, status_notes
   local rel="$1" cve="$2" purl="$3" nsubs="$4" status="$5" notes="${6:-}"
-  local rest type name version quals qrest q k v repo expected def shown tags
+  local rest type name version quals qrest q k v repo expected shown tags shown_defs d
+  local -a defs
 
   # Rule 4 first, so a defect in the identifier cannot mask it: every recipe in
   # triage/README.md scopes the suppression to the one package that was
@@ -144,30 +163,38 @@ check_product() { # rel, cve, product purl, subcomponent count, status, status_n
   # The purl name is the image; there is no "does this image exist" check
   # anywhere else, and a near-miss spelling reads correct while suppressing
   # nothing.
-  def="image/$name/image.yaml"
-  if [ ! -f "$ROOT/$def" ]; then
-    report "$rel" 6.17 "$cve product '$purl' names image '$name', but this repo has no definition '$def' — the statement is about an image nothing here builds"
+  mapfile -t defs < <(definitions_publishing "$name")
+  if [ "${#defs[@]}" -eq 0 ]; then
+    report "$rel" 6.17 "$cve product '$purl' names image '$name', but no definition under image/ publishes a repository named '$name' — there is no 'image/$name/image.yaml', and no other definition's 'image:' ends in it. A variant publishes under its runtime sibling's name, so a definition's directory is never the product name"
     return
   fi
+  shown_defs="$(printf '%s, ' "${defs[@]}")"; shown_defs="${shown_defs%, }"
 
   # A version in source is a scope, not an identifier: compile-vex.sh replaces
   # it with the digest of the image being scanned (6.29) and drops the statement
   # when the tag is not one of that build's (6.30). So a version that is not a
   # published tag is dropped on every build — it suppresses nothing and says
   # nothing, which is the inert case this lint exists to catch.
+  # Unioned across every definition publishing this repository, because a
+  # variant's release tags are as published as its runtime sibling's and both
+  # arrive under the same product name. compile-vex.sh is what separates them:
+  # it drops a statement whose tag is not one of the build's (Req 6.30), so the
+  # tag stays the scope even though the name no longer distinguishes.
   if [ -n "$version" ]; then
-    tags="$(published_tags "$ROOT/$def")"
+    tags="$(for d in "${defs[@]}"; do published_tags "$ROOT/$d"; done | sort -u)"
     if [ -z "$tags" ]; then
-      report "$rel" 6.20 "$cve product '$purl' pins version '$version', but '$def' declares no 'tags:' — there is no published tag this could scope to, so compilation drops it on every build"
+      report "$rel" 6.20 "$cve product '$purl' pins version '$version', but '$shown_defs' declares no 'tags:' — there is no published tag this could scope to, so compilation drops it on every build"
     elif ! grep -qxF "$version" <<<"$tags"; then
       shown="$(tr '\n' ' ' <<<"$tags" | sed 's/ $//')"
-      report "$rel" 6.20 "$cve product '$purl' pins version '$version', which '$def' does not publish — a source version is a published tag, and compilation looks it up against the build. A digest belongs in compiler output, never in source: it is unreviewable and goes stale at the next rebuild of the same release. Tags '$def' publishes: $shown"
+      report "$rel" 6.20 "$cve product '$purl' pins version '$version', which '$shown_defs' does not publish — a source version is a published tag, and compilation looks it up against the build. A digest belongs in compiler output, never in source: it is unreviewable and goes stale at the next rebuild of the same release. Tags '$shown_defs' publishes: $shown"
     fi
   fi
 
-  expected="$(published_repository "$ROOT/$def")"
+  # Every definition in defs publishes the same repository by construction, so
+  # the first is the comparison for all of them.
+  expected="$(published_repository "$ROOT/${defs[0]}")"
   if [ -z "$expected" ]; then
-    report "$rel" 6.18 "$cve product '$purl' resolves to '$def', which declares no 'image:' — there is no published repository to compare against"
+    report "$rel" 6.18 "$cve product '$purl' resolves to '$shown_defs', which declares no 'image:' — there is no published repository to compare against"
     return
   fi
 
@@ -187,9 +214,9 @@ check_product() { # rel, cve, product purl, subcomponent count, status, status_n
   done
 
   if [ -z "$repo" ]; then
-    report "$rel" 6.18 "$cve product '$purl' carries no 'repository_url' value — Trivy's root component purl always has one, so a product without it matches nothing and the author gets no hint of that. Expected the repository '$def' publishes: '$expected' (slashes percent-encoded)"
+    report "$rel" 6.18 "$cve product '$purl' carries no 'repository_url' value — Trivy's root component purl always has one, so a product without it matches nothing and the author gets no hint of that. Expected the repository '$shown_defs' publishes: '$expected' (slashes percent-encoded)"
   elif [ "$repo" != "$expected" ]; then
-    report "$rel" 6.18 "$cve product '$purl' declares repository '$repo', but '$def' publishes '$expected' — Trivy compares this string exactly, so the statement is inert: the finding stays and nothing says why"
+    report "$rel" 6.18 "$cve product '$purl' declares repository '$repo', but '$shown_defs' publishes '$expected' — Trivy compares this string exactly, so the statement is inert: the finding stays and nothing says why"
   fi
 }
 

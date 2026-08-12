@@ -217,5 +217,67 @@ check "no report requested, exit still 0" "0" "$rc"
 if [ ! -e "$SB/report.json" ]; then echo "ok   no report requested, none written"
 else echo "FAIL no report requested, none written"; FAILURES=$((FAILURES+1)); fi
 
+# --- a variant definition publishes under its sibling's name ----------------
+#
+# Every definition's directory name equalled the last segment of its `image:`
+# until image/valkey-compat/, which publishes to .../valkey as a `-compat` tag
+# (docs/CONVENTIONS.md, "Naming"). Trivy builds the product purl from the
+# scanned image's RepoDigest, so on a compat build it sees `valkey` — keying
+# compilation on the directory stamped `valkey-compat` into every product and
+# matched nothing at all, which is the inert case this whole lane exists to
+# catch, arriving through the caller.
+
+# defs() lays out a definition tree the compiler can resolve, and runs it from
+# there: the product name comes from the definition's `image:`, so the script
+# has to be able to find the definition.
+defs() { # $1 = directory under image/, $2 = published repository
+  mkdir -p "$SB/image/$1"
+  printf 'image: %s\ntags:\n  - 9.1.1-alpine3.23-compat\n' "$2" > "$SB/image/$1/image.yaml"
+}
+run_in_root() { ( cd "$SB" && "$COMPILE" "$SB/src" "$SB/out" "$@" 2>&1 ); }
+
+# 19: the product name comes from `image:`, not from the directory. A statement
+#     written the way Trivy will read it survives a compat build.
+fresh
+defs valkey-compat ghcr.io/mm-weber/dhc/valkey
+src a.json "pkg:oci/valkey@9.1.1-alpine3.23-compat?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fvalkey" fixed
+run_in_root valkey-compat "$DIGEST" 9.1.1-alpine3.23-compat >/dev/null
+check "variant compiles under its published name" "pkg:oci/valkey@$DIGEST" "$(products)"
+
+# 20: and the directory name is not a product identifier. Written that way a
+#     statement passes review, compiles, and suppresses nothing.
+fresh
+defs valkey-compat ghcr.io/mm-weber/dhc/valkey
+src a.json "pkg:oci/valkey-compat?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fvalkey" not_affected
+out=$(run_in_root valkey-compat "$DIGEST" 9.1.1-alpine3.23-compat)
+check "the directory name is not a product" "" "$(products)"
+contains "and the drop says which name was built" "$out" "building 'valkey'"
+
+# 21: the runtime sibling's release tags are not this build's. Two definitions
+#     share one repository, so the tag list is the only thing separating them.
+fresh
+defs valkey-compat ghcr.io/mm-weber/dhc/valkey
+src a.json "pkg:oci/valkey@9.1.1-alpine3.23?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fvalkey" fixed
+run_in_root valkey-compat "$DIGEST" 9.1.1-alpine3.23-compat >/dev/null
+check "the sibling's tag is dropped" "" "$(products)"
+
+# 22: the report still identifies the definition, not the published name. Both
+#     valkey definitions compile as `valkey`, and a rescan summary that labelled
+#     its rows with that would render two rows nothing tells apart.
+fresh
+defs valkey-compat ghcr.io/mm-weber/dhc/valkey
+src a.json "pkg:oci/valkey?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fvalkey" not_affected
+COMPILE_VEX_REPORT="$SB/report.json" run_in_root valkey-compat "$DIGEST" 9.1.1-alpine3.23-compat >/dev/null
+check "report keeps the definition as its identity" "valkey-compat" "$(rjq '.image')"
+check "report names the resolved product too"       "valkey"        "$(rjq '.product')"
+
+# 23: no definition in reach is the pre-variant contract — the name given is
+#     the name used. Every caller relied on that before variants existed, and
+#     the tests above run without a definition tree.
+fresh
+src a.json "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" not_affected
+run_in_root grafana "$DIGEST" 13.1.1-alpine3.23 >/dev/null
+check "no definition tree falls back to the given name" "pkg:oci/grafana@$DIGEST" "$(products)"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

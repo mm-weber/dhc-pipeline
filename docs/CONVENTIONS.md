@@ -23,6 +23,20 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
   images (see cert-manager-{controller,webhook,cainjector}) keeps byte-equal
   source pins (`vars:`, `url:`, `checksum:`) across its definitions; Renovate
   groups their bumps into a single PR (Req 3.3) so one version moves all.
+- A **variant** that has to be built rather than merely tagged gets its own
+  directory, `image/<name>-<variant>/` (see valkey-compat). It publishes to the
+  repository its runtime sibling names — the variant is a tag suffix, per
+  Naming above — so this is the one case where two definitions emit to **one**
+  repository and a definition's directory name is not its published image name.
+  Same byte-equal-source-pins and single-PR rules as a monorepo; the pair is
+  additionally checked for parity by `scripts/lint-pins.sh`, since a variant
+  that drifts from its runtime sibling stops being that image plus a package.
+  - Consequence worth knowing before writing one: Trivy builds a scanned
+    image's product purl from its RepoDigest, so **both** valkey definitions
+    are read as `valkey`, and a VEX product naming the directory matches
+    nothing. `scripts/compile-vex.sh` and `scripts/lint-vex-product.sh`
+    therefore resolve the product name through the definition's `image:`, and
+    the published tag is what separates the two (Req 6.29, 6.30).
 
 ## Pinning (Req 1.2, 1.3, 1.6)
 

@@ -429,5 +429,67 @@ fresh
 printf '%s\nname: app\nimage: ghcr.io/mm-weber/dhc/app\nvars:\n  VERSION: 1.1.0\n' "$SYNTAX" > "$SB/image/app/image.yaml"
 run_case "unversioned display name skipped" 0
 
+# --- variant parity (docs/CONVENTIONS.md, Naming) ---------------------------
+#
+# A variant is its runtime sibling plus a package, and the two publish to one
+# repository as different tags. So they have to build the same source: a drifted
+# `vars:` or checksum means the compat image is no longer the runtime image plus
+# a shell, and nothing anywhere would say so. image/valkey-compat/image.yaml's
+# own header promises this parity in prose; 177 of its 208 lines are byte-equal
+# to its sibling and nothing was checking that they stayed that way.
+
+# pair() writes a runtime/variant pair sharing one published repository.
+pair() { # $1 = runtime vars/source body, $2 = variant vars/source body
+  mkdir -p "$SB/image/app" "$SB/image/app-compat"
+  printf '%s\nimage: ghcr.io/mm-weber/dhc/app\n%s' "$SYNTAX" "$1" > "$SB/image/app/image.yaml"
+  printf '%s\nimage: ghcr.io/mm-weber/dhc/app\n%s' "$SYNTAX" "$2" > "$SB/image/app-compat/image.yaml"
+}
+BODY='vars:
+  VERSION: 1.1.0
+contents:
+  packages:
+    - libssl3
+  builds:
+    - name: app
+      contents:
+        files:
+          - url: git+https://github.com/o/app.git#1.1.0
+            checksum: d27f9ba65a04e80d9c417112a7621fc98a56f70d
+'
+# The variant body: byte-equal source pins, one extra package. Every fixture
+# below stays internally coherent (VERSION agrees with the url), so a failure
+# here is the parity rule and never the pre-existing coherence rule.
+VARIANT_BODY="${BODY/    - libssl3/    - busybox
+    - libssl3}"
+
+# 53: the shape the repo actually ships — same source pins, one extra package
+fresh
+pair "$BODY" "$VARIANT_BODY"
+run_case "a variant differing only by a package passes" 0
+
+# 54: a drifted version is the whole failure mode. Two images built from
+#     different releases, published as tags of one repository, both claiming to
+#     be 1.1.0's runtime and compat.
+fresh
+pair "$BODY" "${VARIANT_BODY//1.1.0/1.1.1}"
+run_case "a variant whose source pin drifted fails" 1
+run_case "the drift names the definition" 1 "image/app-compat/image.yaml"
+
+# 55: same for the content pin. A matching version with a different commit is
+#     the harder case to see by eye and the one Renovate's postUpgradeTasks
+#     could produce by refreshing only one of the pair.
+fresh
+pair "$BODY" "${VARIANT_BODY//d27f9ba65a04e80d9c417112a7621fc98a56f70d/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}"
+run_case "a variant whose checksum drifted fails" 1 "checksum"
+
+# 56: definitions publishing different repositories are not a pair — the three
+#     cert-manager definitions share a monorepo but not a repository, and
+#     nothing about them is byte-equal by this rule.
+fresh
+mkdir -p "$SB/image/app" "$SB/image/other"
+printf '%s\nimage: ghcr.io/mm-weber/dhc/app\n%s' "$SYNTAX" "$BODY" > "$SB/image/app/image.yaml"
+printf '%s\nimage: ghcr.io/mm-weber/dhc/other\n%s' "$SYNTAX" "${BODY//1.1.0/2.0.0}" > "$SB/image/other/image.yaml"
+run_case "different repositories are not a pair" 0
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

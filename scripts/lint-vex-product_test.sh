@@ -620,6 +620,48 @@ run_case "a superseded statement retained beside its replacement passes" 0
 refute_case "the supersession shape emits no annotation" 0 "::error"
 run_case "the supersession run names the file it checked" 0 "triage/vex/$CVE2.openvex.json"
 
+# 49: a variant definition publishes under its sibling's name. image/valkey-compat/
+# emits to ghcr.io/mm-weber/dhc/valkey as a `-compat` tag (docs/CONVENTIONS.md,
+# "Naming"), so Trivy reads the product as `valkey` on either build and the tag
+# is the only thing separating them. Resolving the purl name through the
+# directory made the compat tags unwritable: the only spelling Trivy matches
+# scored a Req 6.20 violation, and the spelling that satisfied the lint —
+# `pkg:oci/valkey-compat` — is one compilation stamps into a product that
+# matches nothing.
+compat() { # add the variant definition beside the runtime one
+  mkdir -p "$SB/image/valkey-compat"
+  printf 'name: Valkey compat 9.1.x\nimage: ghcr.io/mm-weber/dhc/valkey\ntags:\n  - 9-alpine3.23-compat\n  - 9.1.1-alpine3.23-compat\n' > "$SB/image/valkey-compat/image.yaml"
+}
+VALKEY_COMPAT_TAGGED="pkg:oci/valkey@9.1.1-alpine3.23-compat?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fvalkey"
+
+fresh; compat
+write_doc "$SB/triage/vex/$CVE1.openvex.json" \
+  "$(stmt_status '"fixed"' "$CVE1" "$(prod "$VALKEY_COMPAT_TAGGED" "$PROM")")"
+run_case "a variant's published tag is a valid scope" 0
+refute_case "the variant tag emits no annotation" 0 "::error"
+
+# 50: the runtime sibling's tags stay valid under the same name — resolving to
+# every definition that publishes the repository is a union, not a swap.
+fresh; compat
+write_doc "$SB/triage/vex/$CVE1.openvex.json" \
+  "$(stmt_status '"fixed"' "$CVE1" "$(prod "pkg:oci/valkey@9-alpine3.23?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fvalkey" "$PROM")")"
+run_case "the runtime sibling's tag still passes" 0
+
+# 51: and a tag neither of them publishes is still caught, so the union widened
+# the scope rather than removing the rule.
+fresh; compat
+write_doc "$SB/triage/vex/$CVE1.openvex.json" \
+  "$(stmt_status '"fixed"' "$CVE1" "$(prod "pkg:oci/valkey@9.9.9-alpine3.23?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fvalkey" "$PROM")")"
+run_case "a tag no definition publishes still fails" 1 "Req 6.20"
+
+# 52: the directory name is not a product identifier. It names a real directory,
+# which is exactly why the old resolution accepted it, and Trivy never produces
+# it — the statement would pass review and suppress nothing.
+fresh; compat
+write_doc "$SB/triage/vex/$CVE1.openvex.json" \
+  "$(stmt_status '"not_affected"' "$CVE1" "$(prod "pkg:oci/valkey-compat?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fvalkey" "$PROM")")"
+run_case "a variant's directory name is not a product" 1 "valkey-compat"
+
 echo
 if [ "$FAILURES" -eq 0 ]; then echo "all lint-vex-product tests passed"; else echo "$FAILURES failing assertion(s)"; fi
 exit $((FAILURES > 0))

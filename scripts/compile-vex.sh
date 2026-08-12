@@ -41,10 +41,10 @@
 set -euo pipefail
 
 if [ "$#" -lt 4 ]; then
-  echo "usage: compile-vex.sh <src-dir> <out-dir> <image-name> <digest> [tag ...]" >&2
+  echo "usage: compile-vex.sh <src-dir> <out-dir> <definition> <digest> [tag ...]" >&2
   exit 2
 fi
-SRC="$1"; OUT="$2"; IMAGE="$3"; DIGEST="$4"; shift 4
+SRC="$1"; OUT="$2"; DEFINITION="$3"; DIGEST="$4"; shift 4
 
 if [ ! -d "$SRC" ]; then
   echo "compile-vex: source directory '$SRC' does not exist — no statement was compiled" >&2
@@ -52,11 +52,36 @@ if [ ! -d "$SRC" ]; then
 fi
 mkdir -p "$OUT"
 
-python3 - "$SRC" "$OUT" "$IMAGE" "$DIGEST" "$@" <<'PY'
+# The product name is the last path segment of the definition's `image:`, not
+# the definition's directory name. Those were the same string for every
+# definition until image/valkey-compat/, which publishes to .../valkey as a
+# `-compat` tag (docs/CONVENTIONS.md, "Naming"). Trivy builds its root component
+# purl from the scanned image's RepoDigest, so on a compat build it reads
+# `valkey` — keyed on the directory this stamped `valkey-compat` into every
+# product, which matches nothing and reports as a clean compile.
+#
+# The definition name stays the reporting identity: two definitions now share
+# one repository, and a summary labelled with the published name would render
+# rows nothing tells apart. Falling back to the given name when no definition is
+# in reach is the pre-variant contract, which the tests rely on.
+IMAGE="$DEFINITION"
+DEF_FILE="image/${DEFINITION}/image.yaml"
+if [ -f "$DEF_FILE" ]; then
+  repo="$(awk 'sub(/^image:[[:space:]]*/, "") {
+                 sub(/[[:space:]]*#.*$/, ""); sub(/[[:space:]]+$/, "")
+                 gsub(/^["'\'']|["'\'']$/, "")
+                 print; exit
+               }' "$DEF_FILE")"
+  [ -n "$repo" ] && IMAGE="${repo##*/}"
+fi
+
+VEX_DEFINITION="$DEFINITION" python3 - "$SRC" "$OUT" "$IMAGE" "$DIGEST" "$@" <<'PY'
 import glob, json, os, sys
 
 src, out, image, digest = sys.argv[1:5]
 tags = set(sys.argv[5:])
+# What built this, as opposed to what it publishes as. They differ for a variant.
+definition = os.environ.get("VEX_DEFINITION") or image
 
 def parse(pid):
     """(name, version) for a pkg:oci purl, or (None, None) if it is not one."""
@@ -132,8 +157,9 @@ print(f"compile-vex: {compiled} statement(s) compiled for {image}@{digest}, {dro
 report = os.environ.get("COMPILE_VEX_REPORT", "")
 if report:
     with open(report, "w") as fh:
-        json.dump({"image": image, "digest": digest, "tags": sorted(tags),
-                   "compiled": compiled, "dropped": dropped, "drops": drops},
+        json.dump({"image": definition, "product": image, "digest": digest,
+                   "tags": sorted(tags), "compiled": compiled,
+                   "dropped": dropped, "drops": drops},
                   fh, indent=2)
         fh.write("\n")
 PY

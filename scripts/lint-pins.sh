@@ -259,8 +259,54 @@ while IFS= read -r -d '' file; do
   fi
 done < <(find "${scan_dirs[@]}" -type f -name '*.yaml' -print0)
 
+# --- variant parity (docs/CONVENTIONS.md, "Naming") -------------------------
+#
+# Two definitions publishing ONE repository are a runtime/variant pair: the
+# variant is its sibling plus a package, shipped as a different tag. So both
+# have to build the same source — the frontend pin, `vars:`, and every
+# url:/checksum: line byte-equal. A drifted pin means the compat image quietly
+# stopped being the runtime image plus a shell, which is exactly the claim
+# image/valkey-compat/image.yaml makes in prose and nothing was checking.
+#
+# Keyed on the published repository rather than on a `-<variant>` name suffix,
+# so the three cert-manager definitions (one monorepo, three repositories) are
+# correctly not a pair.
+source_pins() { # definition path — the fields a pair must agree on
+  awk '/^# syntax=/ { print; next }
+       /^vars:[[:space:]]*$/ { invars = 1; print; next }
+       invars && /^[^[:space:]#]/ { invars = 0 }
+       invars { print; next }
+       /^[[:space:]]*-?[[:space:]]*(url|checksum):[[:space:]]/ {
+         sub(/^[[:space:]]*-?[[:space:]]*/, ""); print
+       }' "$1"
+}
+
+if [ -d "$ROOT/image" ]; then
+  declare -A first_def=()
+  while IFS= read -r def; do
+    [ -f "$def" ] || continue
+    rel="${def#"$ROOT"/}"
+    repo="$(awk 'sub(/^image:[[:space:]]*/, "") {
+                   sub(/[[:space:]]*#.*$/, ""); sub(/[[:space:]]+$/, "")
+                   gsub(/^["'\'']|["'\'']$/, "")
+                   print; exit
+                 }' "$def")"
+    [ -n "$repo" ] || continue
+    if [ -z "${first_def[$repo]:-}" ]; then
+      first_def[$repo]="$def"
+      continue
+    fi
+    sibling="${first_def[$repo]}"
+    if ! diff=$(diff <(source_pins "$sibling") <(source_pins "$def")); then
+      echo "::error file=${rel}::variant parity (docs/CONVENTIONS.md, Naming): this definition publishes '${repo}', the same repository as '${sibling#"$ROOT"/}', so the two are a runtime/variant pair and must build byte-equal source (frontend pin, vars:, url:, checksum:). They differ:"
+      printf '%s\n' "$diff" | sed 's/^/  /'
+      violations=$((violations + 1))
+    fi
+  done < <(find "$ROOT/image" -mindepth 2 -maxdepth 2 -type f -name 'image.yaml' | sort)
+fi
+
 if [ "$violations" -gt 0 ]; then
-  echo "lint-pins: ${violations} violation(s) — see docs/CONVENTIONS.md (Pinning, Upstream tracking)"
+  echo "lint-pins: ${violations} violation(s) — see docs/CONVENTIONS.md (Pinning, Upstream tracking, Naming)"
   exit 1
 fi
 echo "lint-pins: all pinning conventions satisfied"

@@ -137,6 +137,19 @@
       groupName: "cert-manager monorepo",
     },
     {
+      // Req 3.3: image/valkey/ and image/valkey-compat/ are the same build from
+      // the same source pin, differing by one package. A bump has to move both
+      // or the compat image stops being the runtime image plus a shell.
+      //
+      // Renovate's default branch topic would most likely group them anyway —
+      // one depName, one new value, one branch. Stated rather than inherited,
+      // for the same reason the cert-manager rule above is: the grouping is a
+      // requirement, and a default that happens to satisfy it today is not a
+      // record of that.
+      matchDepNames: ["valkey-io/valkey"],
+      groupName: "valkey runtime and compat",
+    },
+    {
       // Req 3.4: a new major stages behind Dependency Dashboard approval
       // instead of opening an automatic PR.
       matchUpdateTypes: ["major"],
