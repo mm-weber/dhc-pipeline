@@ -1,0 +1,62 @@
+# Hardening overlay for the upstream valkey chart (Req 4.2-4.4). Applied with
+# `-f`; upstream templates are untouched. Every delta is documented in
+# ../README.md.
+
+# Swap to the digest-pinned catalogue image (Req 4.2). This chart composes the
+# reference as registry/repository:tag and strips a trailing @sha for the
+# version label, so the digest rides on `tag` — verified in the rendered
+# manifests, not assumed.
+#
+# The COMPAT variant, not the runtime default: the chart's init container runs
+# a /bin/sh script from this same image value. See ../README.md, "Compat-variant
+# decision (Req 4.5)".
+#
+# The digest is the one image/valkey-compat/ published on the first main build
+# after #53 merged. Until then the tag was deliberately left unpinned rather
+# than filled with a placeholder: `@sha256:<anything>` satisfies
+# policies/require-image-digest.yaml (measured — its pattern is `*@sha256:*`),
+# so a placeholder would have passed the gate green while pointing at nothing,
+# whereas unpinned failed it for the true reason. Closing that hole is task 8.4.
+#
+# Nothing bumps this automatically: renovate.json5 is
+# `enabledManagers: ["custom.regex"]` over image/ and scripts/ only, so no
+# manager reads chart values. A rebuild of image/valkey-compat/ moves the digest
+# and this line has to follow it by hand.
+image:
+  registry: ghcr.io
+  repository: mm-weber/dhc/valkey
+  tag: 9.1.1-alpine3.23-compat@sha256:e9bca4f52dde8bf6bd3b83aae1c3f900c19115406aaa3c1f8282177117d51c6d
+
+# UID/GID 65532 (Req 4.3); the chart defaults to 1000, which no catalogue image
+# has an account for. runAsNonRoot is NOT a chart default at pod level and the
+# policy gate reads it there (policies/require-nonroot.yaml), so it is stated
+# here rather than inherited. seccompProfile RuntimeDefault is a chart default
+# and merges in.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+
+# The container context is already restricted upstream — drop-ALL caps,
+# allowPrivilegeEscalation false, readOnlyRootFilesystem true, runAsNonRoot
+# true — so only the UID moves (Req 4.3). Applies to the init container too;
+# the chart renders both from this one block.
+securityContext:
+  runAsUser: 65532
+  runAsGroup: 65532
+
+# Readiness is opt-in upstream (the container had none before 0.11.0), which
+# lets the Service route to a pod that has not answered yet. The handler is the
+# chart's `valkey-cli ping` exec — no shell involved, so the runtime image would
+# have satisfied it; it is the init container alone that needs the compat
+# variant.
+readinessProbe:
+  enabled: true
+
+# Persistence stays OFF (Req 4.4 rationale in ../README.md): the emptyDir the
+# chart falls back to is the writable /data this image needs, and a cache that
+# survives eviction is a deployment-time decision, not a catalogue default.
+# Stated rather than inherited so an upstream default flip is a diff here.
+dataStorage:
+  enabled: false

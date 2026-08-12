@@ -1,0 +1,15 @@
+# Pinned upstream chart (Req 4.1). Templates are NEVER edited — rendered live
+# from this exact version with config/values-hardened.yaml as the only overlay.
+upstream:
+  name: valkey
+  repository: https://valkey-io.github.io/valkey-helm
+  version: 0.11.0   # chart appVersion 9.1.1
+
+# NOTE: this is the valkey project's own chart, and 0.11.0 ships appVersion
+# 9.1.1 — the exact version image/valkey/ builds. No version-skew note is
+# needed here, unlike chart/grafana/.
+#
+# Render (chart CI gate, task 5.5) and install (e2e, phase 6):
+#   helm template dhc-valkey valkey \
+#     --repo https://valkey-io.github.io/valkey-helm --version 0.11.0 \
+#     -f chart/valkey/config/values-hardened.yaml

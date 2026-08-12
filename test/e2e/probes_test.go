@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,6 +84,62 @@ func httpProbe(path string) probeFunc {
 		}
 		return waitJobSucceeded(ctx, r, name, c.Namespace)
 	}
+}
+
+// probeValkey proves a SET/GET round-trip through the Service (Req 5.5): a Job
+// writes a key and asserts that reading it back returns what was written, so a
+// server that answers PING but stores nothing still fails.
+//
+// Two deliberate choices. The image is read off the live Deployment rather than
+// re-derived from the chart values, so the probe can only ever exercise the
+// image that is actually running. And it runs `sh -c`, which the runtime image
+// has no answer for — but this chart already deploys the compat variant for its
+// init container (chart/valkey/README.md), so the shell is present either way
+// and no probe-only image enters the picture.
+func probeValkey(ctx context.Context, r *resources.Resources, c harness.Component) error {
+	var dep appsv1.Deployment
+	if err := r.Get(ctx, c.Release, c.Namespace, &dep); err != nil {
+		return fmt.Errorf("get deployment %s: %w", c.Release, err)
+	}
+	if len(dep.Spec.Template.Spec.Containers) == 0 {
+		return fmt.Errorf("deployment %s renders no containers", c.Release)
+	}
+
+	host := fmt.Sprintf("%s.%s.svc.cluster.local", c.Release, c.Namespace)
+	cli := fmt.Sprintf("valkey-cli -h %s -p 6379", host)
+	// `test` decides the exit code, so correctness never rests on valkey-cli's
+	// exit status for an error reply.
+	script := fmt.Sprintf(`%s set dhc-e2e ok >/dev/null && test "$(%s get dhc-e2e)" = ok`, cli, cli)
+
+	name := "probe-" + c.Name
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: c.Namespace},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: ptr(int32(2)),
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{{
+						Name:    "valkey-cli",
+						Image:   dep.Spec.Template.Spec.Containers[0].Image,
+						Command: []string{"sh", "-c", script},
+						SecurityContext: &corev1.SecurityContext{
+							RunAsNonRoot:             ptr(true),
+							RunAsUser:                ptr(int64(65532)),
+							AllowPrivilegeEscalation: ptr(false),
+							ReadOnlyRootFilesystem:   ptr(true),
+							Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+							SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+						},
+					}},
+				},
+			},
+		},
+	}
+	if err := r.Create(ctx, job); err != nil {
+		return fmt.Errorf("create probe job: %w", err)
+	}
+	return waitJobSucceeded(ctx, r, name, c.Namespace)
 }
 
 // waitJobSucceeded polls until the probe Job completes successfully (checks.JobSucceeded).

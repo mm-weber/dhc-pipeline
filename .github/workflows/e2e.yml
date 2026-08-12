@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       component:
-        description: "Single component (cert-manager|grafana|hardened-app); empty = all"
+        description: "Single component (cert-manager|grafana|hardened-app|valkey); empty = all"
         required: false
         type: string
 
@@ -25,8 +25,9 @@ permissions:
   packages: read # pull the private ghcr.io/mm-weber/dhc images
 
 jobs:
-  # Which chart-backed components does this PR touch? valkey has no chart yet
-  # (task 8.1), so it is never in the matrix. Emits a JSON array for the matrix.
+  # Which chart-backed components does this PR touch? Emits a JSON array for the
+  # matrix. The image side of the regex below is `image/<c>(-|/)`, so a variant
+  # directory (image/valkey-compat/) marks its component affected too.
   affected:
     name: affected components
     runs-on: ubuntu-latest
@@ -45,7 +46,7 @@ jobs:
           DISPATCH: ${{ github.event.inputs.component }}
         run: |
           set -euo pipefail
-          ALL="cert-manager grafana hardened-app"
+          ALL="cert-manager grafana hardened-app valkey"
 
           if [ "$EVENT" = "workflow_dispatch" ]; then
             names="${DISPATCH:-$ALL}"

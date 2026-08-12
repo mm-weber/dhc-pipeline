@@ -26,7 +26,7 @@ var chartFlag string
 
 func init() {
 	flag.StringVar(&chartFlag, "chart", "",
-		"catalogue component to install on kind (cert-manager|grafana|hardened-app)")
+		"catalogue component to install on kind (cert-manager|grafana|hardened-app|valkey)")
 }
 
 // testenv is the e2e-framework environment provisioned in TestMain and shared by
