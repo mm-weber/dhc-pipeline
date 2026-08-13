@@ -6,7 +6,8 @@ name: e2e
 # images are preloaded rather than pulled), install the hardened chart, and run
 # the Ginkgo suite — which asserts readiness (Req 5.3), the restricted
 # securityContext on live pods (Req 5.4), and the functional probe (Req 5.5); on
-# a chart-version bump it runs the upgrade path instead (Req 5.6). Diagnostics
+# a bump — chart version or image pins in the values file — it runs the
+# upgrade path instead (Req 5.6). Diagnostics
 # are uploaded on failure (Req 5.7). GitHub Actions is the authoritative
 # environment for this — chart repos and Docker Hub are unreachable from the
 # devcontainer (Req 8.1).
@@ -140,23 +141,40 @@ jobs:
           docker pull "$PROBE_IMAGE"
           kind load docker-image --name "$CLUSTER" "$PROBE_IMAGE"
 
-      # On a chart-version bump the upgrade-path spec (Req 5.6) installs the base
-      # version then upgrades to the proposed one. Adapted charts only: the pin
-      # is chart/<c>/chart.yaml upstream.version.
-      - name: compute upgrade-from on a chart bump
+      # On a bump the upgrade-path spec (Req 5.6) installs the base state then
+      # upgrades to the proposed one. Two bump shapes: a chart bump moves
+      # chart/<c>/chart.yaml upstream.version (adapted charts only), an image
+      # bump moves the values file the chart deploys with — the ordinary
+      # Renovate path now that the chart-pin managers track image tags+digests
+      # there (task 8.7). For an image bump the BASE branch's values are
+      # snapshotted to a file the suite installs from before upgrading.
+      - name: compute upgrade-from on a bump
         id: upgrade
         env:
           COMPONENT: ${{ matrix.component }}
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
+          [ -n "${BASE_REF:-}" ] || exit 0
           pinfile="chart/${COMPONENT}/chart.yaml"
-          if [ -f "$pinfile" ] && [ -n "${BASE_REF:-}" ]; then
+          if [ -f "$pinfile" ]; then
             head_ver=$(yq '.upstream.version' "$pinfile" | tr -d '"')
             base_ver=$(git show "origin/${BASE_REF}:${pinfile}" 2>/dev/null | yq '.upstream.version' | tr -d '"' || echo "")
             if [ -n "$base_ver" ] && [ "$base_ver" != "null" ] && [ "$base_ver" != "$head_ver" ]; then
               echo "from=$base_ver" >> "$GITHUB_OUTPUT"
-              echo "upgrade path: ${base_ver} -> ${head_ver}"
+              echo "upgrade path (chart): ${base_ver} -> ${head_ver}"
+            fi
+          fi
+          # Adapted charts deploy config/values-hardened.yaml, owned charts
+          # their baked-in values.yaml. A snapshot that cannot be produced
+          # (chart is new on this PR, no base state exists) means a plain
+          # install, not an upgrade.
+          valfile="chart/${COMPONENT}/config/values-hardened.yaml"
+          [ -f "$valfile" ] || valfile="chart/${COMPONENT}/values.yaml"
+          if [ -f "$valfile" ] && ! git diff --quiet "origin/${BASE_REF}...HEAD" -- "$valfile"; then
+            if git show "origin/${BASE_REF}:${valfile}" > "${RUNNER_TEMP}/values-from.yaml" 2>/dev/null; then
+              echo "values_from=${RUNNER_TEMP}/values-from.yaml" >> "$GITHUB_OUTPUT"
+              echo "upgrade path (image/values): ${valfile} changed against ${BASE_REF}"
             fi
           fi
 
@@ -167,6 +185,7 @@ jobs:
           DHC_E2E: "1"
           DHC_PROBE_IMAGE: ${{ env.PROBE_IMAGE }}
           DHC_UPGRADE_FROM: ${{ steps.upgrade.outputs.from }}
+          DHC_UPGRADE_VALUES_FROM: ${{ steps.upgrade.outputs.values_from }}
           DHC_ARTIFACTS: ${{ env.ARTIFACTS }}
         run: go test ./e2e/ -v -timeout 25m -args --chart "$COMPONENT"
 

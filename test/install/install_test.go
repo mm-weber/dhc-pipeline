@@ -131,6 +131,38 @@ func TestArgs(t *testing.T) {
 		}
 	})
 
+	t.Run("owned install with a values override passes -f", func(t *testing.T) {
+		// The image-bump upgrade path (Req 5.6) installs the base state by
+		// overlaying the base branch's values snapshot on the owned chart's
+		// baked-in values.
+		args := Args(Spec{
+			Verb:       "install",
+			Release:    "hardened-app",
+			Namespace:  "hardened-app",
+			Kubeconfig: "/kc",
+			Owned:      true,
+			ChartPath:  "/repo/chart/hardened-app",
+			ValuesFile: "/tmp/values-from.yaml",
+		})
+		if !containsPair(args, "-f", "/tmp/values-from.yaml") {
+			t.Errorf("missing pair -f /tmp/values-from.yaml in %v", args)
+		}
+	})
+
+	t.Run("owned install without a values override passes no -f", func(t *testing.T) {
+		args := Args(Spec{
+			Verb:       "install",
+			Release:    "hardened-app",
+			Namespace:  "hardened-app",
+			Kubeconfig: "/kc",
+			Owned:      true,
+			ChartPath:  "/repo/chart/hardened-app",
+		})
+		if contains(args, "-f") {
+			t.Errorf("owned install with no override must not contain -f: %v", args)
+		}
+	})
+
 	t.Run("extra flags are appended", func(t *testing.T) {
 		args := Args(Spec{
 			Verb:       "install",

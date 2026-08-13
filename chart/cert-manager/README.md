@@ -17,7 +17,7 @@ helm template dhc-cert-manager cert-manager \
 
 | Change | Why | Requirement |
 |---|---|---|
-| `image` / `webhook.image` / `cainjector.image` → digest-pinned `ghcr.io/mm-weber/dhc/cert-manager-*:1.21.0-alpine3.23@sha256:…` | Deploy the hardened catalogue builds, not upstream `quay.io/jetstack` images; digest-pinned so the reference is immutable | Req 4.2 |
+| `image` / `webhook.image` / `cainjector.image` → digest-pinned `ghcr.io/mm-weber/dhc/cert-manager-*:1.21.x-alpine3.23@sha256:…` | Deploy the hardened catalogue builds, not upstream `quay.io/jetstack` images; digest-pinned so the reference is immutable. Kept current by Renovate's chart-pin manager (task 8.7); the image pins may run a patch ahead of the chart-template pin above | Req 4.2 |
 | `securityContext.runAsUser` / `runAsGroup` / `fsGroup: 65532` on all three components | The chart defaults `runAsNonRoot: true` but pins no UID; our runtime images run as 65532, so set it explicitly | Req 4.3 |
 | `startupapicheck.enabled: false` | It runs a post-install **Job** from `cert-manager-startupapicheck`, an image this catalogue does not build. Disabling the optional API-readiness check is preferable to pulling a non-catalogue image, which the registry policy forbids | Req 4.2, Req 4.6 |
 

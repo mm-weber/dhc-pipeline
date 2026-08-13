@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -8,18 +9,21 @@ import (
 )
 
 // The upgrade-path spec verifies Req 5.6: on a component bump the workflow (task
-// 6.5) passes DHC_UPGRADE_FROM=<base version>, and the suite installs that
-// currently-pinned version, upgrades to the proposed (PR) version, and
-// re-asserts readiness, the restricted securityContext, and the functional
-// probe. It is mutually exclusive with the install spec (which skips when
-// DHC_UPGRADE_FROM is set), so a run never installs the same release twice.
-// Scoped to adapted charts, whose upgrade is a chart --version change; owned
-// image-digest upgrades are a follow-up.
+// 6.5) passes the base state — DHC_UPGRADE_FROM=<base chart version> on a chart
+// bump, DHC_UPGRADE_VALUES_FROM=<base values snapshot path> on an image bump
+// (the ordinary Renovate path: a definition bump publishes a new image and the
+// chart-pin manager moves the values file, task 8.7), either or both — and the
+// suite installs that currently-pinned state, upgrades to the proposed (PR)
+// state, and re-asserts readiness, the restricted securityContext, and the
+// functional probe. It is mutually exclusive with the install spec (which
+// skips when either variable is set), so a run never installs the same release
+// twice. Owned charts have no chart version to move, so only the values path
+// triggers them.
 var _ = Describe("hardened catalogue component upgrade path", func() {
 	for _, s := range componentSpecs {
 		s := s
 		Context(s.Name, func() {
-			var fromVersion string
+			var fromVersion, fromValues string
 			BeforeEach(func() {
 				if cfg == nil {
 					Skip("requires a kind cluster (set DHC_E2E=1 and -chart=" + s.Name + ")")
@@ -27,24 +31,22 @@ var _ = Describe("hardened catalogue component upgrade path", func() {
 				if selected.Name != s.Name {
 					Skip("this run targets -chart=" + selected.Name)
 				}
-				if s.Owned {
-					Skip("upgrade-path covers adapted (chart-versioned) components; owned image bumps are a follow-up")
-				}
 				fromVersion = os.Getenv("DHC_UPGRADE_FROM")
-				if fromVersion == "" {
-					Skip("not a bump PR — DHC_UPGRADE_FROM unset (Req 5.6)")
+				fromValues = os.Getenv("DHC_UPGRADE_VALUES_FROM")
+				if fromVersion == "" && fromValues == "" {
+					Skip("not a bump PR — DHC_UPGRADE_FROM and DHC_UPGRADE_VALUES_FROM unset (Req 5.6)")
 				}
 			})
 
-			It("installs the base version, upgrades to the proposed version, and re-asserts", func(ctx SpecContext) {
+			It("installs the base state, upgrades to the proposed state, and re-asserts", func(ctx SpecContext) {
 				r := cfg.Client().Resources(s.Namespace)
 
-				By("install the currently pinned base version " + fromVersion)
-				Expect(helmDeploy(ctx, "install", s, fromVersion)).To(Succeed())
+				By(fmt.Sprintf("install the currently pinned base state (chart version %q, values snapshot %q)", fromVersion, fromValues))
+				Expect(helmDeploy(ctx, "install", s, fromVersion, fromValues)).To(Succeed())
 				assertReadyHardened(ctx, r, s)
 
-				By("helm upgrade to the proposed version and re-assert")
-				Expect(helmDeploy(ctx, "upgrade", s, "")).To(Succeed())
+				By("helm upgrade to the proposed state and re-assert")
+				Expect(helmDeploy(ctx, "upgrade", s, "", "")).To(Succeed())
 				assertHealthy(ctx, r, s)
 			})
 		})
