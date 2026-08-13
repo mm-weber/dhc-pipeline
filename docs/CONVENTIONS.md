@@ -58,12 +58,12 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
 - Every GitHub Action is pinned to a full commit SHA, and **every third-party
   executable a workflow installs is pinned to an exact version and verified
   against a checksum recorded here** (Req 7.5). Trivy and grype
-  (`scripts/install-scanners.sh`) meet both halves; govulncheck is
-  exact-pinned with the Go module sumdb as its checksum control (`build.yml`),
-  and the renovate/json5 test installs are exact-pinned with npm registry
-  integrity verification (`validate.yml`). Still open: kyverno and kind are
-  version-pinned without checksums (#54), and only the install-scanners pins
-  carry a Renovate manager (#55). `curl … | sh` from a branch is a
+  (`scripts/install-scanners.sh`) and kind and kyverno
+  (`scripts/install-tool.sh`) meet both halves with digests recorded in-repo;
+  govulncheck is exact-pinned with the Go module sumdb as its checksum control
+  (`build.yml`), and the renovate/json5 test installs are exact-pinned with
+  npm registry integrity verification (`validate.yml`). Every one of these
+  pins carries a Renovate manager (Req 7.6). `curl … | sh` from a branch is a
   floating tag with a shell attached: the tag can be repointed and the script
   re-published under the same URL. That is not hypothetical for this toolchain —
   CVE-2026-33634 (March 2026) repointed 76 of 77 `aquasecurity/trivy-action`

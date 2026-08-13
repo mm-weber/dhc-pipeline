@@ -94,17 +94,22 @@
       versioningTemplate: "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:\\+security-(?<build>\\d+))?$",
     },
     {
-      // The two CVE scanners the gate itself runs on (Req 7.5, 7.6). They used
-      // to be installed by `curl .../main/install.sh | sudo sh` — unpinned, from
-      // a mutable branch, as root. Now pinned by version + sha256 in
-      // scripts/install-scanners.sh.
+      // The version+sha256 pin scripts (Req 7.5, 7.6): the two CVE scanners
+      // the gate itself runs on (install-scanners.sh — they used to arrive by
+      // `curl .../main/install.sh | sudo sh`, unpinned, from a mutable branch,
+      // as root) and the other workflow-installed binaries, kind and kyverno
+      // (install-tool.sh — formerly version-pinned but never verified, kyverno
+      // by curl piped into tar). One pin-block shape in both files, one
+      // manager reading it.
       //
       // This manager is not optional garnish: a pinned scanner nobody bumps
-      // stops detecting new advisories and says nothing while it does. Pinning
-      // WITHOUT tracking trades a supply-chain risk for a silent-staleness one,
-      // so 7.5 and 7.6 only make sense together.
+      // stops detecting new advisories and says nothing while it does — and
+      // kyverno has the same property one layer up, as the policy engine
+      // behind the Req 4.6 gate. Pinning WITHOUT tracking trades a
+      // supply-chain risk for a silent-staleness one, so 7.5 and 7.6 only
+      // make sense together.
       customType: "regex",
-      managerFilePatterns: ["/^scripts/install-scanners\\.sh$/"],
+      managerFilePatterns: ["/^scripts/install-(scanners|tool)\\.sh$/"],
       matchStrings: [
         "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*\\w+_VERSION=\"(?<currentValue>[^\"]+)\"",
       ],
@@ -125,7 +130,28 @@
       // also never automerge: that rule is scoped to github-tags, and this
       // manager is github-releases.
       //
-      // Two tools, a handful of bumps a year. Cheap enough to keep manual.
+      // Four tools, a handful of bumps a year each. Cheap enough to keep
+      // manual.
+    },
+    {
+      // Workflow-installed tools whose checksum control is NOT a digest in
+      // this repo (Req 7.5, 7.6): govulncheck compiles from the module proxy
+      // under the Go sumdb (build.yml), and the renovate/json5 test installs
+      // are verified by npm against registry integrity hashes (validate.yml).
+      // Their pins are workflow env vars — `NAME_VERSION: value` under the
+      // same `# renovate:` comment convention the pin scripts use, YAML
+      // assignment instead of shell.
+      //
+      // No extractVersionTemplate, unlike the pin-script manager: these pins
+      // are written in each datasource's native format (go: v-prefixed,
+      // npm: bare), so tags and pins already compare directly.
+      customType: "regex",
+      managerFilePatterns: ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      matchStrings: [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*\\w+_VERSION:\\s*[\"']?(?<currentValue>[^\\s\"']+)",
+      ],
+      // A renovate major (41 → 44 is real today) stages behind Dependency
+      // Dashboard approval like every other major, via the Req 3.4 rule below.
     },
   ],
 

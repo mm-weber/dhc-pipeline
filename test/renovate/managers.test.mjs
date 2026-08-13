@@ -48,7 +48,18 @@ function extract(manager, content) {
 }
 
 const read = (rel) => readFileSync(join(root, rel), "utf8");
-const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr] = config.customManagers;
+const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr, workflowMgr] = config.customManagers;
+
+// managerFilePatterns is the half extract() cannot exercise: a pattern that
+// stops matching a file means Renovate silently reads nothing from it, with
+// every matchString still green here. Renovate's /…/-delimited strings are
+// regexes over repo-relative paths.
+function filePatternMatches(manager, path) {
+  return manager.managerFilePatterns.some((p) => {
+    const re = /^\/(.*)\/$/.exec(p);
+    return re ? new RegExp(re[1]).test(path) : p === path;
+  });
+}
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -299,6 +310,99 @@ check(
     ev.exec("v0.72.0")?.groups?.version === "0.72.0",
   );
   check("scanner: extractVersion rejects an unprefixed tag", ev.exec("0.72.0") === null);
+}
+
+// --- tool pins: kind + kyverno via the same manager (Req 7.5, 7.6) -----------
+// install-tool.sh carries the same pin-block shape as install-scanners.sh and
+// the same manager reads both files — kyverno is the Req 4.6 policy engine, so
+// a pin nobody bumps silently stops gaining checks while every gate stays
+// green (issue #55).
+{
+  for (const [file, tools] of [
+    ["scripts/install-scanners.sh", ["trivy", "grype"]],
+    ["scripts/install-tool.sh", ["kind", "kyverno"]],
+  ]) {
+    check(
+      `tool pins: manager file pattern matches ${file}`,
+      filePatternMatches(scannerMgr, file),
+      JSON.stringify(scannerMgr.managerFilePatterns),
+    );
+  }
+
+  const pins = extract(scannerMgr, read("scripts/install-tool.sh"));
+  check("tool pins: install-tool.sh yields exactly two deps", pins.length === 2, `${pins.length}`);
+
+  for (const [tool, depName] of [
+    ["kind", "kubernetes-sigs/kind"],
+    ["kyverno", "kyverno/kyverno"],
+  ]) {
+    const dep = pins.find((d) => d.depName === depName);
+    check(`tool pins: ${tool} is tracked as ${depName}`, !!dep);
+    check(
+      `tool pins: ${tool} resolves against github-releases`,
+      dep?.datasource === "github-releases",
+      dep?.datasource,
+    );
+    // Bare, like trivy/grype, so the shared extractVersionTemplate bridges the
+    // v-prefixed upstream tags — both projects tag vX.Y.Z.
+    check(
+      `tool pins: ${tool} pin is bare semver (no v prefix)`,
+      /^\d+\.\d+\.\d+$/.test(dep?.currentValue ?? ""),
+      dep?.currentValue,
+    );
+  }
+}
+
+// --- workflow env pins: govulncheck + renovate/json5 (Req 7.5, 7.6) ----------
+// The pins whose checksum control lives outside this repo (Go sumdb, npm
+// registry integrity) sit as env vars in the workflows themselves, under the
+// same `# renovate:` comment convention in YAML assignment form (issue #63
+// recorded the pins; this manager is what keeps them from staling, issue #55).
+{
+  for (const wf of ["build.yml", "validate.yml"]) {
+    check(
+      `workflow pins: file pattern matches .github/workflows/${wf}`,
+      filePatternMatches(workflowMgr, `.github/workflows/${wf}`),
+      JSON.stringify(workflowMgr.managerFilePatterns),
+    );
+  }
+
+  const build = extract(workflowMgr, read(".github/workflows/build.yml"));
+  {
+    const d = dep(build, { datasource: "go", depName: "golang.org/x/vuln" });
+    // v-prefixed, matching the go datasource's native version format — this
+    // manager deliberately has no extractVersionTemplate to bridge anything.
+    check(
+      "workflow pins: govulncheck → go golang.org/x/vuln, v-prefixed",
+      !!d && /^v\d+\.\d+\.\d+$/.test(d.currentValue ?? ""),
+      JSON.stringify(build),
+    );
+  }
+  check("workflow pins: build.yml yields exactly one dep", build.length === 1, `${build.length}`);
+
+  const validate = extract(workflowMgr, read(".github/workflows/validate.yml"));
+  for (const [name, re] of [
+    ["renovate", /^\d+\.\d+\.\d+$/],
+    ["json5", /^\d+\.\d+\.\d+$/],
+  ]) {
+    const d = dep(validate, { datasource: "npm", depName: name });
+    check(
+      `workflow pins: ${name} → npm, bare semver`,
+      !!d && re.test(d.currentValue ?? ""),
+      JSON.stringify(validate),
+    );
+  }
+  check(
+    "workflow pins: validate.yml yields exactly two deps",
+    validate.length === 2,
+    `${validate.length}`,
+  );
+
+  // The other direction: env vars without a marker comment stay invisible.
+  // e2e.yml is all unmarked env (CLUSTER, PROBE_IMAGE, …) now that the kind
+  // pin lives in install-tool.sh.
+  const e2e = extract(workflowMgr, read(".github/workflows/e2e.yml"));
+  check("workflow pins: unmarked workflow env is ignored", e2e.length === 0, JSON.stringify(e2e));
 }
 
 if (failures > 0) {

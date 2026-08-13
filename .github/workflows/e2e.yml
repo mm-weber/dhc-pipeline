@@ -82,7 +82,6 @@ jobs:
       matrix:
         component: ${{ fromJSON(needs.affected.outputs.names) }}
     env:
-      KIND_VERSION: v0.32.0
       CLUSTER: dhc-e2e
       PROBE_IMAGE: curlimages/curl:8.11.1
       ARTIFACTS: ${{ github.workspace }}/e2e-artifacts
@@ -98,13 +97,13 @@ jobs:
 
       - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
 
+      # Pin + sha256 live in the script (Req 7.5); installed as the runner
+      # user, same pattern as install-scanners.sh in build.yml — the old
+      # curl + sudo mv was unverified and never needed root.
       - name: install kind
         run: |
-          curl -fsSLo ./kind \
-            "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
-          chmod +x ./kind
-          sudo mv ./kind /usr/local/bin/kind
-          kind version
+          scripts/install-tool.sh kind "${RUNNER_TEMP}/bin"
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
       - name: create kind cluster
         run: |
