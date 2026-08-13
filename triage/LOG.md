@@ -955,3 +955,60 @@ the first decision anyone has recorded about them.
 
 Verified before committing: 12 of 12 exceptions suppress, none silent, and the
 only findings left standing are the two tempo ones the VEX statements cover.
+
+## 2026-08-13 — the fifth x/net finding, and a bump that cannot fix it (#56)
+
+### TRANSFER — CVE-2026-46600, the fifth finding in the zipkin plugin (#56)
+
+`golang.org/x/net/dns/dnsmessage`: denial of service parsing an invalid DNS
+record. HIGH, EPSS 0.0034 (26.7 pct), not in CISA KEV. Filed by the daily rescan
+as #56, which is the first this lane has heard of it from Trivy — though it is
+not new to us. The 2026-08-02 govulncheck run listed it among the eight findings
+Trivy missed. Three months later Trivy has it too, which is the same
+three-scanners-three-answers point recorded above, arriving in the other
+direction.
+
+**Measured, not inferred from the CVE list.** Scanned the published image
+(`grafana:13-alpine3.23`, `sha256:6e391848…`) with the pinned trivy 0.73.0:
+
+```
+CVE-2026-46600  golang.org/x/net v0.49.0 -> fixed 0.56.0  HIGH
+  usr/share/grafana/data/plugins-bundled/zipkin/gpx_grafana-zipkin-datasource_linux_amd64
+```
+
+One binary, and it is the binary four x/net findings already wait in. Same
+module, same shipped version, same fix version. So this is the fifth of a set,
+not a new problem: `main` carries x/net v0.56.0 and clears all five together.
+
+**The interesting part is what it is not.** A fix exists upstream, which by
+Req 6.5 would ordinarily point at a version bump rather than a transfer — and
+there is an open bump PR (#36, grafana 13.1.3) sitting right there. It cannot
+help. The plugin is bundled into the grafana tarball we repackage, so the only
+path to a fixed binary is a plugin release, and there has not been one:
+
+| | |
+|---|---|
+| newest zipkin release | **v12.4.5, 2026-05-18** — still, checked today |
+| fix location | `main` only (x/net v0.56.0) |
+| `main` moving? | yes — commits through 2026-08-10 |
+| upstream ask | issue #94, open, last touched 2026-08-04 |
+
+No grafana version can bundle what upstream has never released. 13.1.3 will not
+clear this finding and neither will 13.1.4; the release is the gate, not the
+grafana version. Recording that explicitly because "there is a fixed version"
+reads like remediation is available, and here it is available to upstream only.
+
+**Outcome: TRANSFER, one entry, expiring 2026-11-02** — the date its four
+siblings already carry, not 90 days from today. One upstream, one re-decision.
+
+Reachability is not claimed, for the same reason as the other five: no
+symbol-level measurement backs it, and a transfer asserts the finding is real
+and someone else owns the fix, which is the conservative reading of an
+unmeasured finding. `not_affected` is what would need the measurement (Req 6.14,
+6.15) and it is not being claimed — though it is worth noting a DNS message
+parser is not obviously on a datasource plugin's path, which is exactly the kind
+of guess Req 6.15 exists to stop anyone banking.
+
+Verified before committing, against the real published image with the gate's own
+inputs — compiled VEX plus the ignorefile: **1 uncovered before, 0 after**, and
+the new entry suppresses the finding it names rather than matching nothing.

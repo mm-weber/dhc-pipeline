@@ -193,6 +193,25 @@ vulnerabilities:
     statement: "transfer: waiting on a grafana-zipkin-datasource release cut from main"
     expired_at: 2026-11-02
 
+  # #56. The fifth x/net finding in this binary, arriving three months after the
+  # other four and clearing on the same release. Same expiry as its siblings so
+  # one upstream keeps one re-decision date.
+  - id: CVE-2026-46600
+    purls: ["pkg:golang/golang.org/x/net"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer--cve-2026-46600-the-fifth-finding-in-the-zipkin-plugin-56"
+    blocked: "as CVE-2026-25681: same binary, same upstream, same unreleased fix
+              on main (x/net v0.56.0, fixed from 0.56.0 exactly). Remediation is
+              closed to us — we repackage a prebuilt tarball and do not build
+              this binary — and measured: v12.4.5 of 2026-05-18 is still the
+              newest release, so no grafana bump, 13.1.3 included, can carry a
+              fixed plugin"
+    statement: "transfer: waiting on a grafana-zipkin-datasource release cut from main"
+    expired_at: 2026-11-02
+
   # #39. Cleared from bin/grafana and from the elasticsearch plugin by the
   # 13.1.2 bump; this is the one binary it survives in, so the issue stays open
   # and its scope narrows to zipkin.
