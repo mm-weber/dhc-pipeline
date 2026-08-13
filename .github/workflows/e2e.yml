@@ -200,3 +200,21 @@ jobs:
       - name: delete kind cluster
         if: always()
         run: kind delete cluster --name "$CLUSTER" || true
+
+  # Static fan-in for branch protection — same reason as the build gate: the
+  # matrix legs (e2e <component>) are dynamic, so this is the requirable check.
+  gate:
+    name: e2e gate
+    needs: [affected, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          AFFECTED: ${{ needs.affected.result }}
+          E2E: ${{ needs.e2e.result }}
+        run: |
+          [ "$AFFECTED" = "success" ] || { echo "::error::affected: $AFFECTED"; exit 1; }
+          case "$E2E" in
+            success|skipped) echo "e2e: $E2E" ;;
+            *) echo "::error::e2e result: $E2E"; exit 1 ;;
+          esac

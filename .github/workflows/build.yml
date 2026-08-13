@@ -650,3 +650,25 @@ jobs:
             n=$((n + 1))
           done
           echo "${NAME}: ${n} OpenVEX statement(s) attested" >> "$GITHUB_STEP_SUMMARY"
+
+  # Static fan-in for branch protection: the matrix legs above are named
+  # dynamically (build <image>), so no leg name can be a required check — a PR
+  # not touching that image would wait on it forever. Require this job instead.
+  # `skipped` passes: that is the "no definitions affected" PR.
+  gate:
+    name: build gate
+    needs: [changes, release]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          CHANGES: ${{ needs.changes.result }}
+          RELEASE: ${{ needs.release.result }}
+        run: |
+          # A failed `changes` skips `release` — skipped alone must not pass
+          # then, that run gated nothing.
+          [ "$CHANGES" = "success" ] || { echo "::error::changes: $CHANGES"; exit 1; }
+          case "$RELEASE" in
+            success|skipped) echo "build: $RELEASE" ;;
+            *) echo "::error::build result: $RELEASE"; exit 1 ;;
+          esac
