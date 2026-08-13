@@ -6,10 +6,11 @@ dhc-pipeline is a miniature DHI-style hardened-image catalogue that mirrors the 
 responsibilities of a Docker Hardened Images engineering role: authoring declarative image
 definitions, adapting upstream Helm charts to hardened non-root images, tracking upstream
 releases automatically, validating behavior with Go-based integration tests on real Kubernetes,
-and recording CVE triage decisions as portable VEX artifacts. It is built in three workdays as a
-skill-building project using real industry tooling (BuildKit, Renovate, Ginkgo/kind, Trivy,
-OpenVEX), then left operating so maintainer history accumulates unattended. Repository and
-registry images remain private until explicitly released.
+and recording CVE triage decisions as portable VEX artifacts. It was built in an initial
+three-workday MVP as a skill-building project using real industry tooling (BuildKit, Renovate,
+Ginkgo/kind, Trivy, OpenVEX), then left operating so maintainer history accumulates unattended —
+the operating period (2026-07-21 → 2026-08-13) is what grew Req 6.7–6.34 and the tasks-8 series.
+Repository and registry images remained private until the public release on 2026-08-13 (MIT).
 
 ## Requirements
 

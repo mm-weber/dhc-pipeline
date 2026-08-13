@@ -54,7 +54,7 @@
 - [x] 4. Upstream tracking live (Day 2)
   - [x] 4.1 `renovate.json5` with regex managers and fixtures
     - Managers over definition pin fields (github-tags/github-releases/docker datasources); parse fixtures committed
-    - cert-manager monorepo grouping; majors behind Dependency Dashboard approval; automerge only digest-only patch updates
+    - cert-manager monorepo grouping; majors behind Dependency Dashboard approval; automerge for digest and patch updates on the github-tags datasource, gated on CI (broader than first written here — the config automerges real patch bumps, not only digest re-pins)
     - Validate with renovate-config-validator in `validate.yml`
     - _Requirements: Req 3.2, Req 3.3, Req 3.4, Req 3.5_
   - [x] 4.2 `renovate.yml` self-hosted cron [OPERATOR: repo secret]
@@ -79,7 +79,7 @@
     - As 5.3 plus emptyDir mounts for writable paths; compat-variant decision documented if chart assumes shell utilities
     - _Requirements: Req 4.1, Req 4.2, Req 4.3, Req 4.4, Req 4.5, Req 4.7_
   - [x] 5.5 Chart CI gate
-    - `ct lint`/`ct install` on changed charts; kyverno CLI over rendered manifests (digest, registry, nonroot)
+    - `ct lint` + kyverno CLI over rendered manifests (digest, registry, nonroot), every chart on every PR — no changed-chart scoping, and no `ct install`: install-level verification is the kind e2e suite's job (`chart.yml` says so)
     - Carry `chart/hardened-app/` over from lab unchanged (owned chart, deploy path for e2e probe)
     - _Requirements: Req 4.6_
 
@@ -118,9 +118,9 @@
     - _Requirements: Req 6.7, Req 6.8, Req 6.9, Req 6.10, Req 6.11, Req 6.12_
   - [x] 7.5 Reachability evidence (blocks 7.3)
     - `govulncheck -mode=binary` on the PR path over every Go binary in the built image; **non-gating** — evidence, not a second gate
-    - `scripts/govulncheck-report.sh` (+ `_test.sh` on committed fixture JSON, wired into `validate.yml`): govulncheck JSON → per-binary OSV / module / `symbol`-`package`-`module` level
+    - `scripts/govulncheck-report.sh` (+ `_test.sh`, self-contained sandbox — no fixture files, no network; wired into `validate.yml`): govulncheck JSON → per-binary OSV / module / `symbol`-`package`-`module` level; module-level-only findings collapse to "unmeasured" (Req 6.16)
     - Unblocks #30 (kin-openapi CRITICAL) and re-grounds both existing `not_affected` statements on a measurement rather than an argument
-    - _Requirements: Req 6.13, Req 6.14, Req 6.15_
+    - _Requirements: Req 6.13, Req 6.14, Req 6.15, Req 6.16_
 
   - [x] 7.6 Make VEX suppression work on the PR gate (blocks 7.3)
     - Trivy derives the `pkg:oci/` product purl from the image's RepoDigest; a buildx `load:` image has none, so the root component carries no purl and **no** OpenVEX statement matches in any form. Measured across digest-pinned, registry-qualified and bare product ids. Upstream: trivy#9399
@@ -167,6 +167,7 @@
   - [ ] 8.2 README narrative and operating handoff
     - README: lab → catalogue arc, verification walkthrough (cosign verify, SBOM/provenance inspect), triage story
     - Confirm crons active (Renovate, rescan); `/spec-validate` + coverage check against this plan; repo stays private
+    - 2026-08-13 partial: crons confirmed live via the API (Renovate 3 scheduled runs that day, rescan daily, all green); spec truth pass landed — design.md brought to as-built (ADR 0001 outcome, real definition schema, amd64 release path, chart.yml, no-retry e2e), coverage table corrected, 8.6/8.7 opened for the gaps the review found; MIT LICENSE added; "repo stays private" superseded by the go-live decision. README still pending, so the box stays open
     - _Requirements: Req 2.4, All (verification)_
   - [ ] 8.3 Restore `linux/arm64`, gated on scanning it first [DEFERRED 2026-08-04]
     - Why it was dropped: arm64 was built, pushed, signed, SBOM'd and attested while every scan step in `build.yml` stayed `pull_request`-gated and the PR gate built amd64 only, and `rescan.yml` passed no `--platform` so Trivy resolved the published index to the runner's own arch. No gate ever read the arm64 image (review finding 1.3). Req 2.6 now forbids publishing a platform nothing scans, so that criterion is the gate this task has to satisfy before the platform returns
@@ -192,6 +193,15 @@
     - `compile-vex.sh` keeps the definition name as its reporting identity, because two definitions now share one repository and `rescan.yml` labels its VEX summary rows with it; the report gains a `product` field for the resolved name. `lint-vex-product.sh` resolves a name to every definition publishing that repository and unions their tags, so a variant's release tags are a valid scope and a tag neither publishes still fails. Req 6.20 was amended to say so — it scoped a version to "that image definition", singular, which stopped being a single definition here
     - The mapping is one reader, `scripts/definition-lib.sh`, shared by both lints, the compiler, and `build.yml`'s affected-definitions step — which was the third consumer of the directory-equals-image-name assumption and derived its matrix for a VEX-only change straight from a purl name. Copies rather than a shared reader is how that one was missed: a reader that misses resolves to the directory name and reports as a clean compile
     - _Requirements: Req 6.17, Req 6.20, Req 6.29, Req 6.30_
+  - [ ] 8.6 Pin the rest of the workflow-installed executables (found by the 2026-08-13 as-built review)
+    - Req 7.5 says *every* third-party executable; only trivy/grype (`install-scanners.sh`) satisfy both halves. Still open: `govulncheck` installed via `go install …@latest` (`build.yml` — not even version-pinned; review A finding 1.2 queued this on 2026-08-04 and nothing closed it), kyverno CLI (`validate.yml`, `chart.yml`) and kind (`e2e.yml`) version-pinned but never checksum-verified, renovate npx pinned to a major only
+    - None carry a Renovate manager (Req 7.6), so a fixed pin would silently stale — extend the `install-scanners.sh` pattern (checksum recorded in-repo + manager over the pin) rather than inventing a second one
+    - `docs/CONVENTIONS.md` claimed all of this was already true; corrected to state the gap until this closes
+    - _Requirements: Req 7.5, Req 7.6_
+  - [ ] 8.7 Chart image pins drift behind Renovate bumps; Req 5.6 never fires on an image bump
+    - Renovate managers read only `image/` and `scripts/`, so a definition bump moves nothing under `chart/`: cert-manager chart pins 1.21.0 while the catalogue publishes 1.21.1, grafana chart pins 13.0.4 against a published 13.1.3, and `chart/hardened-app/README.md` claimed Renovate keeps its digest current (corrected — it never did)
+    - The upgrade-path spec triggers only on a `chart/<c>/chart.yaml` upstream-version edit (`e2e.yml`), so the ordinary bump path has never exercised Req 5.6 — re-pinning the charts and giving the trigger an image-bump path are the same piece of work
+    - _Requirements: Req 4.2, Req 5.6_
 
 ## Requirements Coverage
 
@@ -200,8 +210,13 @@
 | Req 1: Image Definition Catalogue | 2.1, 2.2, 3.1, 3.2, 5.1, 5.2, 1.2, 8.1, 8.4 |
 | Req 2: Image Build and Private Release | 3.3, 8.2, 8.3 |
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
-| Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4 |
-| Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5 |
-| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5 |
-| Req 7: Conventions and Review | 1.1, 1.2, 1.3 |
-| Req 8: Operating Environment | 2.1, 3.3, 4.2, 6.5, 7.2 |
+| Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4, 8.7 |
+| Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7 |
+| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.3, 8.5 |
+| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6 |
+| Req 8: Operating Environment | 3.3, 6.5 |
+
+Req 8.2 (delegate network-heavy work to CI/operator host) has no implementing task: it is an
+operating convention practiced by every workflow rather than a deliverable. The Req 8 row
+previously also listed 2.1, 4.2 and 7.2, none of which annotate a Req 8 criterion — corrected
+in the 2026-08-13 as-built review.
