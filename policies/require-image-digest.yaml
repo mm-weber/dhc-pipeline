@@ -8,7 +8,11 @@ metadata:
     policies.kyverno.io/description: >-
       A tag is a mutable pointer, a digest is content. Every image reference
       in this catalogue is pinned by sha256 digest (Req 1.2, 4.2); tag-only
-      references are rejected.
+      references are rejected, and so is anything after the @sha256: that is
+      not a 64-character hex digest. A glob (`*@sha256:*`) reads the
+      separator rather than the digest, so a placeholder such as
+      `@sha256:PENDING-FIRST-MAIN-BUILD` passes it — a pin resolving to
+      nothing, failing green.
 spec:
   validationFailureAction: Enforce
   background: false
@@ -21,11 +25,17 @@ spec:
                 - Pod
       validate:
         message: >-
-          Image references require a sha256 digest (repo@sha256:...);
-          tag-only references are rejected (Req 1.2).
-        pattern:
-          spec:
-            =(initContainers):
-              - image: "*@sha256:*"
-            containers:
-              - image: "*@sha256:*"
+          Image references require a resolved sha256 digest
+          (repo@sha256:<64 hex>); tag-only and placeholder references are
+          rejected (Req 1.2, 4.2).
+        # `pattern:` has no character classes, hence foreach + regex. The
+        # multi-select then flatten is Kyverno's idiom for "every container
+        # list"; it drops the absent ones rather than erroring on null.
+        foreach:
+          - list: "request.object.spec.[containers, initContainers, ephemeralContainers][]"
+            deny:
+              conditions:
+                all:
+                  - key: "{{ regex_match('^[^@]+@sha256:[a-f0-9]{64}$', element.image) }}"
+                    operator: Equals
+                    value: false

@@ -506,5 +506,24 @@ printf '#syntax=dhi.io/build:2-alpine3.22@%s\nimage: ghcr.io/mm-weber/dhc/app\n%
   "$DIGEST_B" "$BODY" > "$SB/image/app-compat/image.yaml"
 run_case "a drifted frontend pin fails under the unspaced spelling too" 1 "syntax="
 
+# 58: a digest-shaped placeholder is not a pin. Same hole the kyverno policy
+#     carried (task 8.4): a substring test reads the '@sha256:' separator, not
+#     the 64 hex characters that name content, so '@sha256:PENDING' passes it
+#     while resolving to nothing.
+fresh
+printf 'image: ghcr.io/mm-weber/dhc/app:1.0.0@sha256:PENDING-FIRST-MAIN-BUILD\n' > "$SB/chart/app/config/values.yaml"
+run_case "placeholder digest fails" 1 "PENDING-FIRST-MAIN-BUILD"
+
+# 59: hex but truncated — a hand-copied digest that lost characters.
+fresh
+printf 'image: ghcr.io/mm-weber/dhc/app@sha256:abcdef0123456789\n' > "$SB/chart/app/config/values.yaml"
+run_case "truncated digest fails" 1 "abcdef0123456789"
+
+# 60: the frontend pin gets the same reading.
+fresh
+printf '# syntax=dhi.io/build:2-alpine3.22@sha256:TODO\nbase: ghcr.io/mm-weber/dhc/base@%s\n' \
+  "$DIGEST" > "$SB/image/app/image.yaml"
+run_case "placeholder frontend digest fails" 1 "syntax="
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

@@ -18,6 +18,12 @@ set -euo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 violations=0
 
+# A pin names content: '@sha256:' followed by exactly 64 hex characters. A
+# substring test reads the separator instead, so '@sha256:PENDING' satisfies it
+# while resolving to nothing — the same hole the kyverno digest policy carried
+# (task 8.4).
+DIGEST_RE='@sha256:[a-f0-9]{64}'
+
 scan_dirs=()
 [ -d "$ROOT/image" ] && scan_dirs+=("$ROOT/image")
 [ -d "$ROOT/chart" ] && scan_dirs+=("$ROOT/chart")
@@ -35,6 +41,8 @@ while IFS= read -r -d '' file; do
     ref="${ref%%[[:space:]]#*}"
     ref="${ref%\"}"; ref="${ref#\"}"
     ref="${ref%\'}"; ref="${ref#\'}"
+    # trailing whitespace: harmless to a substring test, fatal to an anchored one
+    ref="${ref%"${ref##*[![:space:]]}"}"
     [ -z "$ref" ] && continue
     # Helm-template refs (chart templates) render to a digest at deploy time and
     # are gated by kyverno over the rendered manifests — the literal pin lives in
@@ -55,8 +63,8 @@ while IFS= read -r -d '' file; do
       first="${ref%%/*}"
       [[ "$first" != *.* ]] && continue
     fi
-    if [[ "$ref" != *"@sha256:"* ]]; then
-      echo "::error file=${rel},line=${line_no}::pinning convention (docs/CONVENTIONS.md): floating reference '${ref}' — pin by @sha256 digest"
+    if ! [[ "$ref" =~ ${DIGEST_RE}$ ]]; then
+      echo "::error file=${rel},line=${line_no}::pinning convention (docs/CONVENTIONS.md): floating reference '${ref}' — pin by @sha256 digest (64 hex)"
       violations=$((violations + 1))
     fi
   done < <(awk 'match($0, /^[[:space:]]*(-[[:space:]]+)?(image|base|uses):[[:space:]]*/) {
@@ -69,8 +77,8 @@ while IFS= read -r -d '' file; do
 
   # Frontend pin (ADR 0001): any '# syntax=' line carries a digest
   while IFS=: read -r line_no rest; do
-    if [[ "$rest" != *"@sha256:"* ]]; then
-      echo "::error file=${rel},line=${line_no}::pinning convention (docs/CONVENTIONS.md): '# syntax=' must pin the frontend by @sha256 digest"
+    if ! [[ "$rest" =~ ${DIGEST_RE} ]]; then
+      echo "::error file=${rel},line=${line_no}::pinning convention (docs/CONVENTIONS.md): '# syntax=' must pin the frontend by @sha256 digest (64 hex)"
       violations=$((violations + 1))
     fi
   done < <(grep -n '^#[[:space:]]*syntax=' "$file" || true)

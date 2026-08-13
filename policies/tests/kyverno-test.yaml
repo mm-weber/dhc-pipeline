@@ -35,11 +35,20 @@ results:
     rule: check-run-as-nonroot
     resources: [root-pod]
     result: fail
+  # a digest-shaped reference that resolves to nothing (task 8.4)
+  - policy: require-image-digest
+    rule: check-image-digest
+    resources: [placeholder-digest-pod, placeholder-init-pod, short-digest-pod]
+    result: fail
   # controller coverage via kyverno autogen (Deployment pod template)
   - policy: require-image-digest
     rule: autogen-check-image-digest
     resources: [good-deployment]
     result: pass
+  - policy: require-image-digest
+    rule: autogen-check-image-digest
+    resources: [placeholder-deployment]
+    result: fail
   - policy: restrict-registries
     rule: autogen-check-registry
     resources: [good-deployment]
