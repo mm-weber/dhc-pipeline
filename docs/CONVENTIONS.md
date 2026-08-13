@@ -50,6 +50,11 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
 - Every upstream source is `git+https://...#<ref>` plus a `checksum:` line.
 - Every upstream chart is pinned to an exact version in `chart/<name>/chart.yaml`.
 - Floating tags (`latest`, bare majors like `:1`, digestless tags) fail CI.
+- A digest is 64 lowercase hex characters, and both gates read them:
+  `scripts/lint-pins.sh` over the sources and `policies/require-image-digest.yaml`
+  over rendered manifests. `@sha256:PENDING` is a floating reference wearing the
+  separator — never use a placeholder to get a pin past review; leave the
+  reference unpinned, which fails for the reason that is actually true.
 - Every GitHub Action is pinned to a full commit SHA, and **every third-party
   executable a workflow installs is pinned to an exact version and verified
   against a checksum recorded here** (Req 7.5). `curl … | sh` from a branch is a

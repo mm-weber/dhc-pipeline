@@ -13,10 +13,12 @@
 #
 # The digest is the one image/valkey-compat/ published on the first main build
 # after #53 merged. Until then the tag was deliberately left unpinned rather
-# than filled with a placeholder: `@sha256:<anything>` satisfies
-# policies/require-image-digest.yaml (measured — its pattern is `*@sha256:*`),
-# so a placeholder would have passed the gate green while pointing at nothing,
-# whereas unpinned failed it for the true reason. Closing that hole is task 8.4.
+# than filled with a placeholder: `@sha256:<anything>` satisfied
+# policies/require-image-digest.yaml then (measured — its pattern was
+# `*@sha256:*`), so a placeholder would have passed the gate green while
+# pointing at nothing, whereas unpinned failed it for the true reason. That
+# hole is closed (task 8.4): the policy now reads the 64 hex characters, and
+# so does scripts/lint-pins.sh.
 #
 # Nothing bumps this automatically: renovate.json5 is
 # `enabledManagers: ["custom.regex"]` over image/ and scripts/ only, so no

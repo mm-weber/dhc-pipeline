@@ -64,3 +64,69 @@ spec:
       containers:
         - name: app
           image: ghcr.io/mm-weber/dhc/hardened-app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+---
+# A reference ending in a placeholder resolves to nothing, but ends in
+# "@sha256:" all the same — the shape the old glob matched (task 8.4).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: placeholder-digest-pod
+spec:
+  securityContext:
+    runAsNonRoot: true
+  containers:
+    - name: app
+      image: ghcr.io/mm-weber/dhc/valkey:9.1.1-alpine3.23-compat@sha256:PENDING-FIRST-MAIN-BUILD
+---
+# Same hole on the initContainer path, which the chart gate reaches through
+# every compat variant (8.1).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: placeholder-init-pod
+spec:
+  securityContext:
+    runAsNonRoot: true
+  initContainers:
+    - name: init
+      image: ghcr.io/mm-weber/dhc/valkey@sha256:TODO
+  containers:
+    - name: app
+      image: ghcr.io/mm-weber/dhc/valkey@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+---
+# Hex but truncated: a hand-copied digest that lost characters still names
+# no content.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: short-digest-pod
+spec:
+  securityContext:
+    runAsNonRoot: true
+  containers:
+    - name: app
+      image: ghcr.io/mm-weber/dhc/grafana@sha256:abcdef0123456789
+---
+# Charts render controllers, not bare pods, so the autogen rule is the one
+# the gate actually runs — a passing controller alone cannot tell a rewritten
+# foreach list from an empty one.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: placeholder-deployment
+spec:
+  selector:
+    matchLabels: {app: valkey}
+  template:
+    metadata:
+      labels: {app: valkey}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      initContainers:
+        - name: init
+          image: ghcr.io/mm-weber/dhc/valkey:9.1.1-alpine3.23-compat@sha256:PENDING-FIRST-MAIN-BUILD
+      containers:
+        - name: valkey
+          image: ghcr.io/mm-weber/dhc/valkey@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
