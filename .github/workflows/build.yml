@@ -6,10 +6,11 @@ name: build
 # CVE scan gate: Trivy over HIGH/CRITICAL, failing on anything not excused by an
 # OpenVEX statement in triage/vex/ (Req 6.1), with a Grype second opinion
 # whenever a CRITICAL is present (Req 6.6).
-# main: same build, then push to the PRIVATE ghcr.io/mm-weber/dhc with a cosign
+# main: same build, then push to ghcr.io/mm-weber/dhc with a cosign
 # keyless signature, an SPDX SBOM (Syft), and BuildKit provenance attached
-# (Req 2.2), tags derived from the definition (Req 2.3), and a final guard that
-# the pushed package is private (Req 2.4). Any failure publishes nothing (Req 2.5).
+# (Req 2.2), tags derived from the definition (Req 2.3). Any failure publishes
+# nothing (Req 2.5). Req 2.4's private-package guard was removed at the
+# 2026-08-13 public release — its WHILE clause ended with the visibility flip.
 #
 # Builds run on GitHub Actions runners — the authoritative build environment
 # (Req 8.1). Pulling the frontend + golang builder needs a dhi.io login:
@@ -649,21 +650,3 @@ jobs:
             n=$((n + 1))
           done
           echo "${NAME}: ${n} OpenVEX statement(s) attested" >> "$GITHUB_STEP_SUMMARY"
-
-      # Req 2.4: the pushed package must be private. Fail hard if public;
-      # a private repo makes new packages private by construction, so an
-      # indeterminate lookup is a warning, not a failure.
-      - name: verify package is private
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NAME: ${{ matrix.name }}
-        run: |
-          set -euo pipefail
-          enc="dhc%2F${NAME}"
-          vis=$(gh api "/users/mm-weber/packages/container/${enc}" -q '.visibility' 2>/dev/null || echo unknown)
-          case "$vis" in
-            public)  echo "::error::package dhc/${NAME} is PUBLIC — release requires private (Req 2.4)"; exit 1 ;;
-            private) echo "package dhc/${NAME} visibility: private" ;;
-            *)       echo "::warning::could not determine visibility for dhc/${NAME} (private-by-construction from a private repo)" ;;
-          esac

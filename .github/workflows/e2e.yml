@@ -22,7 +22,7 @@ on:
 
 permissions:
   contents: read
-  packages: read # pull the private ghcr.io/mm-weber/dhc images
+  packages: read # pull the ghcr.io/mm-weber/dhc images
 
 jobs:
   # Which chart-backed components does this PR touch? Emits a JSON array for the

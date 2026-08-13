@@ -1,6 +1,6 @@
 name: rescan
 
-# Daily CVE rescan of the PUBLISHED, private ghcr.io/mm-weber/dhc images (Req 6.2).
+# Daily CVE rescan of the PUBLISHED ghcr.io/mm-weber/dhc images (Req 6.2).
 # Trivy re-scans each catalogue image for HIGH/CRITICAL honouring our OpenVEX
 # statements in triage/vex/. Findings that are new — not already tracked by an
 # open `cve` issue — are enriched with EPSS (FIRST.org) and CISA KEV status and
@@ -21,7 +21,7 @@ on:
 
 permissions:
   contents: read
-  packages: read # pull the private ghcr.io/mm-weber/dhc images
+  packages: read # pull the ghcr.io/mm-weber/dhc images
   issues: write # file new-CVE issues
 
 jobs:
