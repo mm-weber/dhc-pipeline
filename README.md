@@ -38,6 +38,8 @@ cosign verify-attestation $ID --type spdxjson "$REF" \
   | jq -r '.payload | @base64d | fromjson | .predicate'   # SBOM
 cosign verify-attestation $ID --type openvex "$REF" \
   | jq -r '.payload | @base64d | fromjson | .predicate'   # VEX, compiled per digest
+# needs the buildx CLI plugin — without it docker mis-parses --format and
+# prints its top-level usage (Debian/Ubuntu: apt install docker-buildx-plugin)
 docker buildx imagetools inspect "$REF" --format '{{ json .Provenance }}'
 ```
 
