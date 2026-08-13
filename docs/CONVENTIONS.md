@@ -48,7 +48,11 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
 
 - Every base image reference carries `@sha256:<digest>`. No exceptions.
 - Every upstream source is `git+https://...#<ref>` plus a `checksum:` line.
-- Every upstream chart is pinned to an exact version in `chart/<name>/chart.yaml`.
+- Every upstream chart is pinned to an exact version in `chart/<name>/chart.yaml`
+  (hand-pinned; nothing tracks chart versions yet). The **image** pins in each
+  chart's values are Renovate-tracked with tag + digest (task 8.7), so a
+  definition bump reaches the deployed chart and a same-tag rebuild moves the
+  digest; a chart-pin bump PR runs the e2e upgrade path (Req 5.6).
 - Floating tags (`latest`, bare majors like `:1`, digestless tags) fail CI.
 - A digest is 64 lowercase hex characters, and both gates read them:
   `scripts/lint-pins.sh` over the sources and `policies/require-image-digest.yaml`
