@@ -6,8 +6,9 @@ deploy path for the phase-6 e2e HTTP-200 probe.
 
 Hardening is baked into the defaults (no overlay needed — we own it):
 
-- Image digest-pinned to `ghcr.io/mm-weber/dhc/hardened-app` (Req 4.2); Renovate
-  keeps the digest current.
+- Image digest-pinned to `ghcr.io/mm-weber/dhc/hardened-app` (Req 4.2). No
+  Renovate manager reads chart values — the digest moves by hand after a
+  rebuild (task 8.7).
 - Restricted PSS (Req 4.3): `runAsNonRoot`, UID/GID **65532**, RO rootfs,
   drop-ALL caps, `allowPrivilegeEscalation: false`, seccomp RuntimeDefault.
 - `/healthz` readiness + liveness probes on `:8080`. No writable paths — the

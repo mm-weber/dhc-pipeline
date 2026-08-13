@@ -9,9 +9,10 @@ authoring, chart adaptation, upstream tracking, Go-based integration testing, an
 **Users**: The project owner (as catalogue maintainer and job candidate); later, reviewers of the
 repository evaluating maintainer craft.
 
-**Impact**: New repository built from empty in three workdays, then left operating (Renovate cron,
-daily rescans) so genuine maintainer history accumulates unattended. Private until explicitly
-released (Req 2.4).
+**Impact**: New repository built from empty in an initial three-workday MVP (2026-07-18 →
+2026-07-21), then left operating (Renovate cron, daily rescans) so genuine maintainer history
+accumulates unattended — the operating period is what grew tasks 7.4–8.5. Private throughout the
+build (Req 2.4); released publicly under MIT on 2026-08-13.
 
 ### Goals
 
@@ -25,8 +26,9 @@ released (Req 2.4).
 
 - mongodb / kyverno / istio images or charts (post-MVP additions once the pattern exists)
 - FIPS/STIG variants, ELS, registry mirroring, Docker Scout wiring, full SLSA L3 hermeticity
-- Any custom build engine beyond the thin fallback renderer (no wheel-reinvention)
-- Public release ceremony — deferred until the owner flips visibility
+- Any custom build engine beyond the thin fallback renderer (no wheel-reinvention;
+  moot since ADR 0001 retired fallback B)
+- Public release ceremony — deferred until the owner flips visibility (flipped 2026-08-13)
 
 ## Architecture
 
@@ -56,7 +58,7 @@ graph TB
         SCAN[daily rescan → issues]
     end
 
-    GHCR[(ghcr.io/mm-weber/dhc — private)]
+    GHCR[(ghcr.io/mm-weber/dhc)]
 
     UP1 & UP2 & UP3 --> REN --> DEF
     DEF --> CI --> REL --> GHCR
@@ -71,7 +73,7 @@ graph TB
 
 | Layer | Technology | Rationale |
 |-------|------------|-----------|
-| Definitions | Real `dhi.io/build` syntax (spike A) or DHI-style YAML + thin renderer (fallback B) | Req 1.7/1.8; literal job practice first, transparent fallback second |
+| Definitions | Real `dhi.io/build` syntax — spike A succeeded, fallback B retired (ADR 0001) | Req 1.7/1.8; literal job practice; the frontend compiling each definition is the schema gate |
 | Build | BuildKit / buildx bake, GitHub Actions | Docker-native, no bespoke engine |
 | Tracking | Renovate self-hosted (`renovatebot/github-action`) | Industry standard for monorepo/fleet tracking; `postUpgradeTasks` recomputes source checksums (hosted app forbids them) |
 | Charts | Upstream charts + values overrides (rudder-style `config/`) | Upstream untouched; deviations reviewable (Req 4) |
@@ -85,8 +87,13 @@ graph TB
 1. **Real DHI frontend first, thin renderer fallback (Req 1.7/1.8)**
    - **Context**: The JD's first bullet is authoring definition files; DHI's catalog is open source.
    - **Options**: (A) build with Docker's `# syntax=dhi.io/build` frontend; (B) DHI-style YAML rendered to Dockerfiles; (C) plain Dockerfiles FROM dhi.io bases.
-   - **Decision**: Spike A on the owner's host, timeboxed 3h; fall back to B. C rejected (abandons definition authoring).
-   - **Trade-offs**: A risks entitlement/black-box friction; B adds ~small glue we maintain.
+   - **Decision**: **A** — the timeboxed spike produced working builds in native DHI syntax, so
+     fallback B was retired (ADR 0001, accepted). Every definition opens with a digest-pinned
+     `# syntax=dhi.io/build:…` directive; the frontend compiling each changed definition in
+     `build.yml` is the schema-conformance gate (Req 1.5), while `validate.yml`/`lint-pins.sh`
+     covers pinning conventions.
+   - **Trade-offs**: the frontend is a black box we don't control; accepted because it is the
+     literal tool of the role being practiced. C rejected (abandons definition authoring).
 
 2. **Renovate self-hosted, not custom tracker, not hosted app**
    - **Context**: "No wheel-reinvention"; source pins carry checksums Renovate cannot natively recompute.
@@ -118,20 +125,22 @@ sequenceDiagram
 
     U->>R: new tag matches version policy
     R->>PR: bump pin+checksum (grouped; majors → dashboard)
-    PR->>CI: schema+conventions → build → ct → kind e2e → trivy+VEX → kyverno
-    CI-->>PR: checks green (digest-only patch: automerge)
+    PR->>CI: parallel gates: validate / build+trivy+VEX+govulncheck / chart (ct lint, kyverno) / kind e2e
+    CI-->>PR: checks green (digest and patch bumps: automerge)
     PR->>M: merge (human review otherwise)
-    M->>G: multi-arch build, cosign sign, SBOM, provenance, push
+    M->>G: amd64 build, cosign sign, SBOM, compiled-VEX attest, provenance, push
     G->>CI: daily rescan → new CVE? issue → VEX or fix-bump PR
 ```
 
 ## Components and Interfaces
 
 ### image/<name>/ — definitions (Req 1, 2)
-One directory per component; `image.yaml` in DHI schema shapes: `vars` (upstream version + regex
-extraction), `files` (git+https source, `checksum:`), `contents`/`builds` (stages), `outputs`
-(uid/gid/mode), `accounts` (nonroot 65532), `platforms` (amd64/arm64). cert-manager is one
-definition producing three images (controller/webhook/cainjector) from one version var.
+One directory per definition; `image.yaml` in native DHI schema (see Data Models). cert-manager
+is three sibling definitions (`cert-manager-{controller,webhook,cainjector}`) driven by one
+upstream version, with byte-equal source pins enforced across them by `scripts/lint-pins.sh`.
+A variant that must be *built* rather than merely tagged gets its own directory,
+`image/<name>-<variant>/`, publishing to its runtime sibling's repository
+(`image/valkey-compat/`; docs/CONVENTIONS.md, "Naming").
 Consumed by: CI build workflow; watched by: Renovate regex managers.
 
 ### chart/<name>/ — adaptations (Req 4)
@@ -143,12 +152,15 @@ not an upstream adaptation (outside Req 4.1), giving Req 5.5's hardened-app prob
 
 ### test/ — Go module (Req 5)
 Ginkgo v2 suites per component under `test/e2e/`; e2e-framework provisions kind; shared helpers
-for install/upgrade, readiness, live securityContext assertion, functional probes. Entry:
-`go test ./test/e2e/... -args --chart <name>`; CI matrix runs affected components only.
+for install/upgrade, readiness, live securityContext assertion, functional probes. Entry (from
+`test/`): `go test ./e2e/ -args --chart <name>`; CI matrix runs affected components only.
 
 ### triage/ — decisions (Req 6)
-`triage/vex/*.openvex.json` (authored via vexctl, attached with cosign attest),
-`triage/LOG.md` (dated decisions: finding → EPSS/KEV → outcome → link). Consumed by Trivy gate.
+`triage/vex/*.openvex.json` (hand-authored source, compiled per build, attached with cosign
+attest), `triage/LOG.md` (dated decisions: finding → EPSS/KEV → outcome → link),
+`triage/upstream/` (dated upstream-behaviour investigations with re-runnable checks under
+`checks/`), and `triage/rescan/` (unit-tested Go report generator behind the daily rescan).
+Consumed by Trivy gate.
 
 `triage/accepted-risk/<image>.yaml` (Req 6.7–6.12) covers the two treatments VEX
 must never express. Risk has four treatments — avoid (drop the component),
@@ -254,8 +266,8 @@ and subcomponents are versionless so they survive an upstream bump (6.19).
 
 A product name is resolved through each definition's `image:`, never through its
 directory — Trivy builds the name from the scanned image's RepoDigest, and a
-built variant publishes under its runtime sibling's repository (Req 2.3;
-docs/CONVENTIONS.md, "Naming"). So one name can resolve to more than one
+built variant publishes under its runtime sibling's repository
+(docs/CONVENTIONS.md, "Naming"; the tag carries the variant per Req 2.3). So one name can resolve to more than one
 definition, which is why 6.20 scopes a version against the tags of every
 definition publishing that repository; the tag is then what separates them, and
 `scripts/compile-vex.sh` is what enforces it per build (6.30). One reader for
@@ -394,8 +406,9 @@ published 13.0.4 image the later `fixed` statement won over the earlier
 release. Getting 6.30's tag set right is what stops that.
 
 ### .github/workflows/
-`validate.yml` (schema/yamllint/conventions), `build.yml` (PR build + gates; main: release),
-`e2e.yml` (kind matrix), `renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).
+`validate.yml` (yamllint/conventions/lints), `build.yml` (PR build + scan gates; main: release),
+`chart.yml` (ct lint + kyverno over rendered charts), `e2e.yml` (kind matrix),
+`renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).
 
 **Platforms: `linux/amd64` only (Req 2.1, Req 2.6).** The catalogue built and
 published both arches until 2026-08-04, when measurement showed nothing ever
@@ -422,24 +435,30 @@ large upstream (cert-manager) reuse the Go module + compile layers.
 
 ## Data Models
 
-Definition schema (fallback-B shape, mirroring real DHI fields; JSON Schema enforced in CI):
+Definition schema: native `dhi.io/build` syntax (ADR 0001), validated by the frontend itself
+compiling each changed definition in CI. Abridged from `image/grafana/image.yaml` as built:
 
 ```yaml
-name: grafana
+# syntax=dhi.io/build:2-alpine3.23@sha256:…        # digest-pinned frontend
+name: Grafana 13.1.x
+image: ghcr.io/mm-weber/dhc/grafana                # publish repository (VEX product identity)
+variant: runtime
+tags: [13-alpine3.23, 13.1-alpine3.23, 13.1.3-alpine3.23]
+platforms: [linux/amd64, linux/arm64]              # release path currently ships amd64 (task 8.3)
 vars:
-  version: "11.3.0"            # Renovate-managed; regex-extracted tag segments
-files:
-  - url: git+https://github.com/grafana/grafana.git#v${version}
-    checksum: sha256:...       # postUpgradeTasks recompute
+  GRAFANA_SHA256: '#{ target.arch == "amd64" ? "…" : "…" }'   # per-arch pin, Renovate-managed
+  VERSION: 13.1.3
 contents:
-  base: gcr.io/distroless/static-debian12@sha256:...   # digest-pinned always
-builds:
-  - stage: fetch|build|runtime steps (pipeline: runs/uses)
-outputs:
-  - source: ...; target: /usr/share/grafana; uid: 65532; gid: 65532
-accounts:
-  runtime: {user: nonroot, uid: 65532}
-platforms: [linux/amd64, linux/arm64]
+  repositories: [https://dhi.io/apk/alpine/v3.23/main, …]     # apk repos + keyring
+  packages: [alpine-baselayout-data, ca-certificates-bundle, tzdata]
+  builds:                                          # build stages: files (pinned URL + spdx),
+    - name: grafana                                # pipeline (runs), outputs (uid/gid targets)
+      pipeline: [verify checksum, extract and stage]
+accounts: {run-as: nonroot, users: [{name: nonroot, uid: 65532, gid: 65532}]}
+os-release: {…}                                    # image identity
+paths: [{path: /var/lib/grafana, uid: 65532, …}]   # writable-path inventory → chart emptyDirs
+entrypoint: [grafana, server, …]
+ports: [3000/tcp]
 ```
 
 ## Error Handling
@@ -449,7 +468,7 @@ platforms: [linux/amd64, linux/arm64]
 | Definition violates schema/pinning | validate.yml fails naming the rule and reference | 1.5, 1.6, 7.4 |
 | Upstream bump breaks build | PR stays red; failure is the triage/fix work, documented in CONVENTIONS | 2.5 |
 | Renovate mis-parses a pin | regex managers carry unit fixtures in repo; dashboard shows detection state | 3 |
-| kind flake / timeout | one retry per suite; diagnostic logs uploaded as artifacts | 5.7 |
+| kind flake / timeout | no automatic retry (matrix `fail-fast: false` isolates components; rerun is manual); diagnostic logs uploaded as artifacts | 5.7 |
 | Trivy DB outage | PR gate hard-fails (retryable); daily rescan soft-fails with issue | 6 |
 | New CVE on published image | issue with severity/EPSS/KEV → VEX statement or fix-bump PR | 6.3–6.5 |
 
@@ -462,16 +481,21 @@ platforms: [linux/amd64, linux/arm64]
 - Req 5 suite: per-chart install on kind → Ready ≤5min → live securityContext assertions → functional probes (Certificate issued; grafana HTTP health; valkey SET/GET; hardened-app 200) → upgrade path on bump PRs.
 
 ### E2E / Pipeline
-- ct lint+install per changed chart; kyverno CLI over rendered manifests (digest, registry, nonroot); trivy gate with VEX; full bump-flow rehearsal via one deliberately stale pin per component.
+- ct lint + kyverno CLI over rendered manifests (digest, registry, nonroot) for every chart on each PR — install-level verification lives in the kind e2e suite, not `ct install`; trivy gate with compiled VEX; full bump-flow rehearsal via one deliberately stale pin per component.
 
 ## Security Considerations
 
 - Non-root 65532 everywhere; restricted PSS enforced twice (chart overrides + kyverno gate)
 - Everything digest/checksum-pinned; floating tags fail CI (Req 1.6)
 - cosign keyless via GitHub OIDC — no long-lived signing keys; PAT stays in `.keys/` (gitignored)
-- Private repo + private GHCR until owner flips (Req 2.4); no secrets in definitions
+- Private repo + private GHCR through the build phase (Req 2.4); repo public under MIT since
+  2026-08-13 — registry visibility is a separate, explicit decision. No secrets in definitions
 
-## Delivery Plan (3 workdays, cut line explicit)
+## Delivery Plan (3 workdays, cut line explicit — historical)
+
+*This is the MVP plan as drawn on day 0, kept as a record. It was executed 2026-07-18 →
+2026-07-21; the operating period since then grew tasks 7.4–8.5 (risk-treatment lane,
+reachability evidence, VEX compilation, variant convention), which no day below plans for.*
 
 - **Day 1**: skeleton, CONVENTIONS, validate.yml; host spike of `dhi.io/build` (3h box → decision A/B); hardened-app + cert-manager definitions building, signed, pushed; stale pins set.
 - **Day 2**: Renovate live (first real bump PRs incl. staged major); grafana + valkey definitions; cert-manager + grafana chart adaptations + kyverno gate.
