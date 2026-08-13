@@ -1,11 +1,13 @@
 # Pinned upstream chart (Req 4.1). Templates are NEVER edited, forked, or
 # patched — the chart is rendered live from this exact version with
-# config/values-hardened.yaml as the only overlay. Bumped by Renovate alongside
-# the cert-manager image definitions (one upstream version moves both).
+# config/values-hardened.yaml as the only overlay. Hand-pinned: no Renovate
+# manager reads chart.yaml (the chart-pin managers of task 8.7 track the IMAGE
+# pins in the values overlay, which may run a patch ahead of these templates —
+# chart-version tracking is a separate, still-open gap).
 upstream:
   name: cert-manager
   repository: https://charts.jetstack.io
-  version: v1.21.0   # matches catalogue images cert-manager-* 1.21.0
+  version: v1.21.0
 
 # Render (chart CI gate, task 5.5) and install (e2e, phase 6):
 #   helm template dhc-cert-manager cert-manager \

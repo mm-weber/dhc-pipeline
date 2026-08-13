@@ -26,7 +26,7 @@ type Spec struct {
 	Owned      bool
 	ChartPath  string   // owned: local chart directory
 	Pin        Pin      // adapted: upstream coordinates
-	ValuesFile string   // adapted: hardened values overlay
+	ValuesFile string   // adapted: hardened values overlay; owned: optional -f overlay (the upgrade-from values snapshot, Req 5.6)
 	Version    string   // adapted: overrides Pin.Version when non-empty (the upgrade-from version)
 	Extra      []string // extra flags, e.g. []string{"--set", "crds.enabled=true"}
 }
@@ -51,6 +51,11 @@ func Args(spec Spec) []string {
 	args := []string{spec.Verb, spec.Release}
 	if spec.Owned {
 		args = append(args, spec.ChartPath)
+		// Set only on the image-bump upgrade path (Req 5.6): the base branch's
+		// values snapshot overlays the chart's baked-in values.
+		if spec.ValuesFile != "" {
+			args = append(args, "-f", spec.ValuesFile)
+		}
 	} else {
 		version := spec.Version
 		if version == "" {

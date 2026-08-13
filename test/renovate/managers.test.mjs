@@ -31,13 +31,19 @@ function extract(manager, content) {
     while ((m = re.exec(content)) !== null) {
       const g = m.groups ?? {};
       deps.push({
+        // Custom capture groups first (the chart tag@digest manager composes
+        // depName from registry+repository by template, so the parts must be
+        // visible to assertions), then the fields Renovate itself derives.
+        ...g,
         // A manager either captures the datasource from the file (the scanner
         // manager, whose `# renovate:` comment states it the way Renovate's own
         // inline convention does) or fixes it as a template.
         datasource: g.datasource ?? manager.datasourceTemplate,
         // A manager either captures depName from the file (the git-source and
-        // docker managers) or states it as a constant template (the grafana
-        // tarball manager, whose url carries no owner/repo).
+        // docker managers) or states it as a template — constant (grafana
+        // tarball) or composed from capture groups (chart tag@digest). This
+        // emulation does not render templates; assertions check the template
+        // string and the captured parts separately.
         depName: g.depName ?? manager.depNameTemplate,
         currentValue: g.currentValue,
         currentDigest: g.currentDigest,
@@ -48,7 +54,19 @@ function extract(manager, content) {
 }
 
 const read = (rel) => readFileSync(join(root, rel), "utf8");
-const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr] = config.customManagers;
+const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr, workflowMgr, chartDigestMgr, chartTagMgr] =
+  config.customManagers;
+
+// managerFilePatterns is the half extract() cannot exercise: a pattern that
+// stops matching a file means Renovate silently reads nothing from it, with
+// every matchString still green here. Renovate's /…/-delimited strings are
+// regexes over repo-relative paths.
+function filePatternMatches(manager, path) {
+  return manager.managerFilePatterns.some((p) => {
+    const re = /^\/(.*)\/$/.exec(p);
+    return re ? new RegExp(re[1]).test(path) : p === path;
+  });
+}
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -299,6 +317,200 @@ check(
     ev.exec("v0.72.0")?.groups?.version === "0.72.0",
   );
   check("scanner: extractVersion rejects an unprefixed tag", ev.exec("0.72.0") === null);
+}
+
+// --- tool pins: kind + kyverno via the same manager (Req 7.5, 7.6) -----------
+// install-tool.sh carries the same pin-block shape as install-scanners.sh and
+// the same manager reads both files — kyverno is the Req 4.6 policy engine, so
+// a pin nobody bumps silently stops gaining checks while every gate stays
+// green (issue #55).
+{
+  for (const [file, tools] of [
+    ["scripts/install-scanners.sh", ["trivy", "grype"]],
+    ["scripts/install-tool.sh", ["kind", "kyverno"]],
+  ]) {
+    check(
+      `tool pins: manager file pattern matches ${file}`,
+      filePatternMatches(scannerMgr, file),
+      JSON.stringify(scannerMgr.managerFilePatterns),
+    );
+  }
+
+  const pins = extract(scannerMgr, read("scripts/install-tool.sh"));
+  check("tool pins: install-tool.sh yields exactly two deps", pins.length === 2, `${pins.length}`);
+
+  for (const [tool, depName] of [
+    ["kind", "kubernetes-sigs/kind"],
+    ["kyverno", "kyverno/kyverno"],
+  ]) {
+    const dep = pins.find((d) => d.depName === depName);
+    check(`tool pins: ${tool} is tracked as ${depName}`, !!dep);
+    check(
+      `tool pins: ${tool} resolves against github-releases`,
+      dep?.datasource === "github-releases",
+      dep?.datasource,
+    );
+    // Bare, like trivy/grype, so the shared extractVersionTemplate bridges the
+    // v-prefixed upstream tags — both projects tag vX.Y.Z.
+    check(
+      `tool pins: ${tool} pin is bare semver (no v prefix)`,
+      /^\d+\.\d+\.\d+$/.test(dep?.currentValue ?? ""),
+      dep?.currentValue,
+    );
+  }
+}
+
+// --- workflow env pins: govulncheck + renovate/json5 (Req 7.5, 7.6) ----------
+// The pins whose checksum control lives outside this repo (Go sumdb, npm
+// registry integrity) sit as env vars in the workflows themselves, under the
+// same `# renovate:` comment convention in YAML assignment form (issue #63
+// recorded the pins; this manager is what keeps them from staling, issue #55).
+{
+  for (const wf of ["build.yml", "validate.yml"]) {
+    check(
+      `workflow pins: file pattern matches .github/workflows/${wf}`,
+      filePatternMatches(workflowMgr, `.github/workflows/${wf}`),
+      JSON.stringify(workflowMgr.managerFilePatterns),
+    );
+  }
+
+  const build = extract(workflowMgr, read(".github/workflows/build.yml"));
+  {
+    const d = dep(build, { datasource: "go", depName: "golang.org/x/vuln" });
+    // v-prefixed, matching the go datasource's native version format — this
+    // manager deliberately has no extractVersionTemplate to bridge anything.
+    check(
+      "workflow pins: govulncheck → go golang.org/x/vuln, v-prefixed",
+      !!d && /^v\d+\.\d+\.\d+$/.test(d.currentValue ?? ""),
+      JSON.stringify(build),
+    );
+  }
+  check("workflow pins: build.yml yields exactly one dep", build.length === 1, `${build.length}`);
+
+  const validate = extract(workflowMgr, read(".github/workflows/validate.yml"));
+  for (const [name, re] of [
+    ["renovate", /^\d+\.\d+\.\d+$/],
+    ["json5", /^\d+\.\d+\.\d+$/],
+  ]) {
+    const d = dep(validate, { datasource: "npm", depName: name });
+    check(
+      `workflow pins: ${name} → npm, bare semver`,
+      !!d && re.test(d.currentValue ?? ""),
+      JSON.stringify(validate),
+    );
+  }
+  check(
+    "workflow pins: validate.yml yields exactly two deps",
+    validate.length === 2,
+    `${validate.length}`,
+  );
+
+  // The other direction: env vars without a marker comment stay invisible.
+  // e2e.yml is all unmarked env (CLUSTER, PROBE_IMAGE, …) now that the kind
+  // pin lives in install-tool.sh.
+  const e2e = extract(workflowMgr, read(".github/workflows/e2e.yml"));
+  check("workflow pins: unmarked workflow env is ignored", e2e.length === 0, JSON.stringify(e2e));
+}
+
+// --- chart image pins: the values files the charts deploy with (Req 4.2, 7.6) --
+// A definition bump publishes a new image, but until task 8.7 nothing read
+// chart/, so the deployed pins silently fell behind what the catalogue
+// publishes (issue #64: cert-manager a version behind, grafana two, valkey and
+// hardened-app behind on digest alone). Two spellings, one manager each:
+// repository/tag/digest on separate keys (cert-manager ×3, hardened-app) and
+// tag@digest in one value under registry/repository (grafana, valkey — the
+// grafana chart strips the @sha… suffix for its version label itself, which is
+// why the awkward bare-hex `sha:` field could be retired).
+{
+  const isChartTag = (v) => /^\d+\.\d+\.\d+-alpine\d+\.\d+(-[a-z0-9]+)?$/.test(v ?? "");
+
+  for (const [mgr, name, file] of [
+    [chartDigestMgr, "digest-keyed", "chart/cert-manager/config/values-hardened.yaml"],
+    [chartDigestMgr, "digest-keyed", "chart/hardened-app/values.yaml"],
+    [chartTagMgr, "tag@digest", "chart/grafana/config/values-hardened.yaml"],
+    [chartTagMgr, "tag@digest", "chart/valkey/config/values-hardened.yaml"],
+  ]) {
+    check(
+      `chart pins: ${name} manager file pattern matches ${file}`,
+      !!mgr && filePatternMatches(mgr, file),
+      mgr && JSON.stringify(mgr.managerFilePatterns),
+    );
+  }
+
+  // cert-manager: all three images, tracked with tag AND digest so both a
+  // version bump and a same-tag rebuild (digest drift) reach the chart.
+  const cm = chartDigestMgr ? extract(chartDigestMgr, read("chart/cert-manager/config/values-hardened.yaml")) : [];
+  check("chart pins: cert-manager yields exactly three deps", cm.length === 3, `${cm.length}`);
+  for (const role of ["controller", "webhook", "cainjector"]) {
+    const d = dep(cm, { datasource: "docker", depName: `ghcr.io/mm-weber/dhc/cert-manager-${role}` });
+    check(
+      `chart pins: cert-manager-${role} tracked with tag + digest`,
+      !!d && isChartTag(d.currentValue) && is64(d.currentDigest),
+      JSON.stringify(cm),
+    );
+  }
+
+  // hardened-app: the owned chart's baked-in values carry the same spelling.
+  const ha = chartDigestMgr ? extract(chartDigestMgr, read("chart/hardened-app/values.yaml")) : [];
+  {
+    const d = dep(ha, { datasource: "docker", depName: "ghcr.io/mm-weber/dhc/hardened-app" });
+    check(
+      "chart pins: hardened-app tracked with tag + digest",
+      !!d && isChartTag(d.currentValue) && is64(d.currentDigest),
+      JSON.stringify(ha),
+    );
+  }
+  check("chart pins: hardened-app yields exactly one dep", ha.length === 1, `${ha.length}`);
+
+  // grafana + valkey: registry/repository on separate keys, digest riding on
+  // the tag. depName is composed from both keys by template.
+  for (const [name, file, compat] of [
+    ["grafana", "chart/grafana/config/values-hardened.yaml", ""],
+    ["valkey", "chart/valkey/config/values-hardened.yaml", "-compat"],
+  ]) {
+    const deps = chartTagMgr ? extract(chartTagMgr, read(file)) : [];
+    const d = deps[0];
+    check(
+      `chart pins: ${name} tag@digest tracked with tag + digest`,
+      !!d && d.datasource === "docker" && isChartTag(d.currentValue) && is64(d.currentDigest),
+      JSON.stringify(deps),
+    );
+    check(
+      `chart pins: ${name} depName composed as ghcr.io/mm-weber/dhc/${name}`,
+      !!chartTagMgr &&
+        chartTagMgr.depNameTemplate === "{{{registry}}}/{{{repository}}}" &&
+        d?.registry === "ghcr.io" &&
+        d?.repository === `mm-weber/dhc/${name}`,
+      JSON.stringify({ template: chartTagMgr?.depNameTemplate, dep: d }),
+    );
+    check(
+      `chart pins: ${name} pin keeps its compatibility suffix${compat && ` (${compat})`}`,
+      !!d && (d.currentValue ?? "").endsWith(`-alpine3.23${compat}`),
+      d?.currentValue,
+    );
+    check(`chart pins: ${name} yields exactly one dep`, deps.length === 1, `${deps.length}`);
+  }
+
+  // The other direction: neither chart manager may read image definitions
+  // (the docker manager owns those), and the digest-keyed manager must not
+  // double-capture the tag@digest files or vice versa.
+  for (const mgr of [chartDigestMgr, chartTagMgr]) {
+    check(
+      "chart pins: managers do not read image definitions",
+      !!mgr && !filePatternMatches(mgr, "image/grafana/image.yaml"),
+      mgr && JSON.stringify(mgr.managerFilePatterns),
+    );
+  }
+  check(
+    "chart pins: digest-keyed manager ignores tag@digest files",
+    chartDigestMgr && extract(chartDigestMgr, read("chart/grafana/config/values-hardened.yaml")).length === 0,
+    chartDigestMgr && JSON.stringify(extract(chartDigestMgr, read("chart/grafana/config/values-hardened.yaml"))),
+  );
+  check(
+    "chart pins: tag@digest manager ignores digest-keyed files",
+    chartTagMgr && extract(chartTagMgr, read("chart/cert-manager/config/values-hardened.yaml")).length === 0,
+    chartTagMgr && JSON.stringify(extract(chartTagMgr, read("chart/cert-manager/config/values-hardened.yaml"))),
+  );
 }
 
 if (failures > 0) {

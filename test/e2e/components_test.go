@@ -61,7 +61,7 @@ var _ = Describe("hardened catalogue component on kind", func() {
 				if selected.Name != s.Name {
 					Skip("this run targets -chart=" + selected.Name)
 				}
-				if os.Getenv("DHC_UPGRADE_FROM") != "" {
+				if os.Getenv("DHC_UPGRADE_FROM") != "" || os.Getenv("DHC_UPGRADE_VALUES_FROM") != "" {
 					Skip("bump PR — the upgrade-path spec installs and upgrades instead")
 				}
 			})

@@ -25,13 +25,13 @@ jobs:
       - name: pin + definition lint — docs/CONVENTIONS.md (Req 1.5, 1.6, 7.4)
         run: scripts/lint-pins.sh
 
+      # Pin + sha256 live in the script (Req 7.5). Invoked by path because the
+      # install and the tests share this step, and GITHUB_PATH only reaches
+      # the steps after it.
       - name: kyverno policy tests (Req 4.6 gate self-test)
-        env:
-          KYVERNO_VERSION: v1.18.2
         run: |
-          curl -fsSL "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz" \
-            | tar -xz -C /usr/local/bin kyverno
-          kyverno test policies/tests/
+          scripts/install-tool.sh kyverno "${RUNNER_TEMP}/bin"
+          "${RUNNER_TEMP}/bin/kyverno" test policies/tests/
 
       # The risk-treatment lane is the only sanctioned way to stop the scan gate
       # failing on a real finding, so its own rules are enforced here rather than
@@ -67,6 +67,9 @@ jobs:
 
       - name: install-scanners unit tests (Req 7.5)
         run: scripts/install-scanners_test.sh
+
+      - name: install-tool unit tests (Req 7.5)
+        run: scripts/install-tool_test.sh
 
       - name: VEX product identity lint (Req 6.17-6.21)
         run: scripts/lint-vex-product.sh
