@@ -2,14 +2,15 @@
 # Applied with `-f`; upstream templates are untouched. Every delta below is
 # documented with its rationale in ../README.md.
 #
-# Digests are the published catalogue images (ghcr.io/mm-weber/dhc, private).
-# Renovate keeps them current (docker datasource); hand-bumps are CVE-only.
+# Digests are the published catalogue images (ghcr.io/mm-weber/dhc). Renovate's
+# chart-pin manager (task 8.7) keeps tag and digest current; hand-bumps are
+# CVE-only. The three pins move together (one upstream release, grouped PR).
 
 # --- controller (top-level image + pod securityContext) ---
 image:
   repository: ghcr.io/mm-weber/dhc/cert-manager-controller
-  tag: 1.21.0-alpine3.23
-  digest: sha256:22c9acf8a4a82a19911d45a74165f0917f06a72493261b19a3e39f77dac8e827
+  tag: 1.21.1-alpine3.23
+  digest: sha256:fe6ab439dce8b926d4ee8ed2b2b83e2d378a744b9840ce2373ef37e63490362c
 securityContext:
   runAsUser: 65532
   runAsGroup: 65532
@@ -19,8 +20,8 @@ securityContext:
 webhook:
   image:
     repository: ghcr.io/mm-weber/dhc/cert-manager-webhook
-    tag: 1.21.0-alpine3.23
-    digest: sha256:7e5189a954ef1e63a49fd65f9818dbad9604f79b5a85fdf3ba2fda577e5fcb17
+    tag: 1.21.1-alpine3.23
+    digest: sha256:f9666408719e2f84ec870a0f6f362ef2813f4744311a6324d7f1c677b2593332
   securityContext:
     runAsUser: 65532
     runAsGroup: 65532
@@ -30,8 +31,8 @@ webhook:
 cainjector:
   image:
     repository: ghcr.io/mm-weber/dhc/cert-manager-cainjector
-    tag: 1.21.0-alpine3.23
-    digest: sha256:6f5e0d57baa05056e63dd902c8ce828c9653c9b6b9a6fcaf65a52e55871dbfe6
+    tag: 1.21.1-alpine3.23
+    digest: sha256:49a0caeb25e90ce4b023ebdfb7bf44c9ff263e27dcc740cf4b8072689444b916
   securityContext:
     runAsUser: 65532
     runAsGroup: 65532

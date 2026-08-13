@@ -94,17 +94,22 @@
       versioningTemplate: "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:\\+security-(?<build>\\d+))?$",
     },
     {
-      // The two CVE scanners the gate itself runs on (Req 7.5, 7.6). They used
-      // to be installed by `curl .../main/install.sh | sudo sh` — unpinned, from
-      // a mutable branch, as root. Now pinned by version + sha256 in
-      // scripts/install-scanners.sh.
+      // The version+sha256 pin scripts (Req 7.5, 7.6): the two CVE scanners
+      // the gate itself runs on (install-scanners.sh — they used to arrive by
+      // `curl .../main/install.sh | sudo sh`, unpinned, from a mutable branch,
+      // as root) and the other workflow-installed binaries, kind and kyverno
+      // (install-tool.sh — formerly version-pinned but never verified, kyverno
+      // by curl piped into tar). One pin-block shape in both files, one
+      // manager reading it.
       //
       // This manager is not optional garnish: a pinned scanner nobody bumps
-      // stops detecting new advisories and says nothing while it does. Pinning
-      // WITHOUT tracking trades a supply-chain risk for a silent-staleness one,
-      // so 7.5 and 7.6 only make sense together.
+      // stops detecting new advisories and says nothing while it does — and
+      // kyverno has the same property one layer up, as the policy engine
+      // behind the Req 4.6 gate. Pinning WITHOUT tracking trades a
+      // supply-chain risk for a silent-staleness one, so 7.5 and 7.6 only
+      // make sense together.
       customType: "regex",
-      managerFilePatterns: ["/^scripts/install-scanners\\.sh$/"],
+      managerFilePatterns: ["/^scripts/install-(scanners|tool)\\.sh$/"],
       matchStrings: [
         "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*\\w+_VERSION=\"(?<currentValue>[^\"]+)\"",
       ],
@@ -125,7 +130,67 @@
       // also never automerge: that rule is scoped to github-tags, and this
       // manager is github-releases.
       //
-      // Two tools, a handful of bumps a year. Cheap enough to keep manual.
+      // Four tools, a handful of bumps a year each. Cheap enough to keep
+      // manual.
+    },
+    {
+      // Workflow-installed tools whose checksum control is NOT a digest in
+      // this repo (Req 7.5, 7.6): govulncheck compiles from the module proxy
+      // under the Go sumdb (build.yml), and the renovate/json5 test installs
+      // are verified by npm against registry integrity hashes (validate.yml).
+      // Their pins are workflow env vars — `NAME_VERSION: value` under the
+      // same `# renovate:` comment convention the pin scripts use, YAML
+      // assignment instead of shell.
+      //
+      // No extractVersionTemplate, unlike the pin-script manager: these pins
+      // are written in each datasource's native format (go: v-prefixed,
+      // npm: bare), so tags and pins already compare directly.
+      customType: "regex",
+      managerFilePatterns: ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      matchStrings: [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*\\w+_VERSION:\\s*[\"']?(?<currentValue>[^\\s\"']+)",
+      ],
+      // A renovate major (41 → 44 is real today) stages behind Dependency
+      // Dashboard approval like every other major, via the Req 3.4 rule below.
+    },
+    {
+      // Chart image pins, digest-keyed spelling (Req 4.2, 7.6; task 8.7):
+      // cert-manager's three images and hardened-app's baked-in values carry
+      // repository/tag/digest on separate keys. Until this manager existed
+      // nothing read chart/, so the deployed pins silently fell behind what
+      // the catalogue publishes — cert-manager a version, grafana two, valkey
+      // and hardened-app behind on digest alone (issue #64). Tag AND digest
+      // are both captured so a same-tag rebuild (digest drift) reaches the
+      // chart too, not just version bumps.
+      //
+      // The docker datasource resolves ghcr.io/mm-weber/dhc/* anonymously —
+      // the packages are public since go-live. A chart-pin PR trails its
+      // definition bump by one main build (the image must publish before a
+      // tag exists to bump to), and its values change triggers the e2e
+      // upgrade path (Req 5.6), which is the gate that merges it.
+      customType: "regex",
+      managerFilePatterns: ["/^chart/.+/(config/values-hardened|values)\\.yaml$/"],
+      matchStrings: [
+        "repository:\\s*(?<depName>ghcr\\.io/mm-weber/dhc/[^\\s\"']+)\\s*\\n\\s*tag:\\s*\"?(?<currentValue>[^\\s\"'@]+)\"?\\s*\\n\\s*digest:\\s*\"?(?<currentDigest>sha256:[a-f0-9]{64})",
+      ],
+      datasourceTemplate: "docker",
+    },
+    {
+      // Chart image pins, tag@digest spelling (same task): grafana and valkey
+      // charts compose registry/repository:tag themselves, so the digest rides
+      // on the tag value and registry+repository sit on separate keys — depName
+      // is composed from both. grafana moved OFF its chart's bare-hex `sha:`
+      // field onto this spelling deliberately: Renovate writes digests as
+      // `sha256:<hex>`, which would corrupt a bare-hex field, and the chart
+      // strips a trailing `@sha…` from the tag for its version label
+      // (_helpers.tpl), so upstream supports exactly this shape.
+      customType: "regex",
+      managerFilePatterns: ["/^chart/.+/(config/values-hardened|values)\\.yaml$/"],
+      matchStrings: [
+        "registry:\\s*\"?(?<registry>[^\\s\"']+)\"?\\s*\\n\\s*repository:\\s*\"?(?<repository>mm-weber/dhc/[^\\s\"']+)\"?\\s*\\n\\s*tag:\\s*\"?(?<currentValue>[^\\s\"'@]+)@(?<currentDigest>sha256:[a-f0-9]{64})",
+      ],
+      depNameTemplate: "{{{registry}}}/{{{repository}}}",
+      datasourceTemplate: "docker",
     },
   ],
 
@@ -148,6 +213,18 @@
       // record of that.
       matchDepNames: ["valkey-io/valkey"],
       groupName: "valkey runtime and compat",
+    },
+    {
+      // Req 3.3, one layer down: the three cert-manager chart pins are the
+      // same upstream release, so their chart-side bumps move as one PR too —
+      // three separate PRs would each fail the e2e upgrade path against a
+      // half-bumped trio.
+      matchDepNames: [
+        "ghcr.io/mm-weber/dhc/cert-manager-controller",
+        "ghcr.io/mm-weber/dhc/cert-manager-webhook",
+        "ghcr.io/mm-weber/dhc/cert-manager-cainjector",
+      ],
+      groupName: "cert-manager chart pins",
     },
     {
       // Req 3.4: a new major stages behind Dependency Dashboard approval

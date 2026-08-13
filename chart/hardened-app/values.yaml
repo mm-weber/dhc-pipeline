@@ -1,9 +1,11 @@
 # Owned chart: the hardening is baked into the defaults (no overlay). Digest
-# tracks the published catalogue image; Renovate keeps it current.
+# tracks the published catalogue image; Renovate's chart-pin manager (task 8.7)
+# keeps tag and digest current — before it existed this claim was false, and
+# the pinned digest sat a rebuild behind the registry (issue #64).
 image:
   repository: ghcr.io/mm-weber/dhc/hardened-app
   tag: 0.1.0-alpine3.23
-  digest: sha256:253705899cf9bf976ccaa225ee58050abeff518c671c6c99a865697ec9357b3a
+  digest: sha256:8eee13295b6434030d9b6b5295be748bb4b5017977fca6a4ffa9e867c7926bf3
 
 replicaCount: 1
 port: 8080

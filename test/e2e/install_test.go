@@ -20,11 +20,13 @@ func repoRoot() string {
 }
 
 // deploySpec turns a componentSpec into an install.Spec for the given helm verb.
-// version (non-empty only on the upgrade path) overrides the adapted chart's
-// pinned version so the suite can install an older revision then upgrade to the
-// proposed one (Req 5.6). Owned and adapted charts deploy the same two ways
+// version and valuesFile (non-empty only on the upgrade path) override the
+// adapted chart's pinned version and the deployed values, so the suite can
+// install the base state then upgrade to the proposed one (Req 5.6): a chart
+// bump moves the version, an image bump moves the values snapshot, and one PR
+// may move both. Owned and adapted charts deploy the same two ways
 // render-chart.sh renders them.
-func deploySpec(verb string, s componentSpec, version string) (install.Spec, error) {
+func deploySpec(verb string, s componentSpec, version, valuesFile string) (install.Spec, error) {
 	c := s.Component
 	spec := install.Spec{
 		Verb:       verb,
@@ -33,6 +35,7 @@ func deploySpec(verb string, s componentSpec, version string) (install.Spec, err
 		Kubeconfig: cfg.KubeconfigFile(),
 		Owned:      c.Owned,
 		Version:    version,
+		ValuesFile: valuesFile,
 		Extra:      s.ExtraArgs,
 	}
 	if c.Owned {
@@ -48,15 +51,17 @@ func deploySpec(verb string, s componentSpec, version string) (install.Spec, err
 		return install.Spec{}, fmt.Errorf("%s/chart.yaml: %w", c.ChartDir, err)
 	}
 	spec.Pin = p
-	spec.ValuesFile = filepath.Join(repoRoot(), c.ChartDir, "config", "values-hardened.yaml")
+	if spec.ValuesFile == "" {
+		spec.ValuesFile = filepath.Join(repoRoot(), c.ChartDir, "config", "values-hardened.yaml")
+	}
 	return spec, nil
 }
 
 // helmDeploy runs `helm <verb>` for a component, building the argv with the
 // unit-tested install package. Errors carry helm's combined output so a failed
 // deploy is diagnosable from the CI log.
-func helmDeploy(ctx context.Context, verb string, s componentSpec, version string) error {
-	spec, err := deploySpec(verb, s, version)
+func helmDeploy(ctx context.Context, verb string, s componentSpec, version, valuesFile string) error {
+	spec, err := deploySpec(verb, s, version, valuesFile)
 	if err != nil {
 		return err
 	}
@@ -67,9 +72,9 @@ func helmDeploy(ctx context.Context, verb string, s componentSpec, version strin
 	return nil
 }
 
-// helmInstall installs a component's chart at its pinned version.
+// helmInstall installs a component's chart at its pinned version and values.
 func helmInstall(ctx context.Context, s componentSpec) error {
-	return helmDeploy(ctx, "install", s, "")
+	return helmDeploy(ctx, "install", s, "", "")
 }
 
 // component looks a registry entry up or dies at suite build — the registry is

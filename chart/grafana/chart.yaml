@@ -7,10 +7,11 @@ upstream:
 
 # NOTE: the grafana Helm chart lags the app — the newest chart (10.5.15) ships
 # appVersion 12.3.1, and no chart targets grafana 13.x. We pin the latest chart
-# for its templates and override the image to our hardened grafana 13.0.4 build
-# (image.registry/repository/tag/sha below). Grafana's grafana.ini + `grafana
-# server` CLI are stable across 12->13, so the 12.3.1 templates deploy 13.0.4
-# unchanged; the phase-6 e2e HTTP-health probe validates the running deployment.
+# for its templates and override the image to our hardened grafana 13.x build
+# (image.registry/repository/tag in config/values-hardened.yaml, kept current
+# by Renovate's chart-pin manager). Grafana's grafana.ini + `grafana server`
+# CLI are stable across 12->13, so the 12.3.1 templates deploy 13.x unchanged;
+# the phase-6 e2e HTTP-health probe validates the running deployment.
 
 # Render (chart CI gate, task 5.5) and install (e2e, phase 6):
 #   helm template dhc-grafana grafana \

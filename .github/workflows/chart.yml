@@ -17,8 +17,6 @@ jobs:
   gate:
     name: render + policy gate
     runs-on: ubuntu-latest
-    env:
-      KYVERNO_VERSION: v1.18.2
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -32,10 +30,12 @@ jobs:
         with:
           version: v3.14.0
 
+      # Pin + sha256 live in the script (Req 7.5). Replaces curl piped into
+      # tar, which unpacks whatever a truncated or substituted body holds.
       - name: install kyverno
         run: |
-          curl -fsSL "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz" \
-            | tar -xz -C /usr/local/bin kyverno
+          scripts/install-tool.sh kyverno "${RUNNER_TEMP}/bin"
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
       - name: render every chart and gate with kyverno (Req 4.6)
         run: |

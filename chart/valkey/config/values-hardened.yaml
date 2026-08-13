@@ -20,14 +20,14 @@
 # hole is closed (task 8.4): the policy now reads the 64 hex characters, and
 # so does scripts/lint-pins.sh.
 #
-# Nothing bumps this automatically: renovate.json5 is
-# `enabledManagers: ["custom.regex"]` over image/ and scripts/ only, so no
-# manager reads chart values. A rebuild of image/valkey-compat/ moves the digest
-# and this line has to follow it by hand.
+# Renovate's chart-pin manager (task 8.7) tracks this tag@digest against
+# ghcr.io — the by-hand era ended after a rebuild of image/valkey-compat/
+# moved the published digest and this line silently kept vouching for the old
+# one (found re-pinning for issue #64).
 image:
   registry: ghcr.io
   repository: mm-weber/dhc/valkey
-  tag: 9.1.1-alpine3.23-compat@sha256:e9bca4f52dde8bf6bd3b83aae1c3f900c19115406aaa3c1f8282177117d51c6d
+  tag: 9.1.1-alpine3.23-compat@sha256:be04d1605c307b2d52d6370823373f757906141222abe28fff4e0b7adbb040d4
 
 # UID/GID 65532 (Req 4.3); the chart defaults to 1000, which no catalogue image
 # has an account for. runAsNonRoot is NOT a chart default at pod level and the
