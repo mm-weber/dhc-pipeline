@@ -1012,3 +1012,77 @@ of guess Req 6.15 exists to stop anyone banking.
 Verified before committing, against the real published image with the gate's own
 inputs — compiled VEX plus the ignorefile: **1 uncovered before, 0 after**, and
 the new entry suppresses the finding it names rather than matching nothing.
+
+## 2026-08-13 — 13.1.3, a bump that changes no finding (#36)
+
+### Re-scoped, not restated — the three version-scoped statements, again
+
+13.1.3 does not publish `13.1.2-alpine3.23`, so `lint-vex-product.sh` failed the
+three statements pinned to it (Req 6.20) — the same failure the 13.1.2 bump
+produced on 2026-08-07, arriving the same way. Checked before moving them rather
+than assumed: **both dependency pins the arguments rest on are byte-identical in
+13.1.3**, read out of the shipped binary rather than out of a go.mod:
+
+```
+github.com/grafana/tempo        v1.5.1-0.20260427112133-525d1bab07e0
+github.com/prometheus/prometheus v0.312.0
+```
+
+So the commit-ancestry evidence for #23 and #27 and the replace-directive
+evidence for #25 carry over untouched, exactly as at 13.1.2.
+
+| Statement | Scope | Change |
+|---|---|---|
+| CVE-2026-21728 (#23) | `13.1.3-alpine3.23` | product + the two sentences naming a version |
+| CVE-2026-28377 (#27) | `13.1.3-alpine3.23` | product + the two sentences naming a version |
+| CVE-2026-42151 (#25) `fixed` | `13.1.3-alpine3.23` | product + `status_notes` |
+| CVE-2026-42151 (#25) `not_affected` | versionless | **untouched** |
+
+The versionless one stays versionless for the reason recorded on 2026-08-04: it
+is the structural claim, and Req 6.31 scopes by the kind of argument rather than
+by the release. Timestamps unchanged throughout.
+
+Worth stating because it was briefly proposed the other way: the `fixed`
+statement is **not** a candidate for deletion just because Trivy no longer
+reports the finding. It is the supersession Req 6.22 wants kept on the record,
+and Req 6.21 forbids a `fixed` statement without a version — so re-scoping is
+the only move that keeps both rules satisfied. "Suppresses nothing today" is not
+the same property as "says nothing".
+
+### Measured on the real 13.1.3 tarball — the finding set does not move
+
+Downloaded the pinned artifact (sha256 `e0fd22aa…`, matching the definition),
+extracted it, and ran trivy 0.73.0 over all three Go binaries:
+
+| Binary | 13.1.2 | 13.1.3 |
+|---|---|---|
+| `bin/grafana` | tempo ×2 | tempo ×2 |
+| `plugins-bundled/elasticsearch/…` | stdlib ×3 | stdlib ×3 |
+| `plugins-bundled/zipkin/…` | x/net ×4, stdlib ×3, x/text, grpc | x/net ×**5**, stdlib ×3, x/text, grpc |
+
+**15 HIGH, 0 CRITICAL**, against 14 at 13.1.2. The one added is CVE-2026-46600,
+and it is not the bump's doing: x/net v0.49.0 was in that binary all along and
+the advisory reached Trivy's database this week (#56, transferred today). Set
+aside that arrival, and **13.1.3 changes nothing about this image's
+vulnerability surface** — same modules, same versions, same findings, in the
+same three binaries.
+
+That is worth recording rather than glossing. A patch bump that clears nothing
+is still worth landing — it is the release we would have to be on before any
+future fix could reach us, and staying behind accrues nothing — but it should
+not be described as a security improvement, and the zipkin binary remains the
+one stale thing in the image, exactly as it was at 13.1.2.
+
+Every accepted-risk entry still matched after the version change — checked
+rather than assumed, since a bump is exactly when a `paths:` glob or a purl can
+quietly stop matching and Req 6.26 would report a dead entry. Reproduced the
+image layout (`usr/share/grafana/…`) over the extracted tarball so the globs
+resolve: **15 findings without the ignorefile, 2 with it** — 13 suppressed by 13
+entries, none silent. The two left standing are the tempo pair the re-scoped
+statements cover; VEX cannot apply in a rootfs scan, which has no OCI root
+component purl to match.
+
+Verified the scope actually moved rather than the prose alone: compiled against
+this build's tags gives 4 statements and 0 drops, and compiled against the old
+13.1.2 tags drops all three re-scoped products and keeps only the versionless
+claim.
