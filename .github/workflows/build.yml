@@ -492,11 +492,16 @@ jobs:
         continue-on-error: true
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
+          # Exact pin (Req 7.5). No *_SHA256 beside it, unlike install-scanners.sh:
+          # this is compiled from source via the module proxy, and the Go sumdb
+          # already gives every module version go.sum-style checksum verification.
+          # renovate: datasource=go depName=golang.org/x/vuln
+          GOVULNCHECK_VERSION: v1.6.0
         run: |
           set -uo pipefail
           ref=$(printf '%s\n' "$TAGS" | head -n1)
           go version
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
           PATH="$(go env GOPATH)/bin:$PATH"; export PATH
 
           # Export the image filesystem rather than guessing paths: which Go
