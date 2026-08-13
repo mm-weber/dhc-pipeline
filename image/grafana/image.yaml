@@ -6,7 +6,7 @@ variant: runtime
 tags:
   - 13-alpine3.23
   - 13.1-alpine3.23
-  - 13.1.2-alpine3.23
+  - 13.1.3-alpine3.23
 platforms:
   - linux/amd64
   - linux/arm64
@@ -30,11 +30,11 @@ vars:
   # The build-id path has not been touched since it was written on release day,
   # and a re-cut lands at a new URL instead of overwriting this one.
   # See triage/LOG.md 2026-07-26.
-  GRAFANA_SHA256: '#{ target.arch == "amd64" ? "2215a38a59b573f114128e05f3836cb8708ac9b04b9283021ad28fdb88d71290" : "660cc31dbd159d98a3804ac5104b0aca0e0d95ee4e88a164ff63ddd72f9fda2e" }'
+  GRAFANA_SHA256: '#{ target.arch == "amd64" ? "e0fd22aa63901ebc961ee64195da60eef8624a831683ca10b26c7b068082e92b" : "83eef49ccc6529da5ef3ffd2bc76dadfa66cca9a9684278bf858346cf2271b5d" }'
   SEMVER_MAJOR_MINOR_VERSION: "13.1"
   SEMVER_MAJOR_VERSION: "13"
-  SEMVER_VERSION: 13.1.2
-  VERSION: 13.1.2
+  SEMVER_VERSION: 13.1.3
+  VERSION: 13.1.3
 contents:
   repositories:
     - https://dhi.io/apk/alpine/v3.23/main
@@ -56,14 +56,14 @@ contents:
           - tar
           - ca-certificates-bundle
         files:
-          - url: https://dl.grafana.com/grafana/release/13.1.2/grafana_13.1.2_30900078095_linux_${target.arch}.tar.gz
+          - url: https://dl.grafana.com/grafana/release/13.1.3/grafana_13.1.3_31135815010_linux_${target.arch}.tar.gz
             path: ${source.dir}/grafana.tar.gz
             spdx:
               name: grafana
-              version: 13.1.2
+              version: 13.1.3
               packages:
                 - name: grafana
-                  purl: pkg:generic/grafana@13.1.2
+                  purl: pkg:generic/grafana@13.1.3
                   license: AGPL-3.0
             uid: 0
             gid: 0
@@ -117,7 +117,7 @@ os-release:
   bug-report-url: https://github.com/mm-weber/dhc-pipeline/issues
 work-dir: /var/lib/grafana
 environment:
-  GRAFANA_VERSION: 13.1.2
+  GRAFANA_VERSION: 13.1.3
   PATH: /usr/share/grafana/bin:/usr/sbin:/sbin:/usr/bin:/bin:/usr/local/bin
 # Writable-path inventory (Req 4.4 chart work): every path the runtime writes
 # to gets an emptyDir mount in the chart. Owned by nonroot 65532.
