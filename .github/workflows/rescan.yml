@@ -28,6 +28,15 @@ jobs:
   rescan:
     name: rescan published images
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Plain bash, no injected flags (#73): the default shell is
+        # `bash -e {0}`, and a script's own `set -uo pipefail` does not clear
+        # that inherited -e — so the scan loop's soft-fail contract below was
+        # dead code and one unresolvable image aborted the whole rescan. Every
+        # step here declares its error mode with an explicit `set` line; this
+        # makes those lines the whole truth.
+        shell: bash {0}
     env:
       REGISTRY: ghcr.io/mm-weber/dhc
       KEV_URL: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
@@ -250,6 +259,7 @@ jobs:
       - name: summary
         if: always()
         run: |
+          set -euo pipefail
           {
             echo "### Daily rescan"
             echo "- images scanned: ${{ steps.scan.outputs.scanned || 0 }}"
