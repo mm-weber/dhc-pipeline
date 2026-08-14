@@ -1,0 +1,39 @@
+# Python packages CI installs, exact-pinned and hash-verified (Req 7.5,
+# issue #74) — installed with `pip install --require-hashes -r` so pip
+# refuses any artifact whose sha256 is not recorded here, and any dependency
+# not listed here. That is why the transitive deps are pinned too: pathspec
+# and pyyaml for yamllint (validate.yml, rescan.yml via lint-accepted-risk,
+# chart.yml for ct lint), pyyaml for yamale (ct lint's Chart.yaml schema
+# check).
+#
+# Hashes cover the artifacts a linux/amd64 runner can pick (wheels for the
+# supported CPythons, plus the sdist as fallback), so a runner python bump
+# does not break the install. Renovate bumps the version only — refreshing
+# the hash set is the human half of the bump (`pip download <pkg>==<ver>`
+# then `pip hash`, or the digests from pypi.org/pypi/<pkg>/<ver>/json), the
+# same friction as the sha256 pins in scripts/install-*.sh: an install fails
+# on a stale hash, it never passes silently.
+
+# renovate: datasource=pypi depName=yamllint
+yamllint==1.38.0 \
+    --hash=sha256:fc394a5b3be980a4062607b8fdddc0843f4fa394152b6da21722f5d59013c220 \
+    --hash=sha256:09e5f29531daab93366bb061e76019d5e91691ef0a40328f04c927387d1d364d
+
+# renovate: datasource=pypi depName=yamale
+yamale==6.1.0 \
+    --hash=sha256:7e109c9d83e3a7e42703516cb2b70b9c7aa5b7a738019c4a6c202b6b0b9096c5 \
+    --hash=sha256:fd435aa7b830c73e89a9ef548c0ace2d3d8dc3e5e180e6b57ff70b31495672fd
+
+# renovate: datasource=pypi depName=pathspec
+pathspec==1.1.1 \
+    --hash=sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189 \
+    --hash=sha256:17db5ecd524104a120e173814c90367a96a98d07c45b2e10c2f3919fff91bf5a
+
+# renovate: datasource=pypi depName=pyyaml
+pyyaml==6.0.3 \
+    --hash=sha256:9c7708761fccb9397fe64bbc0395abcae8c4bf7b0eac081e12b809bf47700d0b \
+    --hash=sha256:b8bb0864c5a28024fac8a632c443c87c5aa6f215c0b126c449ae1a150412f31d \
+    --hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc \
+    --hash=sha256:0f29edc409a6392443abf94b9cf89ce99889a1dd5376d94316ae5145dfedd5d6 \
+    --hash=sha256:c458b6d084f9b935061bc36216e8a69a7e293a2f1e68bf956dcd9e6cbcd143f5 \
+    --hash=sha256:d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f

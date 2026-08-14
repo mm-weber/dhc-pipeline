@@ -22,20 +22,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
-
-      # Sets up ct with its Chart.yaml schema validator (yamale) and yamllint on
-      # PATH — a plain `pip install` lands them in a dir the runner PATH misses.
-      - uses: helm/chart-testing-action@cf48dbf901ed202ae2c5aee26422dd6dfdf41e47 # v2.7.0
-        with:
-          version: v3.14.0
-
-      # Pin + sha256 live in the script (Req 7.5). Replaces curl piped into
-      # tar, which unpacks whatever a truncated or substituted body holds.
-      - name: install kyverno
+      # Pin + sha256 for all three binaries live in the script (Req 7.5).
+      # Replaces curl piped into tar (kyverno), azure/setup-helm with no
+      # version input (latest helm, unverified), and chart-testing-action
+      # (version-pinned ct, checksum-unverified) — issue #74. ct's runtime
+      # python deps (yamllint, yamale) install hash-verified from the pinned
+      # requirements file; the user-site bin dir joins PATH explicitly so ct
+      # finds them wherever the runner's pip puts console scripts.
+      - name: install helm + ct + kyverno
         run: |
+          scripts/install-tool.sh helm "${RUNNER_TEMP}/bin"
+          scripts/install-tool.sh ct "${RUNNER_TEMP}/bin"
           scripts/install-tool.sh kyverno "${RUNNER_TEMP}/bin"
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+          pip install --quiet --require-hashes -r .github/requirements-ci.txt
+          echo "$(python3 -m site --user-base)/bin" >> "$GITHUB_PATH"
 
       - name: render every chart and gate with kyverno (Req 4.6)
         run: |
@@ -63,6 +64,8 @@ jobs:
             if [ -f "${d}Chart.yaml" ]; then
               echo "ct lint ${d}"
               ct lint --charts "${d%/}" \
+                --lint-conf "${RUNNER_TEMP}/bin/ct-etc/lintconf.yaml" \
+                --chart-yaml-schema "${RUNNER_TEMP}/bin/ct-etc/chart_schema.yaml" \
                 --check-version-increment=false \
                 --validate-maintainers=false
             fi

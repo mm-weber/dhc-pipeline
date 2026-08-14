@@ -6,7 +6,7 @@
 # script does — one tool per invocation, and kind is a bare binary while
 # kyverno is a tarball, so both artifact shapes are exercised.
 #
-#   scripts/install-tool.sh <kind|kyverno> [<destdir>]
+#   scripts/install-tool.sh <kind|kyverno|helm|ct> [<destdir>]
 #
 #   Exit 0 on success, exit 1 on any fetch/verification/architecture/usage
 #   failure (asserted exactly — an absent script exits 127).
@@ -36,11 +36,26 @@ KYVERNO_PIN=cb2feb8356149fd2fe774c894ccf0969f4a60a83867dd913af724f74ffbbc18b
 KIND_DEP=kubernetes-sigs/kind
 KYVERNO_DEP=kyverno/kyverno
 
+# helm's binaries live on get.helm.sh (the GitHub release carries source
+# only), so its fixture sits at the served root; ct is a github tarball whose
+# archive also ships the lint configs ct needs at runtime.
+HELM_VER=4.2.4
+CT_VER=3.14.0
+HELM_ASSET="helm-v${HELM_VER}-linux-amd64.tar.gz"
+CT_ASSET="chart-testing_${CT_VER}_linux_amd64.tar.gz"
+CT_URLDIR="helm/chart-testing/releases/download/v${CT_VER}"
+HELM_PIN=c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3
+CT_PIN=d16f0583616885423826241164ce1f6589c6fe5332fa74f374ebd2bd3cb3fe1f
+HELM_DEP=helm/helm
+CT_DEP=helm/chart-testing
+
 DEFAULT_ARCH=x86_64
 ARCH="$DEFAULT_ARCH"
 
 KIND_MARKER="kind v${KIND_VER} (dhc-test-fixture)"
 KYVERNO_MARKER="kyverno v${KYVERNO_VER} (dhc-test-fixture)"
+HELM_MARKER="helm v${HELM_VER} (dhc-test-fixture)"
+CT_MARKER="ct v${CT_VER} (dhc-test-fixture)"
 
 list_real_bin() { find /usr/local/bin -maxdepth 1 -printf '%f\n' 2>/dev/null | sort; }
 BIN_BEFORE=$(list_real_bin)
@@ -164,7 +179,36 @@ make_kyverno_asset() { # marker
   rm -rf "$stage"
 }
 
-setup() { # fresh sandbox: both assets served, empty destdir, shipped pins in force
+# helm nests its binary under linux-amd64/ — the member path, not the archive
+# root, is what the script must extract.
+make_helm_asset() { # marker
+  local stage
+  stage=$(mktemp -d "$SB/stage.XXXXXX")
+  mkdir -p "$stage/linux-amd64"
+  printf '#!/bin/sh\necho "%s"\n' "$1" > "$stage/linux-amd64/helm"
+  chmod +x "$stage/linux-amd64/helm"
+  printf 'Apache License 2.0\n' > "$stage/linux-amd64/LICENSE"
+  mkdir -p "$UP"
+  tar -czf "$UP/$HELM_ASSET" -C "$stage" linux-amd64
+  rm -rf "$stage"
+}
+# ct's archive carries the binary plus the etc/ lint configs ct lint reads;
+# both must come from the verified bytes, nothing else from the archive.
+make_ct_asset() { # marker
+  local stage
+  stage=$(mktemp -d "$SB/stage.XXXXXX")
+  printf '#!/bin/sh\necho "%s"\n' "$1" > "$stage/ct"
+  chmod +x "$stage/ct"
+  mkdir -p "$stage/etc"
+  printf '# dhc-test-fixture lintconf\n' > "$stage/etc/lintconf.yaml"
+  printf '# dhc-test-fixture chart schema\n' > "$stage/etc/chart_schema.yaml"
+  printf 'Apache License 2.0\n' > "$stage/LICENSE"
+  mkdir -p "$UP/$CT_URLDIR"
+  tar -czf "$UP/$CT_URLDIR/$CT_ASSET" -C "$stage" ct etc LICENSE
+  rm -rf "$stage"
+}
+
+setup() { # fresh sandbox: all assets served, empty destdir, shipped pins in force
   SB=$(mktemp -d)
   UP="$SB/upstream"
   DEST="$SB/bin"
@@ -173,6 +217,8 @@ setup() { # fresh sandbox: both assets served, empty destdir, shipped pins in fo
   mkdir -p "$DEST"
   make_kind_asset "$KIND_MARKER"
   make_kyverno_asset "$KYVERNO_MARKER"
+  make_helm_asset "$HELM_MARKER"
+  make_ct_asset "$CT_MARKER"
 }
 
 write_pins() { # record the fixtures' real digests — the offline success path
@@ -180,6 +226,8 @@ write_pins() { # record the fixtures' real digests — the offline success path
   : > "$PINS"
   (cd "$UP/$KIND_URLDIR" && sha256sum "$KIND_ASSET") >> "$PINS"
   (cd "$UP/$KYVERNO_URLDIR" && sha256sum "$KYVERNO_ASSET") >> "$PINS"
+  (cd "$UP" && sha256sum "$HELM_ASSET") >> "$PINS"
+  (cd "$UP/$CT_URLDIR" && sha256sum "$CT_ASSET") >> "$PINS"
 }
 
 asset_sha() { sha256sum "$1" | cut -d' ' -f1; }
@@ -221,6 +269,42 @@ done
 if [ -z "$stray" ]; then pass "only the kyverno binary lands in destdir"
 else fail "only the kyverno binary lands in destdir" "destdir also holds:$stray"; fi
 
+setup; write_pins; invoke helm
+assert_rc        "helm: matching checksum installs cleanly" 0
+assert_installed "helm is installed and executable" helm
+assert_payload   "installed helm is the nested member that was verified" helm "$HELM_MARKER"
+assert_out       "reports the helm version it installed" "$HELM_VER"
+
+# The nested linux-amd64/ scaffolding and licence stay out of the PATH dir.
+stray=""
+for f in "$DEST"/* "$DEST"/.[!.]*; do
+  [ -e "$f" ] || continue
+  case "${f##*/}" in helm) ;; *) stray="$stray ${f##*/}" ;; esac
+done
+if [ -z "$stray" ]; then pass "only the helm binary lands in destdir"
+else fail "only the helm binary lands in destdir" "destdir also holds:$stray"; fi
+
+setup; write_pins; invoke ct
+assert_rc        "ct: matching checksum installs cleanly" 0
+assert_installed "ct is installed and executable" ct
+assert_payload   "installed ct is the archive that was verified" ct "$CT_MARKER"
+assert_out       "reports the ct version it installed" "$CT_VER"
+if [ -f "$DEST/ct-etc/lintconf.yaml" ] && [ -f "$DEST/ct-etc/chart_schema.yaml" ]; then
+  pass "ct lint configs land in destdir/ct-etc from the verified archive"
+else
+  fail "ct lint configs land in destdir/ct-etc from the verified archive" \
+       "missing under $DEST/ct-etc" "$OUT"
+fi
+
+# Beyond the binary and its configs, the archive contributes nothing to destdir.
+stray=""
+for f in "$DEST"/* "$DEST"/.[!.]*; do
+  [ -e "$f" ] || continue
+  case "${f##*/}" in ct | ct-etc) ;; *) stray="$stray ${f##*/}" ;; esac
+done
+if [ -z "$stray" ]; then pass "only ct and ct-etc land in destdir"
+else fail "only ct and ct-etc land in destdir" "destdir also holds:$stray"; fi
+
 # --- 2: destdir handling ----------------------------------------------------
 
 setup; write_pins; DEST="$SB/fresh-bin"; invoke kind
@@ -258,6 +342,21 @@ assert_rc     "a kyverno checksum mismatch fails" 1
 assert_absent "the unverified kyverno is not installed" kyverno
 assert_out    "the failure names kyverno" kyverno
 
+setup; write_pins
+make_helm_asset "PWNED-helm"
+invoke helm
+assert_rc     "a helm checksum mismatch fails" 1
+assert_absent "the unverified helm is not installed" helm
+
+setup; write_pins
+make_ct_asset "PWNED-ct"
+invoke ct
+assert_rc     "a ct checksum mismatch fails" 1
+assert_absent "the unverified ct is not installed" ct
+if [ -e "$DEST/ct-etc" ]; then
+  fail "no ct-etc appears for an unverified ct" "$DEST/ct-etc exists — configs from an unverified archive" "$OUT"
+else pass "no ct-etc appears for an unverified ct"; fi
+
 # --- 5: the shipped pins are live and are the documented ones ---------------
 
 setup; invoke kind
@@ -269,6 +368,16 @@ setup; invoke kyverno
 assert_rc     "with no pin override the kyverno fixture is rejected" 1
 assert_absent "nothing is installed when the shipped pin does not match (kyverno)" kyverno
 assert_out    "the shipped kyverno pin is the documented digest" "$KYVERNO_PIN"
+
+setup; invoke helm
+assert_rc     "with no pin override the helm fixture is rejected" 1
+assert_absent "nothing is installed when the shipped pin does not match (helm)" helm
+assert_out    "the shipped helm pin is the documented digest" "$HELM_PIN"
+
+setup; invoke ct
+assert_rc     "with no pin override the ct fixture is rejected" 1
+assert_absent "nothing is installed when the shipped pin does not match (ct)" ct
+assert_out    "the shipped ct pin is the documented digest" "$CT_PIN"
 
 # --- 6: an asset with no recorded pin ---------------------------------------
 
@@ -310,6 +419,8 @@ assert_rc     "a missing tool argument is refused" 1
 
 assert_pin_block kind KIND "$KIND_DEP" "$KIND_VER" "$KIND_PIN"
 assert_pin_block kyverno KYVERNO "$KYVERNO_DEP" "$KYVERNO_VER" "$KYVERNO_PIN"
+assert_pin_block helm HELM "$HELM_DEP" "$HELM_VER" "$HELM_PIN"
+assert_pin_block ct CT "$CT_DEP" "$CT_VER" "$CT_PIN"
 
 # --- 10: what the source must and must not contain --------------------------
 

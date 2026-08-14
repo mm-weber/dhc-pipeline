@@ -192,6 +192,21 @@
       depNameTemplate: "{{{registry}}}/{{{repository}}}",
       datasourceTemplate: "docker",
     },
+    {
+      // CI python pins (Req 7.5, 7.6; issue #74): yamllint is the Req 7.2
+      // gate, yamale is ct lint's Chart.yaml schema check, pyyaml/pathspec
+      // are their pinned transitive deps — all installed with
+      // `pip install --require-hashes` from .github/requirements-ci.txt.
+      // Same contract as the pin-script manager above: Renovate bumps the
+      // version and leaves the --hash set behind, so the bump PR fails its
+      // install until a human records the new hashes. pip's own datasource
+      // format is bare PEP 440, no extractVersionTemplate needed.
+      customType: "regex",
+      managerFilePatterns: ["/^\\.github/requirements-ci\\.txt$/"],
+      matchStrings: [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n(?<packageName>[A-Za-z0-9._-]+)==(?<currentValue>[0-9][^\\s\\\\]*)",
+      ],
+    },
   ],
 
   packageRules: [
