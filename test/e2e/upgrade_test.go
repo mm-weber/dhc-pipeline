@@ -14,8 +14,10 @@ import (
 // (the ordinary Renovate path: a definition bump publishes a new image and the
 // chart-pin manager moves the values file, task 8.7), either or both — and the
 // suite installs that currently-pinned state, upgrades to the proposed (PR)
-// state, and re-asserts readiness, the restricted securityContext, and the
-// functional probe. It is mutually exclusive with the install spec (which
+// state, and re-asserts rollout completion, readiness, the restricted
+// securityContext, and the functional probe — rollout completion first, so
+// the re-asserts see the proposed pods, not the base release's (issue #75).
+// It is mutually exclusive with the install spec (which
 // skips when either variable is set), so a run never installs the same release
 // twice. Owned charts have no chart version to move, so only the values path
 // triggers them.

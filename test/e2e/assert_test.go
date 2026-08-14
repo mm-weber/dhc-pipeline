@@ -12,11 +12,19 @@ import (
 	"github.com/mm-weber/dhc-pipeline/test/checks"
 )
 
-// assertReadyHardened waits for the component's workload pods to reach Ready
-// within five minutes (Req 5.3) and asserts every live pod matches the
-// restricted securityContext (Req 5.4). Shared by the install and upgrade specs.
+// assertReadyHardened waits for the component's workload rollout to complete,
+// then for its pods to reach Ready within five minutes (Req 5.3), and asserts
+// every live pod matches the restricted securityContext (Req 5.4). Shared by
+// the install and upgrade specs. The rollout wait is what makes the upgrade
+// path honest (issue #75): pod-level checks alone are satisfied by the OLD
+// ReplicaSet's still-Ready pods during a rolling update, so without it a
+// crash-looping bumped image sails through — every later assertion here would
+// inspect and probe the pre-upgrade pods through the still-serving Service.
 func assertReadyHardened(ctx context.Context, r *resources.Resources, s componentSpec) {
 	GinkgoHelper()
+	By("workload rollout completes — no pod of a previous revision remains")
+	Expect(checks.WaitRolloutComplete(ctx, r, s.Selector, checks.ReadyTimeout)).To(Succeed())
+
 	By("workload pods reach Ready within five minutes")
 	Expect(checks.WaitReady(ctx, r, s.Selector, s.Replicas, checks.ReadyTimeout)).To(Succeed())
 
