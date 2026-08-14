@@ -162,7 +162,9 @@ jobs:
           set -uo pipefail
           # Explicit rather than transitive: unlike validate.yml this workflow
           # installs no yamllint, so PyYAML is not already here by accident.
-          python3 -c 'import yaml' 2>/dev/null || pip install --quiet pyyaml
+          # Exact pins + hashes (Req 7.5, #74) — one pin surface for every
+          # python package CI installs, even though only pyyaml is used here.
+          pip install --quiet --require-hashes -r .github/requirements-ci.txt
           scripts/lint-accepted-risk.sh > "$OUT/accepted-risk.txt" 2>&1 || true
           expiring=$(grep -E 'expires in|is in the past' "$OUT/accepted-risk.txt" || true)
           {

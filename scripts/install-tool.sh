@@ -1,25 +1,37 @@
 #!/usr/bin/env bash
-# install-tool.sh <kind|kyverno> [<destdir>]
+# install-tool.sh <kind|kyverno|helm|ct> [<destdir>]
 #
 # Install one workflow tool pinned to an exact version and verified against a
 # sha256 recorded in this file (Req 7.5, docs/CONVENTIONS.md "Pinning").
 # destdir defaults to /usr/local/bin; CI passes "${RUNNER_TEMP}/bin" and runs
-# as the runner user — neither tool ever needed root.
+# as the runner user — none of these tools ever needed root.
 #
 # Sibling of scripts/install-scanners.sh, not a generalisation of it — that
 # script's contract is "both scanners verified before either installs", and
 # grafting single-tool selection onto it would rewrite a tested contract to
 # save thirty lines of duplication. This one installs exactly one tool per
-# invocation because each workflow needs exactly one: kind provisions the e2e
-# cluster (e2e.yml), kyverno is the policy engine behind the Req 4.6 gate
-# (chart.yml, validate.yml). Both run with the same runner privileges as the
+# invocation: kind provisions the e2e cluster (e2e.yml), kyverno is the
+# policy engine behind the Req 4.6 gate (chart.yml, validate.yml), helm
+# renders and installs the charts (chart.yml, e2e.yml), ct lints the owned
+# charts (chart.yml). All run with the same runner privileges as the
 # scanners, and a version pin alone does not survive re-publication of a tag
 # we already adopted — CVE-2026-33634's shape (see install-scanners.sh).
 #
 # What it replaces: kyverno arrived by `curl … | tar -xz -C /usr/local/bin`
 # — a pipe, so tar unpacks whatever a truncated or substituted body holds —
-# and kind by curl + `sudo mv`, unverified. Fetch-to-file then sha256sum is
-# the same discipline as install-scanners.sh, for the same reasons.
+# and kind by curl + `sudo mv`, unverified. helm and ct arrived through
+# azure/setup-helm (no version input — whatever upstream's latest was that
+# day) and chart-testing-action (version-pinned, checksum-unverified), issue
+# #74. Fetch-to-file then sha256sum is the same discipline as
+# install-scanners.sh, for the same reasons.
+#
+# helm's binaries are served from get.helm.sh, not the GitHub release (which
+# carries source archives only); its pinned sha256 is the one the helm
+# project publishes in the release notes and the .sha256sum sidecar beside
+# the tarball. ct's archive also carries etc/lintconf.yaml and
+# etc/chart_schema.yaml, which `ct lint` needs at runtime: they are installed
+# from the same verified bytes into <destdir>/ct-etc/, and chart.yml points
+# ct at them explicitly.
 #
 # The pin block is shaped for the Renovate custom manager in renovate.json5
 # (Req 7.6): each `# renovate:` comment sits DIRECTLY above its `*_VERSION=`
@@ -49,9 +61,17 @@ KIND_SHA256="50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54"
 KYVERNO_VERSION="1.18.2"
 KYVERNO_SHA256="cb2feb8356149fd2fe774c894ccf0969f4a60a83867dd913af724f74ffbbc18b"
 
+# renovate: datasource=github-releases depName=helm/helm
+HELM_VERSION="4.2.4"
+HELM_SHA256="c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3"
+
+# renovate: datasource=github-releases depName=helm/chart-testing
+CT_VERSION="3.14.0"
+CT_SHA256="d16f0583616885423826241164ce1f6589c6fe5332fa74f374ebd2bd3cb3fe1f"
+
 err() { printf '::error::install-tool: %s\n' "$1" >&2; }
 
-# Both pinned assets are linux/amd64; on any other architecture the checksum
+# All pinned assets are linux/amd64; on any other architecture the checksum
 # verifies and the binary still cannot run (same refusal, same reason as
 # install-scanners.sh).
 case "$ARCH" in
@@ -63,8 +83,10 @@ case "$ARCH" in
 esac
 
 # tarball=empty means the asset IS the binary, installed as fetched once
-# verified; otherwise the named member is extracted and everything else in the
-# archive stays out of the PATH directory.
+# verified; otherwise the member named by `member` (default: the tool's own
+# name at the archive root) is extracted, plus any `extras` — non-binary
+# files the tool needs at runtime, installed 0644 under <destdir>/<tool>-etc/
+# — and everything else in the archive stays out of the PATH directory.
 case "$TOOL" in
   kind)
     version="$KIND_VERSION"
@@ -72,6 +94,8 @@ case "$TOOL" in
     asset="kind-linux-amd64"
     url="${BASE_URL}/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/${asset}"
     tarball=""
+    member=""
+    extras=""
     ;;
   kyverno)
     version="$KYVERNO_VERSION"
@@ -79,9 +103,31 @@ case "$TOOL" in
     asset="kyverno-cli_v${KYVERNO_VERSION}_linux_x86_64.tar.gz"
     url="${BASE_URL}/kyverno/kyverno/releases/download/v${KYVERNO_VERSION}/${asset}"
     tarball=yes
+    member=""
+    extras=""
+    ;;
+  helm)
+    version="$HELM_VERSION"
+    shipped="$HELM_SHA256"
+    asset="helm-v${HELM_VERSION}-linux-amd64.tar.gz"
+    # get.helm.sh serves from its root — the seam replaces the whole host.
+    helm_base="${INSTALL_TOOL_BASE_URL:-https://get.helm.sh}"
+    url="${helm_base%/}/${asset}"
+    tarball=yes
+    member="linux-amd64/helm"
+    extras=""
+    ;;
+  ct)
+    version="$CT_VERSION"
+    shipped="$CT_SHA256"
+    asset="chart-testing_${CT_VERSION}_linux_amd64.tar.gz"
+    url="${BASE_URL}/helm/chart-testing/releases/download/v${CT_VERSION}/${asset}"
+    tarball=yes
+    member=""
+    extras="etc/lintconf.yaml etc/chart_schema.yaml"
     ;;
   *)
-    err "usage: install-tool.sh <kind|kyverno> [<destdir>] — got '${TOOL}'"
+    err "usage: install-tool.sh <kind|kyverno|helm|ct> [<destdir>] — got '${TOOL}'"
     exit 1
     ;;
 esac
@@ -116,17 +162,27 @@ if [ "$got" != "$want" ]; then
 fi
 
 if [ -n "$tarball" ]; then
-  if ! tar -xzf "$WORK/$asset" -C "$WORK" "$TOOL"; then
-    err "${TOOL}: verified ${asset} holds no '${TOOL}' binary at its root"
+  member="${member:-$TOOL}"
+  # $extras unquoted on purpose: a space-separated list of member paths.
+  # shellcheck disable=SC2086
+  if ! tar -xzf "$WORK/$asset" -C "$WORK" "$member" $extras; then
+    err "${TOOL}: verified ${asset} does not hold '${member}'${extras:+ (+ ${extras})}"
     exit 1
   fi
 else
   mv "$WORK/$asset" "$WORK/$TOOL"
+  member="$TOOL"
 fi
 
 # The verified bytes overwrite whatever is already there — an earlier step's
 # leftover binary is not a tool this script vouched for.
 mkdir -p "$DEST_DIR"
-install -m 0755 "$WORK/$TOOL" "$DEST_DIR/$TOOL"
+install -m 0755 "$WORK/$member" "$DEST_DIR/$TOOL"
+if [ -n "$extras" ]; then
+  mkdir -p "$DEST_DIR/${TOOL}-etc"
+  for x in $extras; do
+    install -m 0644 "$WORK/$x" "$DEST_DIR/${TOOL}-etc/${x##*/}"
+  done
+fi
 
 echo "install-tool: ${TOOL} ${version} -> ${DEST_DIR}/${TOOL} (sha256 verified)"

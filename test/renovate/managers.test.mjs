@@ -54,7 +54,7 @@ function extract(manager, content) {
 }
 
 const read = (rel) => readFileSync(join(root, rel), "utf8");
-const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr, workflowMgr, chartDigestMgr, chartTagMgr] =
+const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr, workflowMgr, chartDigestMgr, chartTagMgr, pipMgr] =
   config.customManagers;
 
 // managerFilePatterns is the half extract() cannot exercise: a pattern that
@@ -337,11 +337,13 @@ check(
   }
 
   const pins = extract(scannerMgr, read("scripts/install-tool.sh"));
-  check("tool pins: install-tool.sh yields exactly two deps", pins.length === 2, `${pins.length}`);
+  check("tool pins: install-tool.sh yields exactly four deps", pins.length === 4, `${pins.length}`);
 
   for (const [tool, depName] of [
     ["kind", "kubernetes-sigs/kind"],
     ["kyverno", "kyverno/kyverno"],
+    ["helm", "helm/helm"],
+    ["ct", "helm/chart-testing"],
   ]) {
     const dep = pins.find((d) => d.depName === depName);
     check(`tool pins: ${tool} is tracked as ${depName}`, !!dep);
@@ -511,6 +513,46 @@ check(
     chartTagMgr && extract(chartTagMgr, read("chart/cert-manager/config/values-hardened.yaml")).length === 0,
     chartTagMgr && JSON.stringify(extract(chartTagMgr, read("chart/cert-manager/config/values-hardened.yaml"))),
   );
+}
+
+// --- CI python pins: the hash-verified requirements file (Req 7.5, 7.6) ------
+// yamllint is the Req 7.2 gate, yamale serves ct lint, pyyaml/pathspec are
+// their pinned transitive deps (issue #74). The manager bumps versions only;
+// the --hash set stays behind for a human, so extraction losing a dep means
+// that pin silently stales — the exact failure this file exists to catch.
+{
+  check(
+    "pip pins: manager file pattern matches .github/requirements-ci.txt",
+    !!pipMgr && filePatternMatches(pipMgr, ".github/requirements-ci.txt"),
+    pipMgr && JSON.stringify(pipMgr.managerFilePatterns),
+  );
+
+  const pip = pipMgr ? extract(pipMgr, read(".github/requirements-ci.txt")) : [];
+  check("pip pins: requirements-ci.txt yields exactly four deps", pip.length === 4, `${pip.length}`);
+  for (const name of ["yamllint", "yamale", "pathspec", "pyyaml"]) {
+    const d = dep(pip, { datasource: "pypi", depName: name });
+    check(
+      `pip pins: ${name} → pypi, bare PEP 440 pin`,
+      !!d && /^\d+(\.\d+)+$/.test(d.currentValue ?? ""),
+      JSON.stringify(pip),
+    );
+  }
+
+  // The other direction: the --hash continuation lines must contribute no
+  // deps of their own, and the manager reads nothing but the requirements
+  // file (the pin scripts and workflows have their own managers above).
+  check(
+    "pip pins: hash lines add no phantom deps",
+    pip.every((d) => d.depName && !d.depName.startsWith("--")),
+    JSON.stringify(pip),
+  );
+  for (const other of ["scripts/install-tool.sh", ".github/workflows/validate.yml"]) {
+    check(
+      `pip pins: manager does not read ${other}`,
+      !!pipMgr && !filePatternMatches(pipMgr, other),
+      pipMgr && JSON.stringify(pipMgr.managerFilePatterns),
+    );
+  }
 }
 
 if (failures > 0) {

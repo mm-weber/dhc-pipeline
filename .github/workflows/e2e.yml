@@ -96,13 +96,14 @@ jobs:
           go-version-file: test/go.mod
           cache-dependency-path: test/go.sum
 
-      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
-
       # Pin + sha256 live in the script (Req 7.5); installed as the runner
       # user, same pattern as install-scanners.sh in build.yml — the old
-      # curl + sudo mv was unverified and never needed root.
-      - name: install kind
+      # curl + sudo mv was unverified and never needed root. helm likewise
+      # (#74): its azure/setup-helm predecessor had no version input, so each
+      # run installed whatever upstream's latest was that day, unverified.
+      - name: install helm + kind
         run: |
+          scripts/install-tool.sh helm "${RUNNER_TEMP}/bin"
           scripts/install-tool.sh kind "${RUNNER_TEMP}/bin"
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
