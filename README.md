@@ -10,6 +10,43 @@ admission policies — both carried over) into the full maintainer loop, and the
 automation has been running unattended since 2026-07: real bump PRs, real scan
 findings, real triage decisions, all in this repo's history.
 
+## The pipeline
+
+```mermaid
+flowchart TD
+    subgraph track["Upstream tracking · every 4h"]
+        UP([upstream release]) --> RV["Renovate<br/>self-hosted, custom regex managers"]
+        RV --> BUMP["bump PR<br/>postUpgradeTask re-pins checksum,<br/>commit, tags, purl — coherence linted"]
+    end
+
+    subgraph gate["PR gate · holds no push credential"]
+        BUILD["BuildKit build<br/>dhi.io frontend, digest-pinned"] --> TREG["throwaway local registry<br/>mints the RepoDigest"]
+        TREG --> SCAN{"Trivy + compiled VEX<br/>+ accepted-risk:<br/>HIGH/CRITICAL uncovered?"}
+        KYV["Kyverno gate on rendered charts<br/>digest pins · our registry · non-root"]
+        E2E["kind e2e<br/>ready · hardened · functional probe · upgrade"]
+    end
+
+    subgraph rel["Release · main only"]
+        PUSH["build + push ghcr.io"] --> SIGN["cosign keyless sign + attest<br/>SPDX SBOM · SLSA provenance · OpenVEX"]
+    end
+
+    subgraph op["Operate · daily"]
+        RESCAN["rescan every published image"] -->|new finding| QUEUE["one issue per finding<br/>EPSS/KEV-ordered queue"]
+    end
+
+    BUMP --> BUILD
+    BUMP --> KYV
+    BUMP --> E2E
+    SCAN -->|yes| TRIAGE["triage decision<br/>(model below)"]
+    SCAN -->|no| MERGE([merge])
+    KYV --> MERGE
+    E2E --> MERGE
+    MERGE --> PUSH
+    SIGN --> RESCAN
+    QUEUE --> TRIAGE
+    TRIAGE -->|"fix ⇒ version bump"| UP
+```
+
 ## Layout
 
 | Path | What |
@@ -51,6 +88,19 @@ HIGH/CRITICAL not covered by a VEX statement (`not_affected`/`fixed`, with
 that decays back to un-triaged on expiry. Every decision is a commit:
 [`triage/README.md`](triage/README.md) has the model,
 [`triage/LOG.md`](triage/LOG.md) the history — including the retractions.
+
+```mermaid
+flowchart TD
+    F["HIGH/CRITICAL finding<br/>PR gate or daily rescan"] --> ORDER["queue ordered by EPSS + KEV<br/>ordering only — never a justification"]
+    ORDER --> QA{"can the vulnerable<br/>component be removed?"}
+    QA -->|yes| AVOID["AVOID<br/>drop it from the image"]
+    QA -->|no| QF{"fix available?<br/>upstream release, or go/bump<br/>for from-source images"}
+    QF -->|yes| FIX["FIX<br/>version-bump PR,<br/>back through the pipeline"]
+    QF -->|no| QN{"provably not applicable?<br/>evidence required — a reachable<br/>symbol forbids the claim"}
+    QN -->|yes| VEX["VEX not_affected / fixed<br/>technical claim only, signed and<br/>published with the image;<br/>superseded, never deleted"]
+    QN -->|no| ACC["ACCEPT or TRANSFER<br/>time-boxed ≤ 90 days · blocked: rationale<br/>required · transfer needs a named issue<br/>(never written into VEX)"]
+    ACC -->|"expiry — acceptance<br/>decays on its own"| F
+```
 
 ## Operating loop
 
