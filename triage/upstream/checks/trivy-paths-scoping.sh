@@ -43,8 +43,12 @@ scan() { # $1 = label, $2 = ignorefile ("" for none)
     "$(jq -r '[.Results[]?|select(.ExperimentalModifiedFindings)|.Target|split("/")|.[-2]]|join(",")|if .=="" then "-" else . end' "$WORK/out.json")"
 }
 
-ignore() { # $1 = paths yaml fragment
-  printf 'vulnerabilities:\n  - id: CVE-2026-27145\n%s    statement: "measurement"\n' "$1" \
+ignore() { # $1 = paths line, "" for none. The newline is emitted HERE: a
+           # caller-written "\n" inside double quotes is two literal characters,
+           # and %s does not expand escapes — the garbled one-line YAML of #76.
+  local paths=""
+  if [ -n "$1" ]; then paths="$1"$'\n'; fi
+  printf 'vulnerabilities:\n  - id: CVE-2026-27145\n%s    statement: "measurement"\n' "$paths" \
     > "$WORK/ig.yaml"
   echo "$WORK/ig.yaml"
 }
@@ -57,11 +61,11 @@ scan "no paths" "$(ignore '')"
 
 echo "== paths: scopes to one binary (exact, then globs)"
 for p in "$ES/gpx_grafana_elasticsearch_datasource_linux_amd64" "$ES/*" "**/plugins-bundled/elasticsearch/**" "$ES/gpx_*"; do
-  scan "$p" "$(ignore "    paths: [\"$p\"]\n")"
+  scan "$p" "$(ignore "    paths: [\"$p\"]")"
 done
 
 echo "== a path matching nothing is silent: no warning, exit 0, nothing suppressed"
-scan "typo'd path" "$(ignore "    paths: [\"$ES aerch/*\"]\n")"
+scan "typo'd path" "$(ignore "    paths: [\"$ES aerch/*\"]")"
 
 cat <<'NOTE'
 
@@ -71,6 +75,13 @@ Expected, as measured on 2026-08-04 with trivy 0.72.0:
   no paths                           total=10  suppressed_in=elasticsearch,zipkin
   every paths: form above            total=11  suppressed_in=elasticsearch
   typo'd path                        total=12  suppressed_in=-
+
+Re-measured 2026-08-20 with trivy 0.73.0, fixing #76 (the generated ignore
+file was garbled by a literal \n, so the four paths: cases and the typo'd
+case had never actually run from this script as committed). Absolute totals
+had grown 12→29 as new advisories landed against these go1.26.3 binaries;
+what must hold is the DELTAS, and every one did: no paths −2 (both binaries),
+each paths: form −1 (elasticsearch only), typo'd path −0 and silent.
 
 The last line is the whole reason Req 6.26 exists. Trivy accepts a path that
 matches nothing, suppresses nothing, warns nobody and exits 0, which is
