@@ -21,7 +21,7 @@ findings, real triage decisions, all in this repo's history.
 | `policies/` | Kyverno gate: digest pins, allowed registry, non-root |
 | `scripts/` | Tested glue: pin lints, VEX compiler, scanner installs |
 | `.specs/` | EARS requirements, design, task ledger (the honest one — open gaps included) |
-| `docs/` | Conventions, ADRs, operating-loop evidence |
+| `docs/` | [User manual](docs/user-manual.md), conventions, ADRs, operating-loop evidence |
 
 ## Verify an image
 
