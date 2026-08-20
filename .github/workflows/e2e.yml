@@ -1,9 +1,10 @@
 name: e2e
 
 # Phase-6 integration suite (Req 5.2, Req 8.1). For each chart-backed component
-# a PR touches, provision an ephemeral kind cluster, load the component's PRIVATE
-# ghcr.io/mm-weber/dhc images into it (kind nodes have no registry creds, so the
-# images are preloaded rather than pulled), install the hardened chart, and run
+# a PR touches, provision an ephemeral kind cluster whose pods pull the
+# component's digest-pinned ghcr.io/mm-weber/dhc images straight from the
+# registry (pulled, not kind-loaded — the credentials step below says why),
+# install the hardened chart, and run
 # the Ginkgo suite — which asserts readiness (Req 5.3), the restricted
 # securityContext on live pods (Req 5.4), and the functional probe (Req 5.5); on
 # a bump — chart version or image pins in the values file — it runs the
@@ -113,13 +114,19 @@ jobs:
           kind export kubeconfig --name "$CLUSTER"
           echo "E2E_KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
 
-      # kind nodes need registry creds to pull the PRIVATE ghcr.io/mm-weber/dhc
-      # images. Loading them with `kind load` does not work: the charts pin the
-      # multi-arch INDEX digest (from `imagetools inspect`), but a loaded image
-      # carries a single-arch manifest digest, so containerd never matches
-      # repo:tag@indexdigest and tries to pull it. Instead give kubelet a
-      # config.json so pods pull the exact index digest straight from ghcr,
-      # authenticated — uniform across every chart, and digest pinning is kept.
+      # Pods pull the ghcr.io/mm-weber/dhc images from the registry. Loading
+      # them with `kind load` does not work: the charts pin the multi-arch
+      # INDEX digest (from `imagetools inspect`), but a loaded image carries a
+      # single-arch manifest digest, so containerd never matches
+      # repo:tag@indexdigest and tries to pull it. So give kubelet a
+      # config.json and let pods pull the exact index digest straight from
+      # ghcr — uniform across every chart, and digest pinning is kept.
+      #
+      # The packages are PUBLIC since the 2026-08-13 go-live, so the
+      # credentials are no longer required for the pull itself. The step stays
+      # because it makes this suite independent of package visibility: a
+      # package flipped private (or a new definition published private-first)
+      # breaks nothing here.
       - name: give kind nodes ghcr pull credentials
         env:
           ACTOR: ${{ github.actor }}
