@@ -11,7 +11,7 @@ repository evaluating maintainer craft.
 
 **Impact**: New repository built from empty in an initial three-workday MVP (2026-07-18 →
 2026-07-21), then left operating (Renovate cron, daily rescans) so genuine maintainer history
-accumulates unattended — the operating period is what grew tasks 7.4–8.5. Private throughout the
+accumulates unattended — the operating period is what grew tasks 7.4–8.7. Private throughout the
 build (Req 2.4); released publicly under MIT on 2026-08-13.
 
 ### Goals
@@ -61,6 +61,7 @@ graph TB
     GHCR[(ghcr.io/mm-weber/dhc)]
 
     UP1 & UP2 & UP3 --> REN --> DEF
+    GHCR --> REN --> CHT
     DEF --> CI --> REL --> GHCR
     CHT --> CI
     TST --> CI
@@ -97,7 +98,19 @@ graph TB
 
 2. **Renovate self-hosted, not custom tracker, not hosted app**
    - **Context**: "No wheel-reinvention"; source pins carry checksums Renovate cannot natively recompute.
-   - **Decision**: `renovatebot/github-action` on cron with regex managers, monorepo grouping, Dependency Dashboard for majors, automerge for digest-only patches (Req 3).
+   - **Decision**: `renovatebot/github-action` on cron, custom regex managers **only** (every
+     built-in manager disabled, so nothing opens a surprise PR) — one manager per pin surface.
+     The two definition archetypes split by how a bump is made coherent:
+     *compile-from-source* (github-tags datasource; `refresh-definition.sh` resolves the tag to a
+     commit and recomputes checksum/vars/tags/ldflags) and *tarball-repackage* (github-releases
+     datasource; `refresh-grafana.sh` resolves the opaque build id from three cross-checked
+     indexes, re-pins both per-arch SHA-256s from the `dl.grafana.com` sidecars, and an explicit
+     `versioningTemplate` ranks `+security-NN` builds semver would silently equate — **ADR 0002**).
+     Further surfaces: the dhi.io build layer (docker datasource), chart image pins and the
+     pinned toolchain (both below). Monorepo grouping, Dependency Dashboard for majors (Req 3.4);
+     automerge covers digest **and patch** updates on the github-tags datasource, gated on CI —
+     broader than Req 3.5's minimum, and repackage bumps never automerge (they swap a binary we
+     did not build).
    - **Trade-offs**: We own the runner config; slower than hosted app to first PR.
 
 3. **Stale-pin bootstrap for immediate real history (Req 3.6)**
@@ -132,6 +145,26 @@ sequenceDiagram
     G->>CI: daily rescan → new CVE? issue → VEX or fix-bump PR
 ```
 
+### Chart pins ride the same loop (task 8.7)
+
+The flow above moves `image/` only; nothing in it would ever touch a chart, which is
+how the deployed charts drifted a release behind the registry (issue #64). Two
+chart-pin regex managers close that: they read the image references in `chart/**`
+values against ghcr's docker datasource, capturing tag **and** digest — so a
+definition bump and a *same-tag rebuild* both reach the chart (the digest moves even
+when the tag does not), with cert-manager's trio grouped into one PR.
+
+A chart-pin PR is also the ordinary trigger for Req 5.6, giving the upgrade spec two
+bump shapes: a **chart-version** bump (`chart/<c>/chart.yaml` `upstream.version`
+differs from the base branch) and an **image/values** bump (the deployed values file
+differs; `e2e.yml` snapshots the base branch's copy and the suite installs that
+state before upgrading — `DHC_UPGRADE_VALUES_FROM`). Upgrade re-asserts wait on
+**rollout completion** (`checks.WaitRolloutComplete`, #75): during a rolling update
+the old ReplicaSet's pods are still Ready and still backing the Service, so without
+that gate a crash-looping bumped image passes the exact assertions Req 5.6 exists
+for. Chart *versions* (`chart.yaml`) remain hand-pinned and untracked — a recorded,
+separate gap (noted in `chart/cert-manager/chart.yaml`).
+
 ## Components and Interfaces
 
 ### image/<name>/ — definitions (Req 1, 2)
@@ -152,8 +185,10 @@ not an upstream adaptation (outside Req 4.1), giving Req 5.5's hardened-app prob
 
 ### test/ — Go module (Req 5)
 Ginkgo v2 suites per component under `test/e2e/`; e2e-framework provisions kind; shared helpers
-for install/upgrade, readiness, live securityContext assertion, functional probes. Entry (from
-`test/`): `go test ./e2e/ -args --chart <name>`; CI matrix runs affected components only.
+for install/upgrade (upgrade re-asserts gated on rollout completion — see System Flows),
+readiness, live securityContext assertion, functional probes. Entry (from `test/`):
+`DHC_E2E=1 go test ./e2e/ -args --chart <name>` — without `DHC_E2E=1` the suite is a deliberate
+cluster-free no-op so plain `go test ./...` stays fast; CI matrix runs affected components only.
 
 ### triage/ — decisions (Req 6)
 `triage/vex/*.openvex.json` (hand-authored source, compiled per build, attached with cosign
@@ -433,6 +468,38 @@ what makes task 8.3 a build-matrix change rather than archaeology.
 Both paths use `type=gha` build cache (per-image scope) so repeat builds of a
 large upstream (cert-manager) reuse the Go module + compile layers.
 
+### scripts/install-* — the pinned toolchain (Req 7.5, 7.6)
+
+Every third-party executable a workflow installs is pinned to an exact version
+**and** verified against a checksum recorded in this repository, and every pin
+carries a Renovate manager. The context that makes both halves load-bearing is
+CVE-2026-33634 (March 2026): 76 of 77 `aquasecurity/trivy-action` tags repointed
+to a credential stealer and a malicious trivy release published under
+already-adopted version numbers — so a version pin alone verifies nothing, and
+`curl … main/install.sh | sudo sh` (which `build.yml`/`rescan.yml` originally
+ran, on runners holding registry tokens and cosign signing permissions) is a
+floating tag with a shell attached. Installs run as the runner user into
+`$RUNNER_TEMP/bin`; none of these tools ever needed root.
+
+Two installers, deliberately siblings rather than one generalisation:
+`install-scanners.sh` has the tested contract "both scanners (trivy, grype)
+verified before either installs", which the gate depends on;
+`install-tool.sh <kind|kyverno|helm|ct>` installs exactly one tool per call,
+including helm's nested-tarball member and ct's `etc/` lint configs from the
+same verified bytes. The checksum control varies by ecosystem, chosen rather
+than uniform: recorded sha256 for release binaries (the two scripts), the Go
+module sumdb for `govulncheck` (compiled from source via the proxy), npm
+registry integrity for the renovate/json5 test installs, and
+`pip install --require-hashes` over `.github/requirements-ci.txt` for every
+python package CI touches.
+
+The split with Renovate is deliberate: managers bump the *version* (pin
+scripts, `# renovate:`-marked workflow env pins, the requirements file), and
+the checksum/hash refresh **stays human** — a bump PR fails its own install
+until the new digests are recorded, which is the design working, not a defect.
+A checksum that updates itself would verify nothing. (Tasks 1.3 and 8.6;
+issues #54/#55/#63/#74.)
+
 ## Data Models
 
 Definition schema: native `dhi.io/build` syntax (ADR 0001), validated by the frontend itself
@@ -478,24 +545,27 @@ ports: [3000/tcp]
 - Renovate regex-manager fixtures (does this pin string parse?); schema negative cases; TDD on any fallback-renderer glue (per repo CLAUDE.md).
 
 ### Integration Tests
-- Req 5 suite: per-chart install on kind → Ready ≤5min → live securityContext assertions → functional probes (Certificate issued; grafana HTTP health; valkey SET/GET; hardened-app 200) → upgrade path on bump PRs.
+- Req 5 suite: per-chart install on kind → Ready ≤5min → live securityContext assertions → functional probes (Certificate issued; grafana HTTP health; valkey SET/GET; hardened-app 200) → upgrade path on bump PRs (both shapes — chart-version and image/values — re-asserts gated on rollout completion).
 
 ### E2E / Pipeline
-- ct lint + kyverno CLI over rendered manifests (digest, registry, nonroot) for every chart on each PR — install-level verification lives in the kind e2e suite, not `ct install`; trivy gate with compiled VEX; full bump-flow rehearsal via one deliberately stale pin per component.
+- kyverno CLI over every chart's rendered manifests (digest, registry, nonroot) on each PR, `ct lint` on owned charts only — install-level verification lives in the kind e2e suite, not `ct install`; trivy gate with compiled VEX; full bump-flow rehearsal via one deliberately stale pin per component.
 
 ## Security Considerations
 
 - Non-root 65532 everywhere; restricted PSS enforced twice (chart overrides + kyverno gate)
 - Everything digest/checksum-pinned; floating tags fail CI (Req 1.6)
 - cosign keyless via GitHub OIDC — no long-lived signing keys; PAT stays in `.keys/` (gitignored)
-- Private repo + private GHCR through the build phase (Req 2.4); repo public under MIT since
-  2026-08-13 — registry visibility is a separate, explicit decision. No secrets in definitions
+- Private repo + private GHCR through the build phase (Req 2.4 — its WHILE clause ended at the
+  2026-08-13 go-live); repo public under MIT and the GHCR packages anonymously pullable since
+  then (measured 2026-08-19: unauthenticated manifest fetch returns 200). No secrets in
+  definitions
 
 ## Delivery Plan (3 workdays, cut line explicit — historical)
 
 *This is the MVP plan as drawn on day 0, kept as a record. It was executed 2026-07-18 →
-2026-07-21; the operating period since then grew tasks 7.4–8.5 (risk-treatment lane,
-reachability evidence, VEX compilation, variant convention), which no day below plans for.*
+2026-07-21; the operating period since then grew tasks 7.4–8.7 (risk-treatment lane,
+reachability evidence, VEX compilation, variant convention, toolchain pinning, chart-pin
+tracking), which no day below plans for.*
 
 - **Day 1**: skeleton, CONVENTIONS, validate.yml; host spike of `dhi.io/build` (3h box → decision A/B); hardened-app + cert-manager definitions building, signed, pushed; stale pins set.
 - **Day 2**: Renovate live (first real bump PRs incl. staged major); grafana + valkey definitions; cert-manager + grafana chart adaptations + kyverno gate.
