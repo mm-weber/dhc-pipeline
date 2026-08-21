@@ -1,37 +1,25 @@
-# #74 — pin + verify all workflow-installed tools (Req 7.5/7.6)
+# Production-readiness critique and spec revision (one-man-show scope)
 
-Plan: extend the existing `install-tool.sh` pin-block machinery (already
-renovate-tracked) for helm and ct; hash-pinned pip requirements file for the
-python installs; renovate manager + fixtures for the new pin surface.
+Goal: turn the 2026-08-21 security-leader critique of the catalogue into a
+revised spec that (a) a single maintainer can keep honest in production and
+(b) leaves the primitives in place for a fork to scale to org level without
+re-architecting. Every critique point gets an explicit disposition before
+anything is implemented (amend the spec first, then /spec-implement).
 
-- [x] 1. `install-tool.sh`: add `helm` (get.helm.sh tarball, member
-      `linux-amd64/helm`, pin v4.2.4 = what the unpinned action resolves
-      today) and `ct` (github tarball, member `ct`, plus `etc/lintconf.yaml`
-      + `etc/chart_schema.yaml` extras — ct lint needs them)
-- [x] 2. `install-tool_test.sh`: TDD the new cases via the existing
-      BASE_URL/PINS seams (helm nested member, ct extras, checksum refusal)
-- [x] 3. `.github/requirements-ci.txt`: yamllint + pathspec + pyyaml + yamale,
-      exact pins, full PyPI `--hash` sets, `# renovate:` comments
-- [x] 4. Workflows: e2e.yml + chart.yml helm via install-tool.sh (drop
-      azure/setup-helm); chart.yml ct via install-tool.sh + pip
-      `--require-hashes` (drop chart-testing-action), ct lint gets explicit
-      --lint-conf/--chart-yaml-schema; validate.yml + rescan.yml pip
-      `--require-hashes`
-- [x] 5. renovate.json5: regex manager for requirements-ci.txt (pypi
-      datasource, version-only bumps — hash refresh stays human, same
-      friction model as the sha256 pins)
-- [x] 6. test/renovate: fixture + managers.test.mjs cases (extract + no
-      false-positive), both directions
-- [x] 7. Docs: tasks.md 8.6 list + CONVENTIONS.md pinning claim reflect the
-      new coverage
-- [x] 8. Run all touched test suites; yamllint; commit; PR
+- [x] 1. Record the critique with repo evidence per point in
+      `.specs/dhc-catalogue-mvp/reviews/2026-08-21-production-readiness-critique.md`
+      (same shape as the 2026-08-04 reviews: method, verification legend,
+      numbered findings, prior-art column, disposition ledger)
+- [x] 2. Dialogue, one point at a time: state the goal, weigh options, record
+      the disposition (accept / accept with modification / reject with reason /
+      defer with primitive in place) in the review doc's ledger
+      (done 2026-08-21: framing A, F1–F13 all accepted with mechanisms;
+      amendment sequence A–D in the review's section 6)
+- [ ] 3. Spec amendments per accepted point: EARS criteria in
+      `requirements.md`, rationale in `design.md`, task entries in `tasks.md`,
+      one PR per decision
+- [ ] 4. Only then: implementation PRs via /spec-implement, TDD where code
 
 ## Review
 
 (to fill when done)
-All items done — see PR. Local verification: install-tool suite (23 new
-assertions), scanners suite, renovate manager fixtures + strict config
-validation, --require-hashes install in a clean venv, real ct install from
-upstream (checksum matched) and a real `ct lint` run over hardened-app with
-the new flags. helm fetch is firewall-blocked locally; its pin was
-cross-checked against the helm release notes and CI verifies the bytes.
