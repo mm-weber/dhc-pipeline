@@ -14,7 +14,9 @@ anything is implemented (amend the spec first, then /spec-implement).
       the disposition (accept / accept with modification / reject with reason /
       defer with primitive in place) in the review doc's ledger
       (done 2026-08-21: framing A, F1–F13 all accepted with mechanisms;
-      amendment sequence A–D in the review's section 6)
+      amendment sequence A–D in the review's section 6; F12 terms memo
+      landed as `data/dhi-terms-2026-08-21.md`, obligations folded into
+      clusters C and D)
 - [ ] 3. Spec amendments per accepted point: EARS criteria in
       `requirements.md`, rationale in `design.md`, task entries in `tasks.md`,
       one PR per decision

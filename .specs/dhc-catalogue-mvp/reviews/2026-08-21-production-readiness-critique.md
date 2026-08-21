@@ -583,7 +583,7 @@ Recorded so the dialogue is read as aimed at the gaps, not the design.
 | Ruleset bypass actors on `main` (rulesets themselves now measured, see F1: one approving review required, `build gate` and `e2e gate` not required) | F1, F2: who can merge without the review, and whether Renovate's PAT is among them | `gh api repos/mm-weber/dhc-pipeline/rulesets/20716271` on the host (admin view shows `bypass_actors`); drop the JSON into `data/` |
 | Collaborators and their roles | F1: bus factor as fact, not assumption | `gh api repos/mm-weber/dhc-pipeline/collaborators` |
 | GHCR package settings: who can push, tag mutability (visibility now measured: two of six repositories private, see F9) | F9, F11: whether a bad tag can be moved or deleted, and by whom | GHCR package settings page |
-| DHI terms on public redistribution of derived images | F12 | owner's host research, result into `data/` |
+| DHI terms on public redistribution of derived images (answered 2026-08-21: `data/dhi-terms-2026-08-21.md`, permitted under Apache-2.0 with conditions, DSSA tension flagged) | F12 | closed; sources re-verified by 2026-11-21 (F13 register) |
 
 ---
 
@@ -940,6 +940,46 @@ the README does not use the words "production-ready". Rejected:
 attribution without the terms answer; changing substrate (removes the
 learning objective; a fork's option, which the table supports).
 
+*Terms answered (2026-08-21): `data/dhi-terms-2026-08-21.md`.* Building
+derived images on the Community tier and redistributing them publicly is
+permitted, with the permission flowing from the Apache-2.0 licence on the
+catalog and not from the Docker Subscription Service Agreement, whose
+§2.1 "not on a standalone basis" clause is not reconciled with that grant
+in any Docker document. The memo's two routes: "Stage 1", ship runtime
+layers free of DHI-origin content; "Stage 2", ship them and carry the
+obligations. **This catalogue is Stage 2 by design**: every runtime image
+installs packages from `dhi.io/apk`, and the substrate is the learning
+objective; Stage 1 is rejected for the same reason changing substrate was.
+Obligations adopted, all into cluster D unless noted:
+(a) Apache-2.0 §4(a)/(c): a notice file in the repository naming Docker
+Hardened Images (Copyright 2025 Docker Inc., Apache-2.0) and stating that
+third-party packages carry the upstream licences enumerated in the attested
+SBOM; the same notice inside each image if the frontend can add a file
+(measured at implementation). The SBOM attestation already satisfies "ship
+or link the SBOM".
+(b) Apache-2.0 §4(b): no definition is a copy of a catalog file (measured
+2026-08-21: own-authored, kept close to exemplars, `docs/decisions/0001-build-layer.md:57`),
+so no modification notices are due; `CONVENTIONS.md` records that a
+definition copied from the catalog must carry one.
+(c) Trademark (§6 and Docker's guidelines): descriptive use only. README and
+`CLAUDE.md` drop "DHI-style" as a label in favour of "built with Docker
+Hardened Images tooling and packages", with an explicit sentence that the
+project is not affiliated with or endorsed by Docker, Inc.; no logos; the
+`dhc` names stay.
+(d) Memo Q4: a lint admits only `dhi.io/apk/<distro>/<version>/main` (and
+the `dhi.io/deb/…/main` shape) as package repositories in definitions and
+refuses the entitlement-gated `security` and `els` paths (measured
+2026-08-21: all seven definitions use `/main`). Lands with cluster C's
+definition lints. Fork switch: an entitled fork extends the allowlist.
+(e) The residual DSSA-versus-Apache ambiguity is stated in `SECURITY.md`
+with the dated memo as evidence; the memo's sources are re-verified by
+2026-11-21, tracked as a deliberate human item in the F13 register.
+(f) "production-ready" wording is unblocked once (a), (c) and (d) land; the
+claim carries the sentence from (e).
+Owner-side and optional: seek an explicit statement from Docker on
+free-tier standalone redistribution (memo Stage 3, item 6); save the cited
+pages as accessed into `data/`.
+
 **F13, human-per-item controls (decided 2026-08-21): a manual-controls
 register, three automations, one mechanical link.** The register lives in
 `docs/CONVENTIONS.md` (step, class, why, fork switch). *Deliberate, keep*:
@@ -1013,5 +1053,5 @@ finding), `defer` (with the primitive that is put in place now).
 | F9 | amd64 only; legacy arm64 manifests; two repositories private | accept (5.2): re-point legacy tags, arm64 back only per-platform-scanned, visibility invariant | Req 2.1, Req 2.6, task 8.3, new visibility criterion | |
 | F10 | Grafana same-origin checksum anchor | accept by consequence of F2 (5.2): `# authenticity:` class per definition, enforced at bump, PR and daily; `.deb` route documented as switch | Req 1.3, definition metadata, ADR 0002 | |
 | F11 | No SECURITY.md / advisories / revocation; private reporting disabled | accept (5.2): SECURITY.md, private reporting + invariant, GHSA channel, `triage/revocations.yaml` driving sweep + invariant; VEX repository deferred to Pages | new Req group (catalogue security posture) | |
-| F12 | Substrate attribution; redistribution terms | accept (5.2): attribution rewrite + trust-boundary table; terms research by owner into `data/`; "production-ready" wording gated on it | README, design Overview, concepts.md, SECURITY.md | |
+| F12 | Substrate attribution; redistribution terms | accept (5.2): attribution rewrite + trust-boundary table; terms answered in `data/dhi-terms-2026-08-21.md`: Stage 2 by design, Apache-2.0 notice, descriptive-use wording, `/main`-only repository lint, residual DSSA ambiguity stated | README, design Overview, concepts.md, SECURITY.md, definition lint | |
 | F13 | Human-per-item controls, labelled or not | accept (5.2): manual-controls register; automate issue closing, chart version tracking, same-tag digest automerge; LOG anchors lint-linked | Req 3, Req 6, CONVENTIONS | |
