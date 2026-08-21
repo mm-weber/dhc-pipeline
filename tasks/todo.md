@@ -19,7 +19,12 @@ anything is implemented (amend the spec first, then /spec-implement).
       clusters C and D)
 - [ ] 3. Spec amendments per accepted point: EARS criteria in
       `requirements.md`, rationale in `design.md`, task entries in `tasks.md`,
-      one PR per decision
+      one PR per cluster
+      - [ ] A. release path and published set (F3, F9, F6): Req 1.9,
+            2.7–2.25, 6.35–6.36; design decision 6 + release flow; tasks 9.1–9.7
+      - [ ] B. statuses and clocks (F5, F4, issue closing)
+      - [ ] C. upstream trust (F2, F10, F8, chart tracking, `/main` lint)
+      - [ ] D. catalogue posture (F1, F11, F12, F7, register; new Req 9)
 - [ ] 4. Only then: implementation PRs via /spec-implement, TDD where code
 
 ## Review

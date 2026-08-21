@@ -170,7 +170,7 @@
     - 2026-08-13 partial: crons confirmed live via the API (Renovate 3 scheduled runs that day, rescan daily, all green); spec truth pass landed — design.md brought to as-built (ADR 0001 outcome, real definition schema, amd64 release path, chart.yml, no-retry e2e), coverage table corrected, 8.6/8.7 opened for the gaps the review found; MIT LICENSE added; "repo stays private" superseded by the go-live decision
     - 2026-08-13 done: README written against the published artifacts (walkthrough targets grafana 13.1.3-alpine3.23, whose .sig/.att objects were confirmed on GHCR) — deliberately small; the deep material stays in docs/, triage/ and this spec rather than being restated
     - _Requirements: Req 2.4, All (verification)_
-  - [ ] 8.3 Restore `linux/arm64`, gated on scanning it first [DEFERRED 2026-08-04]
+  - [ ] 8.3 Restore `linux/arm64`, gated on scanning it first [DEFERRED 2026-08-04; absorbed by 9.3 on 2026-08-21, kept for its measurements]
     - Why it was dropped: arm64 was built, pushed, signed, SBOM'd and attested while every scan step in `build.yml` stayed `pull_request`-gated and the PR gate built amd64 only, and `rescan.yml` passed no `--platform` so Trivy resolved the published index to the runner's own arch. No gate ever read the arm64 image (review finding 1.3). Req 2.6 now forbids publishing a platform nothing scans, so that criterion is the gate this task has to satisfy before the platform returns
     - Scan first, ship second. `rescan.yml` loops platforms with `--platform` **and** `--image-src remote`; the second flag is not optional (measured: Trivy prefers the local docker daemon, where the image is single-arch, and silently ignores `--platform` there — `--platform linux/arm64` returned `architecture=amd64` in 0s). Write `${name}-${arch}.json`; `rescan-report` needs no change, since it globs `*.json` and dedupes images by `ArtifactName`, which is identical across platforms (measured). Cost measured at ~35s per platform per image
     - Then `build.yml`: `platforms: linux/amd64,linux/arm64` on main. A PR-side arm64 gate additionally needs `setup-qemu-action` and a multi-platform push to the local registry, because `load:` takes one platform. The cost there is the build, not the scan, and it falls on source-compiled archetypes (cert-manager) far harder than on tarball repackages (grafana)
@@ -208,17 +208,48 @@
     - 2026-08-13 done (#64): two chart-pin regex managers over `chart/**` values (docker datasource, ghcr.io anonymous since go-live) — digest-keyed spelling for cert-manager ×3 + hardened-app, tag@digest for grafana + valkey, both capturing tag AND digest so same-tag rebuilds reach the chart too; cert-manager trio grouped into one PR. grafana migrated OFF the chart's bare-hex `sha:` field onto tag@digest (Renovate writes `sha256:<hex>`, which would corrupt bare hex; upstream's `_helpers.tpl` strips `@sha…` from the tag for the version label, verified by local render + kyverno gate at `fail: 0`). Req 5.6 image path: `e2e.yml` snapshots the base branch's values file on any values diff and the suite installs it before upgrading (`DHC_UPGRADE_VALUES_FROM`; owned charts now take `-f`, lifting the old owned-skip — TDD'd in `test/install`). Re-pinned all four charts: cert-manager 1.21.1, grafana 13.1.3, and valkey + hardened-app digests which had BOTH silently drifted behind same-tag rebuilds (found re-pinning; the exact failure mode this task closes). Chart-VERSION tracking (chart.yaml) remains hand-pinned and untracked — separate gap, noted in cert-manager/chart.yaml
     - _Requirements: Req 4.2, Req 5.6_
 
+- [ ] 9. Production readiness, cluster A: the release path and the published set (review 2026-08-21, findings F3, F9, F6; spec amendment landed before any of these)
+  - [ ] 9.1 Release arm: push by digest, scan, sign, attest, then tag
+    - `build.yml` main arm: `docker/build-push-action` outputs `type=image,push-by-digest=true,name-canonical=true,push=true` with no `tags:`; the release-time scan runs Trivy against the pushed digest per platform manifest (`--image-src remote`, `--platform`), with the same `--vex` (compiled) and `--ignorefile` inputs the PR gate uses, factored into one script both arms call rather than a second copy of the step; `compile-vex.sh` stamps the index digest and every scanned platform digest (Req 6.36) and adds `under_investigation` statements for anything uncovered (Req 2.12); cosign sign, SBOM attest, OpenVEX attest; then `docker buildx imagetools create -t <tag>…` applies the definition-derived tags (Req 2.7 to 2.9)
+    - Fail-closed release setting as a declared workflow variable, default off (Req 2.13); the job's permissions stay `contents: read`, `packages: write`, `id-token: write`: the issue link for an `under_investigation` statement arrives with the next rescan (cluster B), not from the signing job
+    - The local-registry step (trivy#9399 workaround) stays PR-only; on main the RepoDigest exists because the image was pushed
+    - The rescan already compiles per digest; the release arm now produces the same report shape, so "compiled nothing" versus "never compiled" is visible at release too
+    - _Requirements: Req 2.7, Req 2.8, Req 2.9, Req 2.10, Req 2.11, Req 2.12, Req 2.13, Req 6.35, Req 6.36_
+  - [ ] 9.2 Daily scheduled rebuild with publish-if-changed
+    - `schedule:` trigger on `build.yml` (daily, before the 06:17 UTC rescan so the rescan sees fresh digests) building every definition; `scripts/package-set-diff.sh` (+ `_test.sh`) compares the fresh SBOM's (name, version, platform) set with the attested SBOM of the digest the same full release tag points at; equal discards, different publishes through 9.1 and prints the diff in the summary (Req 2.14 to 2.16)
+    - Publish policy as a declared variable, `if-changed` default, `always` for a fork (Req 2.17)
+    - Consequence to accept: each real base change opens one non-automerged chart-pin PR per affected chart; same-tag digest automerge is cluster C (F13)
+    - _Requirements: Req 2.14, Req 2.15, Req 2.16, Req 2.17_
+  - [ ] 9.3 Per-platform scanning, then arm64 (absorbs 8.3)
+    - `rescan.yml` loops platform manifests with `--platform` and `--image-src remote` (8.3's measurement: without `--image-src remote` Trivy prefers the single-arch daemon image and silently ignores `--platform`); 9.1's release-time scan does the same (Req 2.18, 2.19)
+    - Only then `platforms: linux/amd64,linux/arm64` on main (Req 2.20, Req 2.1); the PR gate stays amd64 (cost is the build, not the scan, per 8.3); arm64 e2e out of scope
+    - _Requirements: Req 2.1, Req 2.6, Req 2.18, Req 2.19, Req 2.20_
+  - [ ] 9.4 Visibility invariant
+    - `rescan.yml` step over every repository `definition-lib.sh` knows: `GET https://ghcr.io/token?scope=repository:mm-weber/dhc/<name>:pull` unauthenticated must return 200; any other answer fails the run naming the repository (Req 2.21). Measured 2026-08-21: `hardened-app` and `cert-manager-cainjector` were private; the owner flipped them by hand the same day
+    - _Requirements: Req 2.21_
+  - [ ] 9.5 Legacy tag sweep
+    - Scripted and tested: for each catalogue tag whose index carries a platform manifest no scan ever read (ten measured 2026-08-21: cert-manager-controller and -webhook `1.20`, `1.20.3`, `1.21.0`; grafana `13.0`, `13.0.4`; valkey `9.0`, `9.0.5`), re-point the tag to the amd64 manifest digest already inside the index (`imagetools create`); old index digests stay pullable by digest; one dated `triage/LOG.md` entry lists tag, old digest, new digest (Req 2.22). Run once by the operator (host docker login, or a `workflow_dispatch` job with `packages: write`); the rescan's per-platform loop (9.3) is what keeps it from recurring
+    - _Requirements: Req 2.22_
+  - [ ] 9.6 Verification policy and its daily proof
+    - Verification inputs in one declared place (issuer, identities `https://github.com/mm-weber/dhc-pipeline/.github/workflows/build.yml@refs/heads/main` and `…/rescan.yml@refs/heads/main`, required predicate types `spdxjson` and `openvex`); `policies/verify-catalogue-images.yaml` as the Kyverno `verifyImages` rendering (Req 2.23); a `policy-controller` `ClusterImagePolicy` rendering is a fork's addition, not shipped
+    - `rescan.yml` applies the policy daily to a manifest listing every published digest (must admit) and to one unsigned control image (must reject) and fails the run otherwise (Req 2.24); `kyverno test` fixtures cannot reach a registry, which is why the proof lives in the cron
+    - README and `docs/user-manual.md` verification snippets move from the substring regexp to the anchored identities and issuer (Req 2.25)
+    - _Requirements: Req 2.23, Req 2.24, Req 2.25_
+  - [ ] 9.7 Pinning contract and truth pass
+    - `docs/CONVENTIONS.md` "Pinning": apk packages float by design, resolved set recorded per digest in the attested SBOM, published digest scanned before tagging, daily rebuild as the delivery mechanism for base fixes (Req 1.9); `docs/user-manual.md` release-path, platform and verification sections brought to the new shape; design.md Key Design Decision 6 marked as-built
+    - _Requirements: Req 1.9, Req 7.1_
+
 ## Requirements Coverage
 
 | Requirement | Covered By Tasks |
 |-------------|------------------|
-| Req 1: Image Definition Catalogue | 2.1, 2.2, 3.1, 3.2, 5.1, 5.2, 1.2, 8.1, 8.4 |
-| Req 2: Image Build and Private Release | 3.3, 8.2, 8.3 |
+| Req 1: Image Definition Catalogue | 2.1, 2.2, 3.1, 3.2, 5.1, 5.2, 1.2, 8.1, 8.4, 9.7 |
+| Req 2: Image Build and Release | 3.3, 8.2, 8.3, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6 |
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4, 8.7 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7 |
-| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.3, 8.5 |
-| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6 |
+| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.3, 8.5, 9.1 |
+| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7 |
 | Req 8: Operating Environment | 3.3, 6.5 |
 
 Req 8.2 (delegate network-heavy work to CI/operator host) has no implementing task: it is an

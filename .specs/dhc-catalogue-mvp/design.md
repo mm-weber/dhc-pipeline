@@ -123,7 +123,67 @@ graph TB
 5. **VEX-gated scanning (Req 6)**
    - **Decision**: Trivy PR gate fails only on findings not covered by our OpenVEX; triage outcomes are commits (VEX statement or bump PR), giving auditable history.
 
+6. **Publish with status: scan what you sign (Req 2.7 to 2.25, 6.35, 6.36; review F3, F9, F6, 2026-08-21)**
+   - **Context**: Every scan step in `build.yml` was `pull_request`-gated while the release arm
+     rebuilt, pushed, signed and attested without any scan (review A finding 1.3, left open
+     since 2026-08-04). Package versions float by design, so the released bytes could differ
+     from the gated ones, and nothing rebuilt on a schedule, so a fixed base package reached
+     consumers only after an unrelated commit. Ten legacy tags still resolved to indexes whose
+     arm64 manifest nobody ever scanned, two of six repositories were private while the README
+     called every image public, and the consumer verification snippet matched any identity
+     containing `github.com/mm-weber/dhc-pipeline` as a substring.
+   - **Options**: (A) publish with status: push by digest, scan the pushed digest, record
+     anything uncovered as `under_investigation` in the attested VEX, then tag; (B) fail
+     closed on `main` until a human decides; (C) scan after publish as information only.
+     For packages: declare the float, or pin apk versions (needs a spike plus a bespoke
+     Renovate datasource), or lock-and-compare. For cadence: daily rebuild publishing only
+     when content changed, or rescan-triggered rebuilds, or both.
+   - **Decision**: **A**, under the review's framing of a transparency catalogue (knowledge,
+     not speed). The release sequence becomes push-by-digest (no tag), scan that digest per
+     platform with the gate's own VEX and exception inputs, compile VEX for exactly that
+     digest (and for every platform manifest digest, Req 6.36), sign and attest, and only
+     then apply tags (`docker buildx imagetools create -t …`). "Published" is thereby defined
+     (Req 2.10): tagged, signed, attested; an untagged digest is frozen (Req 2.11). A finding
+     uncovered at release time becomes an `under_investigation` statement with a timestamp
+     (Req 2.12); the issue link arrives with the next rescan and cluster B's re-attestation,
+     so the signing job keeps `contents: read`, `packages: write`, `id-token: write` and gains
+     no `issues: write` (a least-privilege refinement of the review's wording, which had the
+     statement carry the issue reference from the start). apk packages float by declaration
+     (Req 1.9): the DHI model ships base fixes by rebuilding, no versioned apk syntax exists in
+     any input, and the SBOM already records the resolved set per digest. A daily scheduled
+     rebuild publishes only when the resolved package set changed (Req 2.14 to 2.16), which
+     is what stops provenance timestamps alone from minting digests and opening chart-pin
+     PRs. arm64 returns when, and only when, both the release-time scan and the rescan scan
+     every platform manifest (Req 2.18 to 2.20; task 8.3 is absorbed by task 9.3). The ten
+     legacy tags are re-pointed to their scanned amd64 manifests, digests kept (Req 2.22).
+     Visibility becomes a daily invariant (Req 2.21). Verification inputs (issuer, exact
+     identities of `build.yml` and `rescan.yml` at `refs/heads/main`, required attestation
+     types) live in one place, rendered as a Kyverno `verifyImages` policy and proven daily
+     against every published digest and one unsigned control (Req 2.23 to 2.25).
+   - **Trade-offs**: B was rejected as speed-shaped: one maintainer accumulates blocked
+     releases while an unrelated advisory lands between PR scan and merge. Pinning apk would
+     reinvent a datasource and turn every base advisory into a bump PR. Deleting the legacy
+     indexes would break every digest pin for a hazard that is "unscanned", not "known bad".
+     Two declared switches make the fork's choice a value, not a redesign: the fail-closed
+     release setting (Req 2.13) and the publish policy `if-changed` versus `always`
+     (Req 2.17); the cron expression is a third.
+
 ## System Flows
+
+### Release flow (Req 2.7 to 2.17; as specified 2026-08-21, implementation task 9)
+
+```
+merge to main, or the daily schedule
+  ─► build (per-arch pins verified) ─► push by digest, no tag
+  ─► scan the pushed digest, per platform manifest, VEX + exceptions applied
+  ─► compile VEX for this digest (+ platform digests):
+        not_affected / fixed from triage/vex/, under_investigation for anything uncovered
+  ─► cosign sign · Syft SBOM attest · OpenVEX attest
+  ─► scheduled run only: package set equal to the published digest of the same tag? discard
+  ─► apply tags (imagetools create) ─► published (Req 2.10)
+
+fail-closed setting on: uncovered finding ─► no attestation, no tag, red run
+```
 
 ### Upstream bump flow (the operating heart)
 
@@ -465,6 +525,17 @@ pins, and `verify-arch-pins.sh` keeps verifying both. The definitions do support
 arm64; the release path publishes one platform. Keeping the pins exercised is
 what makes task 8.3 a build-matrix change rather than archaeology.
 
+**Cluster A (2026-08-21) states the condition for arm64's return as criteria
+rather than a deferral:** Req 2.18 to 2.20 make per-platform scanning in both
+the release-time scan and the rescan the precondition for building every
+declared platform, and Req 2.22 re-points the ten pre-2026-08-04 tags that still
+resolve to unscanned arm64 manifests (measured in the review, F9) to their
+scanned amd64 manifest digests, keeping the old indexes pullable by digest.
+Task 8.3 is absorbed by task 9.3. The release arm itself changes shape under
+Req 2.7 to 2.9 (push by digest, scan, sign, attest, then tag; Key Design
+Decision 6), and `build.yml` gains a `schedule:` trigger for the daily rebuild
+(Req 2.14) with publish-if-changed (Req 2.15 to 2.17).
+
 Both paths use `type=gha` build cache (per-image scope) so repeat builds of a
 large upstream (cert-manager) reuse the Go module + compile layers.
 
@@ -555,6 +626,15 @@ ports: [3000/tcp]
 - Non-root 65532 everywhere; restricted PSS enforced twice (chart overrides + kyverno gate)
 - Everything digest/checksum-pinned; floating tags fail CI (Req 1.6)
 - cosign keyless via GitHub OIDC — no long-lived signing keys; PAT stays in `.keys/` (gitignored)
+- What a signature means (review F1, F6): the `build.yml` or `rescan.yml` workflow on
+  `refs/heads/main` produced or re-attested this digest. It does not assert that a second human
+  reviewed the change. Consumers verify exactly those two identities (Req 2.23 to 2.25); the
+  substring pattern the README carried until cluster A admitted any identity containing the
+  repository path
+- The published set is defined, not implied (Req 2.10, 2.11): tagged, signed, attested. A digest
+  no tag references is frozen. Every published digest was scanned before it was tagged
+  (Req 2.7 to 2.9), and every catalogue repository is checked daily to answer an anonymous
+  pull (Req 2.21; two of six were private on 2026-08-21 while the README said otherwise)
 - Private repo + private GHCR through the build phase (Req 2.4 — its WHILE clause ended at the
   2026-08-13 go-live); repo public under MIT and the GHCR packages anonymously pullable since
   then (measured 2026-08-19: unauthenticated manifest fetch returns 200). No secrets in
