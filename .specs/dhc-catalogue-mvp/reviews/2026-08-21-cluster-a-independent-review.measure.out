@@ -1,0 +1,87 @@
+### visibility: anonymous token endpoint per repository
+  hardened-app               HTTP 200
+  cert-manager-controller    HTTP 200
+  cert-manager-webhook       HTTP 200
+  cert-manager-cainjector    HTTP 200
+  grafana                    HTTP 200
+  valkey                     HTTP 200
+== hardened-app:0.1.0-alpine3.23 -> sha256:8eee13295b6434030d9b6b5295be748bb4b5017977fca6a4ffa9e867c7926bf3
+  mediaType: application/vnd.oci.image.index.v1+json
+  child sha256:3cb36d90add5f6b85ff4fed39491427862416484a16862fce4d4a13ac6f8e586 linux/amd64 
+  child sha256:5e6ade5b4ba7d9790c8c86119be57ce99273f28abd2e07962db83d7411a731d3 unknown/unknown attestation-manifest
+  on index digest: .sig HTTP 200  .att HTTP 200
+    att predicateType:       1 https://spdx.dev/Document
+  on platform manifest sha256:3cb36d90add5...: .sig HTTP 404  .att HTTP 404
+== cert-manager-controller:1.21.1-alpine3.23 -> sha256:fe6ab439dce8b926d4ee8ed2b2b83e2d378a744b9840ce2373ef37e63490362c
+  mediaType: application/vnd.oci.image.index.v1+json
+  child sha256:a3b982f157d82649fdbeecdc28ee699a3d50dceb3fc5397f56ca9efb6b5a377b linux/amd64 
+  child sha256:5d2ef21344ab2c2b746e40060a605b7a068fd24821d3155e03a93c638fb620e2 unknown/unknown attestation-manifest
+  on index digest: .sig HTTP 200  .att HTTP 200
+    att predicateType:       1 https://spdx.dev/Document
+  on platform manifest sha256:a3b982f157d8...: .sig HTTP 404  .att HTTP 404
+== cert-manager-webhook:1.21.1-alpine3.23 -> sha256:f9666408719e2f84ec870a0f6f362ef2813f4744311a6324d7f1c677b2593332
+  mediaType: application/vnd.oci.image.index.v1+json
+  child sha256:bd44f80b9ca9e80b1b3a0d276f43a9b014ce72c5fb910f450e825c4e5a8de6ae linux/amd64 
+  child sha256:b62d11bc2f521cd66cf95184325f49abfb16feb54530abf23cfb72dd95c53448 unknown/unknown attestation-manifest
+  on index digest: .sig HTTP 200  .att HTTP 200
+    att predicateType:       1 https://spdx.dev/Document
+  on platform manifest sha256:bd44f80b9ca9...: .sig HTTP 404  .att HTTP 404
+== cert-manager-cainjector:1.21.1-alpine3.23 -> sha256:49a0caeb25e90ce4b023ebdfb7bf44c9ff263e27dcc740cf4b8072689444b916
+  mediaType: application/vnd.oci.image.index.v1+json
+  child sha256:441e380fdea17d389df1e0597f75a2621c0efd6f4d2aff8482c69455d229b769 linux/amd64 
+  child sha256:56ffe5992c3e9ff01e177a5e77838eae2b003e0f88683590a3af483bc27d4d74 unknown/unknown attestation-manifest
+  on index digest: .sig HTTP 200  .att HTTP 200
+    att predicateType:       1 https://spdx.dev/Document
+  on platform manifest sha256:441e380fdea1...: .sig HTTP 404  .att HTTP 404
+== grafana:13.1.3-alpine3.23 -> sha256:bea44d40dbddc63634f74beeeac6ca41148b10bf933c5dcf4068a46750771b6e
+  mediaType: application/vnd.oci.image.index.v1+json
+  child sha256:52498158af2d2d3ef0769ef057fef8caa138df8e2c6b6dde293ff2720554c04c linux/amd64 
+  child sha256:3d24e409ba8b7af761658ab3a2cc6f6d2d9b8497b0008886195f95e9875f621e unknown/unknown attestation-manifest
+  on index digest: .sig HTTP 200  .att HTTP 200
+    att predicateType:       3 https://openvex.dev/ns
+    att predicateType:       1 https://spdx.dev/Document
+  on platform manifest sha256:52498158af2d...: .sig HTTP 404  .att HTTP 404
+== valkey:9.1.1-alpine3.23 -> sha256:218eefb041bb6fa4e2455d848f638880b157b2b764f9108c290c0d7219df205c
+  mediaType: application/vnd.oci.image.index.v1+json
+  child sha256:5ec8a3d7fc3711878c486dc5387898a8e3fe5b1dd441da4a53f1e52b5fafce16 linux/amd64 
+  child sha256:5c365b57e089d445113fc2e430b18776df3fd1631318b3811eb61acf78b9f0fa unknown/unknown attestation-manifest
+  on index digest: .sig HTTP 200  .att HTTP 200
+    att predicateType:       1 https://spdx.dev/Document
+  on platform manifest sha256:5ec8a3d7fc37...: .sig HTTP 404  .att HTTP 404
+== valkey:9.1.1-alpine3.23-compat -> sha256:be04d1605c307b2d52d6370823373f757906141222abe28fff4e0b7adbb040d4
+  mediaType: application/vnd.oci.image.index.v1+json
+  child sha256:d631cdd3360d849b7009e5a81ef4740ae95a483f5ff4a49e7e8bb621f08acc6f linux/amd64 
+  child sha256:0fb8e943bbdf4564ff16731a1167cb457ff5934b5423a697b0faaebbe1ae6aa5 unknown/unknown attestation-manifest
+  on index digest: .sig HTTP 200  .att HTTP 200
+    att predicateType:       1 https://spdx.dev/Document
+  on platform manifest sha256:d631cdd3360d...: .sig HTTP 404  .att HTTP 404
+== grafana:13.0.4-alpine3.23 -> sha256:b6987eb3910fe3f4a05011f76f76c5d56728017a6db1afb491d7f4ba51ff182e
+  mediaType: application/vnd.oci.image.index.v1+json
+  child sha256:46607ae250514e845150142fb10ec1941891684acd0cbd8ea3cc66c202153d01 linux/amd64 
+  child sha256:8a99c349bdb68de58841a29b680de43fef2cc8f6d118b1703edadf8b146a5758 linux/arm64 
+  child sha256:4a7e31a4b1627c7a9fe7c84a293467f52d9af405f5147bc2069dec6738619137 unknown/unknown attestation-manifest
+  child sha256:9687cf46c554d5b833de8c5e34c7f0a0cfd633ffece56da22cbde7dbea913508 unknown/unknown attestation-manifest
+  on index digest: .sig HTTP 200  .att HTTP 200
+    att predicateType:       1 https://spdx.dev/Document
+  on platform manifest sha256:46607ae25051...: .sig HTTP 404  .att HTTP 404
+  on platform manifest sha256:8a99c349bdb6...: .sig HTTP 404  .att HTTP 404
+== valkey:9.0.5-alpine3.23 -> sha256:b75aa680d7bb17adaa370307f0d51f106ff0a68baa4327a500de1acb14458f80
+  mediaType: application/vnd.oci.image.index.v1+json
+  child sha256:99e7cb7699670216e032840fde47ca945f37206f51c9e81c85657aee6a8519bb linux/amd64 
+  child sha256:9abe6a450b32203edf3390618d573575a0b99c5ecb47de87ec5a6f3283b10776 linux/arm64 
+  child sha256:65b93d3a474cf47df23c30faaaf123ee686904acd00e6137d5e850ba2ec5e17d unknown/unknown attestation-manifest
+  child sha256:03358d12f9ad2884d923c22ffc0e45130e20943cefec3289ebe84779eeceeb06 unknown/unknown attestation-manifest
+  on index digest: .sig HTTP 200  .att HTTP 200
+    att predicateType:       1 https://spdx.dev/Document
+  on platform manifest sha256:99e7cb769967...: .sig HTTP 404  .att HTTP 404
+  on platform manifest sha256:9abe6a450b32...: .sig HTTP 404  .att HTTP 404
+== cert-manager-controller:1.20.3-alpine3.23 -> sha256:44be33e56308602d2ca9c179e2d5df407741e2b359ee42bd41333fa5cf6629cb
+  mediaType: application/vnd.oci.image.index.v1+json
+  child sha256:2a25d33ba48493f29b90f2c1184f366020598eefeb2c5cc50667bdf045353d58 linux/amd64 
+  child sha256:f4cc2c5fd8a8fac038c6c440fdb1b3d598bd4e0167c1f50063d879551fa90ba0 linux/arm64 
+  child sha256:7589119d11c9abc2c41a823981e03c159a12504a875f9a235bc03013cf21d217 unknown/unknown attestation-manifest
+  child sha256:058ed0d55e986518f7c9461aa0637fef63e21d64a0b2a17bba2a80e4105ba063 unknown/unknown attestation-manifest
+  on index digest: .sig HTTP 200  .att HTTP 200
+    att predicateType:       1 https://spdx.dev/Document
+  on platform manifest sha256:2a25d33ba484...: .sig HTTP 404  .att HTTP 404
+  on platform manifest sha256:f4cc2c5fd8a8...: .sig HTTP 404  .att HTTP 404
