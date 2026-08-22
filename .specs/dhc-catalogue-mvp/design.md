@@ -245,6 +245,14 @@ graph TB
      pull request, invisible in a fork's diff) and per-workflow `env:` blocks (policy
      scattered across files, snippets hand-transcribed). A fork's switches are then one
      file's values.
+   - **Daily invariants are one mechanism (revision finding A5)**: the rescan gains a single
+     `invariants` step that runs every daily assertion the catalogue makes about its own
+     state, each reported by name and any failure failing the run: anonymous pull per
+     repository and tag (Req 2.21) and the verification proof over every tag-referenced
+     digest plus the control digest (Req 2.24) from this cluster; the upstream-checksum
+     re-check from cluster C (review F2, checkpoint 3); ruleset drift, private vulnerability
+     reporting enabled and no tag on a revoked digest from cluster D (F1, F11). One step, one
+     report shape, one place a fork adds an invariant.
 
 ## System Flows
 
@@ -395,7 +403,7 @@ published index, the same finding sits at
 `.../elasticsearch/gpx_..._linux_amd64` on amd64 and at `..._linux_arm64` on
 arm64. The catalogue publishes amd64 only (Req 2.1), so an exact path is correct
 for every scan that runs today and goes silently wrong the moment arm64 returns
-(task 8.3) or a consumer scans an arm64 image themselves. A path matching
+(task 9.3, formerly 8.3) or a consumer scans an arm64 image themselves. A path matching
 nothing is completely silent, per the row above, so a glob is what keeps that
 from becoming a discovery.
 
@@ -595,7 +603,8 @@ and the PR gate builds amd64 only, while `rescan.yml` passes no `--platform`, so
 Trivy resolves the published index to the runner's own architecture. arm64 was
 therefore built, pushed, signed, SBOM'd and attested with no gate ever reading
 it, which is the concrete case in review finding 1.3. Shipping one platform is
-the cheap correction; scanning two is the larger change, deferred to task 8.3.
+the cheap correction; scanning two is the larger change, deferred to task 8.3
+(absorbed by task 9.3 on 2026-08-22).
 
 Measured on the published `grafana:13-alpine3.23` index, both platforms carry an
 identical HIGH/CRITICAL set (11 each, same CVE, package and version), so nothing
@@ -606,7 +615,7 @@ before the other.
 Definitions keep `platforms: [linux/amd64, linux/arm64]` and their per-arch
 pins, and `verify-arch-pins.sh` keeps verifying both. The definitions do support
 arm64; the release path publishes one platform. Keeping the pins exercised is
-what makes task 8.3 a build-matrix change rather than archaeology.
+what makes task 9.3 (which absorbed 8.3) a build-matrix change rather than archaeology.
 
 **Cluster A (2026-08-21) states the condition for arm64's return as criteria
 rather than a deferral:** Req 2.18 to 2.20 make per-platform scanning in both
@@ -669,7 +678,7 @@ name: Grafana 13.1.x
 image: ghcr.io/mm-weber/dhc/grafana                # publish repository (VEX product identity)
 variant: runtime
 tags: [13-alpine3.23, 13.1-alpine3.23, 13.1.3-alpine3.23]
-platforms: [linux/amd64, linux/arm64]              # release path currently ships amd64 (task 8.3)
+platforms: [linux/amd64, linux/arm64]              # release path currently ships amd64 (task 9.3)
 vars:
   GRAFANA_SHA256: '#{ target.arch == "amd64" ? "…" : "…" }'   # per-arch pin, Renovate-managed
   VERSION: 13.1.3
@@ -696,6 +705,13 @@ ports: [3000/tcp]
 | kind flake / timeout | no automatic retry (matrix `fail-fast: false` isolates components; rerun is manual); diagnostic logs uploaded as artifacts | 5.7 |
 | Trivy DB outage | PR gate hard-fails (retryable); daily rescan soft-fails with issue | 6 |
 | New CVE on published image | issue with severity/EPSS/KEV → VEX statement or fix-bump PR | 6.3–6.5 |
+| Release-time scan yields no report for a platform manifest | release arm signs nothing, attests nothing, tags nothing; red run naming the scan | 2.26 |
+| Uncovered finding at release time | default: stated as `under_investigation` in the attested VEX, release completes; fail-closed setting on: nothing signed, attested or tagged, red run naming the finding | 2.12, 2.13 |
+| Scheduled rebuild with an unchanged package set | discarded before any push under the `on-change` publish policy; digest equality logged as the reproducibility measurement | 2.15 |
+| Platform manifest left unscanned at release | no tag applied to that index | 2.19 |
+| Repository or catalogue tag refuses an anonymous pull | daily invariants step fails the rescan run naming it | 2.21 |
+| Tag-referenced digest rejected by the verification policy, or the control digest admitted | daily invariants step fails the rescan run | 2.24 |
+| Rendered verification artifact, workflow cron or job permissions drift from `catalogue-policy.yaml` | validate.yml fails naming the artifact or value | 7.9, 7.10 |
 
 ## Testing Strategy
 

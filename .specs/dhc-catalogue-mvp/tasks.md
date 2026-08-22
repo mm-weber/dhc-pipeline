@@ -48,7 +48,7 @@
     - CI-validated: PR path green on all four definitions (amd64+arm64) before the
       amd64-only/cache speed fix
     - Release path was multi-arch until 2026-08-04 and is now amd64 only, because
-      nothing scanned the arm64 half (Req 2.6). Restoring it is task 8.3
+      nothing scanned the arm64 half (Req 2.6). Restoring it is task 9.3 (formerly 8.3)
     - _Requirements: Req 2.1, Req 2.2, Req 2.3, Req 2.4, Req 2.5, Req 8.1_
 
 - [x] 4. Upstream tracking live (Day 2)
@@ -232,7 +232,7 @@
     - Only then `platforms: linux/amd64,linux/arm64` on main (Req 2.1 as amended); the PR gate stays amd64 (cost is the build, not the scan, per 8.3); arm64 e2e out of scope. Until this task lands the release path stays amd64-only against an amended Req 2.1, which is the spec-ahead-of-implementation state every open task in this ledger is in
     - _Requirements: Req 2.1, Req 2.6, Req 2.18, Req 2.19, Req 2.22, Req 6.2_
   - [ ] 9.4 Visibility invariant
-    - `rescan.yml` step over every repository `definition-lib.sh` knows: `GET https://ghcr.io/token?scope=repository:mm-weber/dhc/<name>:pull` unauthenticated must return 200, and an unauthenticated manifest GET of every catalogue tag from 9.3's enumeration must return 200 (a token is not a pull: a public repository whose tags were deleted still issues one); any other answer fails the run naming the repository or tag (Req 2.21). Measured 2026-08-21: `hardened-app` and `cert-manager-cainjector` were private; the owner flipped them by hand the same day
+    - An `invariants` step in `rescan.yml`, the single home for every daily assertion the catalogue makes about its own state (2.21 here, 2.24 in 9.6; cluster C adds the upstream-checksum re-check, cluster D the ruleset-drift, private-reporting and revoked-digest checks), each reported by name, any failure failing the run. First assertion, over every repository `definition-lib.sh` knows: `GET https://ghcr.io/token?scope=repository:mm-weber/dhc/<name>:pull` unauthenticated must return 200, and an unauthenticated manifest GET of every catalogue tag from 9.3's enumeration must return 200 (a token is not a pull: a public repository whose tags were deleted still issues one); any other answer fails the run naming the repository or tag (Req 2.21). Measured 2026-08-21: `hardened-app` and `cert-manager-cainjector` were private; the owner flipped them by hand the same day
     - _Requirements: Req 2.21_
   - [ ] 9.5 Legacy tags: scanned in place, never re-pointed
     - The ten tags whose indexes carry a never-scanned arm64 manifest (measured 2026-08-21: cert-manager-controller and -webhook `1.20`, `1.20.3`, `1.21.0`; grafana `13.0`, `13.0.4`; valkey `9.0`, `9.0.5`) keep their digests. A re-point was specified first and withdrawn on 2026-08-22: cosign signed the index digests only (`.sig`/`.att` on every platform manifest return 404, measured in the independent review), so a re-pointed tag would have served an unsigned, unattested manifest. 9.3's enumeration scans their arm64 manifests on its first run; whatever those carry becomes `under_investigation` and issues, which is the promise working. One dated `triage/LOG.md` entry records that first full-enumeration rescan and its findings per tag (Req 2.6, 2.18, 2.22)
