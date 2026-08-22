@@ -144,7 +144,10 @@ graph TB
      digest (and for every platform manifest digest, Req 6.36) as exactly one document per
      digest, empty when nothing applies (ADR 0003, measured 2026-08-22 against vexctl,
      Trivy, cosign v2 and v3, and Kyverno; cosign stays pinned on the v2 line because v3's
-     bundle layout is invisible to Kyverno 1.18 and Trivy 0.72), sign and attest, and only
+     bundle layout is invisible to Kyverno 1.18 and Trivy 0.72), sign the index and every
+     platform manifest and attest to each (`--recursive`; one SBOM per platform manifest,
+     the single OpenVEX document on index and platform manifests, so a consumer pinning
+     either form verifies; revision finding 1.8), and only
      then apply tags (`docker buildx imagetools create -t …`). "Published" is thereby defined
      (Req 2.10): tagged, signed, attested; an untagged digest is frozen (Req 2.11). A finding
      uncovered at release time becomes an `under_investigation` statement with a timestamp
@@ -198,7 +201,8 @@ merge to main, the daily schedule, or a manual dispatch
         no report for any platform manifest ─► sign nothing, tag nothing, red run (2.26)
   ─► compile VEX, pass 2: append under_investigation for every uncovered finding (2.12)
         fail-closed setting on and anything uncovered ─► sign nothing, tag nothing, red run (2.13)
-  ─► cosign sign · SBOM attest · one OpenVEX attest (ADR 0003)
+  ─► cosign sign, recursive · SBOM attest per platform manifest · one OpenVEX attest on
+      index and platform manifests (ADR 0003)
   ─► apply tags (imagetools create on the index) ─► published (Req 2.10)
 ```
 

@@ -29,7 +29,7 @@ it (ADR 0001, ADR 0003).
 | 1.5 | Switches contradict their default criteria (2.12 vs 2.13, 2.9 vs 2.13, 2.15 vs 2.17); 2.13 never forbids signing | **decided 2026-08-22**: 2.12 guarded on the fail-closed setting being disabled and reduced to the VEX Compiler's behaviour (the release completing is 2.9); 2.9 guarded on 2.13 not withholding; 2.13 signs nothing too; 2.15 guarded on the if-changed policy | Req 2.9, 2.12, 2.13, 2.15 |
 | 1.6 | "Platform manifest" undefined; every index carries an `unknown/unknown` attestation manifest | **decided 2026-08-22**: terms paragraph under Req 2 (catalogue tag, full release tag, platform manifest); "more than one" dropped from 6.36; 2.18 covers single-manifest digests | Req 2 terms paragraph; Req 6.36; Req 2.18 |
 | 1.7 | A failed release-time scan is unspecified | **decided 2026-08-22**: Req 2.26 (no report for any platform manifest: sign nothing, tag nothing, red run); 2.9 requires a report per platform manifest; error-table rows still to add (1.13) | Req 2.9, 2.26; task 9.1 |
-| 1.8 | One SBOM per index versus per-platform comparison; attestations invisible to platform-digest pinners | open; proposed per-platform SBOM attestation; measure `cosign sign --recursive` in 9.1 | |
+| 1.8 | One SBOM per index versus per-platform comparison; attestations invisible to platform-digest pinners | **decided 2026-08-22: (a)** sign index and platform manifests recursively; one SBOM per platform manifest attested to it; the OpenVEX document attested to index and manifests; `cosign attest --recursive` measured in 9.1 | Req 1.9, 2.9, 2.15; design Decision 6 and flow; tasks 9.1, 9.2 |
 | 1.9 | Flow diagram: compile after scan, discard after sign/attest | **decided 2026-08-22**: comparison before the push (nothing pushed, signed or attested for an unchanged rebuild), two compile passes drawn, both red-run shapes drawn | design Release flow; Req 2.15; task 9.2 |
 | 1.10 | Schedule never reaches the matrix; Req 2.7's trigger excludes schedule and dispatch | **decided 2026-08-22**: 2.7 triggers on any release build (merge, schedule, dispatch); `changes` job gains a schedule branch | Req 2.7; task 9.2 |
 | 1.11 | Policy admits the rescan identity for signatures | **decided 2026-08-22: (a)** two roles as extensible attestor lists: releaser (`build.yml`) signs, attests SBOM and the first OpenVEX; re-attester (`rescan.yml`, from cluster B) attests OpenVEX only; critique F6 amended | Req 2.20, 2.23, 2.25; design Decision 6 and security bullet; task 9.6 |
@@ -76,3 +76,5 @@ it (ADR 0001, ADR 0003).
   error-table rows and remaining 8.3 pointers in design.md (1.13), A5.
 - 2026-08-22, revision commit 3: 1.11 decided as the two-role split. Open
   for the owner: 1.8, A1, A2, A3.
+- 2026-08-22, revision commit 4: 1.8 decided as recursive signing and
+  per-platform SBOMs. Open for the owner: A1, A2, A3.
