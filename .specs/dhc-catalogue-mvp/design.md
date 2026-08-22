@@ -184,6 +184,31 @@ graph TB
      Two declared switches make the fork's choice a value, not a redesign: the fail-closed
      release setting (Req 2.13) and the publish policy `on-change` versus `always`
      (Req 2.17); the cron expression is a third.
+   - **Reproducibility, weighed 2026-08-22 (revision finding A1)**: a bit-identical rebuild
+     would make "nothing changed" a digest comparison and turn provenance into a recomputable
+     fact, and BuildKit has the knobs (`SOURCE_DATE_EPOCH`, `rewrite-timestamp`, provenance
+     `reproducible`). It is not the gate, for the reasons
+     `data/reproducible-digests-vs-content-diff-2026-08-22.md` documents: no catalogue vendor
+     gates publishing on digest equality (Chainguard reproduces with apko and still rebuilds
+     daily, absorbing churn with digestabot; DHI, the same frontend architecture as ours,
+     claims no digest stability at all; Red Hat reproduces in Konflux and uses it to verify by
+     rebuild-and-diff), and a black-box frontend over apk is exactly where "reproducible" flags
+     fail in a long tail nobody outside the frontend can fix. The content comparison (Req 2.15)
+     therefore carries four guardrails. It compares a canonicalised sorted set of package type,
+     name, version and checksum per platform manifest, never SBOM bytes (Syft's ordering and
+     CPE output are not stable). The checksum comes from a CycloneDX SBOM attested beside the
+     SPDX one, because Syft's SPDX output records `checksums: null` for apk packages while its
+     CycloneDX output carries the apk pull checksum as a component property (measured
+     2026-08-22 on `hardened-app:0.1.0-alpine3.23`); DHI publishes both formats. The memo's
+     "base-image digest check" is, in this architecture, the definition's pins: frontend,
+     builder and every source are digest- or checksum-pinned, so a change to them releases
+     through the merge path, and what floats is apk alone, which the pull checksum covers,
+     including a package republished under an unchanged version (the CVE-2026-33634 shape).
+     Reproducibility stays a verification asset: whenever the sets are equal the comparator
+     also logs whether the rebuilt index digest equals the published one, a free nightly
+     measurement; a `diffoci` spike on its own branch is the later step, and the condition
+     that would promote digest equality to the primary gate is zero residual diff across at
+     least 95 percent of images over two weeks.
 
 ## System Flows
 

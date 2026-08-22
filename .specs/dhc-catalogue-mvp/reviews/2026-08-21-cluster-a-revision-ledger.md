@@ -39,7 +39,7 @@ it (ADR 0001, ADR 0003).
 | 1.15 | Req 2.21 measures a token, the design promises a pull; unconditional against Req 2.4's private phase | **decided 2026-08-22**: token plus an unauthenticated manifest GET of every catalogue tag, under WHILE public release is enabled | Req 2.21 reworded; task 9.4 |
 | 1.16 | Two-actor criterion 2.12 | folded into 1.5 | |
 | 1.17 | Task inaccuracies: buildx output needs `name=`, Kyverno predicate-type URIs, `kyverno apply --registry`, 8.3 open beside 9.3, todo wording | **decided 2026-08-22**: all five corrected | tasks 9.1, 9.6, 8.3, coverage table; tasks/todo.md |
-| A1 | Reproducible builds never weighed against publish-if-changed | open; proposed: measure `SOURCE_DATE_EPOCH` against the DHI frontend or record as rejected in Decision 6 | |
+| A1 | Reproducible builds never weighed against publish-if-changed | **decided 2026-08-22: (a)** content comparison stays the gate with four guardrails (canonicalised sorted set with checksums, CycloneDX attested beside SPDX as the checksum source, pinned inputs as the "base digest" check, reproducibility measured nightly as a side effect with the diffoci spike and its flip condition recorded); research input stored in `data/` | Req 1.9, 2.9, 2.15; Decision 6; tasks 9.1, 9.2; `data/reproducible-digests-vs-content-diff-2026-08-22.md` |
 | A2 | `under_investigation` statements derive from an unpersisted scan report | open; proposed: persist the release-time report (artifact or attestation) so the compiled document is reproducible | |
 | A3 | "Declared" switches have no declared location | open; candidate home: cluster B's `triage/policy.yaml` | |
 | A4 | Scan each platform manifest by its own digest rather than `--platform` plus `--image-src remote` | **decided 2026-08-22**: scan by manifest digest | task 9.3 wording |
@@ -78,3 +78,6 @@ it (ADR 0001, ADR 0003).
   for the owner: 1.8, A1, A2, A3.
 - 2026-08-22, revision commit 4: 1.8 decided as recursive signing and
   per-platform SBOMs. Open for the owner: A1, A2, A3.
+- 2026-08-22, revision commit 5: A1 decided on the owner's research memo;
+  CycloneDX attested beside SPDX; comparison key gains type and checksum.
+  Open for the owner: A2, A3.
