@@ -12,6 +12,14 @@ Ginkgo/kind, Trivy, OpenVEX), then left operating so maintainer history accumula
 the operating period (2026-07-21 → 2026-08-13) is what grew Req 6.7–6.34 and the tasks-8 series.
 Repository and registry images remained private until the public release on 2026-08-13 (MIT).
 
+A production-readiness review on 2026-08-21
+(`reviews/2026-08-21-production-readiness-critique.md`) dispositioned thirteen findings under
+one promise, a transparency catalogue: every published digest is signed by a pinned identity,
+every known HIGH or CRITICAL finding against a published digest carries a published
+machine-readable status, and time-to-decision and time-to-fix are measured and published rather
+than promised. Its amendments land in dependency clusters A to D. Cluster A (findings F3, F9,
+F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26 Req 6.35 to 6.37 and Req 7.7 to 7.10, and amended Req 2.1 and 2.2.
+
 ## Requirements
 
 ### Requirement 1: Image Definition Catalogue
@@ -28,19 +36,42 @@ Repository and registry images remained private until the public release on 2026
 6. IF a definition references a floating tag THEN THE CI Pipeline SHALL fail validation with a message naming that reference.
 7. WHERE Docker's dhi.io/build frontend produces working builds outside Docker infrastructure THE Catalogue SHALL author definitions in native DHI syntax.
 8. IF a DHI frontend spike does not produce a working build within a three-hour timebox THEN THE Catalogue SHALL adopt DHI-style YAML definitions rendered to multi-stage Dockerfiles by thin glue tooling.
+9. THE Catalogue SHALL record in CONVENTIONS.md that versions of packages installed from package repositories are not pinned in definitions and that each platform manifest's resolved package set is recorded in the SPDX and CycloneDX SBOMs attested to that manifest.
 
-### Requirement 2: Image Build and Private Release
+### Requirement 2: Image Build and Release
 
 **Objective:** As a catalogue maintainer, I want merged definitions built and released automatically with supply-chain attestations, so that every published image is verifiable.
 
+**Terms used below.** A *catalogue tag* is a tag derived from a definition under criterion 2.3; the `sha256-<digest>.sig` and `sha256-<digest>.att` tags that cosign stores beside an image are not catalogue tags. A *full release tag* is the catalogue tag carrying the complete upstream version (the third of a definition's three tags, for example `13.1.3-alpine3.23`). A *platform manifest* is a manifest that an image index lists with a platform other than `unknown/unknown` and without a `vnd.docker.reference.type` annotation; BuildKit's attestation manifests are therefore not platform manifests. An *uncovered finding* is a HIGH or CRITICAL finding covered neither by a VEX statement recording status not_affected or fixed nor by an unexpired accepted-risk exception; it is what criterion 6.1 fails on.
+
 #### Acceptance Criteria
 
-1. WHEN a definition change merges to main THE CI Pipeline SHALL build affected images for linux/amd64.
-2. WHEN an image build succeeds THE CI Pipeline SHALL push resulting images to ghcr.io/mm-weber/dhc with a cosign keyless signature, an SPDX SBOM, and BuildKit provenance attached.
+1. WHEN a definition change merges to main THE CI Pipeline SHALL build affected images for every platform their definitions declare.
+2. WHEN an image build succeeds THE CI Pipeline SHALL push its image to ghcr.io/mm-weber/dhc with BuildKit provenance attached and SHALL sign and attest it under criterion 2.9.
 3. THE CI Pipeline SHALL derive image tags from upstream semantic versions following DHI naming convention (semver, base OS, and variant segments).
 4. WHILE public release remains disabled THE Repository SHALL keep source and registry images private.
 5. IF an image build fails THEN THE CI Pipeline SHALL publish no artifacts from that run and report each failing step in pull request checks.
 6. WHILE an image for a platform remains published THE Catalogue SHALL scan that platform for HIGH and CRITICAL vulnerabilities.
+7. WHEN THE CI Pipeline builds an image on main for release, from a merged definition change, a declared schedule or a manual dispatch, THE CI Pipeline SHALL push that image to ghcr.io/mm-weber/dhc by digest only and SHALL apply no tag to it before that digest's release-time scan completes.
+8. WHEN an image has been pushed by digest THE CI Pipeline SHALL scan that pushed digest for HIGH and CRITICAL vulnerabilities, once per platform manifest it contains, applying every compiled VEX document and every unexpired accepted-risk exception that THE Scan Gate applies to pull requests.
+9. WHEN a pushed digest's release-time scan completes with a report for every platform manifest and criterion 2.13 does not withhold that digest THE CI Pipeline SHALL sign that digest and every platform manifest it contains with a cosign keyless signature, attest an SPDX SBOM, a CycloneDX SBOM and that manifest's release-time scan report to each platform manifest, attest one compiled OpenVEX document carrying every applicable statement or none to that digest and to each platform manifest, and SHALL apply its definition-derived tags only after those signatures and attestations exist.
+10. WHILE a digest is referenced by a catalogue tag and carries a cosign keyless signature, an SPDX SBOM attestation, an OpenVEX attestation and BuildKit provenance THE Catalogue SHALL treat that digest as published.
+11. IF no catalogue tag references a digest THEN THE Catalogue SHALL treat that digest as frozen: not published, not rescanned, and not re-attested.
+12. IF a declared fail-closed release setting is disabled AND a release-time scan reports an uncovered finding THEN THE VEX Compiler SHALL add to that digest's compiled document an OpenVEX statement recording status under_investigation for that finding, carrying that scan report's timestamp and derived from that report as criterion 2.9 attests it.
+13. WHERE a declared fail-closed release setting is enabled THE CI Pipeline SHALL sign nothing, attest nothing and apply no tag for a digest whose release-time scan reports an uncovered finding, and SHALL report that finding in that run.
+14. THE CI Pipeline SHALL rebuild every definition on a declared schedule at least once per day.
+15. WHERE a declared publish policy is set to on-change THE CI Pipeline SHALL discard a scheduled rebuild whose canonicalised package set, taken as a sorted set of package type, name, version and package checksum per platform manifest, equals that recorded in the CycloneDX SBOMs attested to a published digest carrying its full release tag, pushing nothing, signing nothing and attesting nothing from it.
+16. WHEN a scheduled rebuild produces an image whose resolved package set differs from that of a published digest carrying its full release tag, or for which no published digest carries that tag, THE CI Pipeline SHALL publish that image through criteria 2.7 to 2.9 and SHALL report in its job summary its package-set difference against any published digest carrying that tag.
+17. WHERE a declared publish policy is set to always THE CI Pipeline SHALL publish every scheduled rebuild through criteria 2.7 to 2.9 regardless of package-set equality.
+18. WHEN THE Scan Pipeline rescans a digest that a catalogue tag references THE Scan Pipeline SHALL scan every platform manifest of that digest, or, for a single image manifest, that digest itself.
+19. IF a built index contains a platform manifest that its release-time scan did not scan THEN THE CI Pipeline SHALL apply no tag to that index.
+20. THE Catalogue SHALL count toward criterion 2.10 only a signature and only attestations whose certificate identities criterion 2.23 admits for that signature or for that attestation type.
+21. WHILE public release is enabled THE Scan Pipeline SHALL verify at least once per day that every catalogue repository under ghcr.io/mm-weber/dhc returns a pull token to an unauthenticated request and serves every catalogue tag's manifest to an unauthenticated request, and SHALL report every repository or tag that does not as a failure of that run.
+22. THE Scan Pipeline SHALL enumerate at least once per day every catalogue tag in every catalogue repository together with each digest it references, and SHALL apply criteria 2.18, 2.21 and 2.24 to that enumeration.
+23. THE Repository SHALL publish under policies/ a verification policy that admits an image from ghcr.io/mm-weber/dhc solely on a cosign keyless signature whose certificate issuer is https://token.actions.githubusercontent.com and whose certificate identity is exactly this repository's build workflow at refs/heads/main, together with an SPDX SBOM attestation from that same identity and an OpenVEX attestation from either that identity or this repository's rescan workflow at refs/heads/main.
+24. WHEN a scheduled rescan runs THE Scan Pipeline SHALL apply that verification policy to every digest a catalogue tag references and to one unsigned control digest held under a catalogue repository, and SHALL report any tag-referenced digest that policy rejects or a control digest that policy admits as a failure of that run.
+25. THE Repository SHALL state in its consumer verification instructions which certificate issuer and which exact certificate identities its verification policy admits for the signature and for each attestation type, each identity anchored to its workflow file and ref, and SHALL state that BuildKit provenance is attached at build time and is not verified by that policy.
+26. IF a pushed digest's release-time scan produces no report for any platform manifest THEN THE CI Pipeline SHALL sign nothing, attest nothing and apply no tag for that digest, and SHALL report that failing scan in that run.
 
 ### Requirement 3: Upstream Version Tracking
 
@@ -123,6 +154,9 @@ Repository and registry images remained private until the public release on 2026
 32. WHEN a VEX document is compiled THE VEX Compiler SHALL record every statement omitted from that document and a digest that compilation used.
 33. WHEN a scheduled rescan applies VEX statements THE Scan Pipeline SHALL report every statement that compilation omitted.
 34. WHEN a VEX document is attested to an image THE CI Pipeline SHALL attest a document compiled for that image's digest.
+35. THE Scan Gate SHALL NOT count a VEX statement recording status under_investigation as coverage of a finding.
+36. WHEN a VEX document is compiled for an image index THE VEX Compiler SHALL produce product identifiers covering that index's digest and every scanned platform manifest digest.
+37. WHEN a VEX document is compiled THE VEX Compiler SHALL derive it from source statements under triage/vex/, exceptions under triage/accepted-risk/, scan reports attested to that document's digest, and any OpenVEX document previously attested to that digest, and from no other input.
 
 ### Requirement 7: Conventions and Review Enforcement
 
@@ -136,6 +170,10 @@ Repository and registry images remained private until the public release on 2026
 4. IF a pull request violates a codified convention THEN THE CI Pipeline SHALL fail with a message identifying that convention.
 5. WHEN a workflow installs a third-party executable THE CI Pipeline SHALL pin that executable to an exact version and SHALL verify its download against a checksum recorded in this repository.
 6. IF a pinned third-party executable has a newer released version THEN THE Upstream Tracking SHALL open a pull request updating that pin.
+7. THE Repository SHALL declare in one committed catalogue policy file every release setting that criteria 2.13, 2.14 and 2.17 name, every platform it admits for publishing, and every verification input that criterion 2.23 names.
+8. THE CI Pipeline SHALL render that verification policy under policies/ and those consumer verification instructions from that catalogue policy file's verification section.
+9. IF a rendered verification artifact differs from its committed copy THEN THE CI Pipeline SHALL fail validation naming that artifact.
+10. IF a workflow's schedule trigger or a job's permissions differ from what that catalogue policy file declares THEN THE CI Pipeline SHALL fail validation naming that value.
 
 ### Requirement 8: Operating Environment Constraints
 

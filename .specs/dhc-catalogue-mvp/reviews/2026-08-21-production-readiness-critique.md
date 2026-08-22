@@ -657,7 +657,8 @@ rescan-triggered rebuilds only (ships nothing below HIGH, depends on the
 scanner database noticing the fix, and turns the rescan from reporter into
 actor) and the hybrid (two mechanisms for hours of gain). Fork switches,
 both declared values: the cron expression, and the publish policy
-`if-changed` versus `always`.
+`if-changed` versus `always` (spelled `on-change` in the criteria, since the
+EARS validator reserves the word "if").
 
 **F5 (i), the third verb (decided 2026-08-21): compiler-generated
 `affected` statements from the exception file.** `compile-vex.sh` reads
@@ -716,6 +717,11 @@ here. Rejected: hand-recorded `severity:`/`kev:` per exception (facts the
 scanner already knows, drift, and the gate must cross-check anyway) and a
 flat published 90 (indefensible for a KEV-listed CRITICAL).
 
+*Amended 2026-08-22 (PR #97 revision, finding A3):* the file is the `triage`
+section of `catalogue-policy.yaml` at the repository root, which also holds
+the release switches and the verification inputs (Req 7.7). The decision,
+every number a variable in one committed place, is unchanged; only the path.
+
 **F4 (ii), the clocks (decided 2026-08-21): measured by the rescan tool,
 published to a pinned status issue plus a workflow artifact; GitHub Pages
 later as pure presentation.** Measurement: *first seen* is the earliest of
@@ -764,6 +770,15 @@ stays out of scope. (c) Forced by A: `hardened-app` and
 `cert-manager-cainjector` are made public by hand now, and the rescan gains
 the daily invariant "every catalogue repository answers an anonymous pull".
 
+*Amended 2026-08-22 (PR #97 revision, choice 2):* **(a) is withdrawn.** The
+independent review of the cluster A amendment measured that cosign signed only
+the index digests (`.sig`/`.att` on every platform manifest return 404), so a
+re-pointed tag would have served an unsigned, unattested manifest. The legacy
+tags are scanned in place instead: the rescan enumerates every catalogue tag
+daily and scans every platform manifest of every tag-referenced digest
+(Req 2.18, 2.22), which satisfies Req 2.6 as written and keeps every existing
+signature valid. The digests, and the "never delete" reasoning, are unchanged.
+
 **F6, verification identity (decided 2026-08-21): anchor the prose and
 ship a tested verification policy, with the engine rendering separable.**
 README and manual move to the exact form: issuer pinned, identity anchored
@@ -781,6 +796,12 @@ to each published digest (must admit) and to one unsigned control image
 signature means: the release workflow on `main` produced this digest; it
 does not assert human review. Rejected: prose only (transcription exercise,
 silently wrong after a workflow rename).
+
+*Amended 2026-08-22 (PR #97 revision, finding 1.11):* the identity list is
+split by role. `build.yml` at `refs/heads/main` is the sole signer and sole
+SBOM attestor; `rescan.yml` at `refs/heads/main` may attest OpenVEX only, from
+cluster B on, and never signs. Roles are attestor lists a fork extends by
+adding entries; no role is widened.
 
 **F1, trust root and review (decided 2026-08-21): ruleset as code, honest
 bypass, gates required.** The intended ruleset is committed as JSON under

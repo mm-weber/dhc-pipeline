@@ -54,7 +54,7 @@ graph TB
     subgraph Automation["GitHub Actions"]
         REN[Renovate cron ≤6h]
         CI[PR gates: schema, build, ct, kind e2e, trivy+VEX, kyverno]
-        REL[main: build, sign, SBOM, provenance, push]
+        REL[main: build, push by digest, scan, sign, SBOM + VEX attest, tag]
         SCAN[daily rescan → issues]
     end
 
@@ -123,7 +123,158 @@ graph TB
 5. **VEX-gated scanning (Req 6)**
    - **Decision**: Trivy PR gate fails only on findings not covered by our OpenVEX; triage outcomes are commits (VEX statement or bump PR), giving auditable history.
 
+6. **Publish with status: scan what you sign (Req 2.7 to 2.25, 6.35, 6.36; review F3, F9, F6, 2026-08-21)**
+   - **Context**: Every scan step in `build.yml` was `pull_request`-gated while the release arm
+     rebuilt, pushed, signed and attested without any scan (review A finding 1.3, left open
+     since 2026-08-04). Package versions float by design, so the released bytes could differ
+     from the gated ones, and nothing rebuilt on a schedule, so a fixed base package reached
+     consumers only after an unrelated commit. Ten legacy tags still resolved to indexes whose
+     arm64 manifest nobody ever scanned, two of six repositories were private while the README
+     called every image public, and the consumer verification snippet matched any identity
+     containing `github.com/mm-weber/dhc-pipeline` as a substring.
+   - **Options**: (A) publish with status: push by digest, scan the pushed digest, record
+     anything uncovered as `under_investigation` in the attested VEX, then tag; (B) fail
+     closed on `main` until a human decides; (C) scan after publish as information only.
+     For packages: declare the float, or pin apk versions (needs a spike plus a bespoke
+     Renovate datasource), or lock-and-compare. For cadence: daily rebuild publishing only
+     when content changed, or rescan-triggered rebuilds, or both.
+   - **Decision**: **A**, under the review's framing of a transparency catalogue (knowledge,
+     not speed). The release sequence becomes push-by-digest (no tag), scan that digest per
+     platform with the gate's own VEX and exception inputs, compile VEX for exactly that
+     digest (and for every platform manifest digest, Req 6.36) as exactly one document per
+     digest, empty when nothing applies (ADR 0003, measured 2026-08-22 against vexctl,
+     Trivy, cosign v2 and v3, and Kyverno; cosign stays pinned on the v2 line because v3's
+     bundle layout is invisible to Kyverno 1.18 and Trivy 0.72), sign the index and every
+     platform manifest and attest to each (`--recursive`; one SBOM per platform manifest,
+     the single OpenVEX document on index and platform manifests, so a consumer pinning
+     either form verifies; revision finding 1.8), and only
+     then apply tags (`docker buildx imagetools create -t …`). "Published" is thereby defined
+     (Req 2.10): tagged, signed, attested; an untagged digest is frozen (Req 2.11). A finding
+     uncovered at release time becomes an `under_investigation` statement with a timestamp
+     (Req 2.12); the issue link arrives with the next rescan and cluster B's re-attestation,
+     so the signing job keeps `contents: read`, `packages: write`, `id-token: write` and gains
+     no `issues: write` (a least-privilege refinement of the review's wording, which had the
+     statement carry the issue reference from the start). apk packages float by declaration
+     (Req 1.9): the DHI model ships base fixes by rebuilding, no versioned apk syntax exists in
+     any input, and the SBOM already records the resolved set per digest. A daily scheduled
+     rebuild publishes only when the resolved package set changed (Req 2.14 to 2.16), which
+     is what stops provenance timestamps alone from minting digests and opening chart-pin
+     PRs. arm64 returns when, and only when, both the release-time scan and the rescan scan
+     every platform manifest (Req 2.18 to 2.20; task 8.3 is absorbed by task 9.3). The ten
+     legacy tags are not re-pointed (cosign signed the index only, so a re-pointed tag
+     would serve an unsigned manifest; independent review 1.2, measured): the rescan
+     enumerates every catalogue tag daily and scans every platform manifest of every
+     tag-referenced digest instead (Req 2.18, 2.22), satisfying Req 2.6 as written with
+     every existing signature intact; critique F9 (a) amended 2026-08-22.
+     Visibility becomes a daily invariant (Req 2.21). Verification inputs live in one
+     declared place as **roles**: the *releaser* (`build.yml` at `refs/heads/main`) is the
+     sole signer and sole SBOM attestor and attests the first OpenVEX document; the
+     *re-attester* (`rescan.yml` at `refs/heads/main`, active from cluster B) may attest
+     OpenVEX only, never sign, never tag. Each role is one attestor list in the Kyverno
+     `verifyImages` rendering (signature attestors, then per-predicate-type attestors),
+     proven daily over every tag-referenced digest and one unsigned control (Req 2.20,
+     2.23 to 2.25). The identity in a certificate therefore tells a consumer which role
+     produced what they are reading. A fork adds roles as lines (a dedicated signing
+     workflow behind a protected environment, a revocation job with `packages: write` and
+     no `id-token`), never by widening an existing role (revision finding 1.11).
+   - **Trade-offs**: B was rejected as speed-shaped: one maintainer accumulates blocked
+     releases while an unrelated advisory lands between PR scan and merge. Pinning apk would
+     reinvent a datasource and turn every base advisory into a bump PR. Deleting the legacy
+     indexes would break every digest pin for a hazard that is "unscanned", not "known bad".
+     Two declared switches make the fork's choice a value, not a redesign: the fail-closed
+     release setting (Req 2.13) and the publish policy `on-change` versus `always`
+     (Req 2.17); the cron expression is a third.
+   - **Reproducibility, weighed 2026-08-22 (revision finding A1)**: a bit-identical rebuild
+     would make "nothing changed" a digest comparison and turn provenance into a recomputable
+     fact, and BuildKit has the knobs (`SOURCE_DATE_EPOCH`, `rewrite-timestamp`, provenance
+     `reproducible`). It is not the gate, for the reasons
+     `data/reproducible-digests-vs-content-diff-2026-08-22.md` documents: no catalogue vendor
+     gates publishing on digest equality (Chainguard reproduces with apko and still rebuilds
+     daily, absorbing churn with digestabot; DHI, the same frontend architecture as ours,
+     claims no digest stability at all; Red Hat reproduces in Konflux and uses it to verify by
+     rebuild-and-diff), and a black-box frontend over apk is exactly where "reproducible" flags
+     fail in a long tail nobody outside the frontend can fix. The content comparison (Req 2.15)
+     therefore carries four guardrails. It compares a canonicalised sorted set of package type,
+     name, version and checksum per platform manifest, never SBOM bytes (Syft's ordering and
+     CPE output are not stable). The checksum comes from a CycloneDX SBOM attested beside the
+     SPDX one, because Syft's SPDX output records `checksums: null` for apk packages while its
+     CycloneDX output carries the apk pull checksum as a component property (measured
+     2026-08-22 on `hardened-app:0.1.0-alpine3.23`); DHI publishes both formats. The memo's
+     "base-image digest check" is, in this architecture, the definition's pins: frontend,
+     builder and every source are digest- or checksum-pinned, so a change to them releases
+     through the merge path, and what floats is apk alone, which the pull checksum covers,
+     including a package republished under an unchanged version (the CVE-2026-33634 shape).
+     Reproducibility stays a verification asset: whenever the sets are equal the comparator
+     also logs whether the rebuilt index digest equals the published one, a free nightly
+     measurement; a `diffoci` spike on its own branch is the later step, and the condition
+     that would promote digest equality to the primary gate is zero residual diff across at
+     least 95 percent of images over two weeks.
+   - **Scan reports are attested (revision finding A2, 2026-08-22)**: Req 2.12 has the
+     compiler add `under_investigation` statements for whatever the release-time scan left
+     uncovered, and a scan report that lives only in a job log and a 90-day artifact would
+     make the attested document impossible to recompute from its inputs, against the
+     principle that compiled output is a deterministic rendering of source (Req 6.28 to
+     6.32). It would also collide with cluster B's re-attestation, which re-attests when a
+     fresh compile differs from the attested document: a statement whose origin vanished
+     either disappears from the fresh compile or returns with a new timestamp every night.
+     So the release job attests each platform manifest's Trivy report with cosign's standard
+     vulnerability predicate (`https://cosign.sigstore.dev/attestation/vuln/v1`, produced by
+     `trivy convert --format cosign-vuln` from the gate's own JSON report, no second scan),
+     and Req 6.37 names the compiler's inputs exhaustively: source statements, exceptions,
+     the attested scan reports, and any previously attested OpenVEX document. The last input
+     is the carry-forward rule cluster B needs: a re-attestation may replace an
+     `under_investigation` statement with a decided status or keep it with its original
+     timestamp, never drop it and never re-date it. Consumers get the scanner's own result
+     in-band, and the F4 clocks read "first seen" from a signed timestamp rather than an
+     issue date. Rejected: a workflow artifact alone (expires, unverifiable) and committing
+     the statements from the release job (a bot commit to `main`, ruled out under F4 ii).
+   - **Declared values live in one file (revision finding A3, 2026-08-22)**: the amendment
+     says "declared" for the fail-closed setting, the schedule, the publish policy, the
+     admitted platforms and the verification inputs, and a declaration nobody can diff
+     undercuts the transparency promise. `catalogue-policy.yaml` at the repository root holds
+     three sections: `release` (fail-closed, publish policy, cron expression, admitted
+     platforms), `triage` (aperture, ceilings, warning window; cluster B fills it, which
+     moves F4 (i)'s `triage/policy.yaml` here without changing that decision) and
+     `verification` (issuer, roles with their identities, required predicate types).
+     Workflows read the switches at run time with `yq`; the Kyverno policy and the README and
+     manual verification snippets are rendered from the `verification` section by a tested
+     script, the way `compile-vex.sh` renders VEX, so the consumer instructions cannot drift
+     from the policy (Req 7.8, 7.9). Two things GitHub reads only as literal workflow YAML,
+     the `schedule:` cron and per-job `permissions:`, stay in the workflows and `validate`
+     lints them against the file (Req 7.10). Rejected: repository variables (outside git, no
+     pull request, invisible in a fork's diff) and per-workflow `env:` blocks (policy
+     scattered across files, snippets hand-transcribed). A fork's switches are then one
+     file's values.
+   - **Daily invariants are one mechanism (revision finding A5)**: the rescan gains a single
+     `invariants` step that runs every daily assertion the catalogue makes about its own
+     state, each reported by name and any failure failing the run: anonymous pull per
+     repository and tag (Req 2.21) and the verification proof over every tag-referenced
+     digest plus the control digest (Req 2.24) from this cluster; the upstream-checksum
+     re-check from cluster C (review F2, checkpoint 3); ruleset drift, private vulnerability
+     reporting enabled and no tag on a revoked digest from cluster D (F1, F11). One step, one
+     report shape, one place a fork adds an invariant.
+
 ## System Flows
+
+### Release flow (Req 2.7 to 2.17, 2.26; as specified 2026-08-22, implementation task 9)
+
+```
+merge to main, the daily schedule, or a manual dispatch
+  ─► build (per-arch pins verified) ─► SBOM of the local build output
+  ─► scheduled run, publish policy on-change: package set equal to the published
+      digest of the full release tag? stop here: nothing pushed, signed or attested
+  ─► push by digest, no tag
+  ─► compile VEX, pass 1: not_affected / fixed from triage/vex/, stamped with this
+      digest and every platform manifest digest, as one document
+  ─► scan every platform manifest (by its own digest), VEX + exceptions applied
+        no report for any platform manifest ─► sign nothing, tag nothing, red run (2.26)
+  ─► attest each platform manifest's scan report (cosign `vuln` predicate, via `trivy convert`)
+  ─► compile VEX, pass 2: append under_investigation for every uncovered finding (2.12)
+        fail-closed setting on and anything uncovered ─► sign nothing, tag nothing, red run (2.13)
+  ─► cosign sign, recursive · SBOM attest per platform manifest · one OpenVEX attest on
+      index and platform manifests (ADR 0003)
+  ─► apply tags (imagetools create on the index) ─► published (Req 2.10)
+```
 
 ### Upstream bump flow (the operating heart)
 
@@ -134,14 +285,14 @@ sequenceDiagram
     participant PR as Pull Request
     participant CI as CI gates
     participant M as main / release job
-    participant G as GHCR (private)
+    participant G as GHCR
 
     U->>R: new tag matches version policy
     R->>PR: bump pin+checksum (grouped; majors → dashboard)
     PR->>CI: parallel gates: validate / build+trivy+VEX+govulncheck / chart (ct lint, kyverno) / kind e2e
     CI-->>PR: checks green (digest and patch bumps: automerge)
     PR->>M: merge (human review otherwise)
-    M->>G: amd64 build, cosign sign, SBOM, compiled-VEX attest, provenance, push
+    M->>G: build, push by digest, scan per platform, cosign sign, SBOM + one OpenVEX attest, tag (Req 2.7 to 2.9)
     G->>CI: daily rescan → new CVE? issue → VEX or fix-bump PR
 ```
 
@@ -252,7 +403,7 @@ published index, the same finding sits at
 `.../elasticsearch/gpx_..._linux_amd64` on amd64 and at `..._linux_arm64` on
 arm64. The catalogue publishes amd64 only (Req 2.1), so an exact path is correct
 for every scan that runs today and goes silently wrong the moment arm64 returns
-(task 8.3) or a consumer scans an arm64 image themselves. A path matching
+(task 9.3, formerly 8.3) or a consumer scans an arm64 image themselves. A path matching
 nothing is completely silent, per the row above, so a glob is what keeps that
 from becoming a discovery.
 
@@ -445,14 +596,15 @@ release. Getting 6.30's tag set right is what stops that.
 `chart.yml` (ct lint + kyverno over rendered charts), `e2e.yml` (kind matrix),
 `renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).
 
-**Platforms: `linux/amd64` only (Req 2.1, Req 2.6).** The catalogue built and
+**Platforms: `linux/amd64` only as built (Req 2.1, amended 2026-08-22 to require every declared platform, with task 9.3 carrying the sequencing; Req 2.6).** The catalogue built and
 published both arches until 2026-08-04, when measurement showed nothing ever
 scanned the arm64 half. Every scan step in `build.yml` is `pull_request`-gated
 and the PR gate builds amd64 only, while `rescan.yml` passes no `--platform`, so
 Trivy resolves the published index to the runner's own architecture. arm64 was
 therefore built, pushed, signed, SBOM'd and attested with no gate ever reading
 it, which is the concrete case in review finding 1.3. Shipping one platform is
-the cheap correction; scanning two is the larger change, deferred to task 8.3.
+the cheap correction; scanning two is the larger change, deferred to task 8.3
+(absorbed by task 9.3 on 2026-08-22).
 
 Measured on the published `grafana:13-alpine3.23` index, both platforms carry an
 identical HIGH/CRITICAL set (11 each, same CVE, package and version), so nothing
@@ -463,7 +615,22 @@ before the other.
 Definitions keep `platforms: [linux/amd64, linux/arm64]` and their per-arch
 pins, and `verify-arch-pins.sh` keeps verifying both. The definitions do support
 arm64; the release path publishes one platform. Keeping the pins exercised is
-what makes task 8.3 a build-matrix change rather than archaeology.
+what makes task 9.3 (which absorbed 8.3) a build-matrix change rather than archaeology.
+
+**Cluster A (2026-08-21) states the condition for arm64's return as criteria
+rather than a deferral:** Req 2.18 to 2.20 make per-platform scanning in both
+the release-time scan and the rescan the precondition for building every
+declared platform, and Req 2.22 makes the rescan enumerate every catalogue tag
+daily, so the ten pre-2026-08-04 tags that still resolve to never-scanned arm64
+manifests (measured in the review, F9) are scanned in place with their
+signatures intact. The re-point first specified here was withdrawn on
+2026-08-22: cosign signed only the index digests, measured in the independent
+review (finding 1.2), so a re-pointed tag would have served an unsigned,
+unattested manifest.
+Task 8.3 is absorbed by task 9.3. The release arm itself changes shape under
+Req 2.7 to 2.9 (push by digest, scan, sign, attest, then tag; Key Design
+Decision 6), and `build.yml` gains a `schedule:` trigger for the daily rebuild
+(Req 2.14) with publish-on-change (Req 2.15 to 2.17).
 
 Both paths use `type=gha` build cache (per-image scope) so repeat builds of a
 large upstream (cert-manager) reuse the Go module + compile layers.
@@ -511,7 +678,7 @@ name: Grafana 13.1.x
 image: ghcr.io/mm-weber/dhc/grafana                # publish repository (VEX product identity)
 variant: runtime
 tags: [13-alpine3.23, 13.1-alpine3.23, 13.1.3-alpine3.23]
-platforms: [linux/amd64, linux/arm64]              # release path currently ships amd64 (task 8.3)
+platforms: [linux/amd64, linux/arm64]              # release path currently ships amd64 (task 9.3)
 vars:
   GRAFANA_SHA256: '#{ target.arch == "amd64" ? "…" : "…" }'   # per-arch pin, Renovate-managed
   VERSION: 13.1.3
@@ -538,6 +705,13 @@ ports: [3000/tcp]
 | kind flake / timeout | no automatic retry (matrix `fail-fast: false` isolates components; rerun is manual); diagnostic logs uploaded as artifacts | 5.7 |
 | Trivy DB outage | PR gate hard-fails (retryable); daily rescan soft-fails with issue | 6 |
 | New CVE on published image | issue with severity/EPSS/KEV → VEX statement or fix-bump PR | 6.3–6.5 |
+| Release-time scan yields no report for a platform manifest | release arm signs nothing, attests nothing, tags nothing; red run naming the scan | 2.26 |
+| Uncovered finding at release time | default: stated as `under_investigation` in the attested VEX, release completes; fail-closed setting on: nothing signed, attested or tagged, red run naming the finding | 2.12, 2.13 |
+| Scheduled rebuild with an unchanged package set | discarded before any push under the `on-change` publish policy; digest equality logged as the reproducibility measurement | 2.15 |
+| Platform manifest left unscanned at release | no tag applied to that index | 2.19 |
+| Repository or catalogue tag refuses an anonymous pull | daily invariants step fails the rescan run naming it | 2.21 |
+| Tag-referenced digest rejected by the verification policy, or the control digest admitted | daily invariants step fails the rescan run | 2.24 |
+| Rendered verification artifact, workflow cron or job permissions drift from `catalogue-policy.yaml` | validate.yml fails naming the artifact or value | 7.9, 7.10 |
 
 ## Testing Strategy
 
@@ -555,10 +729,22 @@ ports: [3000/tcp]
 - Non-root 65532 everywhere; restricted PSS enforced twice (chart overrides + kyverno gate)
 - Everything digest/checksum-pinned; floating tags fail CI (Req 1.6)
 - cosign keyless via GitHub OIDC — no long-lived signing keys; PAT stays in `.keys/` (gitignored)
+- What a signature means (review F1, F6): the `build.yml` release job on `refs/heads/main`
+  built, scanned and signed this digest; an OpenVEX attestation from `rescan.yml` on
+  `refs/heads/main` restates its triage status later and signs nothing. Neither asserts that a
+  second human reviewed the change. Consumers verify exactly those identities (Req 2.23 to 2.25, as
+  specified; the README's substring pattern, which admits any identity containing the
+  repository path, stays until task 9.6 lands)
+- The published set is defined, not implied (Req 2.10, 2.11): tagged, signed, attested. A digest
+  no tag references is frozen. As specified, every published digest is scanned before it is
+  tagged (Req 2.7 to 2.9, task 9.1), and every catalogue repository and tag is checked daily
+  to answer an anonymous pull (Req 2.21, task 9.4; two of six repositories were private on
+  2026-08-21 while the README said otherwise, fixed by hand the same day)
 - Private repo + private GHCR through the build phase (Req 2.4 — its WHILE clause ended at the
-  2026-08-13 go-live); repo public under MIT and the GHCR packages anonymously pullable since
-  then (measured 2026-08-19: unauthenticated manifest fetch returns 200). No secrets in
-  definitions
+  2026-08-13 go-live); repo public under MIT since then, and the GHCR packages anonymously
+  pullable: one package measured on 2026-08-19 (unauthenticated manifest fetch returned 200),
+  all six since 2026-08-21 (the production-readiness review found two still private). No
+  secrets in definitions
 
 ## Delivery Plan (3 workdays, cut line explicit — historical)
 

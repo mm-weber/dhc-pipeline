@@ -19,7 +19,17 @@ anything is implemented (amend the spec first, then /spec-implement).
       clusters C and D)
 - [ ] 3. Spec amendments per accepted point: EARS criteria in
       `requirements.md`, rationale in `design.md`, task entries in `tasks.md`,
-      one PR per decision
+      one PR per cluster (the review's section 6 overrode the one-PR-per-decision
+      rule for spec amendments; implementation stays one PR per task)
+      - [x] A. release path and published set (F3, F9, F6): Req 1.9,
+            2.7–2.26, 6.35–6.37, 7.7–7.10, Req 2.1/2.2 amended; design decision 6
+            + release flow; tasks 9.1–9.8. Drafted, independently reviewed
+            (17 findings + 7 angle points, all dispositioned, revision ledger
+            in reviews/), revised in eight commits; PR #97 awaiting the
+            owner's review; ADR 0003 (PR #98) is its spike
+      - [ ] B. statuses and clocks (F5, F4, issue closing)
+      - [ ] C. upstream trust (F2, F10, F8, chart tracking, `/main` lint)
+      - [ ] D. catalogue posture (F1, F11, F12, F7, register; new Req 9)
 - [ ] 4. Only then: implementation PRs via /spec-implement, TDD where code
 
 ## Review
