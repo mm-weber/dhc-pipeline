@@ -18,7 +18,7 @@ one promise, a transparency catalogue: every published digest is signed by a pin
 every known HIGH or CRITICAL finding against a published digest carries a published
 machine-readable status, and time-to-decision and time-to-fix are measured and published rather
 than promised. Its amendments land in dependency clusters A to D. Cluster A (findings F3, F9,
-F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26 and Req 6.35 to 6.36, and amended Req 2.1 and 2.2.
+F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26 and Req 6.35 to 6.37, and amended Req 2.1 and 2.2.
 
 ## Requirements
 
@@ -54,10 +54,10 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26 and R
 6. WHILE an image for a platform remains published THE Catalogue SHALL scan that platform for HIGH and CRITICAL vulnerabilities.
 7. WHEN THE CI Pipeline builds an image on main for release, from a merged definition change, a declared schedule or a manual dispatch, THE CI Pipeline SHALL push that image to ghcr.io/mm-weber/dhc by digest only and SHALL apply no tag to it before that digest's release-time scan completes.
 8. WHEN an image has been pushed by digest THE CI Pipeline SHALL scan that pushed digest for HIGH and CRITICAL vulnerabilities, once per platform manifest it contains, applying every compiled VEX document and every unexpired accepted-risk exception that THE Scan Gate applies to pull requests.
-9. WHEN a pushed digest's release-time scan completes with a report for every platform manifest and criterion 2.13 does not withhold that digest THE CI Pipeline SHALL sign that digest and every platform manifest it contains with a cosign keyless signature, attest an SPDX SBOM and a CycloneDX SBOM of each platform manifest to that manifest, attest one compiled OpenVEX document carrying every applicable statement or none to that digest and to each platform manifest, and SHALL apply its definition-derived tags only after those signatures and attestations exist.
+9. WHEN a pushed digest's release-time scan completes with a report for every platform manifest and criterion 2.13 does not withhold that digest THE CI Pipeline SHALL sign that digest and every platform manifest it contains with a cosign keyless signature, attest an SPDX SBOM, a CycloneDX SBOM and that manifest's release-time scan report to each platform manifest, attest one compiled OpenVEX document carrying every applicable statement or none to that digest and to each platform manifest, and SHALL apply its definition-derived tags only after those signatures and attestations exist.
 10. WHILE a digest is referenced by a catalogue tag and carries a cosign keyless signature, an SPDX SBOM attestation, an OpenVEX attestation and BuildKit provenance THE Catalogue SHALL treat that digest as published.
 11. IF no catalogue tag references a digest THEN THE Catalogue SHALL treat that digest as frozen: not published, not rescanned, and not re-attested.
-12. IF a declared fail-closed release setting is disabled AND a release-time scan reports an uncovered finding THEN THE VEX Compiler SHALL add to that digest's compiled document an OpenVEX statement recording status under_investigation for that finding with a timestamp.
+12. IF a declared fail-closed release setting is disabled AND a release-time scan reports an uncovered finding THEN THE VEX Compiler SHALL add to that digest's compiled document an OpenVEX statement recording status under_investigation for that finding, carrying that scan report's timestamp and derived from that report as criterion 2.9 attests it.
 13. WHERE a declared fail-closed release setting is enabled THE CI Pipeline SHALL sign nothing, attest nothing and apply no tag for a digest whose release-time scan reports an uncovered finding, and SHALL report that finding in that run.
 14. THE CI Pipeline SHALL rebuild every definition on a declared schedule at least once per day.
 15. WHERE a declared publish policy is set to on-change THE CI Pipeline SHALL discard a scheduled rebuild whose canonicalised package set, taken as a sorted set of package type, name, version and package checksum per platform manifest, equals that recorded in the CycloneDX SBOMs attested to a published digest carrying its full release tag, pushing nothing, signing nothing and attesting nothing from it.
@@ -156,6 +156,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26 and R
 34. WHEN a VEX document is attested to an image THE CI Pipeline SHALL attest a document compiled for that image's digest.
 35. THE Scan Gate SHALL NOT count a VEX statement recording status under_investigation as coverage of a finding.
 36. WHEN a VEX document is compiled for an image index THE VEX Compiler SHALL produce product identifiers covering that index's digest and every scanned platform manifest digest.
+37. WHEN a VEX document is compiled THE VEX Compiler SHALL derive it from source statements under triage/vex/, exceptions under triage/accepted-risk/, scan reports attested to that document's digest, and any OpenVEX document previously attested to that digest, and from no other input.
 
 ### Requirement 7: Conventions and Review Enforcement
 

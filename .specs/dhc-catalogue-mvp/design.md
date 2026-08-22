@@ -209,6 +209,25 @@ graph TB
      measurement; a `diffoci` spike on its own branch is the later step, and the condition
      that would promote digest equality to the primary gate is zero residual diff across at
      least 95 percent of images over two weeks.
+   - **Scan reports are attested (revision finding A2, 2026-08-22)**: Req 2.12 has the
+     compiler add `under_investigation` statements for whatever the release-time scan left
+     uncovered, and a scan report that lives only in a job log and a 90-day artifact would
+     make the attested document impossible to recompute from its inputs, against the
+     principle that compiled output is a deterministic rendering of source (Req 6.28 to
+     6.32). It would also collide with cluster B's re-attestation, which re-attests when a
+     fresh compile differs from the attested document: a statement whose origin vanished
+     either disappears from the fresh compile or returns with a new timestamp every night.
+     So the release job attests each platform manifest's Trivy report with cosign's standard
+     vulnerability predicate (`https://cosign.sigstore.dev/attestation/vuln/v1`, produced by
+     `trivy convert --format cosign-vuln` from the gate's own JSON report, no second scan),
+     and Req 6.37 names the compiler's inputs exhaustively: source statements, exceptions,
+     the attested scan reports, and any previously attested OpenVEX document. The last input
+     is the carry-forward rule cluster B needs: a re-attestation may replace an
+     `under_investigation` statement with a decided status or keep it with its original
+     timestamp, never drop it and never re-date it. Consumers get the scanner's own result
+     in-band, and the F4 clocks read "first seen" from a signed timestamp rather than an
+     issue date. Rejected: a workflow artifact alone (expires, unverifiable) and committing
+     the statements from the release job (a bot commit to `main`, ruled out under F4 ii).
 
 ## System Flows
 
@@ -224,6 +243,7 @@ merge to main, the daily schedule, or a manual dispatch
       digest and every platform manifest digest, as one document
   ─► scan every platform manifest (by its own digest), VEX + exceptions applied
         no report for any platform manifest ─► sign nothing, tag nothing, red run (2.26)
+  ─► attest each platform manifest's scan report (cosign `vuln` predicate, via `trivy convert`)
   ─► compile VEX, pass 2: append under_investigation for every uncovered finding (2.12)
         fail-closed setting on and anything uncovered ─► sign nothing, tag nothing, red run (2.13)
   ─► cosign sign, recursive · SBOM attest per platform manifest · one OpenVEX attest on

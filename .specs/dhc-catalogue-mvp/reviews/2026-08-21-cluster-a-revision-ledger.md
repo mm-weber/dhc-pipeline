@@ -40,7 +40,7 @@ it (ADR 0001, ADR 0003).
 | 1.16 | Two-actor criterion 2.12 | folded into 1.5 | |
 | 1.17 | Task inaccuracies: buildx output needs `name=`, Kyverno predicate-type URIs, `kyverno apply --registry`, 8.3 open beside 9.3, todo wording | **decided 2026-08-22**: all five corrected | tasks 9.1, 9.6, 8.3, coverage table; tasks/todo.md |
 | A1 | Reproducible builds never weighed against publish-if-changed | **decided 2026-08-22: (a)** content comparison stays the gate with four guardrails (canonicalised sorted set with checksums, CycloneDX attested beside SPDX as the checksum source, pinned inputs as the "base digest" check, reproducibility measured nightly as a side effect with the diffoci spike and its flip condition recorded); research input stored in `data/` | Req 1.9, 2.9, 2.15; Decision 6; tasks 9.1, 9.2; `data/reproducible-digests-vs-content-diff-2026-08-22.md` |
-| A2 | `under_investigation` statements derive from an unpersisted scan report | open; proposed: persist the release-time report (artifact or attestation) so the compiled document is reproducible | |
+| A2 | `under_investigation` statements derive from an unpersisted scan report | **decided 2026-08-22: (a)** each platform manifest's scan report is attested with cosign's `vuln` predicate (`trivy convert --format cosign-vuln`); Req 6.37 names the compiler's inputs exhaustively, including the previously attested document (carry-forward rule for cluster B) | Req 2.9, 2.12, 6.37; Decision 6; flow; tasks 9.1, 9.6 |
 | A3 | "Declared" switches have no declared location | open; candidate home: cluster B's `triage/policy.yaml` | |
 | A4 | Scan each platform manifest by its own digest rather than `--platform` plus `--image-src remote` | **decided 2026-08-22**: scan by manifest digest | task 9.3 wording |
 | A5 | Req 2.21 belongs to one daily-invariants mechanism | open; cluster D shape | |
@@ -81,3 +81,5 @@ it (ADR 0001, ADR 0003).
 - 2026-08-22, revision commit 5: A1 decided on the owner's research memo;
   CycloneDX attested beside SPDX; comparison key gains type and checksum.
   Open for the owner: A2, A3.
+- 2026-08-22, revision commit 6: A2 decided as attested scan reports plus
+  the carry-forward rule (Req 6.37). Open for the owner: A3.
