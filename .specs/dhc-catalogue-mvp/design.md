@@ -54,7 +54,7 @@ graph TB
     subgraph Automation["GitHub Actions"]
         REN[Renovate cron ≤6h]
         CI[PR gates: schema, build, ct, kind e2e, trivy+VEX, kyverno]
-        REL[main: build, sign, SBOM, provenance, push]
+        REL[main: build, push by digest, scan, sign, SBOM + VEX attest, tag]
         SCAN[daily rescan → issues]
     end
 
@@ -172,24 +172,27 @@ graph TB
      reinvent a datasource and turn every base advisory into a bump PR. Deleting the legacy
      indexes would break every digest pin for a hazard that is "unscanned", not "known bad".
      Two declared switches make the fork's choice a value, not a redesign: the fail-closed
-     release setting (Req 2.13) and the publish policy `if-changed` versus `always`
+     release setting (Req 2.13) and the publish policy `on-change` versus `always`
      (Req 2.17); the cron expression is a third.
 
 ## System Flows
 
-### Release flow (Req 2.7 to 2.17; as specified 2026-08-21, implementation task 9)
+### Release flow (Req 2.7 to 2.17, 2.26; as specified 2026-08-22, implementation task 9)
 
 ```
-merge to main, or the daily schedule
-  ─► build (per-arch pins verified) ─► push by digest, no tag
-  ─► scan the pushed digest, per platform manifest, VEX + exceptions applied
-  ─► compile VEX for this digest (+ platform digests):
-        not_affected / fixed from triage/vex/, under_investigation for anything uncovered
-  ─► cosign sign · Syft SBOM attest · OpenVEX attest
-  ─► scheduled run only: package set equal to the published digest of the same tag? discard
-  ─► apply tags (imagetools create) ─► published (Req 2.10)
-
-fail-closed setting on: uncovered finding ─► no attestation, no tag, red run
+merge to main, the daily schedule, or a manual dispatch
+  ─► build (per-arch pins verified) ─► SBOM of the local build output
+  ─► scheduled run, publish policy on-change: package set equal to the published
+      digest of the full release tag? stop here: nothing pushed, signed or attested
+  ─► push by digest, no tag
+  ─► compile VEX, pass 1: not_affected / fixed from triage/vex/, stamped with this
+      digest and every platform manifest digest, as one document
+  ─► scan every platform manifest (by its own digest), VEX + exceptions applied
+        no report for any platform manifest ─► sign nothing, tag nothing, red run (2.26)
+  ─► compile VEX, pass 2: append under_investigation for every uncovered finding (2.12)
+        fail-closed setting on and anything uncovered ─► sign nothing, tag nothing, red run (2.13)
+  ─► cosign sign · SBOM attest · one OpenVEX attest (ADR 0003)
+  ─► apply tags (imagetools create on the index) ─► published (Req 2.10)
 ```
 
 ### Upstream bump flow (the operating heart)
@@ -201,14 +204,14 @@ sequenceDiagram
     participant PR as Pull Request
     participant CI as CI gates
     participant M as main / release job
-    participant G as GHCR (private)
+    participant G as GHCR
 
     U->>R: new tag matches version policy
     R->>PR: bump pin+checksum (grouped; majors → dashboard)
     PR->>CI: parallel gates: validate / build+trivy+VEX+govulncheck / chart (ct lint, kyverno) / kind e2e
     CI-->>PR: checks green (digest and patch bumps: automerge)
     PR->>M: merge (human review otherwise)
-    M->>G: amd64 build, cosign sign, SBOM, compiled-VEX attest, provenance, push
+    M->>G: build, push by digest, scan per platform, cosign sign, SBOM + one OpenVEX attest, tag (Req 2.7 to 2.9)
     G->>CI: daily rescan → new CVE? issue → VEX or fix-bump PR
 ```
 
@@ -512,7 +515,7 @@ release. Getting 6.30's tag set right is what stops that.
 `chart.yml` (ct lint + kyverno over rendered charts), `e2e.yml` (kind matrix),
 `renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).
 
-**Platforms: `linux/amd64` only (Req 2.1, Req 2.6).** The catalogue built and
+**Platforms: `linux/amd64` only as built (Req 2.1, amended 2026-08-22 to require every declared platform, with task 9.3 carrying the sequencing; Req 2.6).** The catalogue built and
 published both arches until 2026-08-04, when measurement showed nothing ever
 scanned the arm64 half. Every scan step in `build.yml` is `pull_request`-gated
 and the PR gate builds amd64 only, while `rescan.yml` passes no `--platform`, so
@@ -545,7 +548,7 @@ unattested manifest.
 Task 8.3 is absorbed by task 9.3. The release arm itself changes shape under
 Req 2.7 to 2.9 (push by digest, scan, sign, attest, then tag; Key Design
 Decision 6), and `build.yml` gains a `schedule:` trigger for the daily rebuild
-(Req 2.14) with publish-if-changed (Req 2.15 to 2.17).
+(Req 2.14) with publish-on-change (Req 2.15 to 2.17).
 
 Both paths use `type=gha` build cache (per-image scope) so repeat builds of a
 large upstream (cert-manager) reuse the Go module + compile layers.
@@ -639,17 +642,19 @@ ports: [3000/tcp]
 - cosign keyless via GitHub OIDC — no long-lived signing keys; PAT stays in `.keys/` (gitignored)
 - What a signature means (review F1, F6): the `build.yml` or `rescan.yml` workflow on
   `refs/heads/main` produced or re-attested this digest. It does not assert that a second human
-  reviewed the change. Consumers verify exactly those two identities (Req 2.23 to 2.25); the
-  substring pattern the README carried until cluster A admitted any identity containing the
-  repository path
+  reviewed the change. Consumers verify exactly those identities (Req 2.23 to 2.25, as
+  specified; the README's substring pattern, which admits any identity containing the
+  repository path, stays until task 9.6 lands)
 - The published set is defined, not implied (Req 2.10, 2.11): tagged, signed, attested. A digest
-  no tag references is frozen. Every published digest was scanned before it was tagged
-  (Req 2.7 to 2.9), and every catalogue repository is checked daily to answer an anonymous
-  pull (Req 2.21; two of six were private on 2026-08-21 while the README said otherwise)
+  no tag references is frozen. As specified, every published digest is scanned before it is
+  tagged (Req 2.7 to 2.9, task 9.1), and every catalogue repository and tag is checked daily
+  to answer an anonymous pull (Req 2.21, task 9.4; two of six repositories were private on
+  2026-08-21 while the README said otherwise, fixed by hand the same day)
 - Private repo + private GHCR through the build phase (Req 2.4 — its WHILE clause ended at the
-  2026-08-13 go-live); repo public under MIT and the GHCR packages anonymously pullable since
-  then (measured 2026-08-19: unauthenticated manifest fetch returns 200). No secrets in
-  definitions
+  2026-08-13 go-live); repo public under MIT since then, and the GHCR packages anonymously
+  pullable: one package measured on 2026-08-19 (unauthenticated manifest fetch returned 200),
+  all six since 2026-08-21 (the production-readiness review found two still private). No
+  secrets in definitions
 
 ## Delivery Plan (3 workdays, cut line explicit — historical)
 

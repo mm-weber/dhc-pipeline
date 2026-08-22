@@ -26,25 +26,25 @@ it (ADR 0001, ADR 0003).
 | 1.2 | Legacy-tag re-point would serve unsigned platform manifests (cosign signed the index only) | **decided 2026-08-22: (b)** scan in place via the daily enumeration; no re-point; critique F9 (a) amended | Req 2.22 replaced by the enumeration criterion; task 9.5 rewritten; design Decision 6 and platform section; critique 5.2 F9 amendment |
 | 1.3 | "Published set" defined but nothing enumerates it; Req 2.6 and 6.2 unmet for older tags | **decided 2026-08-22** as the mechanism of 1.2 (b): daily enumeration of every catalogue tag and its digest, feeding 2.18, 2.21, 2.24 | Req 2.22 (new text), Req 2.18 reworded; task 9.3 |
 | 1.4 | Req 2.24 tests "published" digests, which by definition cannot fail | **decided 2026-08-22**: the proof runs over every tag-referenced digest plus one unsigned control digest under a catalogue repository | Req 2.24 reworded; task 9.6 names the control |
-| 1.5 | Switches contradict their default criteria (2.12 vs 2.13, 2.9 vs 2.13, 2.15 vs 2.17); 2.13 never forbids signing | open; proposed WHILE guards on the defaults, 2.12 split by actor, "sign nothing" added to 2.13 | |
+| 1.5 | Switches contradict their default criteria (2.12 vs 2.13, 2.9 vs 2.13, 2.15 vs 2.17); 2.13 never forbids signing | **decided 2026-08-22**: 2.12 guarded on the fail-closed setting being disabled and reduced to the VEX Compiler's behaviour (the release completing is 2.9); 2.9 guarded on 2.13 not withholding; 2.13 signs nothing too; 2.15 guarded on the if-changed policy | Req 2.9, 2.12, 2.13, 2.15 |
 | 1.6 | "Platform manifest" undefined; every index carries an `unknown/unknown` attestation manifest | **decided 2026-08-22**: terms paragraph under Req 2 (catalogue tag, full release tag, platform manifest); "more than one" dropped from 6.36; 2.18 covers single-manifest digests | Req 2 terms paragraph; Req 6.36; Req 2.18 |
-| 1.7 | A failed release-time scan is unspecified | open; proposed Req 2.9a (no report, no sign, no tag, red run) plus error-table rows | |
+| 1.7 | A failed release-time scan is unspecified | **decided 2026-08-22**: Req 2.26 (no report for any platform manifest: sign nothing, tag nothing, red run); 2.9 requires a report per platform manifest; error-table rows still to add (1.13) | Req 2.9, 2.26; task 9.1 |
 | 1.8 | One SBOM per index versus per-platform comparison; attestations invisible to platform-digest pinners | open; proposed per-platform SBOM attestation; measure `cosign sign --recursive` in 9.1 | |
-| 1.9 | Flow diagram: compile after scan, discard after sign/attest | open; proposed: comparison before push, two compile passes drawn | |
-| 1.10 | Schedule never reaches the matrix; Req 2.7's trigger excludes schedule and dispatch | open; proposed Req 2.7 trigger rewording plus `changes`-job change in task 9.2 | |
+| 1.9 | Flow diagram: compile after scan, discard after sign/attest | **decided 2026-08-22**: comparison before the push (nothing pushed, signed or attested for an unchanged rebuild), two compile passes drawn, both red-run shapes drawn | design Release flow; Req 2.15; task 9.2 |
+| 1.10 | Schedule never reaches the matrix; Req 2.7's trigger excludes schedule and dispatch | **decided 2026-08-22**: 2.7 triggers on any release build (merge, schedule, dispatch); `changes` job gains a schedule branch | Req 2.7; task 9.2 |
 | 1.11 | Policy admits the rescan identity for signatures | open; proposed: split identities by role (build signs; build or rescan attests) | |
 | 1.12 | Undefined terms: catalogue tag, full release tag, unsigned control image, signature identity in 2.10; 2.15/2.16 silent with no prior digest; which package set | **partly decided 2026-08-22**: catalogue tag, full release tag and platform manifest defined; the control digest named (grafana 13.0.4's amd64 child); still open: signature identity in 2.10, the no-prior-digest case, which package set | Req 2 terms paragraph; task 9.6 |
-| 1.13 | Design asserts as built what is only specified; old diagrams; stale 8.3 pointers; contradictory visibility bullets | open | |
-| 1.14 | Req 2.1 and 2.20 coexist without a note; Req 2.2 dangling; provenance not required by 2.10/2.23; 2.20's WHILE untestable | open | |
+| 1.13 | Design asserts as built what is only specified; old diagrams; stale 8.3 pointers; contradictory visibility bullets | **mostly decided 2026-08-22**: security bullets marked as specified; architecture node, sequence diagram and platform header updated; 8.3 closed as superseded with its stale sentence annotated; visibility bullet corrected. Still open: the error-table rows for the new red-run shapes; the remaining "task 8.3" pointers in design.md | design.md, tasks.md |
+| 1.14 | Req 2.1 and 2.20 coexist without a note; Req 2.2 dangling; provenance not required by 2.10/2.23; 2.20's WHILE untestable | **decided 2026-08-22**: 2.1 requires every declared platform (sequencing in task 9.3); 2.2 pushes with provenance and defers signing to 2.9; 2.10 requires provenance; 2.25 states provenance is attached, not policy-verified; 2.20's slot now holds the signature-identity rule for "published" | Req 2.1, 2.2, 2.10, 2.20, 2.25 |
 | 1.15 | Req 2.21 measures a token, the design promises a pull; unconditional against Req 2.4's private phase | **decided 2026-08-22**: token plus an unauthenticated manifest GET of every catalogue tag, under WHILE public release is enabled | Req 2.21 reworded; task 9.4 |
 | 1.16 | Two-actor criterion 2.12 | folded into 1.5 | |
-| 1.17 | Task inaccuracies: buildx output needs `name=`, Kyverno predicate-type URIs, `kyverno apply --registry`, 8.3 open beside 9.3, todo wording | open | |
+| 1.17 | Task inaccuracies: buildx output needs `name=`, Kyverno predicate-type URIs, `kyverno apply --registry`, 8.3 open beside 9.3, todo wording | **decided 2026-08-22**: all five corrected | tasks 9.1, 9.6, 8.3, coverage table; tasks/todo.md |
 | A1 | Reproducible builds never weighed against publish-if-changed | open; proposed: measure `SOURCE_DATE_EPOCH` against the DHI frontend or record as rejected in Decision 6 | |
 | A2 | `under_investigation` statements derive from an unpersisted scan report | open; proposed: persist the release-time report (artifact or attestation) so the compiled document is reproducible | |
 | A3 | "Declared" switches have no declared location | open; candidate home: cluster B's `triage/policy.yaml` | |
 | A4 | Scan each platform manifest by its own digest rather than `--platform` plus `--image-src remote` | **decided 2026-08-22**: scan by manifest digest | task 9.3 wording |
 | A5 | Req 2.21 belongs to one daily-invariants mechanism | open; cluster D shape | |
-| A6 | Req 6.35 implied by 6.1; coverage predicate copied three times; 2.19/2.20/2.22 are one invariant | open; reviewer keeps 6.35; "uncovered finding" defined once is the candidate | |
+| A6 | Req 6.35 implied by 6.1; coverage predicate copied three times; 2.19/2.20/2.22 are one invariant | **decided 2026-08-22**: "uncovered finding" defined once in the Req 2 terms and used by 2.12, 2.13, 2.26; 6.35 kept (reviewer's reasoning); 2.20 and 2.22 re-purposed, 2.19 kept as the per-release invariant | Req 2 terms; Req 2.12, 2.13, 2.26 |
 | A7 | Req 2.24's "daily checks" is a third name for the run; Req 2.9 gates tagging on attestations but not the signature | **decided 2026-08-22**: 2.24 triggers on "a scheduled rescan"; 2.9 gates tagging on the signature and the attestations | Req 2.9, 2.24 |
 
 ## Spike results to carry (ADR 0003, 2026-08-22)
@@ -70,3 +70,7 @@ it (ADR 0001, ADR 0003).
   questions that need the owner (1.8 recursive signing and per-platform SBOM,
   1.11 identity split, A1 reproducibility, A2 persisted scan report, A3 the
   declared-values home).
+- 2026-08-22, revision commit 2: the pure corrections landed (1.5, 1.7, 1.9,
+  1.10, 1.13 in part, 1.14, 1.17, A6). Open for the owner: 1.8, 1.11, A1, A2,
+  A3; open mechanical: the rest of 1.12 (which package set is compared), the
+  error-table rows and remaining 8.3 pointers in design.md (1.13), A5.

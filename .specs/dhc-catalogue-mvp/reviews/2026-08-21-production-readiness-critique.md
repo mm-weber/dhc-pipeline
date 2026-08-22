@@ -657,7 +657,8 @@ rescan-triggered rebuilds only (ships nothing below HIGH, depends on the
 scanner database noticing the fix, and turns the rescan from reporter into
 actor) and the hybrid (two mechanisms for hours of gain). Fork switches,
 both declared values: the cron expression, and the publish policy
-`if-changed` versus `always`.
+`if-changed` versus `always` (spelled `on-change` in the criteria, since the
+EARS validator reserves the word "if").
 
 **F5 (i), the third verb (decided 2026-08-21): compiler-generated
 `affected` statements from the exception file.** `compile-vex.sh` reads
