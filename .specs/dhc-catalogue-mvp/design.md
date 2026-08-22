@@ -228,6 +228,23 @@ graph TB
      in-band, and the F4 clocks read "first seen" from a signed timestamp rather than an
      issue date. Rejected: a workflow artifact alone (expires, unverifiable) and committing
      the statements from the release job (a bot commit to `main`, ruled out under F4 ii).
+   - **Declared values live in one file (revision finding A3, 2026-08-22)**: the amendment
+     says "declared" for the fail-closed setting, the schedule, the publish policy, the
+     admitted platforms and the verification inputs, and a declaration nobody can diff
+     undercuts the transparency promise. `catalogue-policy.yaml` at the repository root holds
+     three sections: `release` (fail-closed, publish policy, cron expression, admitted
+     platforms), `triage` (aperture, ceilings, warning window; cluster B fills it, which
+     moves F4 (i)'s `triage/policy.yaml` here without changing that decision) and
+     `verification` (issuer, roles with their identities, required predicate types).
+     Workflows read the switches at run time with `yq`; the Kyverno policy and the README and
+     manual verification snippets are rendered from the `verification` section by a tested
+     script, the way `compile-vex.sh` renders VEX, so the consumer instructions cannot drift
+     from the policy (Req 7.8, 7.9). Two things GitHub reads only as literal workflow YAML,
+     the `schedule:` cron and per-job `permissions:`, stay in the workflows and `validate`
+     lints them against the file (Req 7.10). Rejected: repository variables (outside git, no
+     pull request, invisible in a fork's diff) and per-workflow `env:` blocks (policy
+     scattered across files, snippets hand-transcribed). A fork's switches are then one
+     file's values.
 
 ## System Flows
 

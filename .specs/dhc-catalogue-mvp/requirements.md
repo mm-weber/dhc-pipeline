@@ -18,7 +18,7 @@ one promise, a transparency catalogue: every published digest is signed by a pin
 every known HIGH or CRITICAL finding against a published digest carries a published
 machine-readable status, and time-to-decision and time-to-fix are measured and published rather
 than promised. Its amendments land in dependency clusters A to D. Cluster A (findings F3, F9,
-F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26 and Req 6.35 to 6.37, and amended Req 2.1 and 2.2.
+F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26 Req 6.35 to 6.37 and Req 7.7 to 7.10, and amended Req 2.1 and 2.2.
 
 ## Requirements
 
@@ -170,6 +170,10 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26 and R
 4. IF a pull request violates a codified convention THEN THE CI Pipeline SHALL fail with a message identifying that convention.
 5. WHEN a workflow installs a third-party executable THE CI Pipeline SHALL pin that executable to an exact version and SHALL verify its download against a checksum recorded in this repository.
 6. IF a pinned third-party executable has a newer released version THEN THE Upstream Tracking SHALL open a pull request updating that pin.
+7. THE Repository SHALL declare in one committed catalogue policy file every release setting that criteria 2.13, 2.14 and 2.17 name, every platform it admits for publishing, and every verification input that criterion 2.23 names.
+8. THE CI Pipeline SHALL render that verification policy under policies/ and those consumer verification instructions from that catalogue policy file's verification section.
+9. IF a rendered verification artifact differs from its committed copy THEN THE CI Pipeline SHALL fail validation naming that artifact.
+10. IF a workflow's schedule trigger or a job's permissions differ from what that catalogue policy file declares THEN THE CI Pipeline SHALL fail validation naming that value.
 
 ### Requirement 8: Operating Environment Constraints
 

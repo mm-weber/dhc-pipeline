@@ -41,7 +41,7 @@ it (ADR 0001, ADR 0003).
 | 1.17 | Task inaccuracies: buildx output needs `name=`, Kyverno predicate-type URIs, `kyverno apply --registry`, 8.3 open beside 9.3, todo wording | **decided 2026-08-22**: all five corrected | tasks 9.1, 9.6, 8.3, coverage table; tasks/todo.md |
 | A1 | Reproducible builds never weighed against publish-if-changed | **decided 2026-08-22: (a)** content comparison stays the gate with four guardrails (canonicalised sorted set with checksums, CycloneDX attested beside SPDX as the checksum source, pinned inputs as the "base digest" check, reproducibility measured nightly as a side effect with the diffoci spike and its flip condition recorded); research input stored in `data/` | Req 1.9, 2.9, 2.15; Decision 6; tasks 9.1, 9.2; `data/reproducible-digests-vs-content-diff-2026-08-22.md` |
 | A2 | `under_investigation` statements derive from an unpersisted scan report | **decided 2026-08-22: (a)** each platform manifest's scan report is attested with cosign's `vuln` predicate (`trivy convert --format cosign-vuln`); Req 6.37 names the compiler's inputs exhaustively, including the previously attested document (carry-forward rule for cluster B) | Req 2.9, 2.12, 6.37; Decision 6; flow; tasks 9.1, 9.6 |
-| A3 | "Declared" switches have no declared location | open; candidate home: cluster B's `triage/policy.yaml` | |
+| A3 | "Declared" switches have no declared location | **decided 2026-08-22: (a)** one root `catalogue-policy.yaml` (`release`, `triage`, `verification` sections); Kyverno policy and consumer snippets rendered from it; workflow cron and permissions linted against it; critique F4 (i) path amended | Req 7.7 to 7.10; Decision 6; task 9.8; task 9.6 |
 | A4 | Scan each platform manifest by its own digest rather than `--platform` plus `--image-src remote` | **decided 2026-08-22**: scan by manifest digest | task 9.3 wording |
 | A5 | Req 2.21 belongs to one daily-invariants mechanism | open; cluster D shape | |
 | A6 | Req 6.35 implied by 6.1; coverage predicate copied three times; 2.19/2.20/2.22 are one invariant | **decided 2026-08-22**: "uncovered finding" defined once in the Req 2 terms and used by 2.12, 2.13, 2.26; 6.35 kept (reviewer's reasoning); 2.20 and 2.22 re-purposed, 2.19 kept as the per-release invariant | Req 2 terms; Req 2.12, 2.13, 2.26 |
@@ -83,3 +83,6 @@ it (ADR 0001, ADR 0003).
   Open for the owner: A2, A3.
 - 2026-08-22, revision commit 6: A2 decided as attested scan reports plus
   the carry-forward rule (Req 6.37). Open for the owner: A3.
+- 2026-08-22, revision commit 7: A3 decided as one root policy file with
+  rendered artifacts. No owner decisions remain; mechanical leftovers next
+  (1.12 package set, 1.13 error-table rows and stale 8.3 pointers, A5).

@@ -717,6 +717,11 @@ here. Rejected: hand-recorded `severity:`/`kev:` per exception (facts the
 scanner already knows, drift, and the gate must cross-check anyway) and a
 flat published 90 (indefensible for a KEV-listed CRITICAL).
 
+*Amended 2026-08-22 (PR #97 revision, finding A3):* the file is the `triage`
+section of `catalogue-policy.yaml` at the repository root, which also holds
+the release switches and the verification inputs (Req 7.7). The decision,
+every number a variable in one committed place, is unchanged; only the path.
+
 **F4 (ii), the clocks (decided 2026-08-21): measured by the rescan tool,
 published to a pinned status issue plus a workflow artifact; GitHub Pages
 later as pure presentation.** Measurement: *first seen* is the earliest of
