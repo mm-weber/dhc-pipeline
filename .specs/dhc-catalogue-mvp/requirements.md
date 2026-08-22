@@ -42,6 +42,8 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.25 and R
 
 **Objective:** As a catalogue maintainer, I want merged definitions built and released automatically with supply-chain attestations, so that every published image is verifiable.
 
+**Terms used below.** A *catalogue tag* is a tag derived from a definition under criterion 2.3; the `sha256-<digest>.sig` and `sha256-<digest>.att` tags that cosign stores beside an image are not catalogue tags. A *full release tag* is the catalogue tag carrying the complete upstream version (the third of a definition's three tags, for example `13.1.3-alpine3.23`). A *platform manifest* is a manifest that an image index lists with a platform other than `unknown/unknown` and without a `vnd.docker.reference.type` annotation; BuildKit's attestation manifests are therefore not platform manifests.
+
 #### Acceptance Criteria
 
 1. WHEN a definition change merges to main THE CI Pipeline SHALL build affected images for linux/amd64.
@@ -52,7 +54,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.25 and R
 6. WHILE an image for a platform remains published THE Catalogue SHALL scan that platform for HIGH and CRITICAL vulnerabilities.
 7. WHEN a definition change merges to main THE CI Pipeline SHALL push each built image to ghcr.io/mm-weber/dhc by digest only and SHALL apply no tag to it before that digest's release-time scan completes.
 8. WHEN an image has been pushed by digest THE CI Pipeline SHALL scan that pushed digest for HIGH and CRITICAL vulnerabilities, once per platform manifest it contains, applying every compiled VEX document and every unexpired accepted-risk exception that THE Scan Gate applies to pull requests.
-9. WHEN a pushed digest's release-time scan completes THE CI Pipeline SHALL sign that digest with a cosign keyless signature, attest its SPDX SBOM and its compiled OpenVEX documents to it, and SHALL apply its definition-derived tags only after those attestations exist.
+9. WHEN a pushed digest's release-time scan completes with a report for every platform manifest THE CI Pipeline SHALL sign that digest with a cosign keyless signature, attest its SPDX SBOM and one compiled OpenVEX document carrying every applicable statement or none to it, and SHALL apply its definition-derived tags only after that signature and those attestations exist.
 10. WHILE a digest is referenced by a catalogue tag and carries a cosign signature, an SPDX SBOM attestation and an OpenVEX attestation THE Catalogue SHALL treat that digest as published.
 11. IF no catalogue tag references a digest THEN THE Catalogue SHALL treat that digest as frozen: not published, not rescanned, and not re-attested.
 12. IF a release-time scan reports a HIGH or CRITICAL finding covered neither by a VEX statement recording status not_affected or fixed nor by an unexpired accepted-risk exception THEN THE VEX Compiler SHALL add to that digest's compiled document an OpenVEX statement recording status under_investigation for that finding with a timestamp, and THE CI Pipeline SHALL complete that release.
@@ -61,13 +63,13 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.25 and R
 15. WHEN a scheduled rebuild produces an image whose resolved package set, taken as package name and version per platform, equals that of a published digest carrying that image's full release tag THE CI Pipeline SHALL discard that image and publish nothing from it.
 16. WHEN a scheduled rebuild produces an image whose resolved package set differs from that of a published digest carrying that image's full release tag THE CI Pipeline SHALL publish that image through criteria 2.7 to 2.9 and SHALL report both digests' package-set difference in its job summary.
 17. WHERE a declared publish policy is set to always THE CI Pipeline SHALL publish every scheduled rebuild through criteria 2.7 to 2.9 regardless of package-set equality.
-18. WHEN THE Scan Pipeline rescans a published digest THE Scan Pipeline SHALL scan every platform manifest that digest's index contains.
+18. WHEN THE Scan Pipeline rescans a digest that a catalogue tag references THE Scan Pipeline SHALL scan every platform manifest of that digest, or, for a single image manifest, that digest itself.
 19. IF a built index contains a platform manifest that its release-time scan did not scan THEN THE CI Pipeline SHALL apply no tag to that index.
 20. WHILE release-time scans and scheduled rescans cover every platform manifest of every published index THE CI Pipeline SHALL build affected images for every platform their definitions declare.
-21. THE Scan Pipeline SHALL verify at least once per day that every catalogue repository under ghcr.io/mm-weber/dhc returns a pull token to an unauthenticated request and SHALL report every repository that does not as a failure of that run.
-22. WHEN a catalogue tag references an index containing a platform manifest that neither a release-time scan nor a scheduled rescan has scanned THE Catalogue SHALL re-point that tag to its scanned manifest digest and SHALL record that tag, its previous index digest and its new digest in triage/LOG.md.
+21. WHILE public release is enabled THE Scan Pipeline SHALL verify at least once per day that every catalogue repository under ghcr.io/mm-weber/dhc returns a pull token to an unauthenticated request and serves every catalogue tag's manifest to an unauthenticated request, and SHALL report every repository or tag that does not as a failure of that run.
+22. THE Scan Pipeline SHALL enumerate at least once per day every catalogue tag in every catalogue repository together with each digest it references, and SHALL apply criteria 2.18, 2.21 and 2.24 to that enumeration.
 23. THE Repository SHALL publish under policies/ a verification policy that admits an image from ghcr.io/mm-weber/dhc solely on a cosign keyless signature whose certificate issuer is https://token.actions.githubusercontent.com and whose certificate identity is exactly this repository's build workflow or rescan workflow at refs/heads/main, together with an SPDX SBOM attestation and an OpenVEX attestation from those identities.
-24. WHEN THE Scan Pipeline runs its daily checks THE Scan Pipeline SHALL apply that verification policy to every published digest and to one unsigned control image, and SHALL report any published digest that policy rejects or any control image that policy admits as a failure of that run.
+24. WHEN a scheduled rescan runs THE Scan Pipeline SHALL apply that verification policy to every digest a catalogue tag references and to one unsigned control digest held under a catalogue repository, and SHALL report any tag-referenced digest that policy rejects or a control digest that policy admits as a failure of that run.
 25. THE Repository SHALL state in its consumer verification instructions which certificate issuer and which exact certificate identities its verification policy admits, each identity anchored to its workflow file and ref.
 
 ### Requirement 3: Upstream Version Tracking
@@ -152,7 +154,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.25 and R
 33. WHEN a scheduled rescan applies VEX statements THE Scan Pipeline SHALL report every statement that compilation omitted.
 34. WHEN a VEX document is attested to an image THE CI Pipeline SHALL attest a document compiled for that image's digest.
 35. THE Scan Gate SHALL NOT count a VEX statement recording status under_investigation as coverage of a finding.
-36. WHEN a VEX document is compiled for an image index containing more than one platform manifest THE VEX Compiler SHALL produce product identifiers covering that index's digest and every scanned platform manifest digest.
+36. WHEN a VEX document is compiled for an image index THE VEX Compiler SHALL produce product identifiers covering that index's digest and every scanned platform manifest digest.
 
 ### Requirement 7: Conventions and Review Enforcement
 

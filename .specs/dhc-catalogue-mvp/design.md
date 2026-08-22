@@ -141,7 +141,10 @@ graph TB
    - **Decision**: **A**, under the review's framing of a transparency catalogue (knowledge,
      not speed). The release sequence becomes push-by-digest (no tag), scan that digest per
      platform with the gate's own VEX and exception inputs, compile VEX for exactly that
-     digest (and for every platform manifest digest, Req 6.36), sign and attest, and only
+     digest (and for every platform manifest digest, Req 6.36) as exactly one document per
+     digest, empty when nothing applies (ADR 0003, measured 2026-08-22 against vexctl,
+     Trivy, cosign v2 and v3, and Kyverno; cosign stays pinned on the v2 line because v3's
+     bundle layout is invisible to Kyverno 1.18 and Trivy 0.72), sign and attest, and only
      then apply tags (`docker buildx imagetools create -t …`). "Published" is thereby defined
      (Req 2.10): tagged, signed, attested; an untagged digest is frozen (Req 2.11). A finding
      uncovered at release time becomes an `under_investigation` statement with a timestamp
@@ -155,7 +158,11 @@ graph TB
      is what stops provenance timestamps alone from minting digests and opening chart-pin
      PRs. arm64 returns when, and only when, both the release-time scan and the rescan scan
      every platform manifest (Req 2.18 to 2.20; task 8.3 is absorbed by task 9.3). The ten
-     legacy tags are re-pointed to their scanned amd64 manifests, digests kept (Req 2.22).
+     legacy tags are not re-pointed (cosign signed the index only, so a re-pointed tag
+     would serve an unsigned manifest; independent review 1.2, measured): the rescan
+     enumerates every catalogue tag daily and scans every platform manifest of every
+     tag-referenced digest instead (Req 2.18, 2.22), satisfying Req 2.6 as written with
+     every existing signature intact; critique F9 (a) amended 2026-08-22.
      Visibility becomes a daily invariant (Req 2.21). Verification inputs (issuer, exact
      identities of `build.yml` and `rescan.yml` at `refs/heads/main`, required attestation
      types) live in one place, rendered as a Kyverno `verifyImages` policy and proven daily
@@ -528,9 +535,13 @@ what makes task 8.3 a build-matrix change rather than archaeology.
 **Cluster A (2026-08-21) states the condition for arm64's return as criteria
 rather than a deferral:** Req 2.18 to 2.20 make per-platform scanning in both
 the release-time scan and the rescan the precondition for building every
-declared platform, and Req 2.22 re-points the ten pre-2026-08-04 tags that still
-resolve to unscanned arm64 manifests (measured in the review, F9) to their
-scanned amd64 manifest digests, keeping the old indexes pullable by digest.
+declared platform, and Req 2.22 makes the rescan enumerate every catalogue tag
+daily, so the ten pre-2026-08-04 tags that still resolve to never-scanned arm64
+manifests (measured in the review, F9) are scanned in place with their
+signatures intact. The re-point first specified here was withdrawn on
+2026-08-22: cosign signed only the index digests, measured in the independent
+review (finding 1.2), so a re-pointed tag would have served an unsigned,
+unattested manifest.
 Task 8.3 is absorbed by task 9.3. The release arm itself changes shape under
 Req 2.7 to 2.9 (push by digest, scan, sign, attest, then tag; Key Design
 Decision 6), and `build.yml` gains a `schedule:` trigger for the daily rebuild

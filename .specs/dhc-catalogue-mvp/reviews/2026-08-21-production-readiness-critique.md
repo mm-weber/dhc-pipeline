@@ -764,6 +764,15 @@ stays out of scope. (c) Forced by A: `hardened-app` and
 `cert-manager-cainjector` are made public by hand now, and the rescan gains
 the daily invariant "every catalogue repository answers an anonymous pull".
 
+*Amended 2026-08-22 (PR #97 revision, choice 2):* **(a) is withdrawn.** The
+independent review of the cluster A amendment measured that cosign signed only
+the index digests (`.sig`/`.att` on every platform manifest return 404), so a
+re-pointed tag would have served an unsigned, unattested manifest. The legacy
+tags are scanned in place instead: the rescan enumerates every catalogue tag
+daily and scans every platform manifest of every tag-referenced digest
+(Req 2.18, 2.22), which satisfies Req 2.6 as written and keeps every existing
+signature valid. The digests, and the "never delete" reasoning, are unchanged.
+
 **F6, verification identity (decided 2026-08-21): anchor the prose and
 ship a tested verification policy, with the engine rendering separable.**
 README and manual move to the exact form: issuer pinned, identity anchored
