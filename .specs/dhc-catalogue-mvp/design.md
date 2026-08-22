@@ -163,10 +163,17 @@ graph TB
      enumerates every catalogue tag daily and scans every platform manifest of every
      tag-referenced digest instead (Req 2.18, 2.22), satisfying Req 2.6 as written with
      every existing signature intact; critique F9 (a) amended 2026-08-22.
-     Visibility becomes a daily invariant (Req 2.21). Verification inputs (issuer, exact
-     identities of `build.yml` and `rescan.yml` at `refs/heads/main`, required attestation
-     types) live in one place, rendered as a Kyverno `verifyImages` policy and proven daily
-     against every published digest and one unsigned control (Req 2.23 to 2.25).
+     Visibility becomes a daily invariant (Req 2.21). Verification inputs live in one
+     declared place as **roles**: the *releaser* (`build.yml` at `refs/heads/main`) is the
+     sole signer and sole SBOM attestor and attests the first OpenVEX document; the
+     *re-attester* (`rescan.yml` at `refs/heads/main`, active from cluster B) may attest
+     OpenVEX only, never sign, never tag. Each role is one attestor list in the Kyverno
+     `verifyImages` rendering (signature attestors, then per-predicate-type attestors),
+     proven daily over every tag-referenced digest and one unsigned control (Req 2.20,
+     2.23 to 2.25). The identity in a certificate therefore tells a consumer which role
+     produced what they are reading. A fork adds roles as lines (a dedicated signing
+     workflow behind a protected environment, a revocation job with `packages: write` and
+     no `id-token`), never by widening an existing role (revision finding 1.11).
    - **Trade-offs**: B was rejected as speed-shaped: one maintainer accumulates blocked
      releases while an unrelated advisory lands between PR scan and merge. Pinning apk would
      reinvent a datasource and turn every base advisory into a bump PR. Deleting the legacy
@@ -640,9 +647,10 @@ ports: [3000/tcp]
 - Non-root 65532 everywhere; restricted PSS enforced twice (chart overrides + kyverno gate)
 - Everything digest/checksum-pinned; floating tags fail CI (Req 1.6)
 - cosign keyless via GitHub OIDC — no long-lived signing keys; PAT stays in `.keys/` (gitignored)
-- What a signature means (review F1, F6): the `build.yml` or `rescan.yml` workflow on
-  `refs/heads/main` produced or re-attested this digest. It does not assert that a second human
-  reviewed the change. Consumers verify exactly those identities (Req 2.23 to 2.25, as
+- What a signature means (review F1, F6): the `build.yml` release job on `refs/heads/main`
+  built, scanned and signed this digest; an OpenVEX attestation from `rescan.yml` on
+  `refs/heads/main` restates its triage status later and signs nothing. Neither asserts that a
+  second human reviewed the change. Consumers verify exactly those identities (Req 2.23 to 2.25, as
   specified; the README's substring pattern, which admits any identity containing the
   repository path, stays until task 9.6 lands)
 - The published set is defined, not implied (Req 2.10, 2.11): tagged, signed, attested. A digest

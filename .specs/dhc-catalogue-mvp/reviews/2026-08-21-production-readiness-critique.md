@@ -792,6 +792,12 @@ signature means: the release workflow on `main` produced this digest; it
 does not assert human review. Rejected: prose only (transcription exercise,
 silently wrong after a workflow rename).
 
+*Amended 2026-08-22 (PR #97 revision, finding 1.11):* the identity list is
+split by role. `build.yml` at `refs/heads/main` is the sole signer and sole
+SBOM attestor; `rescan.yml` at `refs/heads/main` may attest OpenVEX only, from
+cluster B on, and never signs. Roles are attestor lists a fork extends by
+adding entries; no role is widened.
+
 **F1, trust root and review (decided 2026-08-21): ruleset as code, honest
 bypass, gates required.** The intended ruleset is committed as JSON under
 `.github/rulesets/` (GitHub's native export/import format); because the
