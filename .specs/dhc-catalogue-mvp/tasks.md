@@ -251,6 +251,38 @@
     - `validate.yml` lints the `schedule:` cron of `build.yml` and `rescan.yml` and each job's `permissions:` block against the policy file, since GitHub reads those only as literal workflow YAML (Req 7.10)
     - _Requirements: Req 7.7, Req 7.8, Req 7.9, Req 7.10_
 
+- [ ] 10. Production readiness, cluster B: statuses and clocks (review F5, F4, F13 i; ADR 0003, ADR 0004; spec amendment landed before any of these)
+  - [ ] 10.1 Policy triage section and the exception schema
+    - `catalogue-policy.yaml` `triage` section: `aperture: [CRITICAL, HIGH]`, `ceilings: {CRITICAL: 30d, HIGH: 90d}`, `kev_ceiling: 14d`, `expiry_warning: 14d` (Req 6.49); every value a variable, a fork widens the aperture and tightens the clocks
+    - `triage/accepted-risk/<image>.yaml` entries gain `decided_at` (ISO date); `lint-accepted-risk.sh` requires it and checks `expired_at` minus `decided_at` against the largest ceiling, replacing the "more than 90 days from today" rule (Req 6.7, 6.11); the existing grafana entries get their dates from their LOG entries, by hand, once
+    - The PR gate fetches the KEV feed (the rescan's `KEV_URL`) and fails on any exception over its tier (Req 6.50); the rescan re-evaluates every unexpired exception against current severity and KEV status and reports (Req 6.51); expiry warnings read the window from the policy file (Req 6.10)
+    - _Requirements: Req 6.7, Req 6.10, Req 6.11, Req 6.49, Req 6.50, Req 6.51_
+  - [ ] 10.2 Compiler: `affected` from exceptions, carry-forward, lapses
+    - `compile-vex.sh` reads `triage/accepted-risk/<image>.yaml` and emits one `affected` statement per unexpired entry into the single document: `action_statement` assembled from treatment, `statement:`, `issue:` for a transfer, `paths:` and `expired_at`; `action_statement_timestamp` from `decided_at` (Req 6.38). Products as in 6.29 and 6.36
+    - `lint-vex-product.sh`: a source statement with any status other than `not_affected` or `fixed` fails, naming it (Req 6.39); closes review A 2.3's `wontfix` gap
+    - Carry-forward from the previously attested document (Req 6.37): `timestamp` kept, `last_updated` set on change (Req 6.40); a lapsed exception compiles to `under_investigation` with the original timestamp and a `status_notes` line naming the lapse (Req 6.41); gate coverage ignores `affected` and `under_investigation` (Req 6.35), which Trivy does anyway (ADR 0003)
+    - Measured basis for the timestamp fields: OpenVEX defines statement-level `timestamp`, `last_updated` and `action_statement_timestamp` (spec lines 199, 200, 208)
+    - _Requirements: Req 6.8, Req 6.35, Req 6.37, Req 6.38, Req 6.39, Req 6.40, Req 6.41_
+  - [ ] 10.3 Rescan re-attestation, replacing
+    - Per tag-referenced digest from 9.3's enumeration: `trivy convert --format cosign-vuln` of each platform manifest's report and `cosign attest --type vuln --replace` to that manifest (Req 6.42); compile with the attested reports and the previously attested OpenVEX document as inputs; on difference, `cosign attest --type openvex --replace` on the digest and each platform manifest (Req 6.43). ADR 0004 measured on cosign v2.6.0 that `--replace` swaps only the same predicate type and leaves SBOM and scan-report layers alone; `cosign clean` is all-or-nothing and is not used
+    - `rescan.yml` permissions: `packages: write`, `id-token: write` added beside `issues: write`; the identity joins the re-attester role in `catalogue-policy.yaml` (attests `openvex` and `vuln` only, 9.6)
+    - Invariants step gains "exactly one OpenVEX attestation per tag-referenced digest and platform manifest" (Req 6.44, 6.45); `triage/upstream/checks/trivy-vex-oci-multiple-attestations.sh` joins the daily consumer smoke test (cluster D, F7) as the regression check for the Trivy behaviour
+    - First run replaces the three OpenVEX attestations grafana's current digest carries today with one (until then `--vex oci` consumers get one of three at random, ADR 0004)
+    - _Requirements: Req 6.42, Req 6.43, Req 6.44, Req 6.45_
+  - [ ] 10.4 Clocks and the status issue
+    - `triage/rescan` Go tool: per finding and digest, first seen from the statement `timestamp`, decided from `last_updated` at the first status other than `under_investigation`, fixed from the release line's first tag-referenced digest whose attested scan report omits the finding (Req 6.46); aggregates (medians, open findings by age against the ceilings); unit-tested on fixture attestations
+    - One "Catalogue status" issue maintained the way Renovate maintains the Dependency Dashboard: table plus a fenced `metrics.json` block, same JSON uploaded as a workflow artifact (Req 6.47); the JSON schema is written so a Pages dashboard can be added later as presentation only
+    - _Requirements: Req 6.46, Req 6.47_
+  - [ ] 10.5 Badges
+    - README badges rendered by shields.io from GitHub's public API: open issues carrying `cve`, and workflow status for `build`, `rescan`, `e2e` (Req 6.48); no secrets, no settings; only the rescan and GitHub write a badge's number. Self-rendered clock badges arrive with the Pages layer, not here
+    - _Requirements: Req 6.48_
+  - [ ] 10.6 Evidence-based issue closing
+    - The rescan closes an open `cve` issue when its finding appears in no tag-referenced digest's attested scan report, or when every finding it names is covered by a merged VEX statement or an unexpired exception; the closing comment names the digests and reports, or the covering artifacts, and applies `resolved:fixed` / `resolved:not_affected` / `resolved:accepted` (Req 6.52, 6.53); the tool acts on derived state only and never records a decision (Req 6.54). The dedup marker (`<!-- rescan-cve: <ID> -->`) still keys reopening if the finding returns
+    - _Requirements: Req 6.3, Req 6.52, Req 6.53, Req 6.54_
+  - [ ] 10.7 Truth pass
+    - `docs/user-manual.md` and README: the consumer recipe becomes one `verify-attestation` per predicate type (exactly one OpenVEX attestation per digest), the two-lane table gains the third verb, the rescan section describes replace-not-append and the status issue; `triage/README.md` and `triage/accepted-risk/README.md`: `decided_at`, the policy file's ceilings, `affected` as the published form of an exception; design.md Decision 7 marked as-built
+    - _Requirements: Req 6.8, Req 7.1_
+
 ## Requirements Coverage
 
 | Requirement | Covered By Tasks |
@@ -260,8 +292,8 @@
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4, 8.7 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7 |
-| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5, 9.1, 9.3 |
-| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8 |
+| Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5, 9.1, 9.3, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7 |
+| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7 |
 | Req 8: Operating Environment | 3.3, 6.5 |
 
 Req 8.2 (delegate network-heavy work to CI/operator host) has no implementing task: it is an

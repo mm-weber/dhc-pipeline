@@ -254,6 +254,56 @@ graph TB
      reporting enabled and no tag on a revoked digest from cluster D (F1, F11). One step, one
      report shape, one place a fork adds an invariant.
 
+7. **Statuses and clocks: every known finding carries a published status, and the clocks are read from attestations (Req 6.38 to 6.54; review F5, F4, F13 i; ADR 0003, ADR 0004; 2026-08-23)**
+   - **Context**: the two-lane model published only `not_affected` and `fixed`; an accepted
+     or transferred finding was invisible to anyone pulling the image, which review A had
+     called out on 2026-08-04 and the v2 draft had silently decided against. The exception
+     ceiling was a flat 90 days compared with whatever day the lint ran; no clock existed
+     for time-to-decision or time-to-fix; the rescan opened issues and never closed them.
+     Cluster A then made the published set enumerable, put one OpenVEX document on every
+     digest, attested the scan reports and named the compiler's inputs (Req 6.37), which is
+     what makes the statuses and clocks below derivable rather than bookkept.
+   - **Options**: `affected` statements generated from the exception file, or hand-authored
+     beside it, or a human-readable advisory page; re-attestation by appending with a
+     consumer-side merge, or by replacing; `timestamp` as first seen or as the status-change
+     time; ceilings in the policy file or hand-recorded per exception; metrics to a status
+     issue, to a bot-committed file, or to a Pages dashboard.
+   - **Decision**: exceptions are published as `affected`. `compile-vex.sh` emits one
+     `affected` statement per unexpired exception into the single document (Req 6.38),
+     with the action statement assembled from the exception's fields and its timestamp from
+     a new required `decided_at` (Req 6.7, 6.11); hand-authored statuses other than
+     `not_affected` and `fixed` fail the lint (Req 6.39), which also closes review A's
+     `wontfix` gap. Coverage is untouched: neither `affected` nor `under_investigation` ever
+     counts (Req 6.35). Re-attestation **replaces** (Req 6.43): ADR 0004 measured that with
+     several OpenVEX attestations on a digest `trivy --vex oci` applies one chosen
+     nondeterministically, so exactly one attestation per digest and platform manifest is an
+     invariant (Req 6.44) proven daily (Req 6.45); history is Rekor plus recompute, and the
+     consumer recipe is a single `verify-attestation`. The rescan attests its own scan report
+     first, replacing yesterday's (Req 6.42), so Req 6.37's inputs are complete before it
+     compiles. A carried-forward statement keeps its `timestamp` as *first seen* for life and
+     records changes in `last_updated` (Req 6.40); a lapsed exception re-emits
+     `under_investigation` with the original timestamp and a status note (Req 6.41), so the
+     decision clock restarts without losing first seen. The numbers live in the `triage`
+     section of `catalogue-policy.yaml` (Req 6.49): the decision aperture, ceilings per
+     severity as durations, a KEV ceiling, the warning window; `validate` enforces the outer
+     ceiling from `decided_at` (Req 6.11), the gate enforces the tier per finding with the
+     KEV feed it now fetches (Req 6.50), and the rescan re-evaluates daily because KEV
+     status changes after the fact (Req 6.51). The clocks are computed from attestations and
+     the enumeration (Req 6.46) and published to one status issue plus a workflow artifact
+     (Req 6.47); native badges now (Req 6.48), Pages later. The rescan closes `cve` issues on
+     evidence only (Req 6.52 to 6.54): it acts on derived state, never on judgement.
+   - **Trade-offs**: `rescan.yml` gains `packages: write` and `id-token: write` (rewriting
+     an `.att` manifest is a push), widening what a compromised rescan could do to
+     "publish a bad attestation or move a tag"; the compensating controls are the role split
+     (it cannot mint a signed digest, Req 2.23) and the daily invariants over every
+     tag-referenced digest in the same run (Req 2.24, 6.45). `decided_at` is one more field
+     a human writes, accepted because every alternative (git dates, LOG headings) moves
+     under rebase or reordering. Rejected: hand-authored `affected` (two artifacts for one
+     decision), appending with a merge recipe (the consumer's document becomes a coin flip),
+     bot commits of a metrics file (violates "everything enters as a pull request"), a Pages
+     dashboard now (presentation before the data exists). Fork switches: every number in the
+     `triage` section, and the `resolved:*` closing labels.
+
 ## System Flows
 
 ### Release flow (Req 2.7 to 2.17, 2.26; as specified 2026-08-22, implementation task 9)
@@ -274,6 +324,25 @@ merge to main, the daily schedule, or a manual dispatch
   ─► cosign sign, recursive · SBOM attest per platform manifest · one OpenVEX attest on
       index and platform manifests (ADR 0003)
   ─► apply tags (imagetools create on the index) ─► published (Req 2.10)
+```
+
+### Rescan flow (Req 2.18 to 2.24, 6.42 to 6.54; as specified 2026-08-23, implementation task 10)
+
+```
+daily 06:17 UTC ─► enumerate every catalogue tag → digest (2.22)
+  per tag-referenced digest:
+  ─► scan every platform manifest by its own digest (2.18)
+  ─► attest each scan report, --replace (6.42)
+  ─► compile VEX (6.37): source statements · affected from unexpired exceptions (6.38)
+        · carry-forward, timestamp kept, last_updated on change (6.40)
+        · lapsed exception ─► under_investigation, original timestamp, status note (6.41)
+        · new uncovered finding ─► under_investigation from the attested report
+  ─► differs from the attested document? ─► cosign attest --replace on digest + manifests (6.43)
+  invariants step (one report shape): anonymous pull per repository and tag (2.21)
+        · verification proof + control digest (2.24) · exactly one OpenVEX attestation (6.45)
+        · exceptions against current severity and KEV (6.51)
+  ─► clocks from attestations (6.46) ─► status issue + artifact (6.47)
+  ─► issues: open for new findings (6.3) · close on evidence (6.52 to 6.54) · expiry warnings (6.10)
 ```
 
 ### Upstream bump flow (the operating heart)
@@ -712,6 +781,11 @@ ports: [3000/tcp]
 | Repository or catalogue tag refuses an anonymous pull | daily invariants step fails the rescan run naming it | 2.21 |
 | Tag-referenced digest rejected by the verification policy, or the control digest admitted | daily invariants step fails the rescan run | 2.24 |
 | Rendered verification artifact, workflow cron or job permissions drift from `catalogue-policy.yaml` | validate.yml fails naming the artifact or value | 7.9, 7.10 |
+| A tag-referenced digest carries more than one OpenVEX attestation | daily invariants step fails the rescan run naming it; the next re-attestation replaces | 6.44, 6.45 |
+| Exception expiry exceeds its ceiling for the finding's severity or KEV status | validate.yml fails (outer ceiling), the scan gate fails naming the exception (tier), the rescan reports it daily (KEV status moved) | 6.11, 6.50, 6.51 |
+| A VEX source statement records a status the lane does not author | validate.yml fails naming the statement | 6.39 |
+| An exception lapses | its `affected` statement is replaced by `under_investigation` with the original first-seen timestamp; the finding re-reds the gate | 6.9, 6.41 |
+| A `cve` issue's finding is gone or covered | the rescan closes it with the evidence named, never with a judgement | 6.52 to 6.54 |
 
 ## Testing Strategy
 
