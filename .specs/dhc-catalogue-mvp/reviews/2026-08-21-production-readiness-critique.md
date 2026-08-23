@@ -697,6 +697,30 @@ out-of-band VEX repository as the replacement (unbound from the digest, and
 it is F11's advisory-feed question, where it is weighed as a complement).
 Prior art closed: review A 3.14.
 
+*Amended 2026-08-23 (cluster B design review against the cluster A
+decisions):* **re-attestation replaces, it does not append.** ADR 0003
+measured that Trivy `--vex oci` reads the first OpenVEX attestation on a
+digest only, so an appended re-attestation is invisible to the consumer that
+reads attestations automatically. The rescan therefore runs
+`cosign attest --type openvex --replace` (cosign v2.6.0 replaces every
+existing attestation of the same predicate type; `cosign clean --type` can
+only remove all attestations at once, and cosign v3 has no replace at all,
+one more reason for the v2 pin). History lives in Rekor, which logs every
+attestation ever made, and in the fact that the compiled document is
+recomputable from named inputs (Req 6.37, with carry-forward from the
+previously attested document). The consumer recipe is one
+`verify-attestation`, no merge step. Before compiling, the rescan attests its
+own daily scan report per platform manifest (vulnerability predicate,
+`--replace`), since Req 6.37 names attested scan reports as a compiler
+input. Permissions: `rescan.yml` gains `packages: write` as well as
+`id-token: write`, because rewriting the `.att` manifest is a push; the
+compensating control is the daily verification proof over every
+tag-referenced digest (Req 2.24) in the same run's `invariants` step. The
+published set is cluster A's enumeration (Req 2.22). The spike that opens
+cluster B measures, on v2.6.0, that `--replace` removes every prior OpenVEX
+layer, that Trivy `--vex oci` then reads the new document, and that the old
+entry remains in Rekor.
+
 **F4 (i), ceilings and aperture (decided 2026-08-21): one policy file,
 every number a variable.** `triage/policy.yaml` declares the decision
 aperture (the severities that require a recorded decision), a per-severity
@@ -739,6 +763,15 @@ where the promise is audited. The sink is a declared value. Rejected: bot
 commits of a metrics file to `main` (contradicts "everything enters as a
 pull request"). Deferred by design: a Pages dashboard, with the JSON schema
 written so Pages is presentation only.
+
+*Amended 2026-08-23 (cluster B design review):* **first seen is a signed
+value.** The `under_investigation` statement cluster A writes at release
+(Req 2.12) carries the attested scan report's timestamp and is carried
+forward unchanged (Req 6.37), so *first seen* is read from the attestation
+rather than from the earlier of two dates; the rescan issue's creation date
+becomes a cross-check. *Decided* and *fixed* are read from the same
+attestations and from cluster A's daily enumeration of tag-referenced
+digests and their attested scan reports.
 
 *Badges (decided 2026-08-21): (a) now, (b) when the metrics exist.*
 (a) Native GitHub badges rendered by shields.io from the public API: open
@@ -1025,6 +1058,15 @@ real heading and that every decision has one. Rejected: register only
 task 8.7) and the unified ledger now (right direction per the 2026-08-04
 review, wrong size for one person; option 1 is the incremental path a fork
 can finish).
+
+*Amended 2026-08-23 (cluster B design review):* evidence-based issue
+closing (i) reads "no longer appears in any published digest" against
+cluster A's daily enumeration of tag-referenced digests and their attested
+scan reports (Req 2.22, 6.37), not against one tag per definition; a
+decision that now covers the finding is visible as the replaced OpenVEX
+attestation. The register (cluster D) gains the cosign version pin from
+ADR 0003 as a deliberate human item, completed the way the tool sha256 pins
+are.
 
 ---
 
