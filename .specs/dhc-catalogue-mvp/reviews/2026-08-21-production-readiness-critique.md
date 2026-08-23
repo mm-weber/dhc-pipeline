@@ -698,10 +698,13 @@ it is F11's advisory-feed question, where it is weighed as a complement).
 Prior art closed: review A 3.14.
 
 *Amended 2026-08-23 (cluster B design review against the cluster A
-decisions):* **re-attestation replaces, it does not append.** ADR 0003
-measured that Trivy `--vex oci` reads the first OpenVEX attestation on a
-digest only, so an appended re-attestation is invisible to the consumer that
-reads attestations automatically. The rescan therefore runs
+decisions):* **re-attestation replaces, it does not append.** ADR 0003 read
+Trivy's log line "taking the first one" as "the first attestation wins";
+ADR 0004 then measured the behaviour directly: with more than one OpenVEX
+attestation on a digest, `trivy --vex oci` applies one chosen
+nondeterministically (the same layer set scanned four times gave different
+results), so an appended re-attestation is not merely invisible, it makes
+which document a consumer gets a matter of chance. The rescan therefore runs
 `cosign attest --type openvex --replace` (cosign v2.6.0 replaces every
 existing attestation of the same predicate type; `cosign clean --type` can
 only remove all attestations at once, and cosign v3 has no replace at all,
@@ -772,6 +775,24 @@ rather than from the earlier of two dates; the rescan issue's creation date
 becomes a cross-check. *Decided* and *fixed* are read from the same
 attestations and from cluster A's daily enumeration of tag-referenced
 digests and their attested scan reports.
+
+*Decided 2026-08-23, timestamp semantics on a carried-forward statement:*
+a catalogue-written statement's `timestamp` is first seen, the attested scan
+report's time when the finding first appeared, carried forward unchanged
+through every status change (true to the field's definition: the finding has
+applied since then); `last_updated` records each status or content change;
+`action_statement_timestamp` is the decision date on an `affected`
+statement. Time-to-decision is `last_updated` minus `timestamp` on the first
+status other than `under_investigation`; time-to-fix comes from the
+enumeration (the first tag-referenced digest on the same release line whose
+attested scan report no longer lists the finding). A lapsed exception
+re-emits `under_investigation` with the original `timestamp`, a fresh
+`last_updated` and a `status_notes` line naming the lapse, so the decision
+clock restarts and first seen survives. One catalogue statement per finding
+per document, so Trivy's ordering by `timestamp` is unaffected; a later
+`not_affected` or `fixed` source statement replaces the catalogue statement
+rather than competing with it. Rejected: `timestamp` as the status-change
+time with first seen in free text.
 
 *Badges (decided 2026-08-21): (a) now, (b) when the metrics exist.*
 (a) Native GitHub badges rendered by shields.io from the public API: open
