@@ -680,6 +680,17 @@ exception stops compiling and the finding falls back to
 advisory page instead (invisible to scanner-driven consumers). Prior art
 closed: review A 2.2.
 
+*Amended 2026-08-23 (cluster B design review):* the `affected` statements
+go into the single compiled document per digest (ADR 0003), and the
+exception entry gains a required `decided_at` date, written by the person
+who decides and checked by `lint-accepted-risk.sh` like the other required
+fields. It feeds `action_statement_timestamp`, and it starts the ceiling
+clock: the lint checks `expired_at` minus `decided_at` against the policy
+file's ceiling, where today `expired_at` is only compared with the day the
+lint happens to run. Rejected: deriving the date from git (moves under
+rebase and squash) or from the LOG heading above the `ref:` anchor
+(markdown-structure glue).
+
 **F5 (ii), re-attestation (decided 2026-08-21): the daily rescan
 re-attests when the compiled document changes.** For every digest in the
 published set (digests currently referenced by any catalogue tag, alias fan
