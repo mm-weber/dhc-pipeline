@@ -170,7 +170,7 @@ graph TB
      declared place as **roles**: the *releaser* (`build.yml` at `refs/heads/main`) is the
      sole signer and sole SBOM attestor and attests the first OpenVEX document; the
      *re-attester* (`rescan.yml` at `refs/heads/main`, active from cluster B) may attest
-     OpenVEX only, never sign, never tag. Each role is one attestor list in the Kyverno
+     OpenVEX and scan reports only, never sign, never tag. Each role is one attestor list in the Kyverno
      `verifyImages` rendering (signature attestors, then per-predicate-type attestors),
      proven daily over every tag-referenced digest and one unsigned control (Req 2.20,
      2.23 to 2.25). The identity in a certificate therefore tells a consumer which role
@@ -340,7 +340,8 @@ merge to main, the daily schedule, or a manual dispatch
   ─► scan every platform manifest (by its own digest), VEX + exceptions applied
         no report for any platform manifest ─► sign nothing, tag nothing, red run (2.26)
   ─► attest each platform manifest's scan report (cosign `vuln` predicate, via `trivy convert`)
-  ─► compile VEX, pass 2: append under_investigation for every uncovered finding (2.12)
+  ─► compile VEX, pass 2: append affected from unexpired exceptions (6.38) and
+      under_investigation for every uncovered finding (2.12)
         fail-closed setting on and anything uncovered ─► sign nothing, tag nothing, red run (2.13)
   ─► cosign sign, recursive · SBOM attest per platform manifest · one OpenVEX attest on
       index and platform manifests (ADR 0003)
@@ -448,9 +449,12 @@ VEX as the only pressure valve. That is VEX-washing, which Req 6.8 forbids.
 
 The split is by *question*: **VEX answers "does this apply?"** — a claim about the
 artifact, evidence-backed, attested, no expiry. **accepted-risk answers "what are
-we doing about it?"** — a decision about our exposure, internal, never attested,
-and it expires. Transfer gets no separate file: while waiting on upstream we are
-still carrying the risk, so it is an acceptance with an external owner.
+we doing about it?"** — a decision about our exposure, and it expires. That
+decision is no longer internal: an unexpired exception no source statement
+covers compiles to a published `affected` statement carrying its `decided_at`
+(Req 6.38); the file stays the internal source of record. Transfer gets no
+separate file: while waiting on upstream we are still carrying the risk, so it
+is an acceptance with an external owner.
 
 Mechanically these are native Trivy ignorefiles (`--ignorefile`, one per image so
 an acceptance for grafana never silently covers cert-manager), composed with
@@ -460,7 +464,8 @@ one package, and suppressions surface in `ExperimentalModifiedFindings` with a
 `Source` that distinguishes VEX from acceptance. So **acceptance decays back to
 un-triaged on its own** (Req 6.9) — the property that makes it safe. Our glue is
 only what Trivy lacks: `scripts/lint-accepted-risk.sh` enforcing required fields,
-the 90-day ceiling, and that no ignorefile lives anywhere else (Req 6.11–6.12),
+the policy file's per-severity ceilings (Req 6.49; formerly a flat 90 days),
+and that no ignorefile lives anywhere else (Req 6.11–6.12),
 plus expiry reporting (Req 6.10), since Trivy logs nothing when an entry lapses.
 
 Each entry carries a `blocked:` field stating why avoid and mitigate were
@@ -645,8 +650,10 @@ none of the staleness that makes a hand-written digest wrong in *source*.
 
 Compiling there also replaces the `jq` name-match that step used to decide which
 documents belong to this image. That is the compiler's image filter, already
-tested — an emptied document is never written, so what lands in the output
-directory is exactly what should be attested.
+tested. One as-built behavior reverses here: the compiler used to write no
+document when nothing matched, and now an empty document is written and
+attested (measured acceptable across the toolchain in ADR 0003), so every
+published digest carries its exactly-one OpenVEX attestation (Req 6.43).
 
 **Which tags count (Req 6.30).** "A tag of an image being scanned" is a property
 of the artifact, never of the definition. The two drift by design: a definition
