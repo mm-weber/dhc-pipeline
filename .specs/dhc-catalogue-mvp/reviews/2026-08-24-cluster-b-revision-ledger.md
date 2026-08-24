@@ -20,20 +20,20 @@ truth-pass items (1.12, 1.13).
 
 | # | Finding (short) | Disposition | Where encoded |
 |---|---|---|---|
-| 1.1 | Attested reports omit suppressed findings: accepted clocks as fixed, closes as gone; 6.52/6.53 both fire | open; reviewer's rewording: reports record suppressed findings (`--show-suppressed` in rescan and release scans); "appears" means reported or suppressed | |
-| 1.2 | Decision and fix clocks not computable from named inputs; "release line" undefined; fix date has no source | open; reviewer's shape: decision time from action statement timestamp (affected) or statement timestamp (not_affected/fixed); define release line in the Req 2 terms; name the fixed-date source; critique amendment in the same commit | |
+| 1.1 | Attested reports omit suppressed findings: accepted clocks as fixed, closes as gone; 6.52/6.53 both fire | **decided 2026-08-24**: reports record suppressed findings and scanner/database versions (Req 6.55); "appears" means reported or suppressed (6.52, 6.46); both scan arms attest one report shape | Req 6.46, 6.52, 6.55; tasks 9.1, 10.3 |
+| 1.2 | Decision and fix clocks not computable from named inputs; "release line" undefined; fix date has no source | **decided 2026-08-24** per the reviewer's shape: decision time from `action_statement_timestamp` (affected) or the statement `timestamp` (not_affected/fixed); fix time as the first day absent from every supported digest of its repository, carried forward from the prior status issue's fenced JSON; "release line" replaced by the supported set; critique F4 (ii) amended in the same commit | Req 6.46, 6.47; critique amendment; task 10.4 |
 | 1.3 | 6.38 unconditional (competes with source statements; Trivy picks by timestamp) and never sets the affected statement's timestamp; no day-one first-seen for existing exceptions | open; reviewer's rewording: "that no source statement covers", timestamp = first seen with a defined fallback; migration sentence for the twelve grafana entries | |
 | 1.4 | 6.43 fires every day (document timestamp differs) and never repairs a violated one-attestation invariant; zero attestations invisible | open; reviewer's rewording: differs in its set of statements, or attestation count differs from one; canonical comparison; merge as carry-forward input when several exist | |
-| 1.5 | 6.42's replace scope understated; critique claims a Rekor measurement ADR 0004 lists as unmeasured | open; reword to "every scan report attestation of that predicate type"; correct the critique sentence; task 10.3 measures keyless --replace and Rekor retention first | |
+| 1.5 | 6.42's replace scope understated; critique claims a Rekor measurement ADR 0004 lists as unmeasured | **decided 2026-08-24**: 6.42 reworded to "every scan report attestation of that predicate type"; the critique's Rekor sentence corrected with the overstatement named; keyless `--replace` and Rekor retention still to be measured first, in task 10.3 (to add with 1.9's verification clause) | Req 6.42; critique F5 (ii) correction |
 | 1.6 | Amended 2.6, 2.8, 6.1, 6.3 have no implementing task; aperture is declared but nothing reads it | open; add the reads to task 10.1 (workflow --severity from the policy file, sevRank takes the aperture) and annotate | |
-| 1.7 | Issues over legacy digests never close; reopening claim false to the code; resolved:fixed asserts an unknown reason | open; owner's call on scope, reopening criterion, and label semantics | |
+| 1.7 | Issues over legacy digests never close; reopening claim false to the code; resolved:fixed asserts an unknown reason | **decided 2026-08-24** on the owner's research memo (`data/cve-finding-lifecycle-vs-immutable-tags-2026-08-24.md`): issues, clocks and the badge run over the *supported set* (each definition's current tags); superseded digests keep every knowledge artifact and hold no issues; reopening reactivates the same issue via the marker over closed issues (6.57); labels evidence-graded, `resolved:fixed` only on SBOM proof, `resolved:absent` names scanner and database (6.56); tag retention stays cluster D with the industry poles recorded | Req 2 terms; Req 6.3, 6.46, 6.47, 6.49, 6.52, 6.53, 6.56, 6.57; critique F13 amendment; Decision 7; tasks 10.1, 10.4, 10.6 |
 | 1.8 | 6.50: no KEV-outage rule, no severity source, over-ceiling exceptions past the gate only ever "reported" | open; owner's call on fail-open versus fail-closed; severity source and escalation per the reviewer's suggestion | |
 | 1.9 | Carry-forward input not required to be verified: an unverified read re-signs whatever sits on the digest | open; reviewer's clause: read previous documents and reports only through verification against the 2.23 identities | |
 | 1.10 | Amended 6.8 binds the wrong actor and restates 6.38 | open; reviewer's rewording | |
 | 1.11 | 6.41 fires for findings the scan no longer lists; "original timestamp" has no day-one value | open; reviewer's rewording plus 1.3's first-seen definition | |
 | 1.12 | Standing design text contradicts Decision 7; release flow not updated for affected; dangling issue-link promise | open | |
 | 1.13 | Truth pass misses CONVENTIONS.md, the exception file header, a build.yml comment, the manual's "never closes" line; Req 6.4 left dangling | open | |
-| 1.14 | Daily cost and growth of 6.42/6.43 never stated (~25 scans and log entries per day, growing) | open; owner accepts the number or changes the cadence | |
+| 1.14 | Daily cost and growth of 6.42/6.43 never stated (~25 scans and log entries per day, growing) | **decided 2026-08-24**: the measured baseline (16 digests, 24 platform manifests, ~24 scans and attestations daily, growing until cluster D's retention decision) is stated in Decision 7's trade-offs; owner accepts by PR review | Decision 7 trade-offs |
 | 1.15 | Small defects: 6.40 "change time" unbound and unscoped; 6.48 antecedent; 6.49 per-aperture ceilings; sub-day durations unexpressible; resolved-label source; a task cites ADR 0003 for a design.md measurement; intro cites ADR 0004 before its merge; 6.47 "open finding" undefined | open | |
 
 ## Working notes
@@ -42,3 +42,9 @@ truth-pass items (1.12, 1.13).
   dispositions yet. ADR 0004 (PR #99) must merge before or with this PR, or
   the requirements introduction cites a document `main` does not hold
   (finding 1.15).
+- 2026-08-24, revision commit 1: the owner's lifecycle research memo landed
+  in `data/` and the modified bundle was adopted: 1.1, 1.2, 1.5, 1.7 and
+  1.14 decided and encoded, plus 1.15's "open finding" and per-aperture
+  ceiling items (Req 6.47, 6.49). New criteria 6.55 to 6.57. Open for the
+  owner: 1.8 (KEV outage rule). Open corrections: 1.3, 1.4, 1.6, 1.9, 1.10,
+  1.11, 1.12, 1.13, remaining 1.15 items.

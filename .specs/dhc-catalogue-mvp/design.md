@@ -290,8 +290,23 @@ graph TB
      KEV feed it now fetches (Req 6.50), and the rescan re-evaluates daily because KEV
      status changes after the fact (Req 6.51). The clocks are computed from attestations and
      the enumeration (Req 6.46) and published to one status issue plus a workflow artifact
-     (Req 6.47); native badges now (Req 6.48), Pages later. The rescan closes `cve` issues on
-     evidence only (Req 6.52 to 6.54): it acts on derived state, never on judgement.
+     (Req 6.47); native badges now (Req 6.48), Pages later. Issues, clocks and the badge run
+     over the **supported set**, the digests each definition's current `tags:` reference:
+     the industry scopes its promises to version streams because a frozen digest's report
+     never changes and its findings accrue by design
+     (`data/cve-finding-lifecycle-vs-immutable-tags-2026-08-24.md`: Chainguard states EOL
+     images "start to accrue CVEs", Bitnami moved its back catalogue to a no-updates
+     namespace); superseded tag-referenced digests keep every knowledge artifact, daily
+     scans, attested reports, the re-attested VEX document and the verification proof, but
+     hold no issues, so the `cve` badge counts work actually waiting rather than a floor
+     that grows with every release. The rescan closes `cve` issues on evidence only
+     (Req 6.52 to 6.56) and reopens the same issue when a closed finding returns
+     (Req 6.57, the Dependency-Track reactivate pattern: durable identity is the hidden
+     marker, history stays on one issue); close labels are graded by evidence, with
+     `resolved:fixed` requiring the attested SBOMs to prove the package version bumped,
+     never inferred from absence alone, and `resolved:absent` naming the scanner and
+     database versions so a feed regression is labelled as what it is. It acts on derived
+     state, never on judgement.
    - **Trade-offs**: `rescan.yml` gains `packages: write` and `id-token: write` (rewriting
      an `.att` manifest is a push), widening what a compromised rescan could do to
      "publish a bad attestation or move a tag"; the compensating controls are the role split
@@ -301,8 +316,14 @@ graph TB
      under rebase or reordering. Rejected: hand-authored `affected` (two artifacts for one
      decision), appending with a merge recipe (the consumer's document becomes a coin flip),
      bot commits of a metrics file (violates "everything enters as a pull request"), a Pages
-     dashboard now (presentation before the data exists). Fork switches: every number in the
-     `triage` section, and the `resolved:*` closing labels.
+     dashboard now (presentation before the data exists). The daily cost is stated rather
+     than implied: today's tag-referenced set is 16 digests with 24 platform manifests
+     (measured 2026-08-24), so Req 6.42 is roughly 24 scans (about 35 seconds each) and 24
+     keyless scan-report attestations per day, each a transparency-log entry, growing with
+     every release until cluster D decides tag retention; the memo records the industry's
+     two poles for that decision (Chainguard's 180-day EOL grace against DHI's paid
+     five-year extended support). Fork switches: every number in the `triage` section, the
+     support statement's tag set, and the `resolved:*` closing labels.
 
 ## System Flows
 
@@ -341,8 +362,9 @@ daily 06:17 UTC ─► enumerate every catalogue tag → digest (2.22)
   invariants step (one report shape): anonymous pull per repository and tag (2.21)
         · verification proof + control digest (2.24) · exactly one OpenVEX attestation (6.45)
         · exceptions against current severity and KEV (6.51)
-  ─► clocks from attestations (6.46) ─► status issue + artifact (6.47)
-  ─► issues: open for new findings (6.3) · close on evidence (6.52 to 6.54) · expiry warnings (6.10)
+  ─► clocks from attestations over that supported set (6.46) ─► status issue + artifact (6.47)
+  ─► issues over that supported set: open (6.3) · close, evidence-graded labels (6.52 to 6.56)
+        · reopen on recurrence (6.57) · expiry warnings (6.10)
 ```
 
 ### Upstream bump flow (the operating heart)
@@ -785,7 +807,8 @@ ports: [3000/tcp]
 | Exception expiry exceeds its ceiling for the finding's severity or KEV status | validate.yml fails (outer ceiling), the scan gate fails naming the exception (tier), the rescan reports it daily (KEV status moved) | 6.11, 6.50, 6.51 |
 | A VEX source statement records a status the lane does not author | validate.yml fails naming the statement | 6.39 |
 | An exception lapses | its `affected` statement is replaced by `under_investigation` with the original first-seen timestamp; the finding re-reds the gate | 6.9, 6.41 |
-| A `cve` issue's finding is gone or covered | the rescan closes it with the evidence named, never with a judgement | 6.52 to 6.54 |
+| A `cve` issue's finding is gone or covered on every supported digest | the rescan closes it, evidence named, label graded (`resolved:fixed` only on SBOM proof; `resolved:absent` names scanner and database versions), never with a judgement | 6.52 to 6.56 |
+| A closed issue's finding returns as a reported finding on a supported digest | the rescan reopens that issue, history intact | 6.57 |
 
 ## Testing Strategy
 

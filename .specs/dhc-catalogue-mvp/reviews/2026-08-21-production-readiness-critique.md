@@ -730,10 +730,14 @@ input. Permissions: `rescan.yml` gains `packages: write` as well as
 `id-token: write`, because rewriting the `.att` manifest is a push; the
 compensating control is the daily verification proof over every
 tag-referenced digest (Req 2.24) in the same run's `invariants` step. The
-published set is cluster A's enumeration (Req 2.22). The spike that opens
-cluster B measures, on v2.6.0, that `--replace` removes every prior OpenVEX
-layer, that Trivy `--vex oci` then reads the new document, and that the old
-entry remains in Rekor.
+published set is cluster A's enumeration (Req 2.22). The spike that opened
+cluster B (ADR 0004) measured, on v2.6.0, that `--replace` removes every
+prior OpenVEX layer and that Trivy `--vex oci` then reads the new document.
+Rekor retention of replaced entries was NOT measured there (the spike ran
+with tlog upload disabled) and neither was `--replace` under keyless
+signing; task 10.3 measures both in CI before anything relies on them
+(corrected 2026-08-24; this sentence previously overstated the spike,
+independent review finding 1.5).
 
 **F4 (i), ceilings and aperture (decided 2026-08-21): one policy file,
 every number a variable.** `triage/policy.yaml` declares the decision
@@ -804,6 +808,17 @@ per document, so Trivy's ordering by `timestamp` is unaffected; a later
 `not_affected` or `fixed` source statement replaces the catalogue statement
 rather than competing with it. Rejected: `timestamp` as the status-change
 time with first seen in free text.
+
+*Amended 2026-08-24 (PR #100 revision, finding 1.2):* the clock sources are
+made computable. Decision time reads `action_statement_timestamp` for
+`affected` (equal to `decided_at`) and the statement `timestamp` for
+`not_affected` and `fixed` (the author's dated decision), from the current
+document alone; `last_updated` is provenance, not a clock. Fix time is the
+first day a finding is absent, reported and suppressed alike, from every
+supported digest of its repository, carried forward from the previously
+published status data (the status issue's fenced JSON), which replaces the
+undefined "release line" and survives daily report replacement. Clocks run
+over the supported set (see the F13 amendment of the same date).
 
 *Badges (decided 2026-08-21): (a) now, (b) when the metrics exist.*
 (a) Native GitHub badges rendered by shields.io from the public API: open
@@ -1099,6 +1114,23 @@ decision that now covers the finding is visible as the replaced OpenVEX
 attestation. The register (cluster D) gains the cosign version pin from
 ADR 0003 as a deliberate human item, completed the way the tool sha256 pins
 are.
+
+*Amended 2026-08-24 (PR #100 revision, findings 1.1 and 1.7, on the owner's
+research memo `data/cve-finding-lifecycle-vs-immutable-tags-2026-08-24.md`):*
+issues, clocks and the public count run over the **supported set**, the
+digests each definition's current tags reference; superseded tag-referenced
+digests keep every knowledge artifact (daily scans, attested reports, the
+re-attested VEX document, verification) and hold no issues, the version-
+stream scoping every surveyed vendor uses because a frozen digest's findings
+accrue by design. Attested reports record suppressed findings and their
+scanner and database versions, so covered findings still "appear" and the
+gone-close and covered-close cannot both fire. Closes are evidence-graded:
+`resolved:fixed` only on SBOM-diff proof or a fixed statement, never on
+absence alone; `resolved:absent` names the scanner and database versions. A
+closed finding that returns reopens its original issue (the Dependency-Track
+reactivate pattern; the hidden marker is the durable identity). Whether
+superseded tags are ever retired stays cluster D's question, now with the
+industry's poles recorded in the memo.
 
 ---
 
