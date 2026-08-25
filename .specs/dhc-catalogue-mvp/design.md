@@ -322,7 +322,9 @@ graph TB
      keyless scan-report attestations per day, each a transparency-log entry, growing with
      every release until cluster D decides tag retention; the memo records the industry's
      two poles for that decision (Chainguard's 180-day EOL grace against DHI's paid
-     five-year extended support). Fork switches: every number in the `triage` section, the
+     five-year extended support). The greenfield epoch (Decision 9) resets that
+     baseline: the daily set restarts at the first fresh release, and retention
+     becomes the epoch plus a go-forward policy. Fork switches: every number in the `triage` section, the
      support statement's tag set, and the `resolved:*` closing labels.
 
 8. **Upstream trust: quarantine, declared authenticity, tracked charts (Req 1.3, 1.10 to 1.12, 3.5, 3.7 to 3.12, 4.5, 4.8, 4.9; review F2, F10, F8, F13 ii and iii, F12 d; ADR 0002 amendment; 2026-08-25)**
@@ -390,6 +392,31 @@ graph TB
      watcher (the datasource exists). Fork switches: the age value, the automerge
      update types, the per-definition class, whether compat is allowed at all, an
      entitled fork's extra dhi.io paths.
+
+9. **Greenfield epoch: the catalogue restarts clean before its first promised release (review F9 re-decision, F13, cluster D retention; 2026-08-25)**
+   - **Context**: clusters A to C were specified against a registry carrying ten
+     multi-arch legacy tags with unsigned platform manifests, twelve exceptions
+     predating `decided_at`, three stacked OpenVEX attestations on one digest, and
+     a pre-attestation stratum the superseded set would babysit daily forever. The
+     accommodations were small in spec text but permanent in operation, and every
+     one of them existed to preserve history nobody was promised.
+   - **Decision**: wipe every tag and version in the seven catalogue repositories
+     immediately before task 9.1's first release; the first fresh release mints a
+     registry where every published digest meets Req 2.9 uniformly. Framing A's
+     promise attaches at the epoch; nothing was promised before it. The wipe is
+     recorded in `triage/LOG.md`, stated in `SECURITY.md` (cluster D), and
+     exercises F11's revocation mechanics once, deliberately. Accepted-risk
+     exceptions are re-decided fresh with `decided_at`; source VEX statements are
+     digest-independent and stand; closed `cve` issues keep their durable markers
+     so a returning finding reactivates rather than duplicates (Req 6.57).
+   - **Trade-offs**: any pre-epoch digest pin breaks (no consumer is known; the
+     owner accepts); the live demonstration of operating through unsigned history
+     is lost while its recorded judgement survives in the reviews and ADRs; chart
+     pins reference deleted digests for at most one kickoff cycle before the
+     chart-pin managers re-pin them. Rejected: keeping the stratum (permanent
+     daily cost purchasing no knowledge) and migrating clocks from issue dates
+     (one-time code accommodating removable state). Fork switch: none needed, a
+     fork starts at its own epoch by construction.
 
 ## System Flows
 

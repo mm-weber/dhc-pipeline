@@ -859,6 +859,32 @@ daily and scans every platform manifest of every tag-referenced digest
 (Req 2.18, 2.22), which satisfies Req 2.6 as written and keeps every existing
 signature valid. The digests, and the "never delete" reasoning, are unchanged.
 
+*Amended 2026-08-25 (greenfield epoch, owner decided):* **the digests do
+not stay.** With clusters A to C specified and nothing yet implemented,
+the owner chose a clean epoch over accommodation: before task 9.1's first
+release under the new path, every tag and version in the seven catalogue
+repositories is deleted, and the first fresh release mints a registry
+where every published digest meets Req 2.9 uniformly. The "never delete"
+reasoning weighed deletion against consumers' digest pins; framing A's
+promise attaches at the epoch, no consumer was promised anything before
+it, and a reference implementation is a cleaner exemplar with no
+pre-attestation stratum to caveat. What deletion was reserved for (F11's
+revocation tool) is exercised once, deliberately, as the epoch: the wipe
+is recorded in `triage/LOG.md` with every digest removed, and cluster D's
+`SECURITY.md` states that digests published before the epoch are
+withdrawn. Consequences: the ten multi-arch legacy tags and their
+unsigned platform manifests leave the problem space; the daily scan set
+restarts at the first fresh release; tasks 10.1 to 10.3 lose their
+migration sentences (LOG date backfill, first-seen migration, first-run
+attestation repair), replaced by task group 12; cluster D's tag-retention
+question collapses to the epoch plus a go-forward policy. Accepted-risk
+exceptions are re-decided fresh with `decided_at` at first release; source
+VEX statements are digest-independent claims about product and version
+and stand unchanged; the removed digests' reasoning survives in
+`triage/LOG.md` and git history. The wipe executes at implementation
+kickoff, after cluster D's spec, immediately before task 9.1's first
+release.
+
 **F6, verification identity (decided 2026-08-21): anchor the prose and
 ship a tested verification policy, with the engine rendering separable.**
 README and manual move to the exact form: issuer pinned, identity anchored
