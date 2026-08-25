@@ -367,3 +367,29 @@ consistency signal; deferred until a real incident argues for it.
 
 Stub for tests and offline work: `REFRESH_GRAFANA_API_URL` (`file://`
 fixtures), alongside the existing apt/GH/dl seams.
+
+## Amendment, 2026-08-25: the API-sha cross-check is adopted (deferral reversed)
+
+The 2026-08-11 amendment closed with the API-sha-versus-sidecar comparison
+"deferred until a real incident argues for it". The 2026-08-21
+production-readiness review is the argument (finding F2, checkpoint
+placement decision): grafana's authenticity anchor is a checksum served by
+the same origin as the artifact, and the versions API is the one
+independent-enough origin already in the resolution path. The comparison
+costs one field read from a response the refresh already fetches.
+
+Adopted as review F2's checkpoint 1 (Req 3.8): before any field is written,
+the per-architecture sha256 from the versions API must equal the
+`dl.grafana.com` sidecar's value; a disagreement refuses the bump naming
+both values. Checkpoint 2 repeats the comparison at PR time in
+`verify-arch-pins.sh` against the bytes actually served (Req 3.9), and
+checkpoint 3 repeats it daily in the rescan's invariants (Req 3.10). One
+comparison function, three call sites. The pin source is unchanged: the
+sidecar remains what is written, the API remains a witness. Measured basis,
+2026-08-21: across 13.0.4, 13.0.6, 13.1.1, 13.1.2 and 13.1.3 on amd64,
+arm64, armv6 and armv7, API and sidecar agree in all 20 cases.
+
+The grafana authenticity class this witnesses is declared per definition as
+`# authenticity: cross-origin-checksum` (Req 1.10); the `.deb` route via the
+signed apt index stays the documented switch for a cryptographic bar, not
+taken while the apt index measurably lags releases.

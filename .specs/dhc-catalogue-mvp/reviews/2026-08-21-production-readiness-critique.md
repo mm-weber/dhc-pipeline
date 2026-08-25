@@ -951,6 +951,22 @@ shared code, one test suite, three call sites; checkpoint 3 generalises to
 "every pinned upstream artifact still matches what its origin states
 today" once every definition carries a class.
 
+*Amended 2026-08-25 (cluster C design review against the merged clusters
+A and B):* the decision stands; three placements are fixed to the as-built
+tree. The quarantine age is declared in `renovate.json5`, not the catalogue
+policy file: Renovate reads only its own configuration, and the fork switch
+stays a one-line config value. Req 3.5 as written ("only digest updates
+within a patch release") is narrower than what the config has always done
+and this decision keeps (patch and digest updates of a from-source
+upstream automerge); the criterion is amended to the decided truth in this
+cluster, closing the concession recorded in tasks.md. Checkpoint 1's
+API-sha-versus-sidecar comparison reverses ADR 0002's dated deferral
+("until a real incident argues for it"); that reversal is encoded as a
+dated amendment to ADR 0002 in the same PR, and the as-built refresh
+already meets the rest of checkpoint 1: it cross-checks three build-id
+sources and refuses on conflict, so what is added is the per-architecture
+checksum comparison before any field is written.
+
 **F10, upstream authenticity (decided 2026-08-21 by consequence of F2):
 accept.** Each definition declares its class in a `# authenticity:`
 comment marker, following the existing `# renovate:` convention for
@@ -963,6 +979,13 @@ chart README and `SECURITY.md` state the class per image, so "verified" is
 never read where the truth is "independent origins agree". The `.deb`
 route for real cryptographic authenticity on grafana is the documented
 switch in ADR 0002.
+
+*Amended 2026-08-25 (cluster C design review):* sequencing for
+`hardened-app`. Every definition declares its class in this cluster, and
+`hardened-app` declares `signed-commit` now; enforcement is at bump time
+(F2 b), so the standing pin stays valid while the next bump refuses until
+its tags are SSH-signed. Signing those tags is an owner action sequenced
+before that bump, recorded in the task.
 
 **F7, scanner monoculture (decided 2026-08-21): Grype as a measured second
 consumer, a daily consumer smoke test, consumers as a declared list.**
@@ -1131,6 +1154,19 @@ closed finding that returns reopens its original issue (the Dependency-Track
 reactivate pattern; the hidden marker is the durable identity). Whether
 superseded tags are ever retired stays cluster D's question, now with the
 industry's poles recorded in the memo.
+
+*Amended 2026-08-25 (cluster C design review), items (ii) and (iii):* the
+as-built state moved under them. The task 8.7 chart-pin managers landed
+2026-08-14 and already move the image pins in chart values, same-tag digest
+drift included, so (ii) reduces to its remaining half: a manager over
+`chart/<name>/chart.yaml`'s `upstream.name`, `upstream.repository` and
+`upstream.version` against the native `helm` datasource, covering the three
+upstream charts (`hardened-app`'s chart is own-authored, nothing to track),
+never automerged because a chart bump runs the e2e upgrade path. (iii)
+becomes an automerge rule scoped to digest-only updates from those chart-pin
+managers, gated on green required checks with the e2e gate among them.
+Grafana's chart keeps its recorded version-skew note (chart 10.5.15 deploys
+the 13.x images); a chart-version bump there is reviewed against it.
 
 ---
 

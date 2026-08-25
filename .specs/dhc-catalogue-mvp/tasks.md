@@ -289,17 +289,46 @@
     - `docs/user-manual.md` and README: the consumer recipe becomes one `verify-attestation` per predicate type (exactly one OpenVEX attestation per digest), the two-lane table gains the third verb, the rescan section describes replace-not-append, the status issue and the issue lifecycle with its evidence-graded labels and reopening (the manual's "the cron opens issues, it never closes them" sentence goes); `docs/CONVENTIONS.md`'s "must never be written as a VEX" and 90-day sentences; the header comment of `triage/accepted-risk/grafana.yaml` and the same "never attested" sentence in `build.yml`'s attest step comment (flagged for task 9.1's rewrite of that step); `triage/README.md` and `triage/accepted-risk/README.md`: `decided_at`, the policy file's ceilings, the supported set, `affected` as the published form of an exception; design.md Decision 7 marked as-built
     - _Requirements: Req 6.8, Req 7.1_
 
+- [ ] 11. Production readiness, cluster C: upstream trust (review F2, F10, F8, F13 ii and iii, F12 d; spec amendment landed before any of these)
+  - [ ] 11.1 Quarantine and automerge truth in renovate.json5
+    - `minimumReleaseAge: "3 days"` on the github-tags and github-releases rules (Req 3.7); a comment states independence comes from age, signal and gates, and that the commit sha is pin-at-bump-time, protecting against later tag rewrites (F2 c)
+    - The Req 3.5 packageRule comment and CONVENTIONS' automerge rows state the decided scope truthfully: patch and digest updates of a from-source upstream automerge behind green required checks; repackage bumps never (Req 3.5)
+    - `test/renovate/managers.test.mjs` asserts github-tags supplies release timestamps (the quarantine's input) and `renovate-config-validator --strict` accepts the age rule
+    - _Requirements: Req 3.5, Req 3.7_
+  - [ ] 11.2 Authenticity classes, declared and enforced at bump time
+    - `# authenticity: <class>` beside each definition's source url: signed-tag (cert-manager trio), signed-commit (valkey, hardened-app), cross-origin-checksum (grafana); `lint-pins.sh` requires a marker on every definition and refuses `none` or a missing one (Req 1.10, 1.11); the same lint restricts dhi.io repository paths to /main (Req 1.12; F12 d, memo Q4: `security` and `els` are entitlement-gated)
+    - `refresh-definition.sh` verifies before writing: GitHub's verification statement for the resolved annotated tag (signed-tag) or for the commit a lightweight tag points at (signed-commit), refusing by name on anything but verified (Req 3.8); measured basis in the critique, cert-manager v1.21.1 and valkey 9.1.1 both verified. [OPERATOR: SSH-sign hardened-app tags before its next bump; the standing pin stays valid]
+    - `refresh-grafana.sh` checkpoint 1: per-arch sha256 from the versions API compared against the dl.grafana.com sidecar before any field is written, refusing on disagreement naming both (Req 3.8; reverses ADR 0002's dated deferral, amendment landed with this spec PR)
+    - The signer identity or agreeing origins from the check go into the bump PR body via the refresh output (F2 b)
+    - _Requirements: Req 1.10, Req 1.11, Req 1.12, Req 3.8_
+  - [ ] 11.3 Checkpoints 2 and 3: PR time and daily
+    - `verify-arch-pins.sh` gains the API statement: pinned value, bytes served and the versions-API sha256 must agree per architecture, closing the `REFRESH_GRAFANA_SHA256_*` hand-feed seam (Req 3.9); one comparison function shared with checkpoint 1, one test suite, three call sites
+    - Rescan invariants: re-verify each definition's declared signal daily (git archetype: verification statement still verified for the pinned ref; repackage: pinned sha still equals sidecar and API), a mismatch fails the run and files an issue labelled as a supply-chain signal (Req 3.10); lapsed compat review-by dates reported in the same step (Req 4.9)
+    - _Requirements: Req 3.9, Req 3.10, Req 4.9_
+  - [ ] 11.4 Chart versions tracked, same-tag chart automerge, valkey compat as transfer
+    - renovate.json5: a helm-datasource manager over `chart/<name>/chart.yaml` `upstream.name`/`upstream.repository`/`upstream.version`, covering the three upstream charts (hardened-app's chart is own-authored), never automerged because a chart bump runs the e2e upgrade path (Req 3.11); grafana's version-skew note governs its bump review; fixtures in managers.test.mjs assert capture and non-capture
+    - An automerge packageRule scoped to digest-only updates from the two chart-pin managers (Req 3.12), gated on the required checks (e2e gate among them since 2026-08-21); the dhi.io build-layer rule stays ordered after it so its automerge:false wins
+    - `chart/valkey/chart.yaml` gains `compat:` (reason, upstream issue reference, review-by date); a yamale schema validates it in validate.yml (yamale is already pinned in requirements-ci.txt) and fails validation past the review-by date (Req 4.5, 4.8); the chart README keeps the prose, now citing the block
+    - `triage/upstream/2026-08-25-valkey-helm-init-container-image.md`: the measured evidence (unconditional init container, same image helper as the main container, metrics-exporter image value as upstream's own precedent) with a checks/ script re-running the render measurement; asks for an init-container image value defaulting to the main image, and an enable switch second. [OPERATOR: file against valkey-io/valkey-helm; record the issue number in the compat block and triage/LOG.md]
+    - _Requirements: Req 3.11, Req 3.12, Req 4.5, Req 4.8_
+  - [ ] 11.5 Truth pass
+    - docs/CONVENTIONS.md: the pinning contract gains the authenticity-class row and the dhi.io /main rule; "hand-pinned; nothing tracks chart versions yet" goes; the upstream-tracking table gains the chart-version manager row and the quarantine and signal sentences; the automerge rows state the 3.5 scope
+    - `chart/cert-manager/chart.yaml`'s "still-open gap" comment goes; chart READMEs state each image's authenticity class (F10 consumer half; SECURITY.md's copy arrives with cluster D)
+    - `docs/user-manual.md`: the upstream-tracking section gains quarantine, signal and chart-version tracking
+    - design.md Decision 8 marked as-built when implemented
+    - _Requirements: Req 7.1_
+
 ## Requirements Coverage
 
 | Requirement | Covered By Tasks |
 |-------------|------------------|
-| Req 1: Image Definition Catalogue | 2.1, 2.2, 3.1, 3.2, 5.1, 5.2, 1.2, 8.1, 8.4, 9.7 |
+| Req 1: Image Definition Catalogue | 2.1, 2.2, 3.1, 3.2, 5.1, 5.2, 1.2, 8.1, 8.4, 9.7, 11.2 |
 | Req 2: Image Build and Release | 3.3, 8.2, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 10.1 |
-| Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2 |
-| Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4, 8.7 |
+| Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2, 11.1, 11.2, 11.3, 11.4 |
+| Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4, 8.7, 11.3, 11.4 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7 |
 | Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5, 9.1, 9.3, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7 |
-| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7 |
+| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5 |
 | Req 8: Operating Environment | 3.3, 6.5 |
 
 Req 8.2 (delegate network-heavy work to CI/operator host) has no implementing task: it is an

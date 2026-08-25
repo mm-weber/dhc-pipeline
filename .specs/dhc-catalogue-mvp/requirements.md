@@ -30,13 +30,16 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 
 1. THE Catalogue SHALL contain definition files for four components: hardened-app, cert-manager (controller, webhook, and cainjector images), grafana, and valkey.
 2. THE Catalogue SHALL pin every base image reference by sha256 digest.
-3. THE Catalogue SHALL pin every upstream source reference by git ref plus content checksum.
+3. THE Catalogue SHALL pin every upstream source reference by an exact version reference plus content checksum: a git ref plus commit checksum for a compile-from-source archetype, and a versioned artifact URL plus per-architecture content checksum for a repackage archetype.
 4. THE Catalogue SHALL define a non-root runtime account with UID 65532 for every runtime image.
 5. WHEN a pull request modifies a definition file THE CI Pipeline SHALL validate schema conformance and pinning conventions before merge.
 6. IF a definition references a floating tag THEN THE CI Pipeline SHALL fail validation with a message naming that reference.
 7. WHERE Docker's dhi.io/build frontend produces working builds outside Docker infrastructure THE Catalogue SHALL author definitions in native DHI syntax.
 8. IF a DHI frontend spike does not produce a working build within a three-hour timebox THEN THE Catalogue SHALL adopt DHI-style YAML definitions rendered to multi-stage Dockerfiles by thin glue tooling.
 9. THE Catalogue SHALL record in CONVENTIONS.md that versions of packages installed from package repositories are not pinned in definitions and that each platform manifest's resolved package set is recorded in the SPDX and CycloneDX SBOMs attested to that manifest.
+10. THE Catalogue SHALL declare in each definition an upstream authenticity class naming its verification signal: signed-tag, signed-commit, cross-origin-checksum, or none.
+11. IF a definition declares authenticity class none or declares no class THEN THE CI Pipeline SHALL fail validation naming that definition.
+12. IF a definition names a dhi.io package repository whose path is not of shape dhi.io/apk/(distro)/(release)/main or dhi.io/deb/(distro)/(release)/main THEN THE CI Pipeline SHALL fail validation naming that repository.
 
 ### Requirement 2: Image Build and Release
 
@@ -83,8 +86,14 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 2. WHEN an upstream release matches a definition's version policy THE Renovate Automation SHALL open a pull request updating pinned ref, checksum, and derived tags.
 3. WHEN multiple images share one upstream monorepo THE Renovate Automation SHALL group their bumps into a single pull request.
 4. WHEN an upstream release increments a major version THE Renovate Automation SHALL stage it behind Dependency Dashboard approval instead of opening an automatic pull request.
-5. WHERE a pull request contains only digest updates within a patch release THE Renovate Automation SHALL enable automerge gated on CI success.
+5. WHERE a pull request contains solely digest or patch updates of a compile-from-source upstream THE Renovate Automation SHALL enable automerge gated on green required checks.
 6. WHEN THE Catalogue is initialized THE Catalogue SHALL pin each upstream at least one release behind its latest available version.
+7. THE Renovate Automation SHALL withhold each upstream version bump pull request until its release has aged a declared minimum release age, at least three days in this catalogue.
+8. WHEN a refresh task recomputes a checksum or resolves a commit for a bump THE Refresh Tooling SHALL verify that definition's declared authenticity signal and SHALL write no field of a bump whose signal fails verification, reporting each such refusal naming its signal.
+9. WHEN a pull request changes a repackage definition's per-architecture checksum THE CI Pipeline SHALL verify pinned value, bytes served by its download origin and its upstream's published version statement agree per architecture, failing on any disagreement naming each value.
+10. THE Scan Pipeline SHALL re-verify at least once per day each definition's declared authenticity signal against its upstream origin, and SHALL report each mismatch as a failure of that run and file an issue naming it as a supply-chain signal.
+11. THE Renovate Automation SHALL track each upstream chart version pinned under chart/ against its chart repository and SHALL open a pull request, never automerged, for each new chart release matching its version policy.
+12. WHERE a pull request contains solely digest updates of catalogue image pins under chart/ THE Renovate Automation SHALL enable automerge gated on green required checks, its e2e upgrade path among them.
 
 ### Requirement 4: Helm Chart Adaptation
 
@@ -96,9 +105,11 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 2. THE Chart Adaptation SHALL override image references to digest-pinned Catalogue images.
 3. THE Chart Adaptation SHALL enforce restricted Pod Security Standard settings: runAsNonRoot true, UID and GID 65532, readOnlyRootFilesystem true, allowPrivilegeEscalation false, all capabilities dropped, and seccompProfile RuntimeDefault.
 4. WHERE a workload requires writable filesystem paths THE Chart Adaptation SHALL mount emptyDir volumes at those paths.
-5. IF an upstream chart assumes shell utilities absent from a runtime image THEN THE Chart Adaptation SHALL document a compat-variant decision in that chart's README.
+5. IF an upstream chart assumes shell utilities absent from a runtime image THEN THE Chart Adaptation SHALL record a compat-variant decision as structured metadata carrying reason, upstream issue reference and review-by date, and SHALL document that decision in its chart's README.
 6. WHEN a chart renders in CI THE Policy Gate SHALL evaluate rendered manifests against Kyverno policies requiring digest pinning, allowed registries, and non-root execution.
 7. THE Chart Adaptation SHALL document every deviation from upstream defaults with its rationale in a per-chart README.
+8. IF a compat decision's review-by date has passed THEN THE CI Pipeline SHALL fail validation until that decision carries a fresh review-by date from a dated re-decision.
+9. THE Scan Pipeline SHALL report each lapsed compat review-by date in its daily run.
 
 ### Requirement 5: Go Integration Tests on Real Kubernetes
 

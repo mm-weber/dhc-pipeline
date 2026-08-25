@@ -325,6 +325,62 @@ graph TB
      five-year extended support). Fork switches: every number in the `triage` section, the
      support statement's tag set, and the `resolved:*` closing labels.
 
+8. **Upstream trust: quarantine, declared authenticity, tracked charts (Req 1.3, 1.10 to 1.12, 3.5, 3.7 to 3.12, 4.5, 4.8, 4.9; review F2, F10, F8, F13 ii and iii, F12 d; ADR 0002 amendment; 2026-08-25)**
+   - **Context**: from-source patch bumps automerged while their checksum was recomputed
+     from whatever upstream served at that instant, so an adversary publishing a
+     malicious release also chose whether a human read the diff (F2); grafana's
+     authenticity anchor was a `.sha256` sidecar on the same origin as the tarball,
+     presented where readers expect verification (F10); the valkey compat decision
+     shipped the only stateful workload with a shell, ranked chart purity above runtime
+     hardening, and upstream was never asked (F8); chart versions sat hand-pinned and
+     untracked while the task 8.7 managers moved the image pins (F13 ii), and same-tag
+     digest bumps of chart pins queued behind a human (F13 iii).
+   - **Options**: disable automerge, or quarantine plus signal on top of it; hand-record
+     authenticity per bump, or declare a class per definition and enforce it three
+     times; convert grafana from-source for a real signature, or state truthfully what
+     its anchor is; fork the valkey chart, or compat plus an upstream ask; track chart
+     versions with a bespoke watcher, or Renovate's native helm datasource over the
+     `upstream:` block chart.yaml already carries.
+   - **Decision**: independence comes from age, signal and gates, each declared.
+     (a) `minimumReleaseAge` of three days on both version datasources, the value a
+     one-line switch in `renovate.json5` (Renovate reads only its own config). (b) Each
+     definition declares `# authenticity:` beside its source: `signed-tag`
+     (cert-manager), `signed-commit` (valkey, hardened-app), `cross-origin-checksum`
+     (grafana); `none` and a missing marker fail lint. The refresh scripts verify the
+     declared signal before writing any field: GitHub's verification statement for a
+     resolved tag or commit (measured verified for cert-manager v1.21.1 and valkey
+     9.1.1), per-architecture agreement of the versions-API sha256 with the
+     `dl.grafana.com` sidecar for the repackage archetype (measured equal in all 20
+     cases, five versions by four architectures). `verify-arch-pins.sh` re-verifies at
+     PR time with the API statement included, closing the hand-feed seam; the rescan's
+     invariants re-verify every declared signal daily and file a supply-chain issue on
+     mismatch. (c) A helm-datasource manager tracks `upstream.version` in the three
+     upstream charts' chart.yaml, never automerged (a chart bump runs the e2e upgrade
+     path); digest-only updates from the chart-pin managers automerge behind green
+     required checks, so a same-tag rebuild reaches the deployed chart without a human
+     in the loop while every tag move keeps one. (d) The valkey compat decision becomes
+     structured `compat:` metadata (reason, upstream issue, review-by date) validated
+     by yamale, already pinned in CI; validation fails past the review-by date, the
+     rescan reports lapses, and the upstream ask (an init-container image value,
+     following upstream's own metrics-exporter precedent) is drafted under
+     `triage/upstream/` and filed by the owner. (e) dhi.io package repositories are
+     restricted to `/main` paths by lint, the redistribution memo's Q4 rule (F12 d).
+   - **Trade-offs**: three days of quarantine delays every from-source patch, security
+     patches included; the clocks measure that cost, and a KEV-listed fix can be
+     hand-bumped past the queue through the existing fix-forward lane (Req 6.5,
+     CONVENTIONS). Signal verification trusts GitHub's verification statement rather
+     than a locally managed keyring; a fork wanting local key management swaps the
+     check behind the same marker. The API-versus-sidecar comparison makes the
+     versions API a hard dependency of grafana bumps (it already resolves the build
+     id, so no new origin). Chart-version bumps arrive as reviewable PRs that can lag
+     behind upstream; never-automerged is the decided cost of running the upgrade
+     path under review. Rejected: disabling automerge (a queue for one person that
+     worsens the published clocks), age without signal (forfeits what both upstreams
+     provide), vendoring a patched valkey chart (violates Req 4.1), a bespoke chart
+     watcher (the datasource exists). Fork switches: the age value, the automerge
+     update types, the per-definition class, whether compat is allowed at all, an
+     entitled fork's extra dhi.io paths.
+
 ## System Flows
 
 ### Release flow (Req 2.7 to 2.17, 2.26; as specified 2026-08-22, implementation task 9)
@@ -379,8 +435,8 @@ sequenceDiagram
     participant M as main / release job
     participant G as GHCR
 
-    U->>R: new tag matches version policy
-    R->>PR: bump pin+checksum (grouped; majors → dashboard)
+    U->>R: new tag matches version policy (after a 3-day minimum release age, Req 3.7)
+    R->>PR: refresh verifies the declared authenticity signal (Req 3.8), then bump pin+checksum (grouped; majors → dashboard)
     PR->>CI: parallel gates: validate / build+trivy+VEX+govulncheck / chart (ct lint, kyverno) / kind e2e
     CI-->>PR: checks green (digest and patch bumps: automerge)
     PR->>M: merge (human review otherwise)
@@ -405,8 +461,10 @@ state before upgrading — `DHC_UPGRADE_VALUES_FROM`). Upgrade re-asserts wait o
 **rollout completion** (`checks.WaitRolloutComplete`, #75): during a rolling update
 the old ReplicaSet's pods are still Ready and still backing the Service, so without
 that gate a crash-looping bumped image passes the exact assertions Req 5.6 exists
-for. Chart *versions* (`chart.yaml`) remain hand-pinned and untracked — a recorded,
-separate gap (noted in `chart/cert-manager/chart.yaml`).
+for. Chart *versions* (`chart.yaml`) are tracked by a third manager against the native
+`helm` datasource (Req 3.11, Decision 8), never automerged; digest-only chart-pin
+updates automerge behind the required checks (Req 3.12). Before cluster C they were
+hand-pinned and untracked, the gap `chart/cert-manager/chart.yaml` recorded.
 
 ## Components and Interfaces
 
@@ -816,6 +874,11 @@ ports: [3000/tcp]
 | An exception lapses | its `affected` statement is replaced by `under_investigation` with the original first-seen timestamp; the finding re-reds the gate | 6.9, 6.41 |
 | A `cve` issue's finding is gone or covered on every supported digest | the rescan closes it, evidence named, label graded (`resolved:fixed` only on SBOM proof; `resolved:absent` names scanner and database versions), never with a judgement | 6.52 to 6.56 |
 | A closed issue's finding returns as a reported finding on a supported digest | the rescan reopens that issue, history intact | 6.57 |
+| Authenticity signal fails at bump time | refresh task writes no field and names the signal; Renovate may still open its own one-line edit, which the version-coherence lint turns red | 3.8, 7.4 |
+| Pinned checksum, served bytes and API statement disagree at PR time | verify-arch-pins fails naming all three values per architecture | 3.9 |
+| Daily authenticity re-verification mismatch | rescan run fails; issue filed labelled as a supply-chain signal | 3.10 |
+| Compat review-by date passes | validate.yml fails on any PR until re-decided; rescan reports it daily | 4.8, 4.9 |
+| Definition names a dhi.io repository off the /main path | validate.yml fails naming the repository | 1.12 |
 
 ## Testing Strategy
 
