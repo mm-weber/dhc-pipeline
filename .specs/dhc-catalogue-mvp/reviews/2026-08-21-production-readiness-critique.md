@@ -862,8 +862,9 @@ signature valid. The digests, and the "never delete" reasoning, are unchanged.
 *Amended 2026-08-25 (greenfield epoch, owner decided):* **the digests do
 not stay.** With clusters A to C specified and nothing yet implemented,
 the owner chose a clean epoch over accommodation: before task 9.1's first
-release under the new path, every tag and version in the seven catalogue
-repositories is deleted, and the first fresh release mints a registry
+release under the new path, every tag and version in the six catalogue
+repositories (seven definitions; valkey-compat publishes into dhc/valkey)
+is deleted, and the first fresh release mints a registry
 where every published digest meets Req 2.9 uniformly. The "never delete"
 reasoning weighed deletion against consumers' digest pins; framing A's
 promise attaches at the epoch, no consumer was promised anything before
@@ -884,6 +885,31 @@ and stand unchanged; the removed digests' reasoning survives in
 `triage/LOG.md` and git history. The wipe executes at implementation
 kickoff, after cluster D's spec, immediately before task 9.1's first
 release.
+
+*Revised 2026-08-25, same day, on the independent review of PR #102 and
+the owner's direction:* **the epoch is a successor repository, not an
+in-place wipe.** The review measured three defects in wipe-first
+execution: whole-package deletion silently re-privatises a personal-scope
+package (fresh publishes default private), the kickoff window deadlocks
+(chart re-pin PRs cannot pass an e2e gate whose upgrade path installs
+just-deleted digests), and the stated postcondition is a state GitHub
+does not represent (findings 2.2, 2.3). Rather than specify escapes, the
+owner chose the mechanism that makes retirement unnecessary:
+implementation completes in this repository, and the catalogue then
+restarts as a new repository (not a fork) seeded from the cleaned tree;
+this repository and its registry are archived in place, read-only, every
+digest, attestation, issue and LOG entry intact, with a pointer to the
+successor. Nothing is deleted anywhere, so F9's original "never delete"
+instinct survives in full, while framing A's promise still attaches at
+the epoch: the successor's first release. The successor is the point of
+the exercise: a forkable base repository whose image set is modular (an
+adopter carries only the definitions it wants; nobody inherits the
+grafana tarball by default), which requires the final requirements
+cleanup to parameterize what is hardcoded today (owner, repository and
+registry names in criteria, identities and policy) and to restate Req
+1.1's fixed four-component list as a reference set. Sequencing the owner
+set: cluster D now, then that cleanup, then implementation task by task
+in this repository, then the cut.
 
 **F6, verification identity (decided 2026-08-21): anchor the prose and
 ship a tested verification policy, with the engine rendering separable.**
