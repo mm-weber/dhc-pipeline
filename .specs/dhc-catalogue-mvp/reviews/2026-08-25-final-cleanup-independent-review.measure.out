@@ -1,0 +1,116 @@
+scratch: /tmp/tmp.MHn3z1kV2N
+
+== S1: EARS validator, amended requirements
+EARS Validation PASSED
+**Valid Statements:** 161
+
+== S1b: EARS validator, proposed replacement criteria
+EARS Validation PASSED
+**Valid Statements:** 15
+
+== S2: instance literals in requirements.md
+-- registry and owner literals (expect no output):
+(none)
+-- component names inside numbered criteria (expect line 31, Req 1.1 reference set, only):
+31:1. THE Catalogue SHALL carry its image definitions as self-contained directory subtrees under image/, its reference set comprising hardened-app, cert-manager (controller, webhook, and cainjector images), grafana, and valkey.
+
+== S3: universal quantifiers vs the active set
+70:14. THE CI Pipeline SHALL rebuild every definition on a declared schedule at least once per day.
+71:15. WHERE a declared publish policy is set to on-change THE CI Pipeline SHALL discard a scheduled rebuild whose canonicalised package set, taken as a sorted set of package type, name, version and package checksum per platform manifest, equals that recorded in the CycloneDX SBOMs attested to a published digest carrying its full release tag, pushing nothing, signing nothing and attesting nothing from it.
+72:16. WHEN a scheduled rebuild produces an image whose resolved package set differs from that of a published digest carrying its full release tag, or for which no published digest carries that tag, THE CI Pipeline SHALL publish that image through criteria 2.7 to 2.9 and SHALL report in its job summary its package-set difference against any published digest carrying that tag.
+57:1. WHEN a definition change merges to main THE CI Pipeline SHALL build affected images for every platform their definitions declare.
+91:2. WHEN an upstream release matches a definition's version policy THE Renovate Automation SHALL open a pull request updating pinned ref, checksum, and derived tags.
+92:3. WHEN multiple images share one upstream monorepo THE Renovate Automation SHALL group their bumps into a single pull request.
+99:10. THE Scan Pipeline SHALL re-verify at least once per day each definition's declared authenticity signal against its upstream origin, and SHALL report each mismatch as a failure of that run and file an issue naming it as a supply-chain signal.
+100:11. THE Renovate Automation SHALL track each upstream chart version pinned under chart/ against its chart repository and SHALL open a pull request, never automerged, for each new chart release matching its version policy.
+126:2. WHEN a pull request affects an image or chart THE Test Suite SHALL install each affected chart on a kind cluster in CI.
+43:13. THE Repository SHALL declare in its catalogue policy file an active set naming each definition it builds, tracks, tests and publishes.
+44:14. THE CI Pipeline SHALL derive its build matrix, its chart and test matrices and its upstream tracking scope solely from that active set.
+45:15. WHILE a definition sits outside that active set THE CI Pipeline SHALL publish no new digest for it.
+46:16. IF a pull request bumps a definition outside that active set THEN THE CI Pipeline SHALL fail validation naming that definition.
+47:17. THE Repository SHALL document per build archetype a builder contract naming its input, one definition directory, and its outputs, an image pushed by digest and per-platform SBOM material carrying package pull checksums.
+109:1. WHERE an active definition declares an upstream chart THE Chart Adaptation SHALL consume that chart at a pinned version without modifying upstream templates.
+129:5. WHEN pods are Ready THE Test Suite SHALL execute each active definition's declared functional probe.
+
+== S4: tree facts
+-- definition directories (expect 7):
+cert-manager-cainjector
+cert-manager-controller
+cert-manager-webhook
+grafana
+hardened-app
+valkey
+valkey-compat
+7
+-- chart directories (expect 4):
+4
+-- build.yml matrix mechanism (job output feeding fromJSON):
+42:      names: ${{ steps.detect.outputs.names }}
+120:        name: ${{ fromJSON(needs.changes.outputs.names) }}
+-- build.yml all-definitions source (disk listing, not a declared set):
+57:          all_defs() { find image -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/image.yaml' ';' -print | cut -d/ -f2; }
+-- e2e.yml hardcoded component list and definition-to-component prefix regex:
+51:          ALL="cert-manager grafana hardened-app valkey"
+61:              if printf '%s\n' "$changed" | grep -qE "^chart/${c}/|^image/${c}(-|/)"; then
+-- chart.yml has no matrix, loops every chart directory:
+(no matrix key in chart.yml)
+45:          for d in chart/*/; do
+63:          for d in chart/*/; do
+-- componentSpecs: probes keyed by chart-backed component (expect 4 Probe: lines):
+4
+23:// componentSpecs are the four components that have a hardened chart.
+-- no definition declares a chart (expect: no chart: key in any definition):
+(no chart: key in any definition)
+-- every 'chart' mention in definitions is a comment or a label value:
+image/valkey-compat/image.yaml:203:  org.opencontainers.image.description: Minimal Valkey image plus a busybox shell, for charts that need one
+-- upstream chart is declared chart-side (chart.yaml upstream block):
+chart/cert-manager/chart.yaml:7:upstream:
+chart/grafana/chart.yaml:3:upstream:
+chart/valkey/chart.yaml:3:upstream:
+-- valkey-compat is the init-container image in the deployed chart (comment lines elided):
+14:# The digest is the one image/valkey-compat/ published on the first main build
+30:  tag: 9.1.1-alpine3.23-compat@sha256:be04d1605c307b2d52d6370823373f757906141222abe28fff4e0b7adbb040d4
+54:# have satisfied it; it is the init container alone that needs the compat
+-- lint-pins.sh variant parity: byte-equal source pins across one published repository:
+273:# --- variant parity (docs/CONVENTIONS.md, "Naming") -------------------------
+311:      echo "::error file=${rel}::variant parity (docs/CONVENTIONS.md, Naming): this definition publishes '${repo}', the same repository as '${sibling#"$ROOT"/}', so the two are a runtime/variant pair and must build byte-equal source (frontend pin, vars:, url:, checksum:). They differ:"
+-- renovate grouping rules (monorepo trio, valkey pair, chart-pin trio):
+217:      groupName: "cert-manager monorepo",
+230:      groupName: "valkey runtime and compat",
+242:      groupName: "cert-manager chart pins",
+293:      groupName: "dhi.io build layer",
+-- restrict-registries hardcodes the namespace (enforcing lines; comments elided):
+24:          Only images from ghcr.io/mm-weber/dhc are allowed (Req 4.2).
+28:              - image: "ghcr.io/mm-weber/dhc/*"
+30:              - image: "ghcr.io/mm-weber/dhc/*"
+-- renovate.json5 namespace literals (matchStrings and matchDepNames; comments elided):
+174:        "repository:\\s*(?<depName>ghcr\\.io/mm-weber/dhc/[^\\s\"']+)\\s*\\n\\s*tag:\\s*\"?(?<currentValue>[^\\s\"'@]+)\"?\\s*\\n\\s*digest:\\s*\"?(?<currentDigest>sha256:[a-f0-9]{64})",
+190:        "registry:\\s*\"?(?<registry>[^\\s\"']+)\"?\\s*\\n\\s*repository:\\s*\"?(?<repository>mm-weber/dhc/[^\\s\"']+)\"?\\s*\\n\\s*tag:\\s*\"?(?<currentValue>[^\\s\"'@]+)@(?<currentDigest>sha256:[a-f0-9]{64})",
+238:        "ghcr.io/mm-weber/dhc/cert-manager-controller",
+239:        "ghcr.io/mm-weber/dhc/cert-manager-webhook",
+240:        "ghcr.io/mm-weber/dhc/cert-manager-cainjector",
+-- validate.yml: pinned renovate for config validation, Go steps for a probe lint:
+92:          RENOVATE_VERSION: 41.173.1
+131:        run: go test ./harness/... ./checks/... ./install/...
+-- tasks.md: 9.1 and 9.4 step text still hardcodes the namespace; 9.2 lists every definition:
+213:    - `build.yml` main arm: `docker/build-push-action` outputs `type=image,name=ghcr.io/mm-weber/dhc/<image>,push-by-digest=true,name-canonical=true,push=true` with no `tags:`; the release-time scan runs Trivy against the pushed digest per platform manifest (`--image-src remote`, `--platform`), with the same `--vex` (compiled) and `--ignorefile` inputs the PR gate uses, factored into one script both arms call rather than a second copy of the step; `compile-vex.sh` stamps the index digest and every scanned platform digest (Req 6.36) and adds `under_investigation` statements for anything uncovered (Req 2.12); cosign sign, SBOM attest, OpenVEX attest; then `docker buildx imagetools create -t <tag>…` applies the definition-derived tags (Req 2.7 to 2.9)
+235:    - An `invariants` step in `rescan.yml`, the single home for every daily assertion the catalogue makes about its own state (2.21 here, 2.24 in 9.6; cluster C adds the upstream-checksum re-check, cluster D the ruleset-drift, private-reporting and revoked-digest checks), each reported by name, any failure failing the run. First assertion, over every repository `definition-lib.sh` knows: `GET https://ghcr.io/token?scope=repository:mm-weber/dhc/<name>:pull` unauthenticated must return 200, and an unauthenticated manifest GET of every catalogue tag from 9.3's enumeration must return 200 (a token is not a pull: a public repository whose tags were deleted still issues one); any other answer fails the run naming the repository or tag (Req 2.21). Measured 2026-08-21: `hardened-app` and `cert-manager-cainjector` were private; the owner flipped them by hand the same day
+224:    - `schedule:` trigger on `build.yml` (daily, before the 06:17 UTC rescan so the rescan sees fresh digests) building every definition. The `changes` job gains a schedule branch that lists every definition (its `workflow_dispatch` branch already has that shape): `github.event.before` is empty on a schedule, so the current fallback would diff `HEAD~1` and skip the release job (independent review 1.10)
+
+== S5: renovate ignore mechanisms at the pinned version (network)
+3289 /tmp/tmp.MHn3z1kV2N/renovate-options.ts
+1197:    name: 'ignorePaths',
+1628:    name: 'matchFileNames',
+407:    name: 'enabled',
+1329:    name: 'ignoreDeps',
+-- renovatebot/github-action v43.0.9 default renovate version:
+  renovate-version:
+    description: |
+      Renovate version to use.
+    required: false
+    default: '41' # renovate
+
+== S6: subject facts
+da5621e02a63642512c8f14053c366ee2cb9de60
+53907ea spec: final cleanup, the base-repo contract (Req 1.13-1.17; amendments to 1.1, 2.2, 2.7, 2.21, 2.23, 4.1, 5.5, 7.7)
+ 4 files changed, 73 insertions(+), 13 deletions(-)
