@@ -322,7 +322,9 @@ graph TB
      keyless scan-report attestations per day, each a transparency-log entry, growing with
      every release until cluster D decides tag retention; the memo records the industry's
      two poles for that decision (Chainguard's 180-day EOL grace against DHI's paid
-     five-year extended support). Fork switches: every number in the `triage` section, the
+     five-year extended support). The greenfield successor (Decision 9) resets that
+     baseline: the daily set restarts at its first release, and retention becomes
+     the epoch plus a go-forward policy. Fork switches: every number in the `triage` section, the
      support statement's tag set, and the `resolved:*` closing labels.
 
 8. **Upstream trust: quarantine, declared authenticity, tracked charts (Req 1.3, 1.10 to 1.12, 3.5, 3.7 to 3.12, 4.5, 4.8, 4.9; review F2, F10, F8, F13 ii and iii, F12 d; ADR 0002 amendment; 2026-08-25)**
@@ -390,6 +392,41 @@ graph TB
      watcher (the datasource exists). Fork switches: the age value, the automerge
      update types, the per-definition class, whether compat is allowed at all, an
      entitled fork's extra dhi.io paths.
+
+9. **Greenfield successor: the catalogue restarts as a new repository, and this one is archived intact (review F9 re-decision, revised on PR #102's independent review; F13, cluster D retention; 2026-08-25)**
+   - **Context**: clusters A to C were specified against a registry carrying ten
+     multi-arch legacy tags with unsigned platform manifests, thirteen exceptions
+     predating `decided_at`, three stacked OpenVEX attestations on one digest, and
+     a pre-attestation stratum the superseded set would babysit daily forever. A
+     first cut of this decision wiped the registry in place; the independent
+     review measured that wipe-first re-privatises the packages (fresh
+     personal-scope publishes default private), deadlocks the kickoff window
+     (chart re-pin PRs cannot pass an e2e gate whose upgrade path installs
+     just-deleted digests), and ends in a postcondition GitHub does not represent
+     (findings 2.2, 2.3).
+   - **Decision**: no deletion anywhere. Implementation completes in this
+     repository, against its real state; the catalogue then restarts as a new
+     repository (not a fork) seeded from the cleaned tree, with fresh GHCR
+     packages made public on first publish and asserted daily by the visibility
+     invariant (fresh packages default private, measured), a fresh issue space,
+     and its first release as the epoch framing A's promise attaches to. This
+     repository and its registry are archived read-only with a pointer to the
+     successor: every digest, attestation, issue and LOG entry stays resolvable,
+     consumers' digest pins never break, and the recorded history remains the
+     worked example. The successor is the product: a forkable base whose image
+     set is modular; the reference definitions, grafana's tarball included, are
+     carried by choice, not inheritance.
+   - **Consequences**: retirement machinery is unnecessary (no wipe step, no
+     issue reset, no transition revocation record); the daily cost baseline
+     restarts at the successor's first release; Req 2.24's must-reject control is
+     minted fresh in the successor (an unsigned manifest pushed by digest,
+     untagged so it is frozen under Req 2.11); the final requirements cleanup
+     parameterizes owner, repository and registry names and restates the fixed
+     component list as a reference set, the base-repo primitive a fork needs
+     anyway. Rejected: the in-place wipe (measured defects above) and a fork of
+     this repository (carries the history the greenfield exists to shed). Fork
+     switch: the successor mechanism IS the fork path, exercised once by the
+     owner.
 
 ## System Flows
 

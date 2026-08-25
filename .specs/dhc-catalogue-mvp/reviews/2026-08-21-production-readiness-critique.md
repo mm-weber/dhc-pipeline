@@ -611,6 +611,42 @@ reaches B by changing numbers, not machinery. Every disposition below is
 judged against A: does the change make a promise one person can keep, and
 does it leave the switch a fork needs.
 
+*Framing addendum, decided 2026-08-25 (recorded from the modularity
+discussion; feeds cluster D's trust-boundary table and the final
+requirements cleanup):* **what the successor is, and where its seams
+are.** The product is the operating model in a box: the promise machinery
+(scan-what-you-sign, exactly one OpenVEX attestation per digest, the
+decision aperture with measured clocks, the evidence-graded issue
+lifecycle, quarantined and signal-checked tracking, daily invariants) as
+spec-driven, measured glue over industry-standard tools. Positioning
+sentence for the successor's README: a forkable reference implementation
+of a one-person hardened-image catalogue, batteries included for Docker
+Hardened Images, with declared seams for the build backend, the
+authoritative scanner, and the platform. Commitments: (1) one declared
+**active-set** of definitions in the catalogue policy file, read by every
+plane (build matrix, rescan enumeration, e2e matrix, badges, lint), so a
+definition is carried by choice and disabling one reuses the
+supported-set semantics; grafana's tarball ships as a reference
+definition behind that switch. (2) A **builder contract** per archetype
+(definition directory in; image pushed by digest plus SBOM material out);
+everything downstream consumes only the contract's outputs, already true
+by construction since publish-on-change keys on CycloneDX pull checksums.
+DHI is the installed backend; apko plus Wolfi is the documented
+alternative a fork targets; the dhi.io login the build step needs today
+is stated as an adoption constraint, not hidden. (3) **Seams declared,
+not built**: no build-system-agnostic meta-format and no second backend
+now; the authoritative scanner stays Trivy with its coupling stated and
+the F7 consumer smoke test as migration insurance; cosign-to-notation and
+Kyverno-to-policy-controller remain declared-value renderings; the
+deepest coupling is GitHub itself (Actions, GHCR, Issues, rulesets, OIDC
+identities), accepted deliberately and made honest by the cleanup's
+parameterization of owner, repository and registry names. Audience,
+stated: platform engineers who must run curated base images without a
+team; teams whose vendor supplies images but no triage machinery;
+individuals building the skill. The competitor is DIY glue, and the
+receipts (measured ADRs, upstream reports, adversarial reviews) are the
+differentiator.
+
 ### 5.2 Decisions per finding
 
 **F3 (i), release path (decided 2026-08-21): publish with status.** On
@@ -858,6 +894,58 @@ tags are scanned in place instead: the rescan enumerates every catalogue tag
 daily and scans every platform manifest of every tag-referenced digest
 (Req 2.18, 2.22), which satisfies Req 2.6 as written and keeps every existing
 signature valid. The digests, and the "never delete" reasoning, are unchanged.
+
+*Amended 2026-08-25 (greenfield epoch, owner decided):* **the digests do
+not stay.** With clusters A to C specified and nothing yet implemented,
+the owner chose a clean epoch over accommodation: before task 9.1's first
+release under the new path, every tag and version in the six catalogue
+repositories (seven definitions; valkey-compat publishes into dhc/valkey)
+is deleted, and the first fresh release mints a registry
+where every published digest meets Req 2.9 uniformly. The "never delete"
+reasoning weighed deletion against consumers' digest pins; framing A's
+promise attaches at the epoch, no consumer was promised anything before
+it, and a reference implementation is a cleaner exemplar with no
+pre-attestation stratum to caveat. What deletion was reserved for (F11's
+revocation tool) is exercised once, deliberately, as the epoch: the wipe
+is recorded in `triage/LOG.md` with every digest removed, and cluster D's
+`SECURITY.md` states that digests published before the epoch are
+withdrawn. Consequences: the ten multi-arch legacy tags and their
+unsigned platform manifests leave the problem space; the daily scan set
+restarts at the first fresh release; tasks 10.1 to 10.3 lose their
+migration sentences (LOG date backfill, first-seen migration, first-run
+attestation repair), replaced by task group 12; cluster D's tag-retention
+question collapses to the epoch plus a go-forward policy. Accepted-risk
+exceptions are re-decided fresh with `decided_at` at first release; source
+VEX statements are digest-independent claims about product and version
+and stand unchanged; the removed digests' reasoning survives in
+`triage/LOG.md` and git history. The wipe executes at implementation
+kickoff, after cluster D's spec, immediately before task 9.1's first
+release.
+
+*Revised 2026-08-25, same day, on the independent review of PR #102 and
+the owner's direction:* **the epoch is a successor repository, not an
+in-place wipe.** The review measured three defects in wipe-first
+execution: whole-package deletion silently re-privatises a personal-scope
+package (fresh publishes default private), the kickoff window deadlocks
+(chart re-pin PRs cannot pass an e2e gate whose upgrade path installs
+just-deleted digests), and the stated postcondition is a state GitHub
+does not represent (findings 2.2, 2.3). Rather than specify escapes, the
+owner chose the mechanism that makes retirement unnecessary:
+implementation completes in this repository, and the catalogue then
+restarts as a new repository (not a fork) seeded from the cleaned tree;
+this repository and its registry are archived in place, read-only, every
+digest, attestation, issue and LOG entry intact, with a pointer to the
+successor. Nothing is deleted anywhere, so F9's original "never delete"
+instinct survives in full, while framing A's promise still attaches at
+the epoch: the successor's first release. The successor is the point of
+the exercise: a forkable base repository whose image set is modular (an
+adopter carries only the definitions it wants; nobody inherits the
+grafana tarball by default), which requires the final requirements
+cleanup to parameterize what is hardcoded today (owner, repository and
+registry names in criteria, identities and policy) and to restate Req
+1.1's fixed four-component list as a reference set. Sequencing the owner
+set: cluster D now, then that cleanup, then implementation task by task
+in this repository, then the cut.
 
 **F6, verification identity (decided 2026-08-21): anchor the prose and
 ship a tested verification policy, with the engine rendering separable.**
