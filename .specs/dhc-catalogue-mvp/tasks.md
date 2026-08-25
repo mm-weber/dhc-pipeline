@@ -329,6 +329,31 @@
     - Depends on the final requirements cleanup: owner, repository and registry names parameterized as declared values; Req 1.1's four-component list restated as a reference set, so an adopter carries only the definitions it wants
     - _Requirements: Req 2.11, Req 2.24_
 
+- [ ] 13. Production readiness, cluster D: catalogue posture (review F1, F11, F12, F7, F13 register; spec amendment landed before any of these)
+  - [ ] 13.1 SECURITY.md, notice, attribution, trust-boundary table
+    - `SECURITY.md` with every Req 9.1 item: the promise, aperture and ceilings by reference to `catalogue-policy.yaml`, published/supported/superseded/frozen digests and the epoch, retention from the epoch, what a signature attests and does not (this repository's release workflow on main produced this digest; no human review asserted), the single-maintainer bypass kept deliberately in force, authenticity classes per definition, the Rekor disclosure fact, the terms statement citing `data/dhi-terms-2026-08-21.md` with its DSSA ambiguity sentence (F12 e), and the status issue link
+    - `NOTICE` naming Docker Hardened Images (Copyright 2025 Docker Inc., Apache-2.0) and the SBOM licence statement (Req 9.16; F12 a); an in-image copy is measured at implementation per the memo; CONVENTIONS records that a definition copied from the catalog must carry a modification notice (F12 b)
+    - README gains the non-affiliation sentence (Req 9.17); CLAUDE.md drops "DHI-style" for "built with Docker Hardened Images tooling and packages" (F12 c, the last remaining occurrence); the "production-ready" wording is unblocked once this task and 11.2's /main lint land (F12 f)
+    - Trust-boundary table in `docs/concepts.md`, linked from SECURITY.md: every component with owner class and seam alternative (5.1 framing addendum: DHI backend with apko plus Wolfi named, Trivy authoritative with the consumer smoke test as migration insurance, GitHub coupling declared; Req 9.15)
+    - _Requirements: Req 9.1, Req 9.15, Req 9.16, Req 9.17_
+  - [ ] 13.2 Governance as code
+    - `.github/rulesets/main_sec.json`: the live ruleset exported and committed, both gates required, `require_code_owner_review` carried as the documented second-maintainer switch; [OPERATOR: retire the overlapping weaker `branch` ruleset (id 19534405, still active, measured 2026-08-25); enable private vulnerability reporting] (Req 9.2, 9.8)
+    - `CODEOWNERS` naming the maintainer per lane: triage/, image/, chart/, policies/, .github/ (Req 9.10)
+    - Rescan invariants: committed ruleset compared against the live rules API and the reporting-enabled check, both anonymous reads (Req 9.3, 9.9; measured basis: both endpoints answer anonymously, epoch review measure S6 and critique F1)
+    - _Requirements: Req 9.2, Req 9.3, Req 9.8, Req 9.9, Req 9.10_
+  - [ ] 13.3 Revocation record
+    - `triage/revocations.yaml` (digest, reason, replacement digest, advisory link, date), yamale schema validated in validate.yml (Req 9.5, 9.6), starting empty; a short runbook in docs/: remove that tag by hand, record the entry, publish a GHSA advisory, the status issue lists it
+    - Rescan invariant: no catalogue tag references a recorded digest (Req 9.7); GHSA named as the advisory channel in SECURITY.md (Req 9.4)
+    - _Requirements: Req 9.4, Req 9.5, Req 9.6, Req 9.7_
+  - [ ] 13.4 Consumers: declared list, portability block, daily smoke test
+    - `catalogue-policy.yaml` gains the consumer list (trivy authoritative, grype second; Req 9.11); one adapter contract: scan a digest with the compiled per-digest VEX, emit vulnerability, purl and suppression state normalised; measured basis: grype 0.116.0 accepts `--vex` (critique F7, 2026-08-21)
+    - PR and rescan summaries gain the VEX portability block: per statement the authoritative scanner suppressed, each consumer's result, divergences named; informational, a fork flips it to gating (Req 9.12)
+    - Daily consumer smoke test: the manual's recipe verbatim against one published digest (`cosign verify-attestation` against the role identities, `vexctl merge`, `trivy --vex`, `grype --vex`), asserting each suppression lands; `triage/upstream/checks/trivy-vex-oci-multiple-attestations.sh` joins it as the Trivy regression check (task 10.3's hand-off) (Req 9.13)
+    - _Requirements: Req 9.11, Req 9.12, Req 9.13_
+  - [ ] 13.5 Manual-controls register
+    - `docs/CONVENTIONS.md` register (step, class, why, fork switch): deliberate rows: tool sha256 completion, build-layer bumps reviewed by hand, VEX and exception decisions, hardened-app tag signing; dated rows: the cosign v2 pin (ADR 0003) completed the way sha256 pins are, terms sources re-verified by 2026-11-21 (F12 e); every remaining human step labelled deliberate or pending automation, and the manual's runbook steps cite their register rows (Req 9.14)
+    - _Requirements: Req 9.14_
+
 ## Requirements Coverage
 
 | Requirement | Covered By Tasks |
@@ -341,6 +366,7 @@
 | Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5, 9.1, 9.3, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7 |
 | Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5 |
 | Req 8: Operating Environment | 3.3, 6.5 |
+| Req 9: Catalogue Posture | 13.1, 13.2, 13.3, 13.4, 13.5 |
 
 Req 8.2 (delegate network-heavy work to CI/operator host) has no implementing task: it is an
 operating convention practiced by every workflow rather than a deliverable. The Req 8 row

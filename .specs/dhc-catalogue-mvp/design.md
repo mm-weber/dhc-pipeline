@@ -428,6 +428,53 @@ graph TB
      switch: the successor mechanism IS the fork path, exercised once by the
      owner.
 
+10. **Catalogue posture: the trust statement, records that drive mechanics, and N consumers compared (Req 9; review F1, F11, F12, F7, F13 register; 2026-08-25)**
+   - **Context**: the catalogue asked consumers to trust its signatures while
+     holding no SECURITY.md, no disclosure channel except public issues, no
+     advisory feed, no revocation record, no CODEOWNERS, no committed ruleset,
+     and one scanner's word for what its VEX suppresses; every merge is a
+     recorded bypass of a one-review rule nobody stated anywhere. Measured
+     2026-08-21 and re-measured 2026-08-25: private vulnerability reporting
+     disabled; both gates now required with bypass_actors null; the weaker
+     `branch` ruleset still active.
+   - **Decision**: publish the posture and make records drive mechanics.
+     `SECURITY.md` states the promise, the aperture and ceilings by reference,
+     the digest state definitions and the epoch, retention, what a signature
+     attests and does not, the single-maintainer bypass kept deliberately in
+     force, per-definition authenticity classes, the Rekor disclosure fact and
+     the terms statement (Req 9.1). Reporting goes private (9.2, 9.3, asserted
+     daily); advisories are GHSA (9.4). Revocation is a lint-checked record
+     (`triage/revocations.yaml`, 9.5 to 9.7) whose daily invariant asserts no
+     catalogue tag references a revoked digest; the runbook is short because
+     the record drives it. Governance is committed: the intended ruleset under
+     `.github/rulesets/` in GitHub's export format with both gates required
+     (9.8), compared daily against the live API (9.9); CODEOWNERS names a
+     maintainer per lane (9.10), carried as the switch a second maintainer
+     flips. VEX consumers are a declared list of adapters in the policy file
+     (9.11, Trivy authoritative, Grype measured second, Scout a fork adds); a
+     portability block in every scan summary names divergences (9.12); the
+     manual's consumer recipe runs verbatim daily against one published digest
+     (9.13), turning the README's verification section into a tested contract
+     and carrying the trivy-vex-oci regression check from task 10.3. The
+     manual-controls register labels every human step deliberate or pending
+     automation (9.14); the trust-boundary table lists owner class and seam
+     alternative per component (9.15, the 5.1 framing addendum's column); the
+     notice file and the non-affiliation sentence close F12's obligations
+     (9.16, 9.17), unblocking the "production-ready" wording.
+   - **Trade-offs**: the daily invariants gain four assertions (reporting
+     enabled, ruleset drift, revoked tags, consumer smoke), all anonymous
+     reads or pulls, no new permissions; the register is one more file humans
+     must keep honest, accepted because unlabelled toil is how F13 happened;
+     the consumer smoke test doubles scan cost on exactly one digest per day.
+     Rejected: a second maintainer now (outside the one-person frame; the
+     committed ruleset and CODEOWNERS make it a one-line change), a protected
+     release environment (a human approval point on nightly rebuilds is what
+     a catalogue must not have), policy and advisories without the revocation
+     record (improvised under pressure), and gating on consumer divergence
+     (informational first, like govulncheck; a fork flips it). Fork switches:
+     `require_code_owner_review` in the committed ruleset, the consumer list,
+     divergence gating, the register's rows.
+
 ## System Flows
 
 ### Release flow (Req 2.7 to 2.17, 2.26; as specified 2026-08-22, implementation task 9)
@@ -465,7 +512,9 @@ daily 06:17 UTC ─► enumerate every catalogue tag → digest (2.22)
   ─► differs from the attested document? ─► cosign attest --replace on digest + manifests (6.43)
   invariants step (one report shape): anonymous pull per repository and tag (2.21)
         · verification proof + control digest (2.24) · exactly one OpenVEX attestation (6.45)
-        · exceptions against current severity and KEV (6.51)
+        · exceptions against current severity and KEV (6.51) · authenticity signals (3.10)
+        · private reporting enabled (9.3) · ruleset drift (9.9) · no revoked tag (9.7)
+        · consumer smoke, recipe verbatim (9.13)
   ─► clocks from attestations over that supported set (6.46) ─► status issue + artifact (6.47)
   ─► issues over that supported set: open (6.3) · close, evidence-graded labels (6.52 to 6.56)
         · reopen on recurrence (6.57) · expiry warnings (6.10)
@@ -926,6 +975,11 @@ ports: [3000/tcp]
 | Daily authenticity re-verification mismatch | rescan run fails; issue filed labelled as a supply-chain signal | 3.10 |
 | Compat review-by date passes | validate.yml fails on any PR until re-decided; rescan reports it daily | 4.8, 4.9 |
 | Definition names a dhi.io repository off the /main path | validate.yml fails naming the repository | 1.12 |
+| Private vulnerability reporting found disabled | daily invariants step fails the rescan run naming it | 9.3 |
+| Committed ruleset differs from the live ruleset | daily invariants step fails the rescan run naming each difference | 9.9 |
+| A catalogue tag references a revoked digest | daily invariants step fails the rescan run naming that tag | 9.7 |
+| A suppression from the authoritative scanner does not land in a declared consumer | portability block names the divergence; the daily consumer smoke test fails the run on a broken recipe | 9.12, 9.13 |
+| revocations.yaml entry violates its schema | validate.yml fails naming the entry | 9.6 |
 
 ## Testing Strategy
 
