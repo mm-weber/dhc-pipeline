@@ -1,0 +1,45 @@
+scratch: /tmp/tmp.2Z7DdWuAM3
+
+== S1: EARS validator, standing requirements
+EARS Validation PASSED
+**Valid Statements:** 164
+
+== S1b: EARS validator, the 15 proposed replacement criteria
+EARS Validation PASSED
+**Valid Statements:** 15
+
+== S2: numeric cross-references between criteria
+      1 criteria 2.13, 2.14 and 2.17
+      1 criteria 2.18, 2.21 and 2.24
+      2 criteria 2.7 to 2.9
+      1 criteria 2.9 and 6.43
+      1 criteria 6.52 to 6.57
+      1 criterion 2.10
+      1 criterion 2.13
+      3 criterion 2.23
+      1 criterion 2.3
+      2 criterion 2.9
+      1 criterion 3.3
+      1 criterion 6.1
+      1 criterion 6.38
+
+== S3: criterion count per group
+Req 1: 19
+Req 2: 26
+Req 3: 12
+Req 4: 9
+Req 5: 8
+Req 6: 60
+Req 7: 10
+Req 8: 2
+Req 9: 18
+total: 164
+
+== S4: dash audit of the review file (expect: no output between markers)
+--- begin
+--- end
+
+== S5: subject facts
+spec-cleanup
+ec569ea spec: cleanup revision 1: active-set collisions resolved against the standing quantifiers
+ 8 files changed, 945 insertions(+), 29 deletions(-)
