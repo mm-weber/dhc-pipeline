@@ -1,0 +1,102 @@
+scratch: /tmp/tmp.5omR7AtBWT
+
+== S1: EARS validator
+EARS Validation PASSED
+**Valid Statements:** 155
+EARS Validation PASSED
+**Valid Statements:** 8
+
+== S2: anonymous rulesets API
+list entry: 19534405 branch active
+list entry: 20716271 main_sec active
+single-ruleset top-level keys: ['_links', 'conditions', 'created_at', 'enforcement', 'id', 'name', 'node_id', 'rules', 'source', 'source_type', 'target', 'updated_at']
+bypass_actors key present: False
+current_user_can_bypass key present: False
+pull_request parameters: {"allowed_merge_methods": ["squash"], "dismiss_stale_reviews_on_push": false, "require_code_owner_review": false, "require_extra_approval_for_unattributed_changes": true, "require_last_push_approval": false, "required_approving_review_count": 1, "required_review_thread_resolution": true, "required_reviewers": []}
+required checks: ['yamllint, pin lint, policy tests', 'go modules (e2e + rescan tool)', 'render + policy gate', 'e2e gate', 'build gate']
+-- rules API (rules/branches/main), the endpoint task 13.2 names, for contrast:
+merged rule entries: 11
+entry keys of first rule: ['ruleset_id', 'ruleset_source', 'ruleset_source_type', 'type']
+ruleset_ids present: [19534405, 20716271]
+
+== S3: docs.github.com REST rules page notes
+bypass note: To prevent leaking sensitive information, the bypass_actors property is only returned if the user making the API request has write access to the ruleset.
+without-authentication note occurrences: 5
+
+== S4: behavioral bypass proof (PR #102)
+PR 102 author: mm-weber | merged_at: 2026-08-25T15:20:58Z
+PR 102 reviews: [('mm-weber', 'COMMENTED')]
+APPROVED count: 0
+
+== S5: private vulnerability reporting, anonymous
+{
+  "enabled": false
+}
+HTTP 200
+
+== S6: repository security advisories, anonymous
+own repo HTTP 200: advisory count: 0
+grafana/grafana control: [('GHSA-7rqg-hjwc-6mjf', 'published'), ('GHSA-8xmm-x63g-f6xv', 'published')]
+
+== S7: ruleset export or import format
+import flow: Import a ruleset . Open the exported JSON file.
+ruleset-recipes repo export top-level keys: ['bypass_actors', 'conditions', 'enforcement', 'id', 'name', 'rules', 'source', 'source_type', 'target']
+bypass_actors in export: [{"actor_id": 8862074, "actor_type": "Team", "bypass_mode": "always"}]
+id in export: 193130 | source in export: repo-rules-demo/dev-repo1
+
+== S8: grype --vex source facts (anchore/grype main)
+103:		identifiers = append(identifiers, tag)
+111:			identifiers = append(identifiers, packageurl.NewPackageURL("oci", "", name, "", qualifiers, "").String())
+123:		identifiers = append(identifiers, d)
+155:		identifiers = append(identifiers, packageurl.NewPackageURL(
+161:		identifiers = append(identifiers, strings.TrimPrefix(shaString, "sha256:"))
+240:		if statement.Status != openvex.StatusNotAffected && statement.Status != openvex.StatusFixed {
+295:		if statement.Status == openvex.StatusNotAffected && rule.VexJustification != "" &&
+29:- [OpenVEX](https://github.com/openvex) support for filtering and augmenting scan results
+
+== S9: catalogue tag counts (anonymous ghcr)
+hardened-app: 3 catalogue tags
+cert-manager-controller: 6 catalogue tags
+cert-manager-webhook: 6 catalogue tags
+cert-manager-cainjector: 6 catalogue tags
+grafana: 6 catalogue tags
+valkey: 8 catalogue tags
+total catalogue tags: 35
+
+== S10: packages REST docs deletion endpoints
+delete endpoint families: ['Delete a package for a user', 'Delete a package for a user ', 'Delete a package for an organization', 'Delete a package for an organization ', 'Delete a package for the authenticated user', 'Delete a package for the authenticated user ', 'Delete a package version for the authenticated user', 'Delete a package version for the authenticated user ', 'Delete package version for a user', 'Delete package version for a user ', 'Delete package version for an organization', 'Delete package version for an organization ']
+tag-scoped delete endpoint mentions: 0
+
+== S11: tree facts
+-- DHI-style label occurrences outside reviews and ADR history:
+README.md:3:A miniature [Docker Hardened Images](https://docs.docker.com/dhi/)-style
+CLAUDE.md:3:Mini DHI-style hardened-image catalogue: a skill-building repo mirroring the
+.specs/dhc-catalogue-mvp/requirements.md:5:dhc-pipeline is a miniature DHI-style hardened-image catalogue that mirrors the day-to-day
+.specs/dhc-catalogue-mvp/requirements.md:38:8. IF a DHI frontend spike does not produce a working build within a three-hour timebox THEN THE Catalogue SHALL adopt DHI-style YAML definitions rendered to multi-stage Dockerfiles by thin glue tooling.
+.specs/dhc-catalogue-mvp/design.md:5:**Purpose**: A miniature DHI-style hardened-image catalogue ("dhc") that exercises, with real
+.specs/dhc-catalogue-mvp/design.md:90:   - **Options**: (A) build with Docker's `# syntax=dhi.io/build` frontend; (B) DHI-style YAML rendered to Dockerfiles; (C) plain Dockerfiles FROM dhi.io bases.
+docs/decisions/0001-build-layer.md:9:native DHI syntax, or (B) DHI-style YAML rendered to Dockerfiles by thin glue.
+-- grype and vexctl locations in the manual and README (file:line only; all are maintainer-side):
+docs/user-manual.md:450
+docs/user-manual.md:538
+docs/user-manual.md:541
+docs/user-manual.md:911
+-- grype or vexctl inside the consumer verification sections (manual lines 144 to 246, README lines 27 to 45):
+(none: no consumer-facing grype or vexctl step exists in the manual recipe)
+(none in README verify section)
+-- ADR 0003 on the merge step:
+  document) or the consumer recipe has to merge via `cosign verify-attestation`
+  and `vexctl merge`, which the manual already describes. Decide there, not
+consumer recipe needs no merge step once one document is the invariant.
+-- posture artifacts absent (expected, tasks open):
+SECURITY.md absent
+NOTICE absent
+CODEOWNERS absent
+.github/rulesets absent
+triage/revocations.yaml absent
+-- LOG-anchor lint in any task or criterion:
+.specs/dhc-catalogue-mvp/tasks.md:225:    - `scripts/package-set-diff.sh` (+ `_test.sh`) runs before 9.1's push: it takes Syft's CycloneDX output of the local build per platform manifest, canonicalises it to a sorted set of (type, name, version, pull checksum) and compares it with the same projection of the CycloneDX SBOM attested to the matching platform manifest of the digest the same full release tag points at; never raw SBOM bytes (Syft ordering and CPE output are not stable, anchore/syft #331 and #2967); equal stops the run with nothing pushed, signed or attested; different, or no published digest under that tag, publishes through 9.1 and prints the diff in the summary (Req 2.14 to 2.16)
+.specs/dhc-catalogue-mvp/tasks.md:243:    - README and `docs/user-manual.md` verification snippets move from the substring regexp to the anchored identities per role: `cosign verify` pins the releaser alone, `cosign verify-attestation --type spdxjson` the releaser alone, `cosign verify-attestation --type openvex` releaser or re-attester; the text also says that BuildKit provenance is attached at build time and not policy-verified (Req 2.25)
+.specs/dhc-catalogue-mvp/requirements.md:76:25. THE Repository SHALL state in its consumer verification instructions which certificate issuer and which exact certificate identities its verification policy admits for the signature and for each attestation type, each identity anchored to its workflow file and ref, and SHALL state that BuildKit provenance is attached at build time and is not verified by that policy.
+
+done.
