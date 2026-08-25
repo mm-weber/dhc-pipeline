@@ -1,0 +1,151 @@
+# Outputs of 2026-08-25-cluster-c-independent-review.measure.sh, run 2026-08-25
+# in the devcontainer (worktree spec-cluster-c at 917d7e3).
+# Note: one artifact of the environment, recorded for honesty. A first run of S4
+# wrote its curl temp file to /tmp, which the sandbox denies; every fetch in that
+# run reported HTTP 000. The re-run below uses the scratch directory and is what
+# the review cites.
+
+== S1: EARS validator
+EARS Validation PASSED
+**File:** .specs/dhc-catalogue-mvp/requirements.md
+**Valid Statements:** 138
+**Status:** All acceptance criteria follow valid EARS patterns.
+exit=0
+
+== S2: live rulesets and required checks (anonymous)
+19534405 branch active
+20716271 main_sec active
+yamllint, pin lint, policy tests
+go modules (e2e + rescan tool)
+render + policy gate
+e2e gate
+build gate
+
+== S3: upstream signature statements (anonymous GitHub API)
+cert-manager v1.21.1 ref:  tag 99224164fdb4f41072fa9f622db9a3c34ef432f9
+{ "tag": "v1.21.1", "verified": true, "reason": "valid" }
+valkey 9.1.1 ref:          commit d27f9ba65a04e80d9c417112a7621fc98a56f70d   (lightweight tag)
+{ "sha": "d27f9ba65a04e80d9c417112a7621fc98a56f70d", "verified": true, "reason": "valid" }
+hardened-app v0.1.0 ref:   commit 90a8da0c20eaf60d75e4faed6f27fef5b1611fc4   (lightweight tag)
+{ "sha": "90a8da0c20eaf60d75e4faed6f27fef5b1611fc4", "verified": false, "reason": "unsigned" }
+image/hardened-app/image.yaml:16:  COMMIT_SHA: 90a8da0c20eaf60d75e4faed6f27fef5b1611fc4
+image/hardened-app/image.yaml:42:          - url: git+https://github.com/mm-weber/hardened-app.git#v0.1.0
+image/hardened-app/image.yaml:43:            checksum: 90a8da0c20eaf60d75e4faed6f27fef5b1611fc4
+image/valkey/image.yaml:16:  COMMIT_SHA: d27f9ba65a04e80d9c417112a7621fc98a56f70d
+(valkey pinned commit equals the verified commit; hardened-app pinned commit is the unsigned one)
+
+== S4: grafana API sha256 vs sidecar, 5 versions x 4 arches
+13.0.4 amd64 AGREE (sidecar==api)
+13.0.4 arm64 AGREE (sidecar==api)
+13.0.4 arm-6 AGREE (sidecar==api)
+13.0.4 arm-7 AGREE (sidecar==api)
+13.0.6 amd64 AGREE (sidecar==api)
+13.0.6 arm64 AGREE (sidecar==api)
+13.0.6 arm-6 AGREE (sidecar==api)
+13.0.6 arm-7 AGREE (sidecar==api)
+13.1.1 amd64 AGREE (sidecar==api)
+13.1.1 arm64 AGREE (sidecar==api)
+13.1.1 arm-6 AGREE (sidecar==api)
+13.1.1 arm-7 AGREE (sidecar==api)
+13.1.2 amd64 AGREE (sidecar==api)
+13.1.2 arm64 AGREE (sidecar==api)
+13.1.2 arm-6 AGREE (sidecar==api)
+13.1.2 arm-7 AGREE (sidecar==api)
+13.1.3 amd64 AGREE (sidecar==api)
+13.1.3 arm64 AGREE (sidecar==api)
+13.1.3 arm-6 AGREE (sidecar==api)
+13.1.3 arm-7 AGREE (sidecar==api)
+All 20 cases reproduce. The armv6/armv7 filenames are linux_arm-6 / linux_arm-7.
+13.1.3 API values for amd64 (e0fd22aa...) and arm64 (83eef49c...) equal the pins at
+image/grafana/image.yaml:33.
+
+== S5: renovate 41.173.1 source facts (npm exit=0)
+modules/datasource/github-tags/index.js:17:      releaseTimestampSupport = true;
+util/github/graphql/query-adapters/tags-query-adapter.js:51:  releaseTimestamp: committedDate
+modules/datasource/github-releases/index.js:17:  releaseTimestampSupport = true;   (from publishedAt)
+modules/datasource/helm/index.js:16:  defaultRegistryUrls = ['https://charts.helm.sh/stable'];
+modules/datasource/helm/index.js:21:  releaseTimestampSupport = true;            (from index `created`)
+config/options/index.js:1840:  name: 'minimumReleaseAge', type string, default null
+config/options/index.js:1846:  name: 'minimumReleaseAgeBehaviour', default 'timestamp-optional',
+                               allowedValues ['timestamp-required', 'timestamp-optional']
+workers/repository/process/lookup/filter-checks.js:47-70 (paraphrase of the read source):
+  a candidate release with a releaseTimestamp younger than minimumReleaseAge is skipped
+  as pending; a candidate WITHOUT a releaseTimestamp is skipped only under
+  timestamp-required; under the default timestamp-optional it PASSES with a once-warn log.
+util/package-rules/index.js:28: `for (const packageRule of packageRules)`: rules are
+  applied in array order and each matching rule's values override the previous
+  (mergeChildConfig), so a later automerge:false wins over an earlier automerge:true.
+config/options/index.js:2904: platformAutomerge default true (GitHub auto-merge, which
+  waits on required checks; this is what makes "gated on green required checks" the
+  accurate phrase).
+workers/repository/update/branch/execute-post-upgrade-commands.js:95-96: the exec result
+  of a postUpgradeTask is passed to logger.debug only; :99-103: a FAILING command's stderr
+  is pushed to artifactErrors (which render in the PR as an artifact-update problem).
+  No path carries a succeeding command's stdout into the PR body.
+modules/manager/custom/regex/utils.js:16: 'registryUrl' is a supported capture field
+  (packed into dependency.registryUrls after URL validation).
+
+== S6: config validator and helm-manager emulation
+chart/cert-manager/chart.yaml pattern-match: true deps: [{"depName":"cert-manager","registryUrl":"https://charts.jetstack.io","currentValue":"v1.21.0"}]
+chart/grafana/chart.yaml pattern-match: true deps: [{"depName":"grafana","registryUrl":"https://grafana.github.io/helm-charts","currentValue":"10.5.15"}]
+chart/valkey/chart.yaml pattern-match: true deps: [{"depName":"valkey","registryUrl":"https://valkey-io.github.io/valkey-helm","currentValue":"0.11.0"}]
+chart/hardened-app/Chart.yaml pattern-match: false deps: []      (capital C, correctly excluded)
+chart/hardened-app/values.yaml pattern-match: false deps: []
+github-tags releaseTimestampSupport: true
+github-releases releaseTimestampSupport: true
+helm releaseTimestampSupport: true defaultRegistryUrls: [ 'https://charts.helm.sh/stable' ]
+validator, baseline repo config:      INFO: Config validated successfully
+validator, cluster-C-shaped variant:  INFO: Config validated successfully
+(variant = repo config plus: helm regex manager with registryUrl capture; two
+datasource-scoped rules {matchDatasources github-tags / github-releases,
+minimumReleaseAge "3 days", minimumReleaseAgeBehaviour "timestamp-required"}; a
+{matchDatasources docker, matchFileNames chart/**, matchUpdateTypes digest,
+automerge true} rule inserted before the dhi.io rule)
+
+== S7: yamale 6.1.0 day() semantics
+class Day(Validator):
+    """Day validator. Format: YYYY-MM-DD"""
+    value_type = date
+    tag = "day"
+    constraints = [con.Min, con.Max]
+    def _is_valid(self, value):
+        return isinstance(value, date)
+schema `review_by: day(max=2026-08-24)` (unquoted): SCHEMA SYNTAX ERROR
+  ("leading zeros in decimal integer literals are not permitted"; the constraint
+  argument is parsed as a Python expression and must be a quoted string)
+schema `review_by: day(max="2026-08-24")`:
+  good.yaml   (review_by 2026-08-01) -> Validation success, exit 0
+  lapsed.yaml (review_by 2026-09-30) -> "2026-09-30 is greater than 2026-08-24", exit 1
+grep for today/date.today/now() across yamale validators: no hits.
+Conclusion: min/max are static literals baked into the schema text; no constraint
+compares a value against the current date.
+
+== S8: chart repository indexes
+jetstack cert-manager newest: ['v1.21.1', 'v1.21.0', 'v1.21.0-beta.0']   (v-prefixed, matches the pin spelling; v1.21.1 exists, so the chart manager opens a real bump PR on day one)
+grafana chart newest: ['10.5.15', '10.5.14', '10.5.13']                  (bare; pinned 10.5.15 is current)
+valkey index: https://valkey-io.github.io/valkey-helm/index.yaml is a 301; following it
+lands on https://valkey.io/valkey-helm/index.yaml, HTTP 200
+valkey chart newest: ['0.11.0', '0.10.0', '0.9.4'] created present: True (bare; pinned 0.11.0 is current)
+All three indexes carry `created` per entry, the field the helm datasource maps to
+releaseTimestamp.
+
+== S9: tree facts
+image/cert-manager-cainjector/image.yaml:24:    - https://dhi.io/apk/alpine/v3.23/main
+image/valkey/image.yaml:23:                     - https://dhi.io/apk/alpine/v3.23/main
+image/cert-manager-webhook/image.yaml:24:       - https://dhi.io/apk/alpine/v3.23/main
+image/cert-manager-controller/image.yaml:24:    - https://dhi.io/apk/alpine/v3.23/main
+image/hardened-app/image.yaml:24:               - https://dhi.io/apk/alpine/v3.23/main
+image/grafana/image.yaml:40:                    - https://dhi.io/apk/alpine/v3.23/main
+image/valkey-compat/image.yaml:37:              - https://dhi.io/apk/alpine/v3.23/main
+(seven of seven definitions use the apk /main path; no dhi.io/deb path exists in the tree)
+git log -S 'values-hardened' -- renovate.json5:
+f3b5f87 2026-08-13 Land #69 + #70 on main (stacked merges went to feature branches) (#71)
+(the only commit introducing the chart-pin manager patterns; tasks.md:208 records
+"2026-08-13 done (#64)")
+scripts/install-scanners.sh:55: # renovate: datasource=github-releases depName=aquasecurity/trivy
+scripts/install-scanners.sh:59: # renovate: datasource=github-releases depName=anchore/grype
+scripts/install-tool.sh:56:     # renovate: datasource=github-releases depName=kubernetes-sigs/kind
+scripts/install-tool.sh:60:     # renovate: datasource=github-releases depName=kyverno/kyverno
+scripts/install-tool.sh:64:     # renovate: datasource=github-releases depName=helm/helm
+scripts/install-tool.sh:68:     # renovate: datasource=github-releases depName=helm/chart-testing
+data/dhi-terms-2026-08-21.md:87: "(a parallel Debian example uses `https://dhi.io/deb/debian/main`)"
