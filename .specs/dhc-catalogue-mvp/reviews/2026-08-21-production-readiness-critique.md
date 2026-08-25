@@ -611,6 +611,42 @@ reaches B by changing numbers, not machinery. Every disposition below is
 judged against A: does the change make a promise one person can keep, and
 does it leave the switch a fork needs.
 
+*Framing addendum, decided 2026-08-25 (recorded from the modularity
+discussion; feeds cluster D's trust-boundary table and the final
+requirements cleanup):* **what the successor is, and where its seams
+are.** The product is the operating model in a box: the promise machinery
+(scan-what-you-sign, exactly one OpenVEX attestation per digest, the
+decision aperture with measured clocks, the evidence-graded issue
+lifecycle, quarantined and signal-checked tracking, daily invariants) as
+spec-driven, measured glue over industry-standard tools. Positioning
+sentence for the successor's README: a forkable reference implementation
+of a one-person hardened-image catalogue, batteries included for Docker
+Hardened Images, with declared seams for the build backend, the
+authoritative scanner, and the platform. Commitments: (1) one declared
+**active-set** of definitions in the catalogue policy file, read by every
+plane (build matrix, rescan enumeration, e2e matrix, badges, lint), so a
+definition is carried by choice and disabling one reuses the
+supported-set semantics; grafana's tarball ships as a reference
+definition behind that switch. (2) A **builder contract** per archetype
+(definition directory in; image pushed by digest plus SBOM material out);
+everything downstream consumes only the contract's outputs, already true
+by construction since publish-on-change keys on CycloneDX pull checksums.
+DHI is the installed backend; apko plus Wolfi is the documented
+alternative a fork targets; the dhi.io login the build step needs today
+is stated as an adoption constraint, not hidden. (3) **Seams declared,
+not built**: no build-system-agnostic meta-format and no second backend
+now; the authoritative scanner stays Trivy with its coupling stated and
+the F7 consumer smoke test as migration insurance; cosign-to-notation and
+Kyverno-to-policy-controller remain declared-value renderings; the
+deepest coupling is GitHub itself (Actions, GHCR, Issues, rulesets, OIDC
+identities), accepted deliberately and made honest by the cleanup's
+parameterization of owner, repository and registry names. Audience,
+stated: platform engineers who must run curated base images without a
+team; teams whose vendor supplies images but no triage machinery;
+individuals building the skill. The competitor is DIY glue, and the
+receipts (measured ADRs, upstream reports, adversarial reviews) are the
+differentiator.
+
 ### 5.2 Decisions per finding
 
 **F3 (i), release path (decided 2026-08-21): publish with status.** On
