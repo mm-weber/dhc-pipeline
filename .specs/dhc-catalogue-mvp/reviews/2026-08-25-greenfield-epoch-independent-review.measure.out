@@ -1,0 +1,75 @@
+
+===== 1. ghcr repositories under mm-weber/dhc: anonymous token + tag lists =====
+repo hardened-app: token_http=200 tags_total=11 catalogue_tags=3
+  catalogue tags: 0-alpine3.23 0.1-alpine3.23 0.1.0-alpine3.23
+repo cert-manager-controller: token_http=200 tags_total=20 catalogue_tags=6
+  catalogue tags: 1-alpine3.23 1.20-alpine3.23 1.20.3-alpine3.23 1.21-alpine3.23 1.21.0-alpine3.23 1.21.1-alpine3.23
+repo cert-manager-webhook: token_http=200 tags_total=20 catalogue_tags=6
+  catalogue tags: 1-alpine3.23 1.20-alpine3.23 1.20.3-alpine3.23 1.21-alpine3.23 1.21.0-alpine3.23 1.21.1-alpine3.23
+repo cert-manager-cainjector: token_http=200 tags_total=20 catalogue_tags=6
+  catalogue tags: 1-alpine3.23 1.20-alpine3.23 1.20.3-alpine3.23 1.21-alpine3.23 1.21.0-alpine3.23 1.21.1-alpine3.23
+repo grafana: token_http=200 tags_total=16 catalogue_tags=6
+  catalogue tags: 13-alpine3.23 13.0-alpine3.23 13.0.4-alpine3.23 13.1-alpine3.23 13.1.2-alpine3.23 13.1.3-alpine3.23
+repo valkey: token_http=200 tags_total=22 catalogue_tags=8
+  catalogue tags: 9-alpine3.23 9.0-alpine3.23 9.0.5-alpine3.23 9.1-alpine3.23 9.1.1-alpine3.23 9-alpine3.23-compat 9.1-alpine3.23-compat 9.1.1-alpine3.23-compat
+repo valkey-compat: token_http=403 error="DENIED"
+
+===== 2. the ten legacy multi-arch tags named by critique F9 still resolve =====
+cert-manager-controller:1.20-alpine3.23: manifest_http=200
+cert-manager-controller:1.20.3-alpine3.23: manifest_http=200
+cert-manager-controller:1.21.0-alpine3.23: manifest_http=200
+cert-manager-webhook:1.20-alpine3.23: manifest_http=200
+cert-manager-webhook:1.20.3-alpine3.23: manifest_http=200
+cert-manager-webhook:1.21.0-alpine3.23: manifest_http=200
+grafana:13.0-alpine3.23: manifest_http=200
+grafana:13.0.4-alpine3.23: manifest_http=200
+valkey:9.0-alpine3.23: manifest_http=200
+valkey:9.0.5-alpine3.23: manifest_http=200
+
+===== 3. grafana 13.0.4-alpine3.23 index children (task 9.6's control digest) =====
+[{"digest":"sha256:46607ae25051","platform":"linux/amd64"},{"digest":"sha256:8a99c349bdb6","platform":"linux/arm64"},{"digest":"sha256:4a7e31a4b162","platform":"unknown/unknown"},{"digest":"sha256:9687cf46c554","platform":"unknown/unknown"}]
+
+===== 4. grafana 13.1.3-alpine3.23: digest and OpenVEX attestation count =====
+13.1.3-alpine3.23 index digest: sha256:bea44d40dbddc63634f74beeeac6ca41148b10bf933c5dcf4068a46750771b6e
+predicateType counts on sha256-bea44d40dbddc63634f74beeeac6ca41148b10bf933c5dcf4068a46750771b6e.att:
+      3 https://openvex.dev/ns
+      1 https://spdx.dev/Document
+
+===== 5. GitHub packages API needs authentication (anonymous probe) =====
+GET /users/mm-weber/packages/container/dhc%2Fgrafana -> 401
+
+===== 6. live rulesets: required checks and bypass actors (anonymous) =====
+{"id":19534405,"name":"branch","enforcement":"active"}
+{"id":20716271,"name":"main_sec","enforcement":"active"}
+{"name":"main_sec","bypass_actors":null,"required_checks":["yamllint, pin lint, policy tests","go modules (e2e + rescan tool)","render + policy gate","e2e gate","build gate"]}
+
+===== 7. documented deletion and visibility semantics (docs.github.com) =====
+FOUND: You cannot delete a public package if any version of the package has more than 5,000 downloads.
+FOUND: A specific version of a public package, if the package version doesn't have more than 5,000 downloads
+FOUND: You restore the package within 30 days of its deletion.
+FOUND: The same package namespace is still available and not used for a new package.
+FOUND: GitHub Packages only supports authentication using a personal access token (classic).
+FOUND: When you first publish a package that is scoped to your personal account, the default visibility is private and only you can see the package.
+last-version phrasing on either page: False
+
+===== 8. local tree counts (worktree state, no prose quoted) =====
+accepted-risk entries in triage/accepted-risk/grafana.yaml: 13
+entries expiring 2026-10-04: 2
+entries expiring 2026-11-02: 11
+oss/release matchString lines in renovate.json5: 2
+oss/release alias handling in scripts/refresh-grafana.sh at lines: 21 69 72 96 196 
+oss/release alias tests in scripts/refresh-grafana_test.sh at lines: 152 196 203 204 209 306 
+rescan dedup searches open issues only, rescan.yml line: 211
+closed-state dedup specified only in task 10.6, tasks.md line: 286
+digest pins in chart values files:
+/workspace/repos/dhc-pipeline/greenfield-epoch/chart/cert-manager/config/values-hardened.yaml:3
+/workspace/repos/dhc-pipeline/greenfield-epoch/chart/grafana/config/values-hardened.yaml:2
+/workspace/repos/dhc-pipeline/greenfield-epoch/chart/valkey/config/values-hardened.yaml:3
+/workspace/repos/dhc-pipeline/greenfield-epoch/chart/hardened-app/values.yaml:1
+definitions and their published repositories (image: field):
+      1 image: ghcr.io/mm-weber/dhc/cert-manager-cainjector
+      1 image: ghcr.io/mm-weber/dhc/cert-manager-controller
+      1 image: ghcr.io/mm-weber/dhc/cert-manager-webhook
+      1 image: ghcr.io/mm-weber/dhc/grafana
+      1 image: ghcr.io/mm-weber/dhc/hardened-app
+      2 image: ghcr.io/mm-weber/dhc/valkey
