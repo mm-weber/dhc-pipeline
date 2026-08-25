@@ -24,11 +24,11 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 
 ### Requirement 1: Image Definition Catalogue
 
-**Objective:** As a catalogue maintainer, I want declarative definition files for four archetypal images, so that builds are reproducible, reviewable, and mechanically extensible.
+**Objective:** As a catalogue maintainer, I want declarative definition files for a modular set of archetypal images, so that builds are reproducible, reviewable, and mechanically extensible.
 
 #### Acceptance Criteria
 
-1. THE Catalogue SHALL carry its image definitions as self-contained directory subtrees under image/, its reference set comprising hardened-app, cert-manager (controller, webhook, and cainjector images), grafana, and valkey.
+1. THE Catalogue SHALL carry its image definitions as self-contained directory subtrees under image/, its reference set comprising hardened-app, cert-manager (controller, webhook, and cainjector images), grafana, and valkey (runtime and compat images).
 2. THE Catalogue SHALL pin every base image reference by sha256 digest.
 3. THE Catalogue SHALL pin every upstream source reference by an exact version reference plus content checksum: a git ref plus commit checksum for a compile-from-source archetype, and a versioned artifact URL plus per-architecture content checksum for a repackage archetype.
 4. THE Catalogue SHALL define a non-root runtime account with UID 65532 for every runtime image.
@@ -40,11 +40,13 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 10. THE Catalogue SHALL declare in each definition an upstream authenticity class naming its verification signal: signed-tag, signed-commit, cross-origin-checksum, or none.
 11. IF a definition declares authenticity class none or declares no class THEN THE CI Pipeline SHALL fail validation naming that definition.
 12. IF a definition names a dhi.io package repository whose path is not of shape dhi.io/apk/(distro)/(release)/main or dhi.io/deb/(distro)/main THEN THE CI Pipeline SHALL fail validation naming that repository.
-13. THE Repository SHALL declare in its catalogue policy file an active set naming each definition it builds, tracks, tests and publishes.
-14. THE CI Pipeline SHALL derive its build matrix, its chart and test matrices and its upstream tracking scope solely from that active set.
-15. WHILE a definition sits outside that active set THE CI Pipeline SHALL publish no new digest for it.
-16. IF a pull request bumps a definition outside that active set THEN THE CI Pipeline SHALL fail validation naming that definition.
+13. THE Repository SHALL declare in its catalogue policy file an active set naming each definition it builds, tracks, tests and publishes, a definition so named being an active definition.
+14. THE CI Pipeline SHALL read that active set as its sole source of candidate definitions for its build and test matrices and its upstream tracking scope, and SHALL admit no definition outside that active set into any of them.
+15. WHILE a definition sits outside that active set THE CI Pipeline SHALL push no new digest for it and SHALL apply no new tag for it.
+16. IF a pull request bumps a definition outside that active set or a chart adaptation deploying no active definition THEN THE CI Pipeline SHALL fail validation naming that definition or that chart adaptation.
 17. THE Repository SHALL document per build archetype a builder contract naming its input, one definition directory, and its outputs, an image pushed by digest and per-platform SBOM material carrying package pull checksums.
+18. IF that active set splits a definition group whose source pins are enforced byte-equal or whose bumps are grouped under criterion 3.3 THEN THE CI Pipeline SHALL fail validation naming that group.
+19. IF that active set names a definition with no definition directory under image/ THEN THE CI Pipeline SHALL fail validation naming that entry.
 
 ### Requirement 2: Image Build and Release
 
@@ -54,7 +56,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 
 #### Acceptance Criteria
 
-1. WHEN a definition change merges to main THE CI Pipeline SHALL build affected images for every platform their definitions declare.
+1. WHEN a definition change merges to main THE CI Pipeline SHALL build each affected active definition's images for every platform its definition declares.
 2. WHEN an image build succeeds THE CI Pipeline SHALL push its image to its declared registry namespace with BuildKit provenance attached and SHALL sign and attest it under criterion 2.9.
 3. THE CI Pipeline SHALL derive image tags from upstream semantic versions following DHI naming convention (semver, base OS, and variant segments).
 4. WHILE public release remains disabled THE Repository SHALL keep source and registry images private.
@@ -67,7 +69,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 11. IF no catalogue tag references a digest THEN THE Catalogue SHALL treat that digest as frozen: not published, not rescanned, and not re-attested.
 12. IF a declared fail-closed release setting is disabled AND a release-time scan reports an uncovered finding THEN THE VEX Compiler SHALL add to that digest's compiled document an OpenVEX statement recording status under_investigation for that finding, carrying that scan report's timestamp and derived from that report as criterion 2.9 attests it.
 13. WHERE a declared fail-closed release setting is enabled THE CI Pipeline SHALL sign nothing, attest nothing and apply no tag for a digest whose release-time scan reports an uncovered finding, and SHALL report that finding in that run.
-14. THE CI Pipeline SHALL rebuild every definition on a declared schedule at least once per day.
+14. THE CI Pipeline SHALL rebuild every definition in its declared active set on a declared schedule at least once per day.
 15. WHERE a declared publish policy is set to on-change THE CI Pipeline SHALL discard a scheduled rebuild whose canonicalised package set, taken as a sorted set of package type, name, version and package checksum per platform manifest, equals that recorded in the CycloneDX SBOMs attested to a published digest carrying its full release tag, pushing nothing, signing nothing and attesting nothing from it.
 16. WHEN a scheduled rebuild produces an image whose resolved package set differs from that of a published digest carrying its full release tag, or for which no published digest carries that tag, THE CI Pipeline SHALL publish that image through criteria 2.7 to 2.9 and SHALL report in its job summary its package-set difference against any published digest carrying that tag.
 17. WHERE a declared publish policy is set to always THE CI Pipeline SHALL publish every scheduled rebuild through criteria 2.7 to 2.9 regardless of package-set equality.
@@ -88,7 +90,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 #### Acceptance Criteria
 
 1. THE Renovate Automation SHALL run self-hosted via GitHub Actions at least once every six hours.
-2. WHEN an upstream release matches a definition's version policy THE Renovate Automation SHALL open a pull request updating pinned ref, checksum, and derived tags.
+2. WHEN an upstream release matches an active definition's version policy THE Renovate Automation SHALL open a pull request updating pinned ref, checksum, and derived tags.
 3. WHEN multiple images share one upstream monorepo THE Renovate Automation SHALL group their bumps into a single pull request.
 4. WHEN an upstream release increments a major version THE Renovate Automation SHALL stage it behind Dependency Dashboard approval instead of opening an automatic pull request.
 5. WHERE a pull request contains solely digest or patch updates of a compile-from-source upstream THE Renovate Automation SHALL enable automerge gated on green required checks.
@@ -96,8 +98,8 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 7. THE Renovate Automation SHALL withhold each pull request bumping a pinned third-party release version until that release has aged a declared minimum release age, at least three days in this catalogue, exempting only its docker datasource of catalogue-published digests and hand-reviewed build-layer pins.
 8. WHEN a refresh task recomputes a checksum or resolves a commit for a definition's bump THE Refresh Tooling SHALL verify that definition's declared authenticity signal and SHALL write no field of a bump whose signal fails verification, reporting each such refusal naming its signal.
 9. WHEN a pull request changes a repackage definition's per-architecture checksum THE CI Pipeline SHALL verify pinned value, bytes served by its download origin and its upstream's published version statement agree per architecture, failing on any disagreement naming each value.
-10. THE Scan Pipeline SHALL re-verify at least once per day each definition's declared authenticity signal against its upstream origin, and SHALL report each mismatch as a failure of that run and file an issue naming it as a supply-chain signal.
-11. THE Renovate Automation SHALL track each upstream chart version pinned under chart/ against its chart repository and SHALL open a pull request, never automerged, for each new chart release matching its version policy.
+10. THE Scan Pipeline SHALL re-verify at least once per day each active definition's declared authenticity signal against its upstream origin, and SHALL report each mismatch as a failure of that run and file an issue naming it as a supply-chain signal.
+11. THE Renovate Automation SHALL track each upstream chart version pinned under chart/ for an active definition against its chart repository and SHALL open a pull request, never automerged, for each new chart release matching its version policy.
 12. WHERE a pull request contains solely digest updates of catalogue image pins under chart/ THE Renovate Automation SHALL enable automerge gated on green required checks.
 
 ### Requirement 4: Helm Chart Adaptation
@@ -106,7 +108,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 
 #### Acceptance Criteria
 
-1. WHERE an active definition declares an upstream chart THE Chart Adaptation SHALL consume that chart at a pinned version without modifying upstream templates.
+1. WHERE a chart adaptation deploying an active definition's images pins an upstream chart THE Chart Adaptation SHALL consume that chart at its pinned version without modifying upstream templates.
 2. THE Chart Adaptation SHALL override image references to digest-pinned Catalogue images.
 3. THE Chart Adaptation SHALL enforce restricted Pod Security Standard settings: runAsNonRoot true, UID and GID 65532, readOnlyRootFilesystem true, allowPrivilegeEscalation false, all capabilities dropped, and seccompProfile RuntimeDefault.
 4. WHERE a workload requires writable filesystem paths THE Chart Adaptation SHALL mount emptyDir volumes at those paths.
@@ -126,9 +128,11 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 2. WHEN a pull request affects an image or chart THE Test Suite SHALL install each affected chart on a kind cluster in CI.
 3. WHEN a chart install completes THE Test Suite SHALL assert workload pods reach Ready within five minutes.
 4. WHEN pods are Ready THE Test Suite SHALL assert live pod securityContext matches restricted profile settings, including UID 65532 and read-only root filesystem.
-5. WHEN pods are Ready THE Test Suite SHALL execute each active definition's declared functional probe.
+5. WHEN pods are Ready THE Test Suite SHALL execute each functional probe declared by an active definition that installed chart deploys, executing a probe shared by several definitions once.
 6. WHEN a pull request bumps a component version THE Test Suite SHALL verify an upgrade from currently pinned version to proposed version.
 7. IF any assertion fails THEN THE Test Suite SHALL fail its CI check and preserve cluster diagnostic logs as workflow artifacts.
+
+8. IF an active definition declares no functional probe THEN THE CI Pipeline SHALL fail validation naming that definition.
 
 ### Requirement 6: CVE Triage With Recorded Decisions
 

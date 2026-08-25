@@ -16,9 +16,9 @@ build (Req 2.4); released publicly under MIT on 2026-08-13.
 
 ### Goals
 
-- Author four archetypal image definitions with DHI-grade pinning discipline (Req 1)
+- Author a modular set of archetypal image definitions (four components in the reference set) with DHI-grade pinning discipline (Req 1)
 - Operate real automation: Renovate bump PRs, CI gates, daily scans (Req 3, 6)
-- Adapt three upstream charts to hardened non-root images via overrides only (Req 4)
+- Adapt upstream charts (three in the reference set) to hardened non-root images via overrides only (Req 4)
 - Prove hardening on live Kubernetes with Go integration tests (Req 5)
 - Keep every decision explainable — the owner must be able to defend each one in an interview
 
@@ -504,7 +504,17 @@ graph TB
      planes consume only contract outputs, already true by construction, and
      the trust-boundary table names each archetype's installed backend and
      its alternative. Grafana's tarball ships as a reference definition
-     behind the active-set switch.
+     behind the active-set switch. Two boundaries drawn on the review's
+     findings: the render-and-policy chart gate keeps checking every chart
+     directory as validation, so the reference tree cannot rot, while only
+     the build, test and tracking planes scope to the set (the recorded
+     every-chart decision of task 5.5 stands); and the
+     definition-to-component mapping the matrices and probes need is
+     declared as a `deploys:` list in each chart's chart.yaml. Deliberate
+     divergences, recorded: rescan enumeration and badges stay tag-driven
+     for inactive definitions (Decision 7 unchanged), and a deactivated
+     definition's findings keep every status lane except the fix bump,
+     deactivation being the avoid treatment writ large.
    - **Trade-offs**: one more policy-file section every plane must read; the
      aperture lesson applies, a switch nothing reads is decoration, so
      "solely" in 1.14 is the criterion. Renovate cannot read the policy file,
@@ -1024,8 +1034,10 @@ ports: [3000/tcp]
 | A suppression from the authoritative scanner does not land in a declared consumer | portability block names the divergence, informational; the daily smoke test fails the run only on a failed instruction step or a suppression missing in its authoritative consumer | 9.12, 9.13 |
 | revocations.yaml violates its schema | validate.yml fails naming each violation | 9.6 |
 | An exception's reasoning reference or a statement's log citation resolves to no LOG.md heading | validate.yml fails naming that reference | 9.18 |
-| A pull request bumps a definition outside the active set | validate.yml fails naming that definition | 1.16 |
-| An active definition lacks a declared functional probe | validate.yml fails naming that definition | 5.5 |
+| A pull request bumps a definition outside the active set, or a chart adaptation deploying no active definition | validate.yml fails naming it | 1.16 |
+| An active definition declares no functional probe | validate.yml fails naming that definition | 5.8 |
+| An active set splits a byte-equal pair or a grouped monorepo | validate.yml fails naming that group | 1.18 |
+| An active-set entry names no definition directory | validate.yml fails naming that entry | 1.19 |
 
 ## Testing Strategy
 
@@ -1033,7 +1045,7 @@ ports: [3000/tcp]
 - Renovate regex-manager fixtures (does this pin string parse?); schema negative cases; TDD on any fallback-renderer glue (per repo CLAUDE.md).
 
 ### Integration Tests
-- Req 5 suite: per-chart install on kind → Ready ≤5min → live securityContext assertions → functional probes (Certificate issued; grafana HTTP health; valkey SET/GET; hardened-app 200) → upgrade path on bump PRs (both shapes — chart-version and image/values — re-asserts gated on rollout completion).
+- Req 5 suite: per-chart install on kind → Ready ≤5min → live securityContext assertions → each deployed active definition's declared functional probe (reference registrations: Certificate issued; grafana HTTP health; valkey SET/GET; hardened-app 200) → upgrade path on bump PRs (both shapes, chart-version and image/values, re-asserts gated on rollout completion).
 
 ### E2E / Pipeline
 - kyverno CLI over every chart's rendered manifests (digest, registry, nonroot) on each PR, `ct lint` on owned charts only — install-level verification lives in the kind e2e suite, not `ct install`; trivy gate with compiled VEX; full bump-flow rehearsal via one deliberately stale pin per component.
