@@ -18,7 +18,7 @@ one promise, a transparency catalogue: every published digest is signed by a pin
 every known HIGH or CRITICAL finding against a published digest carries a published
 machine-readable status, and time-to-decision and time-to-fix are measured and published rather
 than promised. Its amendments land in dependency clusters A to D. Cluster A (findings F3, F9,
-F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 6.35 to 6.37 and Req 7.7 to 7.10, and amended Req 2.1 and 2.2. Cluster B (findings F5, F4 and the issue-closing half of F13: statuses and clocks) added Req 6.38 to 6.60 and amended Req 2.6, 2.8, 6.1, 6.3, 6.7, 6.8, 6.10, 6.11 and 6.35; its spikes are ADR 0003 and ADR 0004. Cluster C (findings F2, F10, F8, F13 ii and iii, F12 d: upstream trust) added Req 1.10 to 1.12, Req 3.7 to 3.12 and Req 4.8 to 4.9, and amended Req 1.3, 3.5 and 4.5; its spike record is the 2026-08-25 amendment to ADR 0002.
+F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 6.35 to 6.37 and Req 7.7 to 7.10, and amended Req 2.1 and 2.2. Cluster B (findings F5, F4 and the issue-closing half of F13: statuses and clocks) added Req 6.38 to 6.60 and amended Req 2.6, 2.8, 6.1, 6.3, 6.7, 6.8, 6.10, 6.11 and 6.35; its spikes are ADR 0003 and ADR 0004. Cluster C (findings F2, F10, F8, F13 ii and iii, F12 d: upstream trust) added Req 1.10 to 1.12, Req 3.7 to 3.12 and Req 4.8 to 4.9, and amended Req 1.3, 3.5 and 4.5; its spike record is the 2026-08-25 amendment to ADR 0002. Cluster D (findings F1, F11, F12 obligations, F7, F13 register: catalogue posture) added Req 9; the greenfield successor (F9 re-decision, 2026-08-25) is design Decision 9 and task group 12.
 
 ## Requirements
 
@@ -217,3 +217,28 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 
 1. THE CI Pipeline SHALL execute image builds, kind clusters, registry pushes, and scans on GitHub Actions runners or on an operator host machine.
 2. IF a task requires registry or internet access THEN THE Development Workflow SHALL delegate that task to GitHub Actions or an operator host instead of executing it inside a restricted devcontainer.
+
+### Requirement 9: Catalogue Posture and Trust Statement
+
+**Objective:** As a catalogue consumer, I want the catalogue's promise, governance, disclosure path and revocation mechanics stated and machine-verified, so that trusting its signatures is a decision I can make on published facts.
+
+#### Acceptance Criteria
+
+1. THE Repository SHALL publish a security policy stating: its published promise, every published digest signed by a pinned identity, every known finding within its decision aperture carrying a published machine-readable status, and time-to-decision and time-to-fix measured and published; its decision aperture and ceilings by reference to its catalogue policy file; its definitions of published, supported, superseded and frozen digests and its epoch; its tag retention policy from that epoch; what a signature attests and does not attest; its single-maintainer bypass posture; its vulnerability reporting channel; its advisory channel; its revocation record and runbook locations; each definition's upstream authenticity class; its transparency-log disclosure fact; its substrate redistribution terms statement with its dated evidence; and a link to its status issue.
+2. THE Repository SHALL accept vulnerability reports through GitHub private vulnerability reporting.
+3. THE Scan Pipeline SHALL verify at least once per day that private vulnerability reporting remains enabled and SHALL report a disabled state as a failure of that run.
+4. THE Repository SHALL publish catalogue-level security advisories as GitHub repository security advisories.
+5. THE Repository SHALL record every revoked digest in triage/revocations.yaml, each entry carrying digest, reason, replacement digest or a recorded absence of one, advisory link and date.
+6. IF triage/revocations.yaml violates its schema THEN THE CI Pipeline SHALL fail validation naming each violation.
+7. IF a catalogue tag references a digest recorded in triage/revocations.yaml THEN THE Scan Pipeline SHALL report that tag as a failure of its daily run.
+8. THE Repository SHALL commit under .github/rulesets/ its intended branch ruleset in GitHub's native export format, requiring its build gate and its e2e gate as status checks.
+9. THE Scan Pipeline SHALL compare at least once per day each committed ruleset's name, target, enforcement, conditions and rules against its live counterpart through anonymous reads, and SHALL report each difference, each committed ruleset lacking an active live counterpart and each active branch ruleset lacking a committed counterpart as a failure of that run.
+10. THE Repository SHALL commit a CODEOWNERS file naming a maintainer for each lane: triage/, image/, chart/, policies/ and .github/.
+11. THE Repository SHALL declare its VEX consumers as a list in its catalogue policy file, exactly one consumer marked authoritative, each consumer an adapter emitting findings in one normalised shape: vulnerability identifier, package url and suppression state.
+12. WHEN a pull request scan or a scheduled rescan completes THE Scan Pipeline SHALL report a VEX portability block naming, for each statement its authoritative scanner suppressed on that pull request's images or on a supported digest, each declared consumer's suppression result and each divergence.
+13. THE Scan Pipeline SHALL run at least once per day its published consumer verification instructions verbatim against one published digest, SHALL report a failed instruction step or a suppression missing in its authoritative consumer as a failure of that run, and SHALL report each remaining declared consumer's suppression result and each divergence in that run's portability block.
+14. THE Repository SHALL maintain in CONVENTIONS.md a manual-controls register labelling every human step deliberate or pending automation, each entry carrying step, class, reason and fork switch.
+15. THE Repository SHALL publish a trust-boundary table listing every component with its owner class, substrate-inherited, upstream-inherited with its authenticity class, or own, and any declared seam alternative.
+16. THE Repository SHALL carry a notice file naming its hardening substrate's copyright and licence, SHALL carry a copy of its hardening substrate's licence text, and SHALL state beside them that third-party packages carry upstream licences enumerated in attested SBOMs.
+17. THE Repository SHALL state in its README non-affiliation with and non-endorsement by its hardening substrate's vendor.
+18. IF an accepted-risk exception's reasoning reference or a VEX source statement's log citation resolves to no heading in triage/LOG.md THEN THE CI Pipeline SHALL fail validation naming that reference.
