@@ -18,7 +18,7 @@ one promise, a transparency catalogue: every published digest is signed by a pin
 every known HIGH or CRITICAL finding against a published digest carries a published
 machine-readable status, and time-to-decision and time-to-fix are measured and published rather
 than promised. Its amendments land in dependency clusters A to D. Cluster A (findings F3, F9,
-F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 6.35 to 6.37 and Req 7.7 to 7.10, and amended Req 2.1 and 2.2. Cluster B (findings F5, F4 and the issue-closing half of F13: statuses and clocks) added Req 6.38 to 6.60 and amended Req 2.6, 2.8, 6.1, 6.3, 6.7, 6.8, 6.10, 6.11 and 6.35; its spikes are ADR 0003 and ADR 0004.
+F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 6.35 to 6.37 and Req 7.7 to 7.10, and amended Req 2.1 and 2.2. Cluster B (findings F5, F4 and the issue-closing half of F13: statuses and clocks) added Req 6.38 to 6.60 and amended Req 2.6, 2.8, 6.1, 6.3, 6.7, 6.8, 6.10, 6.11 and 6.35; its spikes are ADR 0003 and ADR 0004. Cluster C (findings F2, F10, F8, F13 ii and iii, F12 d: upstream trust) added Req 1.10 to 1.12, Req 3.7 to 3.12 and Req 4.8 to 4.9, and amended Req 1.3, 3.5 and 4.5; its spike record is the 2026-08-25 amendment to ADR 0002.
 
 ## Requirements
 
@@ -39,7 +39,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 9. THE Catalogue SHALL record in CONVENTIONS.md that versions of packages installed from package repositories are not pinned in definitions and that each platform manifest's resolved package set is recorded in the SPDX and CycloneDX SBOMs attested to that manifest.
 10. THE Catalogue SHALL declare in each definition an upstream authenticity class naming its verification signal: signed-tag, signed-commit, cross-origin-checksum, or none.
 11. IF a definition declares authenticity class none or declares no class THEN THE CI Pipeline SHALL fail validation naming that definition.
-12. IF a definition names a dhi.io package repository whose path is not of shape dhi.io/apk/(distro)/(release)/main or dhi.io/deb/(distro)/(release)/main THEN THE CI Pipeline SHALL fail validation naming that repository.
+12. IF a definition names a dhi.io package repository whose path is not of shape dhi.io/apk/(distro)/(release)/main or dhi.io/deb/(distro)/main THEN THE CI Pipeline SHALL fail validation naming that repository.
 
 ### Requirement 2: Image Build and Release
 
@@ -88,12 +88,12 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 4. WHEN an upstream release increments a major version THE Renovate Automation SHALL stage it behind Dependency Dashboard approval instead of opening an automatic pull request.
 5. WHERE a pull request contains solely digest or patch updates of a compile-from-source upstream THE Renovate Automation SHALL enable automerge gated on green required checks.
 6. WHEN THE Catalogue is initialized THE Catalogue SHALL pin each upstream at least one release behind its latest available version.
-7. THE Renovate Automation SHALL withhold each upstream version bump pull request until its release has aged a declared minimum release age, at least three days in this catalogue.
-8. WHEN a refresh task recomputes a checksum or resolves a commit for a bump THE Refresh Tooling SHALL verify that definition's declared authenticity signal and SHALL write no field of a bump whose signal fails verification, reporting each such refusal naming its signal.
+7. THE Renovate Automation SHALL withhold each pull request bumping a pinned third-party release version until that release has aged a declared minimum release age, at least three days in this catalogue, exempting only its docker datasource of catalogue-published digests and hand-reviewed build-layer pins.
+8. WHEN a refresh task recomputes a checksum or resolves a commit for a definition's bump THE Refresh Tooling SHALL verify that definition's declared authenticity signal and SHALL write no field of a bump whose signal fails verification, reporting each such refusal naming its signal.
 9. WHEN a pull request changes a repackage definition's per-architecture checksum THE CI Pipeline SHALL verify pinned value, bytes served by its download origin and its upstream's published version statement agree per architecture, failing on any disagreement naming each value.
 10. THE Scan Pipeline SHALL re-verify at least once per day each definition's declared authenticity signal against its upstream origin, and SHALL report each mismatch as a failure of that run and file an issue naming it as a supply-chain signal.
 11. THE Renovate Automation SHALL track each upstream chart version pinned under chart/ against its chart repository and SHALL open a pull request, never automerged, for each new chart release matching its version policy.
-12. WHERE a pull request contains solely digest updates of catalogue image pins under chart/ THE Renovate Automation SHALL enable automerge gated on green required checks, its e2e upgrade path among them.
+12. WHERE a pull request contains solely digest updates of catalogue image pins under chart/ THE Renovate Automation SHALL enable automerge gated on green required checks.
 
 ### Requirement 4: Helm Chart Adaptation
 

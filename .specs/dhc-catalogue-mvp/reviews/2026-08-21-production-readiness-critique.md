@@ -967,6 +967,22 @@ already meets the rest of checkpoint 1: it cross-checks three build-id
 sources and refuses on conflict, so what is added is the per-architecture
 checksum comparison before any field is written.
 
+*Revised 2026-08-25 on independent review findings 1.3 and 1.4, owner
+decided:* the quarantine's boundary is principled rather than
+datasource-incidental: every third-party version datasource ages three
+days (github-tags, github-releases, npm, pypi, helm, go), and the docker
+datasource is exempt by name (catalogue-published digests must reach
+charts same-day; the build layer is hand-reviewed). npm's record is the
+densest (ua-parser-js, chalk/debug, Shai-Hulud, all caught inside days)
+and its 72-hour unpublish window is what three days answers; renovate
+itself is the highest-privilege pin in the repository. Stated plainly:
+quarantine catches fast-burn compromise, not slow-burn (xz shipped five
+weeks before discovery); slow-burn stays with the signal and the gates.
+And the evidence line moves from the bump PR body, a mechanism Renovate
+does not have (postUpgradeTask stdout is discarded, measured), to a
+dated verification comment beside the pin, carried by the diff reviewers
+read.
+
 **F10, upstream authenticity (decided 2026-08-21 by consequence of F2):
 accept.** Each definition declares its class in a `# authenticity:`
 comment marker, following the existing `# renovate:` convention for
@@ -980,12 +996,19 @@ never read where the truth is "independent origins agree". The `.deb`
 route for real cryptographic authenticity on grafana is the documented
 switch in ADR 0002.
 
-*Amended 2026-08-25 (cluster C design review):* sequencing for
-`hardened-app`. Every definition declares its class in this cluster, and
-`hardened-app` declares `signed-commit` now; enforcement is at bump time
-(F2 b), so the standing pin stays valid while the next bump refuses until
-its tags are SSH-signed. Signing those tags is an owner action sequenced
-before that bump, recorded in the task.
+*Amended 2026-08-25 (cluster C design review; revised same day on
+independent review finding 1.1):* sequencing for `hardened-app`. Every
+definition declares its class in this cluster, and `hardened-app` declares
+`signed-commit` now. Its standing pinned commit is measured unsigned and
+can never become signed, so the owner chose to keep Req 3.10's daily
+re-verification universal rather than write grandfather logic for one
+transitional pin: a signed `hardened-app` release, bumped through the
+Req 3.8 gate, is sequenced before task 11.3 lands, so every definition's
+signal verifies on the sweep's first day. Until checkpoint 3 is
+implemented nothing asserts the standing pin, and its next bump refuses
+until its tags are SSH-signed. `none` is refused for every definition,
+not only new ones; every current definition carries a real class, so
+nothing is grandfathered.
 
 **F7, scanner monoculture (decided 2026-08-21): Grype as a measured second
 consumer, a daily consumer smoke test, consumers as a declared list.**
@@ -1157,7 +1180,7 @@ industry's poles recorded in the memo.
 
 *Amended 2026-08-25 (cluster C design review), items (ii) and (iii):* the
 as-built state moved under them. The task 8.7 chart-pin managers landed
-2026-08-14 and already move the image pins in chart values, same-tag digest
+2026-08-13 and already move the image pins in chart values, same-tag digest
 drift included, so (ii) reduces to its remaining half: a manager over
 `chart/<name>/chart.yaml`'s `upstream.name`, `upstream.repository` and
 `upstream.version` against the native `helm` datasource, covering the three

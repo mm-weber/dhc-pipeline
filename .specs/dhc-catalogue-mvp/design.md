@@ -342,8 +342,15 @@ graph TB
      versions with a bespoke watcher, or Renovate's native helm datasource over the
      `upstream:` block chart.yaml already carries.
    - **Decision**: independence comes from age, signal and gates, each declared.
-     (a) `minimumReleaseAge` of three days on both version datasources, the value a
-     one-line switch in `renovate.json5` (Renovate reads only its own config). (b) Each
+     (a) `minimumReleaseAge` of three days on every third-party version datasource
+     (github-tags, github-releases, npm, pypi, helm, go), the value a one-line switch
+     in `renovate.json5` (Renovate reads only its own config); the docker datasource
+     is exempt by name, carrying catalogue-published digests that must reach charts
+     same-day and the hand-reviewed build layer. Three days is npm's unpublish
+     window, and the record it answers is fast-burn: ua-parser-js lived four hours,
+     chalk/debug two, the tj-actions and trivy tag repointings days; renovate itself
+     is the highest-privilege pin in this repository, one more reason its ecosystem
+     ages. (b) Each
      definition declares `# authenticity:` beside its source: `signed-tag`
      (cert-manager), `signed-commit` (valkey, hardened-app), `cross-origin-checksum`
      (grafana); `none` and a missing marker fail lint. The refresh scripts verify the
@@ -360,15 +367,18 @@ graph TB
      required checks, so a same-tag rebuild reaches the deployed chart without a human
      in the loop while every tag move keeps one. (d) The valkey compat decision becomes
      structured `compat:` metadata (reason, upstream issue, review-by date) validated
-     by yamale, already pinned in CI; validation fails past the review-by date, the
-     rescan reports lapses, and the upstream ask (an init-container image value,
+     by yamale for shape, already pinned in CI, and by a validate-lint date test
+     past the review-by date (yamale day() constraints are static literals, no
+     dynamic today); the rescan reports lapses, and the upstream ask (an init-container image value,
      following upstream's own metrics-exporter precedent) is drafted under
      `triage/upstream/` and filed by the owner. (e) dhi.io package repositories are
      restricted to `/main` paths by lint, the redistribution memo's Q4 rule (F12 d).
-   - **Trade-offs**: three days of quarantine delays every from-source patch, security
-     patches included; the clocks measure that cost, and a KEV-listed fix can be
-     hand-bumped past the queue through the existing fix-forward lane (Req 6.5,
-     CONVENTIONS). Signal verification trusts GitHub's verification statement rather
+   - **Trade-offs**: three days of quarantine delays every third-party version bump,
+     security patches and scanner releases included; the clocks measure that cost,
+     and a KEV-listed fix can be hand-bumped past the queue through the existing
+     fix-forward lane (Req 6.5, CONVENTIONS). It does not catch slow-burn compromise
+     (xz shipped five weeks before discovery); that residual stays with the signal
+     and the behavioural gates. Signal verification trusts GitHub's verification statement rather
      than a locally managed keyring; a fork wanting local key management swaps the
      check behind the same marker. The API-versus-sidecar comparison makes the
      versions API a hard dependency of grafana bumps (it already resolves the build
