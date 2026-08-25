@@ -27,7 +27,12 @@ anything is implemented (amend the spec first, then /spec-implement).
             (17 findings + 7 angle points, all dispositioned, revision ledger
             in reviews/), revised in eight commits; PR #97 awaiting the
             owner's review; ADR 0003 (PR #98) is its spike
-      - [ ] B. statuses and clocks (F5, F4, issue closing)
+      - [ ] B. statuses and clocks (F5, F4, issue closing): Req 6.38–6.54,
+            amendments to 2.6, 2.8, 6.1, 6.3, 6.7, 6.8, 6.10, 6.11, 6.35; design
+            decision 7 + rescan flow; tasks 10.1–10.7. Design reviewed against
+            the cluster A decisions first (critique 5.2 amended 2026-08-23;
+            ADR 0004 spike, PR #99); drafted 2026-08-23, independent review
+            next
       - [ ] C. upstream trust (F2, F10, F8, chart tracking, `/main` lint)
       - [ ] D. catalogue posture (F1, F11, F12, F7, register; new Req 9)
 - [ ] 4. Only then: implementation PRs via /spec-implement, TDD where code

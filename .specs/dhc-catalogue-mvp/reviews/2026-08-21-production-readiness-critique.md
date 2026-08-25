@@ -680,6 +680,17 @@ exception stops compiling and the finding falls back to
 advisory page instead (invisible to scanner-driven consumers). Prior art
 closed: review A 2.2.
 
+*Amended 2026-08-23 (cluster B design review):* the `affected` statements
+go into the single compiled document per digest (ADR 0003), and the
+exception entry gains a required `decided_at` date, written by the person
+who decides and checked by `lint-accepted-risk.sh` like the other required
+fields. It feeds `action_statement_timestamp`, and it starts the ceiling
+clock: the lint checks `expired_at` minus `decided_at` against the policy
+file's ceiling, where today `expired_at` is only compared with the day the
+lint happens to run. Rejected: deriving the date from git (moves under
+rebase and squash) or from the LOG heading above the `ref:` anchor
+(markdown-structure glue).
+
 **F5 (ii), re-attestation (decided 2026-08-21): the daily rescan
 re-attests when the compiled document changes.** For every digest in the
 published set (digests currently referenced by any catalogue tag, alias fan
@@ -696,6 +707,37 @@ F9 and F11. Rejected: attest at release only (stale by construction) and an
 out-of-band VEX repository as the replacement (unbound from the digest, and
 it is F11's advisory-feed question, where it is weighed as a complement).
 Prior art closed: review A 3.14.
+
+*Amended 2026-08-23 (cluster B design review against the cluster A
+decisions):* **re-attestation replaces, it does not append.** ADR 0003 read
+Trivy's log line "taking the first one" as "the first attestation wins";
+ADR 0004 then measured the behaviour directly: with more than one OpenVEX
+attestation on a digest, `trivy --vex oci` applies one chosen
+nondeterministically (the same layer set scanned four times gave different
+results), so an appended re-attestation is not merely invisible, it makes
+which document a consumer gets a matter of chance. The rescan therefore runs
+`cosign attest --type openvex --replace` (cosign v2.6.0 replaces every
+existing attestation of the same predicate type; `cosign clean --type` can
+only remove all attestations at once, and cosign v3 has no replace at all,
+one more reason for the v2 pin). History lives in Rekor, which logs every
+attestation ever made, and in the fact that the compiled document is
+recomputable from named inputs (Req 6.37, with carry-forward from the
+previously attested document). The consumer recipe is one
+`verify-attestation`, no merge step. Before compiling, the rescan attests its
+own daily scan report per platform manifest (vulnerability predicate,
+`--replace`), since Req 6.37 names attested scan reports as a compiler
+input. Permissions: `rescan.yml` gains `packages: write` as well as
+`id-token: write`, because rewriting the `.att` manifest is a push; the
+compensating control is the daily verification proof over every
+tag-referenced digest (Req 2.24) in the same run's `invariants` step. The
+published set is cluster A's enumeration (Req 2.22). The spike that opened
+cluster B (ADR 0004) measured, on v2.6.0, that `--replace` removes every
+prior OpenVEX layer and that Trivy `--vex oci` then reads the new document.
+Rekor retention of replaced entries was NOT measured there (the spike ran
+with tlog upload disabled) and neither was `--replace` under keyless
+signing; task 10.3 measures both in CI before anything relies on them
+(corrected 2026-08-24; this sentence previously overstated the spike,
+independent review finding 1.5).
 
 **F4 (i), ceilings and aperture (decided 2026-08-21): one policy file,
 every number a variable.** `triage/policy.yaml` declares the decision
@@ -739,6 +781,44 @@ where the promise is audited. The sink is a declared value. Rejected: bot
 commits of a metrics file to `main` (contradicts "everything enters as a
 pull request"). Deferred by design: a Pages dashboard, with the JSON schema
 written so Pages is presentation only.
+
+*Amended 2026-08-23 (cluster B design review):* **first seen is a signed
+value.** The `under_investigation` statement cluster A writes at release
+(Req 2.12) carries the attested scan report's timestamp and is carried
+forward unchanged (Req 6.37), so *first seen* is read from the attestation
+rather than from the earlier of two dates; the rescan issue's creation date
+becomes a cross-check. *Decided* and *fixed* are read from the same
+attestations and from cluster A's daily enumeration of tag-referenced
+digests and their attested scan reports.
+
+*Decided 2026-08-23, timestamp semantics on a carried-forward statement:*
+a catalogue-written statement's `timestamp` is first seen, the attested scan
+report's time when the finding first appeared, carried forward unchanged
+through every status change (true to the field's definition: the finding has
+applied since then); `last_updated` records each status or content change;
+`action_statement_timestamp` is the decision date on an `affected`
+statement. Time-to-decision is `last_updated` minus `timestamp` on the first
+status other than `under_investigation`; time-to-fix comes from the
+enumeration (the first tag-referenced digest on the same release line whose
+attested scan report no longer lists the finding). A lapsed exception
+re-emits `under_investigation` with the original `timestamp`, a fresh
+`last_updated` and a `status_notes` line naming the lapse, so the decision
+clock restarts and first seen survives. One catalogue statement per finding
+per document, so Trivy's ordering by `timestamp` is unaffected; a later
+`not_affected` or `fixed` source statement replaces the catalogue statement
+rather than competing with it. Rejected: `timestamp` as the status-change
+time with first seen in free text.
+
+*Amended 2026-08-24 (PR #100 revision, finding 1.2):* the clock sources are
+made computable. Decision time reads `action_statement_timestamp` for
+`affected` (equal to `decided_at`) and the statement `timestamp` for
+`not_affected` and `fixed` (the author's dated decision), from the current
+document alone; `last_updated` is provenance, not a clock. Fix time is the
+first day a finding is absent, reported and suppressed alike, from every
+supported digest of its repository, carried forward from the previously
+published status data (the status issue's fenced JSON), which replaces the
+undefined "release line" and survives daily report replacement. Clocks run
+over the supported set (see the F13 amendment of the same date).
 
 *Badges (decided 2026-08-21): (a) now, (b) when the metrics exist.*
 (a) Native GitHub badges rendered by shields.io from the public API: open
@@ -1025,6 +1105,32 @@ real heading and that every decision has one. Rejected: register only
 task 8.7) and the unified ledger now (right direction per the 2026-08-04
 review, wrong size for one person; option 1 is the incremental path a fork
 can finish).
+
+*Amended 2026-08-23 (cluster B design review):* evidence-based issue
+closing (i) reads "no longer appears in any published digest" against
+cluster A's daily enumeration of tag-referenced digests and their attested
+scan reports (Req 2.22, 6.37), not against one tag per definition; a
+decision that now covers the finding is visible as the replaced OpenVEX
+attestation. The register (cluster D) gains the cosign version pin from
+ADR 0003 as a deliberate human item, completed the way the tool sha256 pins
+are.
+
+*Amended 2026-08-24 (PR #100 revision, findings 1.1 and 1.7, on the owner's
+research memo `data/cve-finding-lifecycle-vs-immutable-tags-2026-08-24.md`):*
+issues, clocks and the public count run over the **supported set**, the
+digests each definition's current tags reference; superseded tag-referenced
+digests keep every knowledge artifact (daily scans, attested reports, the
+re-attested VEX document, verification) and hold no issues, the version-
+stream scoping every surveyed vendor uses because a frozen digest's findings
+accrue by design. Attested reports record suppressed findings and their
+scanner and database versions, so covered findings still "appear" and the
+gone-close and covered-close cannot both fire. Closes are evidence-graded:
+`resolved:fixed` only on SBOM-diff proof or a fixed statement, never on
+absence alone; `resolved:absent` names the scanner and database versions. A
+closed finding that returns reopens its original issue (the Dependency-Track
+reactivate pattern; the hidden marker is the durable identity). Whether
+superseded tags are ever retired stays cluster D's question, now with the
+industry's poles recorded in the memo.
 
 ---
 
