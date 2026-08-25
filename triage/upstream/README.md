@@ -45,3 +45,4 @@ deliberate act, and the entry in `../LOG.md` records the resulting issue number.
 | [2026-07-26, `/oss/release/` tarballs overwritten](2026-07-26-grafana-oss-release-alias-overwritten.md) | `grafana/grafana` | not filed |
 | [2026-08-04, zipkin datasource: unreleased Go bump](2026-08-04-grafana-zipkin-datasource-unreleased-go-bump.md) | `grafana/grafana-zipkin-datasource` | draft, under review |
 | [2026-08-04, elasticsearch datasource: `go.mod` pins 1.26.3](2026-08-04-grafana-elasticsearch-datasource-go-mod-pins-1263.md) | `grafana/grafana-elasticsearch-datasource` | **filed** as [#410](https://github.com/grafana/grafana-elasticsearch-datasource/issues/410) |
+| [2026-08-23, `--vex oci` picks one of several OpenVEX attestations at random](2026-08-23-trivy-vex-oci-multiple-attestations.md) | `aquasecurity/trivy` | draft, under review (ADR 0004) |

@@ -122,3 +122,21 @@ Two things were measured that the question did not ask for:
   Kyverno keyless attestor against the real `build.yml` identity (no OIDC
   locally; the key attestor measured above exercises the same predicate-type
   match). cosign keyless with v2.6.0 is what CI runs today and is unchanged.
+
+## Amendment, 2026-08-23: "taking the first one" is not "the first one wins"
+
+The evidence section above reads Trivy's log line as a rule: the first
+OpenVEX attestation on a digest is applied and later ones are ignored. That
+was an inference from a log message, not a measurement, and ADR 0004 measured
+it: with several OpenVEX attestations on one digest, `trivy --vex oci` applies
+one chosen **nondeterministically**. The same unchanged layer set scanned four
+times returned different findings counts (`7 8 7 7`, `8 8 8 7`, `7 7 8 7`),
+and no ordering (first, last, newest timestamp) predicts the pick.
+
+The decision here stands and is strengthened: one document per digest is the
+only shape under which a consumer's result does not depend on chance. The
+consequence bullet "Input to cluster B" is superseded by ADR 0004: the
+mechanism is `cosign attest --replace` (which replaces only attestations of
+the same predicate type, measured), not `cosign clean --type attestation`,
+which would also remove the SBOM and scan-report attestations; and the
+consumer recipe needs no merge step once one document is the invariant.
