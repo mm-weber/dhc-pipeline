@@ -1160,20 +1160,28 @@ repository before Pages exists for other reasons.
 
 *Amended 2026-08-25 (cluster D design review against the merged
 decisions):* the decision stands; its content list moved under later
-decisions. `SECURITY.md` additionally states the epoch, the supported
-and superseded sets and the go-forward tag retention policy (Decision 9
-collapsed F13's retention question to exactly that), and the
-trust-boundary table gains the seam-alternative column from the 5.1
-framing addendum. "What published and frozen mean" now reads from the
+decisions. `SECURITY.md` additionally states the epoch, the definitions
+of the supported and superseded sets and the go-forward tag retention
+policy (Decision 9 collapsed F13's retention question to exactly that),
+and the trust-boundary table gains the seam-alternative column from the
+5.1 framing addendum; the table lives in `docs/concepts.md` with
+SECURITY.md linking it, one copy rather than the two the base decision
+named. "What published and frozen mean" now reads from the
 Req 2 terms paragraph rather than F3 (i) and F9 alone. The F9 sweep
 sentence is obsolete with the sweep's withdrawal; a real revocation in
 the live repository removes a tag by hand, records it in
 triage/revocations.yaml, and the daily invariant re-asserts no tag
 references a revoked digest. Live state re-measured 2026-08-25 in the
-epoch review: `build gate` and `e2e gate` are required checks and
-`bypass_actors` is null on `main_sec`; the weaker `branch` ruleset is
-still active, so its retirement stays an operator action; private
-vulnerability reporting stays to be enabled by hand.
+epoch review: `build gate` and `e2e gate` are required checks on
+`main_sec`. Bypass actors are withheld from anonymous reads (F1's [U]
+stands; a jq null on that withheld field briefly read as a measured
+empty, corrected 2026-08-25 by the cluster D review, finding 3.1) while
+live behaviour proves at least one exists, since merges land over the
+one-review rule; the honest-bypass sentence in SECURITY.md carries the
+posture, and the admin-view JSON lands in data/ per section 4's open
+item. The weaker `branch` ruleset is still active, so its retirement
+stays an operator action; private vulnerability reporting stays to be
+enabled by hand.
 
 **F12, attribution and terms (decided 2026-08-21): attribution rewrite
 and a trust-boundary table now; terms research by the owner; the public

@@ -435,8 +435,9 @@ graph TB
      and one scanner's word for what its VEX suppresses; every merge is a
      recorded bypass of a one-review rule nobody stated anywhere. Measured
      2026-08-21 and re-measured 2026-08-25: private vulnerability reporting
-     disabled; both gates now required with bypass_actors null; the weaker
-     `branch` ruleset still active.
+     disabled; both gates now required; bypass actors withheld from anonymous
+     reads and demonstrably non-empty, since merges land over a one-review
+     rule; the weaker `branch` ruleset still active.
    - **Decision**: publish the posture and make records drive mechanics.
      `SECURITY.md` states the promise, the aperture and ceilings by reference,
      the digest state definitions and the epoch, retention, what a signature
@@ -464,8 +465,14 @@ graph TB
    - **Trade-offs**: the daily invariants gain four assertions (reporting
      enabled, ruleset drift, revoked tags, consumer smoke), all anonymous
      reads or pulls, no new permissions; the register is one more file humans
-     must keep honest, accepted because unlabelled toil is how F13 happened;
-     the consumer smoke test doubles scan cost on exactly one digest per day.
+     must keep honest, accepted because unlabelled toil is how F13 happened.
+     Costs owned plainly: the portability block runs every declared consumer
+     over each supported digest's suppressed statements, roughly multiplying
+     that scan surface by the consumer count, and the smoke test adds one
+     digest on top. `bypass_actors` sits outside the drift comparison's field
+     set: anonymous reads withhold it, so it is carried by the committed
+     export, the SECURITY.md bypass statement, and the operator's admin view
+     (dropped into data/ per the critique's open-items table).
      Rejected: a second maintainer now (outside the one-person frame; the
      committed ruleset and CODEOWNERS make it a one-line change), a protected
      release environment (a human approval point on nightly rebuilds is what
@@ -498,7 +505,7 @@ merge to main, the daily schedule, or a manual dispatch
   ─► apply tags (imagetools create on the index) ─► published (Req 2.10)
 ```
 
-### Rescan flow (Req 2.18 to 2.24, 6.42 to 6.54; as specified 2026-08-23, implementation task 10)
+### Rescan flow (Req 2.18 to 2.24, 3.10, 6.42 to 6.54, 9.3, 9.7, 9.9, 9.13; as specified 2026-08-23, amended 2026-08-25; implementation tasks 10, 11.3, 13)
 
 ```
 daily 06:17 UTC ─► enumerate every catalogue tag → digest (2.22)
@@ -978,8 +985,9 @@ ports: [3000/tcp]
 | Private vulnerability reporting found disabled | daily invariants step fails the rescan run naming it | 9.3 |
 | Committed ruleset differs from the live ruleset | daily invariants step fails the rescan run naming each difference | 9.9 |
 | A catalogue tag references a revoked digest | daily invariants step fails the rescan run naming that tag | 9.7 |
-| A suppression from the authoritative scanner does not land in a declared consumer | portability block names the divergence; the daily consumer smoke test fails the run on a broken recipe | 9.12, 9.13 |
-| revocations.yaml entry violates its schema | validate.yml fails naming the entry | 9.6 |
+| A suppression from the authoritative scanner does not land in a declared consumer | portability block names the divergence, informational; the daily smoke test fails the run only on a failed instruction step or a suppression missing in its authoritative consumer | 9.12, 9.13 |
+| revocations.yaml violates its schema | validate.yml fails naming each violation | 9.6 |
+| An exception's reasoning reference or a statement's log citation resolves to no LOG.md heading | validate.yml fails naming that reference | 9.18 |
 
 ## Testing Strategy
 
