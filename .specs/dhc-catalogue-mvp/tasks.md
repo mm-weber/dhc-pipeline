@@ -358,17 +358,31 @@
     - `lint-accepted-risk.sh` validates each exception's `ref:` resolves to a real `triage/LOG.md` heading; `lint-vex-product.sh` or a sibling validates each source statement's log citation likewise; both directions checked, every decision has a heading (Req 9.18; F13 "mechanically linked", delivered by no earlier cluster, review 3.4); unit-tested like the other lints
     - _Requirements: Req 9.18_
 
+- [ ] 14. Final cleanup: the base-repo contract (5.1 framing addendum encoded; spec amendment landed before any of these; the last amendment before implementation)
+  - [ ] 14.1 Policy file: registry namespace and active set
+    - `catalogue-policy.yaml` gains `registry: ghcr.io/mm-weber/dhc` beside the verification section, and an `active_set:` listing all seven definitions (the reference instance activates everything, grafana's tarball included); task 9.8's rendering and every reader treat both as declared inputs (Req 1.13, 7.7)
+    - _Requirements: Req 1.13, Req 7.7_
+  - [ ] 14.2 Every matrix derives from the active set
+    - `build.yml`'s definition matrix, `chart.yml` and `e2e.yml`'s chart matrices, and the Renovate scope derive solely from `active_set` (build, chart and test read the policy file at plan time; tracking via a rendered ignore list drift-checked like the other renderings, Req 7.9 pattern); a bump PR touching an inactive definition fails validation naming it (Req 1.14, 1.15, 1.16); managers.test.mjs fixtures cover the rendered ignore list
+    - _Requirements: Req 1.14, Req 1.15, Req 1.16_
+  - [ ] 14.3 Probes declared per definition
+    - `test/e2e`'s probe registry keyed by definition name, each active definition required to register one, enforced by a validate-side lint (Req 5.5); today's probes (Certificate issuance, HTTP health, SET and GET, HTTP 200) become the reference registrations
+    - _Requirements: Req 5.5_
+  - [ ] 14.4 Builder contract documented; truth pass
+    - `docs/concepts.md` gains the per-archetype builder contract (input: one definition directory; outputs: an image pushed by digest, per-platform SBOM material carrying pull checksums), cross-linked from the trust-boundary table's backend column (Req 1.17); docs/CONVENTIONS.md and the manual describe the active set, the reference set and deactivation semantics (published tags keep the tag-driven planes until retention retires them); README's positioning sentence (5.1 addendum) lands with task 12.1
+    - _Requirements: Req 1.17_
+
 ## Requirements Coverage
 
 | Requirement | Covered By Tasks |
 |-------------|------------------|
-| Req 1: Image Definition Catalogue | 2.1, 2.2, 3.1, 3.2, 5.1, 5.2, 1.2, 8.1, 8.4, 9.7, 11.2 |
+| Req 1: Image Definition Catalogue | 2.1, 2.2, 3.1, 3.2, 5.1, 5.2, 1.2, 8.1, 8.4, 9.7, 11.2, 14.1, 14.2, 14.4 |
 | Req 2: Image Build and Release | 3.3, 8.2, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 10.1 |
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2, 11.1, 11.2, 11.3, 11.4 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4, 8.7, 11.3, 11.4 |
-| Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7 |
+| Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7, 14.3 |
 | Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5, 9.1, 9.3, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7 |
-| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5 |
+| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5, 14.1 |
 | Req 8: Operating Environment | 3.3, 6.5 |
 | Req 9: Catalogue Posture | 13.1, 13.2, 13.3, 13.4, 13.5, 13.6 |
 

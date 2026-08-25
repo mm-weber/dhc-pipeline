@@ -645,7 +645,10 @@ stated: platform engineers who must run curated base images without a
 team; teams whose vendor supplies images but no triage machinery;
 individuals building the skill. The competitor is DIY glue, and the
 receipts (measured ADRs, upstream reports, adversarial reviews) are the
-differentiator.
+differentiator. *Encoded 2026-08-25:* commitments (1) to (3) landed as
+Req 1.13 to 1.17 with amendments to Req 1.1, 2.2, 2.7, 2.21, 2.23, 4.1,
+5.5 and 7.7, design Decision 11 and task group 14, the final spec
+amendment before implementation.
 
 ### 5.2 Decisions per finding
 

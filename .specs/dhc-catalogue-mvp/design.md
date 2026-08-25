@@ -482,6 +482,42 @@ graph TB
      `require_code_owner_review` in the committed ruleset, the consumer list,
      divergence gating, the register's rows.
 
+11. **The base-repo contract: a declared active set, parameterized instance values, a documented builder contract (Req 1.1, 1.13 to 1.17, 2.2, 2.7, 2.21, 2.23, 4.1, 5.5, 7.7; the 5.1 framing addendum encoded; 2026-08-25)**
+   - **Context**: the criteria hardcoded one instance, `ghcr.io/mm-weber/dhc` in
+     four criteria and a fixed four-component list in three more, so a fork had
+     to edit requirements to exist, and grafana's tarball was inherited rather
+     than chosen. The framing addendum committed to one declared active set, a
+     builder contract per archetype, and seams declared rather than built.
+   - **Decision**: instance values move behind the catalogue policy file. The
+     registry namespace joins Req 7.7's declared inputs and the four registry
+     criteria bind to "its declared registry namespace" (identities were
+     already repository-relative). Req 1.1's list becomes the reference set;
+     the active set is declared in the policy file and solely drives the
+     build, chart, test and tracking matrices (1.13, 1.14). Deactivation
+     reuses the standing machinery: a definition outside the active set gets
+     no new digest (1.15) and its bumps fail validation (1.16), while its
+     already-published tags keep every tag-driven plane (enumeration 2.22,
+     daily scans, issues over its current tags) until retention retires them;
+     nothing about Decision 7 changes. The builder contract is documented per
+     archetype (1.17): a definition directory in, an image pushed by digest
+     plus per-platform SBOM material with pull checksums out; downstream
+     planes consume only contract outputs, already true by construction, and
+     the trust-boundary table names each archetype's installed backend and
+     its alternative. Grafana's tarball ships as a reference definition
+     behind the active-set switch.
+   - **Trade-offs**: one more policy-file section every plane must read; the
+     aperture lesson applies, a switch nothing reads is decoration, so
+     "solely" in 1.14 is the criterion. Renovate cannot read the policy file,
+     so the bump refusal lands in validation rather than tracking config,
+     accepted as the same shape as the refresh refusals. Probes become
+     per-definition declarations with a lint that every active definition has
+     one, a refactor of an implemented suite. Rejected: a build-system
+     meta-format (a permanently trailing IR), runtime per-plane switches
+     (half-wired flags), and deleting inactive directories in the reference
+     repository (a fork deletes; the reference demonstrates the switch). Fork
+     switches: the active set itself, the registry namespace, the reference
+     set.
+
 ## System Flows
 
 ### Release flow (Req 2.7 to 2.17, 2.26; as specified 2026-08-22, implementation task 9)
@@ -988,6 +1024,8 @@ ports: [3000/tcp]
 | A suppression from the authoritative scanner does not land in a declared consumer | portability block names the divergence, informational; the daily smoke test fails the run only on a failed instruction step or a suppression missing in its authoritative consumer | 9.12, 9.13 |
 | revocations.yaml violates its schema | validate.yml fails naming each violation | 9.6 |
 | An exception's reasoning reference or a statement's log citation resolves to no LOG.md heading | validate.yml fails naming that reference | 9.18 |
+| A pull request bumps a definition outside the active set | validate.yml fails naming that definition | 1.16 |
+| An active definition lacks a declared functional probe | validate.yml fails naming that definition | 5.5 |
 
 ## Testing Strategy
 

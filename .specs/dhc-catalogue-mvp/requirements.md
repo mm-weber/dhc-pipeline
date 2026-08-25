@@ -18,7 +18,7 @@ one promise, a transparency catalogue: every published digest is signed by a pin
 every known HIGH or CRITICAL finding against a published digest carries a published
 machine-readable status, and time-to-decision and time-to-fix are measured and published rather
 than promised. Its amendments land in dependency clusters A to D. Cluster A (findings F3, F9,
-F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 6.35 to 6.37 and Req 7.7 to 7.10, and amended Req 2.1 and 2.2. Cluster B (findings F5, F4 and the issue-closing half of F13: statuses and clocks) added Req 6.38 to 6.60 and amended Req 2.6, 2.8, 6.1, 6.3, 6.7, 6.8, 6.10, 6.11 and 6.35; its spikes are ADR 0003 and ADR 0004. Cluster C (findings F2, F10, F8, F13 ii and iii, F12 d: upstream trust) added Req 1.10 to 1.12, Req 3.7 to 3.12 and Req 4.8 to 4.9, and amended Req 1.3, 3.5 and 4.5; its spike record is the 2026-08-25 amendment to ADR 0002. Cluster D (findings F1, F11, F12 obligations, F7, F13 register: catalogue posture) added Req 9; the greenfield successor (F9 re-decision, 2026-08-25) is design Decision 9 and task group 12.
+F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 6.35 to 6.37 and Req 7.7 to 7.10, and amended Req 2.1 and 2.2. Cluster B (findings F5, F4 and the issue-closing half of F13: statuses and clocks) added Req 6.38 to 6.60 and amended Req 2.6, 2.8, 6.1, 6.3, 6.7, 6.8, 6.10, 6.11 and 6.35; its spikes are ADR 0003 and ADR 0004. Cluster C (findings F2, F10, F8, F13 ii and iii, F12 d: upstream trust) added Req 1.10 to 1.12, Req 3.7 to 3.12 and Req 4.8 to 4.9, and amended Req 1.3, 3.5 and 4.5; its spike record is the 2026-08-25 amendment to ADR 0002. Cluster D (findings F1, F11, F12 obligations, F7, F13 register: catalogue posture) added Req 9; the greenfield successor (F9 re-decision, 2026-08-25) is design Decision 9 and task group 12. A final cleanup (2026-08-25, encoding the 5.1 framing addendum) amended Req 1.1, 2.2, 2.7, 2.21, 2.23, 4.1, 5.5 and 7.7 and added Req 1.13 to 1.17: parameterized instance values, a declared active set, and a documented builder contract, preparing the forkable base and its greenfield successor.
 
 ## Requirements
 
@@ -28,7 +28,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 
 #### Acceptance Criteria
 
-1. THE Catalogue SHALL contain definition files for four components: hardened-app, cert-manager (controller, webhook, and cainjector images), grafana, and valkey.
+1. THE Catalogue SHALL carry its image definitions as self-contained directory subtrees under image/, its reference set comprising hardened-app, cert-manager (controller, webhook, and cainjector images), grafana, and valkey.
 2. THE Catalogue SHALL pin every base image reference by sha256 digest.
 3. THE Catalogue SHALL pin every upstream source reference by an exact version reference plus content checksum: a git ref plus commit checksum for a compile-from-source archetype, and a versioned artifact URL plus per-architecture content checksum for a repackage archetype.
 4. THE Catalogue SHALL define a non-root runtime account with UID 65532 for every runtime image.
@@ -40,6 +40,11 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 10. THE Catalogue SHALL declare in each definition an upstream authenticity class naming its verification signal: signed-tag, signed-commit, cross-origin-checksum, or none.
 11. IF a definition declares authenticity class none or declares no class THEN THE CI Pipeline SHALL fail validation naming that definition.
 12. IF a definition names a dhi.io package repository whose path is not of shape dhi.io/apk/(distro)/(release)/main or dhi.io/deb/(distro)/main THEN THE CI Pipeline SHALL fail validation naming that repository.
+13. THE Repository SHALL declare in its catalogue policy file an active set naming each definition it builds, tracks, tests and publishes.
+14. THE CI Pipeline SHALL derive its build matrix, its chart and test matrices and its upstream tracking scope solely from that active set.
+15. WHILE a definition sits outside that active set THE CI Pipeline SHALL publish no new digest for it.
+16. IF a pull request bumps a definition outside that active set THEN THE CI Pipeline SHALL fail validation naming that definition.
+17. THE Repository SHALL document per build archetype a builder contract naming its input, one definition directory, and its outputs, an image pushed by digest and per-platform SBOM material carrying package pull checksums.
 
 ### Requirement 2: Image Build and Release
 
@@ -50,12 +55,12 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 #### Acceptance Criteria
 
 1. WHEN a definition change merges to main THE CI Pipeline SHALL build affected images for every platform their definitions declare.
-2. WHEN an image build succeeds THE CI Pipeline SHALL push its image to ghcr.io/mm-weber/dhc with BuildKit provenance attached and SHALL sign and attest it under criterion 2.9.
+2. WHEN an image build succeeds THE CI Pipeline SHALL push its image to its declared registry namespace with BuildKit provenance attached and SHALL sign and attest it under criterion 2.9.
 3. THE CI Pipeline SHALL derive image tags from upstream semantic versions following DHI naming convention (semver, base OS, and variant segments).
 4. WHILE public release remains disabled THE Repository SHALL keep source and registry images private.
 5. IF an image build fails THEN THE CI Pipeline SHALL publish no artifacts from that run and report each failing step in pull request checks.
 6. WHILE an image for a platform remains published THE Catalogue SHALL scan that platform for findings within that decision aperture.
-7. WHEN THE CI Pipeline builds an image on main for release, from a merged definition change, a declared schedule or a manual dispatch, THE CI Pipeline SHALL push that image to ghcr.io/mm-weber/dhc by digest only and SHALL apply no tag to it before that digest's release-time scan completes.
+7. WHEN THE CI Pipeline builds an image on main for release, from a merged definition change, a declared schedule or a manual dispatch, THE CI Pipeline SHALL push that image to its declared registry namespace by digest only and SHALL apply no tag to it before that digest's release-time scan completes.
 8. WHEN an image has been pushed by digest THE CI Pipeline SHALL scan that pushed digest for findings within that decision aperture, once per platform manifest it contains, applying every compiled VEX document and every unexpired accepted-risk exception that THE Scan Gate applies to pull requests.
 9. WHEN a pushed digest's release-time scan completes with a report for every platform manifest and criterion 2.13 does not withhold that digest THE CI Pipeline SHALL sign that digest and every platform manifest it contains with a cosign keyless signature, attest an SPDX SBOM, a CycloneDX SBOM and that manifest's release-time scan report to each platform manifest, attest one compiled OpenVEX document carrying every applicable statement or none to that digest and to each platform manifest, and SHALL apply its definition-derived tags only after those signatures and attestations exist.
 10. WHILE a digest is referenced by a catalogue tag and carries a cosign keyless signature, an SPDX SBOM attestation, an OpenVEX attestation and BuildKit provenance THE Catalogue SHALL treat that digest as published.
@@ -69,9 +74,9 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 18. WHEN THE Scan Pipeline rescans a digest that a catalogue tag references THE Scan Pipeline SHALL scan every platform manifest of that digest, or, for a single image manifest, that digest itself.
 19. IF a built index contains a platform manifest that its release-time scan did not scan THEN THE CI Pipeline SHALL apply no tag to that index.
 20. THE Catalogue SHALL count toward criterion 2.10 only a signature and only attestations whose certificate identities criterion 2.23 admits for that signature or for that attestation type.
-21. WHILE public release is enabled THE Scan Pipeline SHALL verify at least once per day that every catalogue repository under ghcr.io/mm-weber/dhc returns a pull token to an unauthenticated request and serves every catalogue tag's manifest to an unauthenticated request, and SHALL report every repository or tag that does not as a failure of that run.
+21. WHILE public release is enabled THE Scan Pipeline SHALL verify at least once per day that every catalogue repository under its declared registry namespace returns a pull token to an unauthenticated request and serves every catalogue tag's manifest to an unauthenticated request, and SHALL report every repository or tag that does not as a failure of that run.
 22. THE Scan Pipeline SHALL enumerate at least once per day every catalogue tag in every catalogue repository together with each digest it references, and SHALL apply criteria 2.18, 2.21 and 2.24 to that enumeration.
-23. THE Repository SHALL publish under policies/ a verification policy that admits an image from ghcr.io/mm-weber/dhc solely on a cosign keyless signature whose certificate issuer is https://token.actions.githubusercontent.com and whose certificate identity is exactly this repository's build workflow at refs/heads/main, together with an SPDX SBOM attestation from that same identity and an OpenVEX attestation from either that identity or this repository's rescan workflow at refs/heads/main.
+23. THE Repository SHALL publish under policies/ a verification policy that admits an image from its declared registry namespace solely on a cosign keyless signature whose certificate issuer is https://token.actions.githubusercontent.com and whose certificate identity is exactly this repository's build workflow at refs/heads/main, together with an SPDX SBOM attestation from that same identity and an OpenVEX attestation from either that identity or this repository's rescan workflow at refs/heads/main.
 24. WHEN a scheduled rescan runs THE Scan Pipeline SHALL apply that verification policy to every digest a catalogue tag references and to one unsigned control digest held under a catalogue repository, and SHALL report any tag-referenced digest that policy rejects or a control digest that policy admits as a failure of that run.
 25. THE Repository SHALL state in its consumer verification instructions which certificate issuer and which exact certificate identities its verification policy admits for the signature and for each attestation type, each identity anchored to its workflow file and ref, and SHALL state that BuildKit provenance is attached at build time and is not verified by that policy.
 26. IF a pushed digest's release-time scan produces no report for any platform manifest THEN THE CI Pipeline SHALL sign nothing, attest nothing and apply no tag for that digest, and SHALL report that failing scan in that run.
@@ -101,7 +106,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 
 #### Acceptance Criteria
 
-1. THE Chart Adaptation SHALL consume each upstream chart (cert-manager, grafana, valkey) at a pinned version without modifying upstream templates.
+1. WHERE an active definition declares an upstream chart THE Chart Adaptation SHALL consume that chart at a pinned version without modifying upstream templates.
 2. THE Chart Adaptation SHALL override image references to digest-pinned Catalogue images.
 3. THE Chart Adaptation SHALL enforce restricted Pod Security Standard settings: runAsNonRoot true, UID and GID 65532, readOnlyRootFilesystem true, allowPrivilegeEscalation false, all capabilities dropped, and seccompProfile RuntimeDefault.
 4. WHERE a workload requires writable filesystem paths THE Chart Adaptation SHALL mount emptyDir volumes at those paths.
@@ -121,7 +126,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 2. WHEN a pull request affects an image or chart THE Test Suite SHALL install each affected chart on a kind cluster in CI.
 3. WHEN a chart install completes THE Test Suite SHALL assert workload pods reach Ready within five minutes.
 4. WHEN pods are Ready THE Test Suite SHALL assert live pod securityContext matches restricted profile settings, including UID 65532 and read-only root filesystem.
-5. WHEN pods are Ready THE Test Suite SHALL execute a per-component functional probe: cert-manager issues a Certificate, grafana answers HTTP health checks, valkey serves SET and GET operations, and hardened-app returns HTTP 200.
+5. WHEN pods are Ready THE Test Suite SHALL execute each active definition's declared functional probe.
 6. WHEN a pull request bumps a component version THE Test Suite SHALL verify an upgrade from currently pinned version to proposed version.
 7. IF any assertion fails THEN THE Test Suite SHALL fail its CI check and preserve cluster diagnostic logs as workflow artifacts.
 
@@ -204,7 +209,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 4. IF a pull request violates a codified convention THEN THE CI Pipeline SHALL fail with a message identifying that convention.
 5. WHEN a workflow installs a third-party executable THE CI Pipeline SHALL pin that executable to an exact version and SHALL verify its download against a checksum recorded in this repository.
 6. IF a pinned third-party executable has a newer released version THEN THE Upstream Tracking SHALL open a pull request updating that pin.
-7. THE Repository SHALL declare in one committed catalogue policy file every release setting that criteria 2.13, 2.14 and 2.17 name, every platform it admits for publishing, and every verification input that criterion 2.23 names.
+7. THE Repository SHALL declare in one committed catalogue policy file every release setting that criteria 2.13, 2.14 and 2.17 name, every platform it admits for publishing, every verification input that criterion 2.23 names, its registry namespace, and its active set of definitions.
 8. THE CI Pipeline SHALL render that verification policy under policies/ and those consumer verification instructions from that catalogue policy file's verification section.
 9. IF a rendered verification artifact differs from its committed copy THEN THE CI Pipeline SHALL fail validation naming that artifact.
 10. IF a workflow's schedule trigger or a job's permissions differ from what that catalogue policy file declares THEN THE CI Pipeline SHALL fail validation naming that value.
