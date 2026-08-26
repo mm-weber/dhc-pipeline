@@ -679,7 +679,7 @@ Each entry carries a `blocked:` field stating why avoid and mitigate were
 unavailable — presence machine-enforced, content judged at review. It is what
 keeps the file from becoming the path of least resistance.
 
-**Per-binary scope (Req 6.23–6.27).** One file per image stops an acceptance for
+**Per-binary scope (Req 6.7, 6.25 to 6.27).** One file per image stops an acceptance for
 grafana covering cert-manager. It does not stop an acceptance for *one binary
 inside* grafana covering another, and a repackage image is exactly where that
 bites: CVE-2026-27145 is in both `plugins-bundled/elasticsearch/` and
@@ -687,7 +687,7 @@ bites: CVE-2026-27145 is in both `plugins-bundled/elasticsearch/` and
 upstreams, on different schedules. An entry keyed only on `id` + `purls` matches
 `stdlib` wherever it appears, so deciding elasticsearch silently decides zipkin
 — the same failure the per-image filename was introduced to prevent, one level
-down. Req 6.23/6.24 push the scope into the entry via Trivy's `paths:`, so an
+down. Req 6.7/6.11 (6.23/6.24 retired into them) push the scope into the entry via Trivy's `paths:`, so an
 exception names the binary whose exposure was actually argued.
 
 Verified against Trivy 0.72.0 rather than inferred, on a two-binary tree built
@@ -795,7 +795,7 @@ Version in *source* is therefore a scope, not an identifier:
 Only tags are admissible in source (6.20). A digest in source would be a claim
 nobody can review and would go stale at the next rebuild of the same release.
 
-**Versionless is a decision, not a default (Req 6.31).** The two scopes answer
+**Versionless is a decision, not a default (Req 6.20; 6.31 retired into it).** The two scopes answer
 different questions and neither is right for both kinds of `not_affected`:
 
 - *structural* claims do not depend on a version. "This image runs Grafana's
@@ -901,7 +901,7 @@ release. Getting 6.30's tag set right is what stops that.
 `chart.yml` (ct lint + kyverno over rendered charts), `e2e.yml` (kind matrix),
 `renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).
 
-**Platforms: `linux/amd64` only as built (Req 2.1, amended 2026-08-22 to require every declared platform, with task 9.3 carrying the sequencing; Req 2.6).** The catalogue built and
+**Platforms: `linux/amd64` only as built (Req 2.1, amended 2026-08-22 to require every declared platform, with task 9.3 carrying the sequencing; Req 2.22).** The catalogue built and
 published both arches until 2026-08-04, when measurement showed nothing ever
 scanned the arm64 half. Every scan step in `build.yml` is `pull_request`-gated
 and the PR gate builds amd64 only, while `rescan.yml` passes no `--platform`, so
@@ -923,7 +923,7 @@ arm64; the release path publishes one platform. Keeping the pins exercised is
 what makes task 9.3 (which absorbed 8.3) a build-matrix change rather than archaeology.
 
 **Cluster A (2026-08-21) states the condition for arm64's return as criteria
-rather than a deferral:** Req 2.18 to 2.20 make per-platform scanning in both
+rather than a deferral:** Req 2.8, 2.20 and 2.22 make per-platform scanning in both
 the release-time scan and the rescan the precondition for building every
 declared platform, and Req 2.22 makes the rescan enumerate every catalogue tag
 daily, so the ten pre-2026-08-04 tags that still resolve to never-scanned arm64
@@ -1010,13 +1010,13 @@ ports: [3000/tcp]
 | kind flake / timeout | no automatic retry (matrix `fail-fast: false` isolates components; rerun is manual); diagnostic logs uploaded as artifacts | 5.7 |
 | Trivy DB outage | PR gate hard-fails (retryable); daily rescan soft-fails with issue | 6 |
 | New CVE on published image | issue with severity/EPSS/KEV → VEX statement or fix-bump PR | 6.3–6.5 |
-| Release-time scan yields no report for a platform manifest | release arm signs nothing, attests nothing, tags nothing; red run naming the scan | 2.26 |
+| Release-time scan yields no report for a platform manifest, or leaves one unscanned | release arm signs nothing, attests nothing, tags nothing; red run naming the scan | 2.26 |
 | Uncovered finding at release time | default: stated as `under_investigation` in the attested VEX, release completes; fail-closed setting on: nothing signed, attested or tagged, red run naming the finding | 2.12, 2.13 |
 | Scheduled rebuild with an unchanged package set | discarded before any push under the `on-change` publish policy; digest equality logged as the reproducibility measurement | 2.15 |
 | Repository or catalogue tag refuses an anonymous pull | daily invariants step fails the rescan run naming it | 2.21 |
 | Tag-referenced digest rejected by the verification policy, or the control digest admitted | daily invariants step fails the rescan run | 2.24 |
 | Rendered verification artifact, workflow cron or job permissions drift from `catalogue-policy.yaml` | validate.yml fails naming the artifact or value | 7.9, 7.10 |
-| A tag-referenced digest carries more than one OpenVEX attestation | daily invariants step fails the rescan run naming it; the next re-attestation replaces | 6.44 |
+| A tag-referenced digest carries more than one OpenVEX attestation | daily invariants step fails the rescan run naming it; the next re-attestation replaces | 6.44, 6.45 |
 | Exception expiry exceeds its ceiling for the finding's severity or KEV status | validate.yml fails (outer ceiling), the scan gate fails naming the exception (tier), the rescan reports it daily (KEV status moved) | 6.11, 6.50, 6.51 |
 | A VEX source statement records a status the lane does not author | validate.yml fails naming the statement | 6.39 |
 | An exception lapses | its `affected` statement is replaced by `under_investigation` with the original first-seen timestamp; the finding re-reds the gate | 6.9, 6.41 |
@@ -1088,4 +1088,4 @@ tracking), which no day below plans for.*
 Per repo CLAUDE.md: requirements writing in EARS (this spec), progress managed in scalable bits
 with the agent-orchestration plugin, TDD wherever coding applies (renderer glue, test helpers).
 Heavy operations (builds, kind, pushes) run in GitHub Actions or on the operator host — never in
-the restricted devcontainer (Req 8).
+the restricted devcontainer (an operating convention; Req 8 retired 2026-08-26).

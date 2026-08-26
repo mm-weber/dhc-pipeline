@@ -17,8 +17,15 @@ A production-readiness review on 2026-08-21
 one promise, a transparency catalogue: every published digest is signed by a pinned identity,
 every known HIGH or CRITICAL finding against a published digest carries a published
 machine-readable status, and time-to-decision and time-to-fix are measured and published rather
-than promised. Its amendments land in dependency clusters A to D. Cluster A (findings F3, F9,
-F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 6.35 to 6.37 and Req 7.7 to 7.10, and amended Req 2.1 and 2.2. Cluster B (findings F5, F4 and the issue-closing half of F13: statuses and clocks) added Req 6.38 to 6.60 and amended Req 2.6, 2.8, 6.1, 6.3, 6.7, 6.8, 6.10, 6.11 and 6.35; its spikes are ADR 0003 and ADR 0004. Cluster C (findings F2, F10, F8, F13 ii and iii, F12 d: upstream trust) added Req 1.10 to 1.12, Req 3.7 to 3.12 and Req 4.8 to 4.9, and amended Req 1.3, 3.5 and 4.5; its spike record is the 2026-08-25 amendment to ADR 0002. Cluster D (findings F1, F11, F12 obligations, F7, F13 register: catalogue posture) added Req 9; the greenfield successor (F9 re-decision, 2026-08-25) is design Decision 9 and task group 12. A final cleanup (2026-08-25, encoding the 5.1 framing addendum) amended Req 1.1, 2.2, 2.7, 2.21, 2.23, 4.1, 5.5 and 7.7 and added Req 1.13 to 1.17: parameterized instance values, a declared active set, and a documented builder contract, preparing the forkable base and its greenfield successor. A primitives pass (2026-08-26, encoding the cross-review numbered 5.x) removed or merged nineteen criteria; criterion numbers are stable identifiers, so removed numbers are retired, never reused, and the gaps they leave are deliberate (retired: 1.5, 1.8, 2.4, 2.6, 2.18, 2.19, 3.6, 6.2, 6.6, 6.18, 6.21, 6.23, 6.24, 6.31, 6.36, 6.45, 6.48, and group 8 whole). Rendered ordered-list numbering on a forge may drift after a gap; the source numbers govern. The successor's seed renumbers contiguously once, with a recorded mapping (task 12.1).
+than promised. Its amendments land in dependency clusters A to D.
+Cluster A (findings F3, F9, F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 6.35 to 6.37 and Req 7.7 to 7.10, and amended Req 2.1 and 2.2.
+Cluster B (findings F5, F4 and the issue-closing half of F13: statuses and clocks) added Req 6.38 to 6.60 and amended Req 2.6, 2.8, 6.1, 6.3, 6.7, 6.8, 6.10, 6.11 and 6.35; its spikes are ADR 0003 and ADR 0004.
+Cluster C (findings F2, F10, F8, F13 ii and iii, F12 d: upstream trust) added Req 1.10 to 1.12, Req 3.7 to 3.12 and Req 4.8 to 4.9, and amended Req 1.3, 3.5 and 4.5; its spike record is the 2026-08-25 amendment to ADR 0002.
+Cluster D (findings F1, F11, F12 obligations, F7, F13 register: catalogue posture) added Req 9; the greenfield successor (F9 re-decision, 2026-08-25) is design Decision 9 and task group 12.
+A final cleanup (2026-08-25, encoding the 5.1 framing addendum) added Req 1.13 to 1.19 and Req 5.8, and amended Req 1.1, 2.1, 2.2, 2.7, 2.14, 2.21, 2.23, 3.2, 3.10, 3.11, 4.1, 5.5 and 7.7: parameterized instance values, a declared active set, and a documented builder contract, preparing the forkable base and its greenfield successor.
+A primitives pass (2026-08-26, encoding the cross-review numbered 5.x) removed or merged nineteen criteria; a same-day multi-angle code review of that pass restored two of them, 2.4 in revised form and 6.45 unchanged, and repaired four merged texts, leaving 147 criteria.
+
+Criterion numbers are stable identifiers: a removed number is retired, never reused, and the gaps it leaves are deliberate. Retired: 1.5, 1.8, 2.6, 2.18, 2.19, 3.6, 6.2, 6.6, 6.18, 6.21, 6.23, 6.24, 6.31, 6.36, 6.48, and group 8 whole. Rendered ordered-list numbering on a forge may drift after a gap; the source numbers govern. The successor's seed renumbers contiguously once, with a recorded mapping (task 12.1).
 
 ## Requirements
 
@@ -33,7 +40,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 3. THE Catalogue SHALL pin every upstream source reference by an exact version reference plus content checksum: a git ref plus commit checksum for a compile-from-source archetype, and a versioned artifact URL plus per-architecture content checksum for a repackage archetype.
 4. THE Catalogue SHALL define a non-root runtime account with UID 65532 for every runtime image.
 6. IF a definition references a floating tag THEN THE CI Pipeline SHALL fail validation with a message naming that reference.
-7. THE Catalogue SHALL author every definition in native syntax of its archetype's installed build backend, that backend and its declared alternative being named in its trust-boundary table.
+7. THE Catalogue SHALL author every definition in native syntax of its archetype's installed build backend, that backend and its declared alternative being those criterion 9.15's trust-boundary table names.
 9. THE Catalogue SHALL record in CONVENTIONS.md that versions of packages installed from package repositories are not pinned in definitions and that each platform manifest's resolved package set is recorded in the SPDX and CycloneDX SBOMs attested to that manifest.
 10. THE Catalogue SHALL declare in each definition an upstream authenticity class naming its verification signal: signed-tag, signed-commit, cross-origin-checksum, or none.
 11. IF a definition declares authenticity class none or declares no class THEN THE CI Pipeline SHALL fail validation naming that definition.
@@ -57,6 +64,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 1. WHEN a definition change merges to main THE CI Pipeline SHALL build each affected active definition's images for every platform its definition declares.
 2. WHEN an image build succeeds THE CI Pipeline SHALL push its image to its declared registry namespace with BuildKit provenance attached and SHALL sign and attest it under criterion 2.9.
 3. THE CI Pipeline SHALL derive image tags from upstream semantic versions following DHI naming convention (semver, base OS, and variant segments).
+4. WHILE its declared public-release state is disabled THE Repository SHALL keep source and registry images private.
 5. IF an image build fails THEN THE CI Pipeline SHALL publish no artifacts from that run and SHALL report each failing step in that run's checks.
 7. WHEN THE CI Pipeline builds an image on main for release, from a merged definition change, a declared schedule or a manual dispatch, THE CI Pipeline SHALL push that image to its declared registry namespace by digest only and SHALL apply no tag to it before that digest's release-time scan completes.
 8. WHEN an image has been pushed by digest THE CI Pipeline SHALL scan that pushed digest for findings within that decision aperture, once per platform manifest it contains, applying every compiled VEX document and every unexpired accepted-risk exception that THE Scan Gate applies to pull requests.
@@ -71,11 +79,11 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 17. WHERE a declared publish policy is set to always THE CI Pipeline SHALL publish every scheduled rebuild through criteria 2.7 to 2.9 regardless of package-set equality.
 20. THE Catalogue SHALL count toward criterion 2.10 only a signature and only attestations whose certificate identities criterion 2.23 admits for that signature or for that attestation type.
 21. WHILE public release is enabled THE Scan Pipeline SHALL verify at least once per day that every catalogue repository under its declared registry namespace returns a pull token to an unauthenticated request and serves every catalogue tag's manifest to an unauthenticated request, and SHALL report every repository or tag that does not as a failure of that run.
-22. THE Scan Pipeline SHALL enumerate at least once per day every catalogue tag in every catalogue repository together with each digest it references, SHALL scan for findings within that decision aperture every platform manifest of each tag-referenced digest, or that digest itself for a single image manifest, and SHALL apply criteria 2.21 and 2.24 to that enumeration.
+22. THE Scan Pipeline SHALL enumerate at least once per day every catalogue tag in every catalogue repository together with each digest it references, SHALL scan for findings within that decision aperture every platform manifest of each tag-referenced digest (or, for a single image manifest, that digest itself), and SHALL apply criteria 2.21 and 2.24 to that enumeration.
 23. THE Repository SHALL publish under policies/ a verification policy that admits an image from its declared registry namespace solely on a cosign keyless signature whose certificate issuer is https://token.actions.githubusercontent.com and whose certificate identity is exactly this repository's build workflow at refs/heads/main, together with an SPDX SBOM attestation from that same identity and an OpenVEX attestation from either that identity or this repository's rescan workflow at refs/heads/main.
 24. WHEN a scheduled rescan runs THE Scan Pipeline SHALL apply that verification policy to every digest a catalogue tag references and to one unsigned control digest held under a catalogue repository, and SHALL report any tag-referenced digest that policy rejects or a control digest that policy admits as a failure of that run.
 25. THE Repository SHALL state in its consumer verification instructions which certificate issuer and which exact certificate identities its verification policy admits for the signature and for each attestation type, each identity anchored to its workflow file and ref, and SHALL state that BuildKit provenance is attached at build time and is not verified by that policy.
-26. IF a pushed digest's release-time scan produces no report for one or more of its platform manifests THEN THE CI Pipeline SHALL sign nothing, attest nothing and apply no tag for that digest, and SHALL report that failing scan in that run.
+26. IF a pushed digest's release-time scan produces no report for one or more of its platform manifests, or leaves one or more of its platform manifests unscanned, THEN THE CI Pipeline SHALL sign nothing, attest nothing and apply no tag for that digest, and SHALL report that failing scan in that run.
 
 ### Requirement 3: Upstream Version Tracking
 
@@ -149,7 +157,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 16. IF govulncheck reports a finding at module level only THEN THE Triage Process SHALL treat that result as unmeasured and SHALL NOT cite it as evidence of unreachability.
 17. IF a VEX statement names a product that is not an OCI package URL for an existing image definition, or names a product identifier declaring a repository other than that image definition's published repository, THEN THE CI Pipeline SHALL fail validation.
 19. IF a VEX statement's subcomponent identifier carries a version THEN THE CI Pipeline SHALL fail validation.
-20. IF a VEX source statement's product identifier carries a version that is not a published tag of any image definition publishing that product's repository, carries no version for a statement recording status fixed, or carries no version beside status notes recording no reason its claim holds for every release, THEN THE CI Pipeline SHALL fail validation.
+20. IF a VEX source statement's product identifier carries a version that is not a published tag of any image definition publishing that product's repository, or carries no version on a statement recording status fixed, or carries no version on a statement whose status notes record no reason its claim holds for every release, THEN THE CI Pipeline SHALL fail validation.
 22. WHEN a triage decision supersedes an earlier VEX statement THE Triage Process SHALL retain that earlier statement in its document and SHALL add a superseding statement carrying a later timestamp.
 25. IF two accepted-risk exceptions in one file record an identical vulnerability identifier AND name an identical binary path THEN THE CI Pipeline SHALL fail validation.
 26. WHEN a scan applies accepted-risk exceptions THE Scan Gate SHALL report every exception that suppressed no finding.
@@ -168,7 +176,8 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 41. IF an accepted-risk exception has passed its expiry date THEN THE VEX Compiler SHALL compile no affected statement from it and SHALL record status under_investigation for each finding it named that that digest's attested scan report lists, carrying that finding's first-seen time under criterion 6.38 and a status note naming that lapse.
 42. WHEN a scheduled rescan runs THE Scan Pipeline SHALL attest each tag-referenced platform manifest's scan report to that manifest, replacing every scan report attestation of that predicate type on that manifest, before compiling VEX for that digest.
 43. WHEN a compiled document for a tag-referenced digest differs in its set of statements from that digest's attested OpenVEX document, or a tag-referenced digest or any of its platform manifests carries a number of OpenVEX attestations other than one, THE Scan Pipeline SHALL attest that compiled document to that digest and to each of its platform manifests, replacing every existing OpenVEX attestation on each.
-44. THE Catalogue SHALL keep exactly one OpenVEX attestation on every tag-referenced digest and on each of its platform manifests, THE Scan Pipeline reporting each digest or platform manifest carrying more than one as a failure of each scheduled rescan run.
+44. THE Catalogue SHALL keep exactly one OpenVEX attestation on every tag-referenced digest and on each of its platform manifests.
+45. WHEN a scheduled rescan runs THE Scan Pipeline SHALL report any tag-referenced digest or platform manifest carrying more than one OpenVEX attestation as a failure of that run.
 46. WHEN a scheduled rescan runs THE Scan Pipeline SHALL compute for every finding within that decision aperture on every supported digest its first-seen time from its statement's timestamp, its decision time from its statement's action statement timestamp for status affected and from its statement's timestamp for status not_affected or fixed, and its fix time as that finding's first day absent, reported and suppressed alike, from every supported digest of its repository, carried forward from previously published status data.
 47. WHEN a scheduled rescan completes THE Scan Pipeline SHALL publish those times and, for every finding on a supported digest not yet decided or fixed, its age against that catalogue policy file's ceilings, to one status issue, as a table and as a fenced JSON block, and as a workflow artifact.
 49. THE Repository SHALL declare in that catalogue policy file's triage section a decision aperture, an exception ceiling as a duration per severity in that aperture, a ceiling for findings listed in CISA KEV, an expiry warning window, and a support statement naming which tags define that supported set and recording that superseded tag-referenced digests keep scans and attestations and sit outside issue scope.
@@ -191,7 +200,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 #### Acceptance Criteria
 
 1. THE Repository SHALL contain a CONVENTIONS.md defining naming, pinning, variant, and override rules.
-2. WHEN a pull request opens THE CI Pipeline SHALL run yamllint on changed YAML files and SHALL validate schema conformance and pinning conventions of every changed definition file before merge.
+2. WHEN a pull request opens or gains commits THE CI Pipeline SHALL run yamllint on changed YAML files and SHALL validate schema conformance and pinning conventions of every changed definition file before merge.
 3. THE Repository SHALL provide a pull request template prompting for requirement references and convention compliance.
 4. IF a pull request violates a codified convention THEN THE CI Pipeline SHALL fail with a message identifying that convention.
 5. WHEN a workflow installs a third-party executable THE CI Pipeline SHALL pin that executable to an exact version and SHALL verify its download against a checksum recorded in this repository.
@@ -203,7 +212,7 @@ F6: the release path and the published set) added Req 1.9, Req 2.7 to 2.26, Req 
 
 ### Requirement 8: Operating Environment Constraints
 
-Retired 2026-08-26 (primitives pass, finding 5.8): both criteria were owner-environment guidance, not catalogue promise; the guidance lives in CLAUDE.md, design.md and CONVENTIONS.md. Group number retired, not reused.
+Retired 2026-08-26 (primitives pass, finding 5.8): both criteria were owner-environment guidance, not catalogue promise; the guidance lives in CLAUDE.md and in design.md's Development Process section. Group number retired, not reused.
 
 ### Requirement 9: Catalogue Posture and Trust Statement
 
