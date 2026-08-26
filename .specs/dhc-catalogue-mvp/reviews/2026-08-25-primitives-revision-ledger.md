@@ -22,25 +22,25 @@ semantics): 5.9, 5.10, 5.11, 5.13, 5.14, 5.15, 5.16, 5.17, 5.18.
 
 | # | Finding (short) | Disposition | Where encoded |
 |---|---|---|---|
-| 5.1 | One daily-scan primitive stated four ways (2.6, 2.18, 2.22, 6.2) | open; P1 merges into one enumeration-and-scan criterion, net minus 3 | |
-| 5.2 | Release-tag gate triple (2.19 inside 2.26's idiomatic reading) | open; P2 rewrites 2.26 unambiguously, deletes 2.19 | |
-| 5.3 | 1.7/1.8 encode ADR 0001's finished spike | open; P3 replaces both with one authored-syntax criterion naming the builder seam | |
-| 5.4 | 3.6 stale-pin bootstrap serves MVP history, mildly security-negative for a fork | open; delete, no replacement | |
-| 5.5 | 2.4 private phase over; its guard state declared nowhere | open; delete 2.4, declare the public-release state via P14 | |
-| 5.6 | 6.6 second-opinion scan superseded by 9.11 to 9.13 | open; delete, no replacement | |
-| 5.7 | 6.48 badges are presentation over 6.47's publication | open; delete, no replacement | |
-| 5.8 | Req 8 is owner-environment guidance, not catalogue promise | open; remove group, guidance to design/CONVENTIONS | |
-| 5.9 | Exception field lists split (6.7/6.23, 6.11/6.24) | open; P9a, P9b merge, net minus 2 | |
-| 5.10 | Five VEX shape lints mergeable by actor and consequence | open; P10a, P10b, net minus 3 | |
-| 5.11 | Compiler identifier rule split (6.29/6.36) | open; P11, net minus 1 | |
-| 5.12 | One-attestation invariant and its alarm as two criteria (6.44/6.45) | open; P12 merges, net minus 1 | |
-| 5.13 | Definition validation in two groups (1.5/7.2) | open; P13, net minus 1 | |
-| 5.14 | 7.10 lints against declarations 7.7 never requires; guard states homeless | open; P14 completes 7.7's declared-values list | |
-| 5.15 | 5.2 installs charts 1.14 excludes (the one partial contradiction) | open; P15 anchors 5.2 to active-definition chart adaptations | |
-| 5.16 | Authoritative scanner data in 9.11, prose in 6.1 | open; P18 has 6.1 read the declared authoritative consumer and the defined term | |
-| 5.17 | 2.5 reports scheduled-build failures to pull request checks | open; P16 rewords to that run's checks | |
-| 5.18 | Actor vocabulary drift (7.6 "Upstream Tracking") | open; P19 renames to Renovate Automation; 6.13/9.12 note held | |
-| 5.19 | Held notes: 2.23 issuer hardcode (deliberate coupling), "epoch" undefined in requirements, EPSS/KEV asymmetry, class none vocabulary, 6.46/9.1 density | open; note-only unless owner asks | |
+| 5.1 | One daily-scan primitive stated four ways (2.6, 2.18, 2.22, 6.2) | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P1 merges into one enumeration-and-scan criterion, net minus 3 | |
+| 5.2 | Release-tag gate triple (2.19 inside 2.26's idiomatic reading) | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P2 rewrites 2.26 unambiguously, deletes 2.19 | |
+| 5.3 | 1.7/1.8 encode ADR 0001's finished spike | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P3 replaces both with one authored-syntax criterion naming the builder seam | |
+| 5.4 | 3.6 stale-pin bootstrap serves MVP history, mildly security-negative for a fork | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); delete, no replacement | |
+| 5.5 | 2.4 private phase over; its guard state declared nowhere | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); delete 2.4, declare the public-release state via P14 | |
+| 5.6 | 6.6 second-opinion scan superseded by 9.11 to 9.13 | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); delete, no replacement | |
+| 5.7 | 6.48 badges are presentation over 6.47's publication | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); delete, no replacement | |
+| 5.8 | Req 8 is owner-environment guidance, not catalogue promise | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); remove group, guidance to design/CONVENTIONS | |
+| 5.9 | Exception field lists split (6.7/6.23, 6.11/6.24) | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P9a, P9b merge, net minus 2 | |
+| 5.10 | Five VEX shape lints mergeable by actor and consequence | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P10a, P10b, net minus 3 | |
+| 5.11 | Compiler identifier rule split (6.29/6.36) | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P11, net minus 1 | |
+| 5.12 | One-attestation invariant and its alarm as two criteria (6.44/6.45) | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P12 merges, net minus 1 | |
+| 5.13 | Definition validation in two groups (1.5/7.2) | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P13, net minus 1 | |
+| 5.14 | 7.10 lints against declarations 7.7 never requires; guard states homeless | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P14 completes 7.7's declared-values list | |
+| 5.15 | 5.2 installs charts 1.14 excludes (the one partial contradiction) | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P15 anchors 5.2 to active-definition chart adaptations | |
+| 5.16 | Authoritative scanner data in 9.11, prose in 6.1 | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P18 has 6.1 read the declared authoritative consumer and the defined term | |
+| 5.17 | 2.5 reports scheduled-build failures to pull request checks | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P16 rewords to that run's checks | |
+| 5.18 | Actor vocabulary drift (7.6 "Upstream Tracking") | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); P19 renames to Renovate Automation; 6.13/9.12 note held | |
+| 5.19 | Held notes: 2.23 issuer hardcode (deliberate coupling), "epoch" undefined in requirements, EPSS/KEV asymmetry, class none vocabulary, 6.46/9.1 density | **adopted 2026-08-26** (owner's call: full package, per-item veto at PR review); note-only unless owner asks | |
 
 ## Working notes
 
@@ -50,3 +50,13 @@ semantics): 5.9, 5.10, 5.11, 5.13, 5.14, 5.15, 5.16, 5.17, 5.18.
   candidate cross-referenced by a surviving criterion. Encoding waits
   for #104's merge and lands as its own PR with the renumbering sweep
   across design.md and tasks.md.
+- 2026-08-26: the owner chose (b), full package adoption with per-item
+  veto at PR review. Encoded on branch `spec-primitives` (stacked on
+  #104): all 19 rows, with criterion numbers as stable identifiers
+  (removed numbers retired, never reused, listed in the requirements
+  introduction; contiguous renumbering happens once, at the successor
+  cut, task 12.1). 5.19's held notes stay held. Live citations updated
+  only in forward-facing text (task groups 9 to 14, flow diagrams,
+  error rows); dated decisions, completed task groups and historical
+  reviews keep their numbers, which the stable-ID rule keeps true.
+  Validator: 145 valid.

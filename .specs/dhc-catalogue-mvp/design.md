@@ -551,12 +551,12 @@ merge to main, the daily schedule, or a manual dispatch
   ─► apply tags (imagetools create on the index) ─► published (Req 2.10)
 ```
 
-### Rescan flow (Req 2.18 to 2.24, 3.10, 6.42 to 6.54, 9.3, 9.7, 9.9, 9.13; as specified 2026-08-23, amended 2026-08-25; implementation tasks 10, 11.3, 13)
+### Rescan flow (Req 2.20 to 2.24, 3.10, 6.42 to 6.54, 9.3, 9.7, 9.9, 9.13; as specified 2026-08-23, amended 2026-08-26; implementation tasks 10, 11.3, 13)
 
 ```
 daily 06:17 UTC ─► enumerate every catalogue tag → digest (2.22)
   per tag-referenced digest:
-  ─► scan every platform manifest by its own digest (2.18)
+  ─► scan every platform manifest by its own digest (2.22)
   ─► attest each scan report, --replace (6.42)
   ─► compile VEX (6.37): source statements · affected from unexpired exceptions (6.38)
         · carry-forward, timestamp kept, last_updated on change (6.40)
@@ -564,7 +564,7 @@ daily 06:17 UTC ─► enumerate every catalogue tag → digest (2.22)
         · new uncovered finding ─► under_investigation from the attested report
   ─► differs from the attested document? ─► cosign attest --replace on digest + manifests (6.43)
   invariants step (one report shape): anonymous pull per repository and tag (2.21)
-        · verification proof + control digest (2.24) · exactly one OpenVEX attestation (6.45)
+        · verification proof + control digest (2.24) · exactly one OpenVEX attestation (6.44)
         · exceptions against current severity and KEV (6.51) · authenticity signals (3.10)
         · private reporting enabled (9.3) · ruleset drift (9.9) · no revoked tag (9.7)
         · consumer smoke, recipe verbatim (9.13)
@@ -1004,7 +1004,7 @@ ports: [3000/tcp]
 
 | Failure | Response | Requirement |
 |---------|----------|-------------|
-| Definition violates schema/pinning | validate.yml fails naming the rule and reference | 1.5, 1.6, 7.4 |
+| Definition violates schema/pinning | validate.yml fails naming the rule and reference | 7.2, 1.6, 7.4 |
 | Upstream bump breaks build | PR stays red; failure is the triage/fix work, documented in CONVENTIONS | 2.5 |
 | Renovate mis-parses a pin | regex managers carry unit fixtures in repo; dashboard shows detection state | 3 |
 | kind flake / timeout | no automatic retry (matrix `fail-fast: false` isolates components; rerun is manual); diagnostic logs uploaded as artifacts | 5.7 |
@@ -1013,11 +1013,10 @@ ports: [3000/tcp]
 | Release-time scan yields no report for a platform manifest | release arm signs nothing, attests nothing, tags nothing; red run naming the scan | 2.26 |
 | Uncovered finding at release time | default: stated as `under_investigation` in the attested VEX, release completes; fail-closed setting on: nothing signed, attested or tagged, red run naming the finding | 2.12, 2.13 |
 | Scheduled rebuild with an unchanged package set | discarded before any push under the `on-change` publish policy; digest equality logged as the reproducibility measurement | 2.15 |
-| Platform manifest left unscanned at release | no tag applied to that index | 2.19 |
 | Repository or catalogue tag refuses an anonymous pull | daily invariants step fails the rescan run naming it | 2.21 |
 | Tag-referenced digest rejected by the verification policy, or the control digest admitted | daily invariants step fails the rescan run | 2.24 |
 | Rendered verification artifact, workflow cron or job permissions drift from `catalogue-policy.yaml` | validate.yml fails naming the artifact or value | 7.9, 7.10 |
-| A tag-referenced digest carries more than one OpenVEX attestation | daily invariants step fails the rescan run naming it; the next re-attestation replaces | 6.44, 6.45 |
+| A tag-referenced digest carries more than one OpenVEX attestation | daily invariants step fails the rescan run naming it; the next re-attestation replaces | 6.44 |
 | Exception expiry exceeds its ceiling for the finding's severity or KEV status | validate.yml fails (outer ceiling), the scan gate fails naming the exception (tier), the rescan reports it daily (KEV status moved) | 6.11, 6.50, 6.51 |
 | A VEX source statement records a status the lane does not author | validate.yml fails naming the statement | 6.39 |
 | An exception lapses | its `affected` statement is replaced by `under_investigation` with the original first-seen timestamp; the finding re-reds the gate | 6.9, 6.41 |
