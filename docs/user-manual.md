@@ -148,20 +148,25 @@ digest: an SPDX SBOM, BuildKit SLSA provenance, and OpenVEX (Req 2.2,
 Req 6.4). All signing is cosign keyless via GitHub OIDC — verification pins
 the workflow identity, not a key:
 
+<!-- render-verification:begin -->
 ```sh
-REF=ghcr.io/mm-weber/dhc/grafana:13.1.3-alpine3.23
-ID='--certificate-identity-regexp github.com/mm-weber/dhc-pipeline
-    --certificate-oidc-issuer https://token.actions.githubusercontent.com'
+# rendered by scripts/render-verification.sh from catalogue-policy.yaml; do not edit
+REF=ghcr.io/mm-weber/dhc/IMAGE:TAG        # any catalogue tag, e.g. grafana:13.1.3-alpine3.23
+ISSUER='--certificate-oidc-issuer https://token.actions.githubusercontent.com'
+BUILD='--certificate-identity https://github.com/mm-weber/dhc-pipeline/.github/workflows/build.yml@refs/heads/main'
+RESCAN='--certificate-identity https://github.com/mm-weber/dhc-pipeline/.github/workflows/rescan.yml@refs/heads/main'
 
-cosign verify $ID "$REF"                                  # signature
-cosign verify-attestation $ID --type spdxjson "$REF" \
-  | jq -r '.payload | @base64d | fromjson | .predicate'   # SBOM
-cosign verify-attestation $ID --type openvex "$REF" \
-  | jq -r '.payload | @base64d | fromjson | .predicate'   # VEX, compiled per digest
-# needs the buildx CLI plugin — without it docker mis-parses --format and
-# prints its top-level usage (Debian/Ubuntu: apt install docker-buildx-plugin)
+cosign verify $ISSUER $BUILD "$REF"                          # signature: the release workflow on main
+cosign verify-attestation $ISSUER $BUILD --type spdxjson "$REF" \
+  | jq -r '.payload | @base64d | fromjson | .predicate'      # SBOM
+cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" 2>/dev/null \
+  || cosign verify-attestation $ISSUER $RESCAN --type openvex "$REF" \
+  | jq -r '.payload | @base64d | fromjson | .predicate'      # VEX: releaser or re-attester
+# BuildKit provenance is attached at build time and is not verified by the
+# policy above (Req 2.25); inspect it with the buildx CLI plugin:
 docker buildx imagetools inspect "$REF" --format '{{ json .Provenance }}'
 ```
+<!-- render-verification:end -->
 
 What each artifact gives you:
 

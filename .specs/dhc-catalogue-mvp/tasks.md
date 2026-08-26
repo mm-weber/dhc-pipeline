@@ -245,7 +245,7 @@
   - [ ] 9.7 Pinning contract and truth pass
     - `docs/CONVENTIONS.md` "Pinning": apk packages float by design, resolved set recorded per digest in the attested SBOM, published digest scanned before tagging, daily rebuild as the delivery mechanism for base fixes (Req 1.9); `docs/user-manual.md` release-path, platform and verification sections brought to the new shape; design.md Key Design Decision 6 marked as-built
     - _Requirements: Req 1.9, Req 7.1_
-  - [ ] 9.8 Catalogue policy file and its renderings
+  - [x] 9.8 Catalogue policy file and its renderings [done 2026-08-26]
     - `catalogue-policy.yaml` at the repository root: `release` (fail-closed setting, publish policy, cron expression, admitted platforms), `verification` (issuer, roles and identities, required predicate types), and a `triage` section left for cluster B (aperture, ceilings, warning window; F4 (i)'s `triage/policy.yaml` becomes this section). `build.yml` and `rescan.yml` read the switches at run time with `yq` (Req 7.7)
     - `scripts/render-verification.sh` (+ `_test.sh`) renders `policies/verify-catalogue-images.yaml` and the fenced verification snippets in `README.md` and `docs/user-manual.md` from the `verification` section; `validate.yml` re-renders and fails on any diff against the committed copies, naming the artifact (Req 7.8, 7.9)
     - `validate.yml` lints the `schedule:` cron of `build.yml` and `rescan.yml` and each job's `permissions:` block against the policy file, since GitHub reads those only as literal workflow YAML (Req 7.10)
