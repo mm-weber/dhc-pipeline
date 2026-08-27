@@ -166,12 +166,14 @@ rc=0
 # The Kyverno artifact.
 KY="$ROOT/$KYVERNO_REL"
 if [ "$MODE" = check ]; then
-  if [ ! -f "$KY" ] || ! diff -q <(printf '%s' "$KYVERNO_TEXT") "$KY" >/dev/null 2>&1; then
+  if [ ! -f "$KY" ] || ! diff -q <(printf '%s\n' "$KYVERNO_TEXT") "$KY" >/dev/null 2>&1; then
     echo "::error file=$KYVERNO_REL::render-verification: $KYVERNO_REL differs from its rendered form (Req 7.9); edit catalogue-policy.yaml and re-run scripts/render-verification.sh"
     rc=1
   fi
 else
-  printf '%s' "$KYVERNO_TEXT" > "$KY"
+  # Trailing newline is not cosmetic: yamllint's new-line-at-end-of-file rule
+  # is an error in this repo, so an artifact without one fails validate.
+  printf '%s\n' "$KYVERNO_TEXT" > "$KY"
 fi
 
 # The docs snippets.

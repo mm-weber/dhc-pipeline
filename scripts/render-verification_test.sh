@@ -91,6 +91,17 @@ for doc in "$SB/README.md" "$SB/docs/user-manual.md"; do
 done
 grep -qF "intro" "$SB/README.md" && pass "text outside markers untouched" || fail "text outside markers untouched"
 
+# 3b: every rendered file ends with a newline. yamllint's
+# new-line-at-end-of-file rule is an error in this repo, so an artifact
+# without one fails the validate gate (measured on PR #106, run 33110774290).
+for f in "$POL" "$SB/README.md" "$SB/docs/user-manual.md"; do
+  if [ -n "$(tail -c 1 "$f")" ]; then
+    fail "$(basename "$f") ends with a newline"
+  else
+    pass "$(basename "$f") ends with a newline"
+  fi
+done
+
 # 4: idempotent: a second render changes nothing
 cp "$POL" "$POL.first"; cp "$SB/README.md" "$SB/README.md.first"
 "$RENDER" "$SB" >/dev/null 2>&1

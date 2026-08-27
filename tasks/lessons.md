@@ -46,3 +46,10 @@ owner spotted the missing jobs; the local checks run after the sed
    rather than crashing: `lint-workflow-policy.sh` gained that behaviour
    and its own regression test in this task, and it named the one
    remaining broken line immediately.
+5. Run the gate exactly as CI runs it, never a subset. The follow-up
+   commit still failed once, because the local check was
+   `yamllint .github/workflows/ catalogue-policy.yaml` while CI runs
+   `yamllint .`: the rendered `policies/verify-catalogue-images.yaml`
+   was missing its trailing newline, which this repo lints as an error.
+   A generator must satisfy the repo's own linters, so the renderer now
+   ends every artifact with a newline and its test asserts it.
