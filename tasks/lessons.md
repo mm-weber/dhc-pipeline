@@ -46,7 +46,16 @@ owner spotted the missing jobs; the local checks run after the sed
    rather than crashing: `lint-workflow-policy.sh` gained that behaviour
    and its own regression test in this task, and it named the one
    remaining broken line immediately.
-5. Run the gate exactly as CI runs it, never a subset. The follow-up
+5. A generator must not depend on which implementation of a text tool is
+   installed. The rendered snippet carries shell line continuations;
+   GitHub's runners ship gawk, which strips a backslash before a newline
+   in an `awk -v` assignment, while this devcontainer ships mawk, which
+   keeps it. The drift check therefore passed locally and failed in CI
+   with no local reproduction. Splicing moved into python3, which does no
+   escape processing, and a stub awk mimicking gawk is now a regression
+   test. Same class as command substitution eating trailing newlines:
+   keep rendered text inside one implementation that touches nothing.
+6. Run the gate exactly as CI runs it, never a subset. The follow-up
    commit still failed once, because the local check was
    `yamllint .github/workflows/ catalogue-policy.yaml` while CI runs
    `yamllint .`: the rendered `policies/verify-catalogue-images.yaml`

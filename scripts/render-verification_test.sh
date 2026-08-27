@@ -135,6 +135,35 @@ else
   fail "--check fails naming the drifted README snippet" "exit=$rc" "$out"
 fi
 
+# 7b: rendering must not depend on the local awk's escape handling. GitHub's
+# runners ship gawk, which strips a backslash before a newline in a -v
+# assignment, while this devcontainer ships mawk, which keeps it: the shell
+# line continuations in the snippet therefore rendered clean locally and
+# drifted in CI (PR #106, run 33110992171). A stub awk mimicking gawk
+# reproduces that here.
+fresh
+STUB=$(mktemp -d)
+cat > "$STUB/awk" <<'STUBEOF'
+#!/usr/bin/env python3
+import os, sys
+argv, out, i = sys.argv[1:], [], 0
+while i < len(argv):
+    if argv[i] == "-v" and i + 1 < len(argv):
+        out += ["-v", argv[i + 1].replace("\\\n", "\n")]  # gawk eats it
+        i += 2
+    else:
+        out.append(argv[i]); i += 1
+os.execv("/usr/bin/mawk", ["/usr/bin/mawk"] + out)
+STUBEOF
+chmod +x "$STUB/awk"
+PATH="$STUB:$PATH" "$RENDER" "$SB" >/dev/null 2>&1
+body=$(snippet "render-verification:begin" "render-verification:end" "$SB/README.md")
+if grep -qF '"$REF" \' <<<"$body"; then
+  pass "rendering survives a gawk-style awk (line continuations preserved)"
+else
+  fail "rendering survives a gawk-style awk (line continuations preserved)" "$body"
+fi
+
 # 8: a target without markers fails naming the file and the marker
 fresh
 printf 'no markers here\n' > "$SB/README.md"

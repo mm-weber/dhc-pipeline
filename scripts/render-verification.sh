@@ -10,15 +10,17 @@
 #       <!-- render-verification:begin --> / <!-- render-verification:end -->
 #     in README.md and docs/user-manual.md   (Req 2.25)
 #
-# --check re-renders into a scratch copy and fails naming each committed
-# artifact that differs (Req 7.9): validate.yml runs this on every PR, so a
-# hand edit to a rendered artifact goes red instead of silently forking the
-# declared values.
+# --check re-renders and fails naming each committed artifact that differs
+# (Req 7.9): validate.yml runs this on every PR, so a hand edit to a rendered
+# artifact goes red instead of silently forking the declared values.
 #
-# YAML is read with python3 + PyYAML, the same dependency lint-accepted-risk.sh
-# already leans on (installed by validate.yml's yamllint step; present in the
-# devcontainer). mikefarah yq is NOT assumed: the local container ships the
-# incompatible python wrapper under the same name.
+# Rendering and splicing happen in python3 (PyYAML, the dependency
+# lint-accepted-risk.sh already leans on; installed by validate.yml's yamllint
+# step). Deliberately no awk and no command substitution on the rendered text:
+# the snippet carries shell line continuations, gawk strips a backslash before
+# a newline in a -v assignment while mawk keeps it, and command substitution
+# eats trailing newlines. Text handling stays in one implementation that does
+# no escape processing at all (PR #106, run 33110992171).
 set -euo pipefail
 
 MODE=render
@@ -28,21 +30,19 @@ ROOT="${ROOT%/}"
 POLICY_FILE="$ROOT/catalogue-policy.yaml"
 [ -f "$POLICY_FILE" ] || { echo "render-verification: no catalogue-policy.yaml under $ROOT" >&2; exit 1; }
 
-BEGIN='<!-- render-verification:begin -->'
-END='<!-- render-verification:end -->'
-TARGET_DOCS=("README.md" "docs/user-manual.md")
-KYVERNO_REL="policies/verify-catalogue-images.yaml"
+python3 - "$MODE" "$ROOT" "$POLICY_FILE" <<'PY'
+import os, sys, yaml
 
-# Emit the two rendered texts, separated by a NUL, from the policy file.
-render_texts() {
-  python3 - "$POLICY_FILE" <<'PY'
-import sys, yaml
+mode, root, policy_path = sys.argv[1], sys.argv[2], sys.argv[3]
 
-pol = yaml.safe_load(open(sys.argv[1]))["verification"]
-registry = pol["registry"]
-issuer = pol["issuer"]
-roles = pol["roles"]
-required = pol["required"]
+BEGIN = "<!-- render-verification:begin -->"
+END = "<!-- render-verification:end -->"
+KYVERNO_REL = "policies/verify-catalogue-images.yaml"
+DOC_RELS = ["README.md", "docs/user-manual.md"]
+
+pol = yaml.safe_load(open(policy_path))["verification"]
+registry, issuer = pol["registry"], pol["issuer"]
+roles, required = pol["roles"], pol["required"]
 
 # cosign --type aliases to the predicateType URLs Kyverno matches on.
 PREDICATE = {
@@ -52,20 +52,20 @@ PREDICATE = {
     "vuln": "https://cosign.sigstore.dev/attestation/vuln/v1",
 }
 
-def keyless(role):
+def keyless(role, indent):
+    pad = " " * indent
     return (
-        "                - keyless:\n"
-        f"                    subject: {roles[role]['identity']}\n"
-        f"                    issuer: {issuer}\n"
-        "                    rekor:\n"
-        "                      url: https://rekor.sigstore.dev\n"
+        f"{pad}- keyless:\n"
+        f"{pad}    subject: {roles[role]['identity']}\n"
+        f"{pad}    issuer: {issuer}\n"
+        f"{pad}    rekor:\n"
+        f"{pad}      url: https://rekor.sigstore.dev\n"
     )
 
 sig_role = required["signature"]
 att = required["attestations"]
 
-kyverno = []
-kyverno.append(f"""# Rendered by scripts/render-verification.sh from catalogue-policy.yaml's
+parts = [f"""# Rendered by scripts/render-verification.sh from catalogue-policy.yaml's
 # verification section (Req 7.8); do not edit: edit the policy file and
 # re-render. validate.yml fails on any drift (Req 7.9).
 apiVersion: kyverno.io/v1
@@ -95,102 +95,89 @@ spec:
             - "{registry}/*"
           attestors:
             - entries:
-{keyless(sig_role)}          attestations:
-""")
+{keyless(sig_role, 16)}          attestations:
+"""]
 for alias in ["spdxjson", "openvex", "cyclonedx", "vuln"]:
     if alias not in att:
         continue
-    kyverno.append(f"            - type: {PREDICATE[alias]}\n              attestors:\n                - entries:\n")
+    parts.append(f"            - type: {PREDICATE[alias]}\n              attestors:\n                - entries:\n")
     for role in att[alias]:
-        # one indent level deeper than the signature attestor block
-        block = "\n".join("    " + line if line else line for line in keyless(role).splitlines())
-        kyverno.append(block + "\n")
-kyverno_text = "".join(kyverno)
+        parts.append(keyless(role, 20))
+kyverno_text = "".join(parts)
 
 rel = roles[sig_role]["identity"]
 vex_roles = att.get("openvex", [sig_role])
-snippet = []
-snippet.append(f"""```sh
-# rendered by scripts/render-verification.sh from catalogue-policy.yaml; do not edit
-REF={registry}/IMAGE:TAG        # any catalogue tag, e.g. grafana:13.1.3-alpine3.23
-ISSUER='--certificate-oidc-issuer {issuer}'
-BUILD='--certificate-identity {rel}'
-""")
+snip = [
+    "```sh",
+    "# rendered by scripts/render-verification.sh from catalogue-policy.yaml; do not edit",
+    f"REF={registry}/IMAGE:TAG        # any catalogue tag, e.g. grafana:13.1.3-alpine3.23",
+    f"ISSUER='--certificate-oidc-issuer {issuer}'",
+    f"BUILD='--certificate-identity {rel}'",
+]
 if len(vex_roles) > 1:
     other = [r for r in vex_roles if r != sig_role][0]
-    snippet.append(f"RESCAN='--certificate-identity {roles[other]['identity']}'\n")
-snippet.append(f"""
-cosign verify $ISSUER $BUILD "$REF"                          # signature: the release workflow on main
-cosign verify-attestation $ISSUER $BUILD --type spdxjson "$REF" \\
-  | jq -r '.payload | @base64d | fromjson | .predicate'      # SBOM
-""")
+    snip.append(f"RESCAN='--certificate-identity {roles[other]['identity']}'")
+snip += [
+    "",
+    'cosign verify $ISSUER $BUILD "$REF"                          # signature: the release workflow on main',
+    'cosign verify-attestation $ISSUER $BUILD --type spdxjson "$REF" \\',
+    "  | jq -r '.payload | @base64d | fromjson | .predicate'      # SBOM",
+]
 if len(vex_roles) > 1:
-    snippet.append("""cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" 2>/dev/null \\
-  || cosign verify-attestation $ISSUER $RESCAN --type openvex "$REF" \\
-  | jq -r '.payload | @base64d | fromjson | .predicate'      # VEX: releaser or re-attester
-""")
+    snip += [
+        'cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" 2>/dev/null \\',
+        '  || cosign verify-attestation $ISSUER $RESCAN --type openvex "$REF" \\',
+        "  | jq -r '.payload | @base64d | fromjson | .predicate'      # VEX: releaser or re-attester",
+    ]
 else:
-    snippet.append("""cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" \\
-  | jq -r '.payload | @base64d | fromjson | .predicate'      # VEX, compiled per digest
-""")
-snippet.append("""# BuildKit provenance is attached at build time and is not verified by the
-# policy above (Req 2.25); inspect it with the buildx CLI plugin:
-docker buildx imagetools inspect "$REF" --format '{{ json .Provenance }}'
-```""")
-snippet_text = "".join(snippet)
+    snip += [
+        'cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" \\',
+        "  | jq -r '.payload | @base64d | fromjson | .predicate'      # VEX, compiled per digest",
+    ]
+snip += [
+    "# BuildKit provenance is attached at build time and is not verified by the",
+    "# policy above (Req 2.25); inspect it with the buildx CLI plugin:",
+    "docker buildx imagetools inspect \"$REF\" --format '{{ json .Provenance }}'",
+    "```",
+]
+snippet_lines = [line + "\n" for line in snip]
 
-sys.stdout.write(kyverno_text + "\0" + snippet_text)
+failures = 0
+def drift(rel_path):
+    global failures
+    print(f"::error file={rel_path}::render-verification: {rel_path} differs from its "
+          f"rendered form (Req 7.9); edit catalogue-policy.yaml and re-run "
+          f"scripts/render-verification.sh")
+    failures += 1
+
+def emit(rel_path, text):
+    path = os.path.join(root, rel_path)
+    if mode == "check":
+        current = open(path).read() if os.path.isfile(path) else None
+        if current != text:
+            drift(rel_path)
+    else:
+        open(path, "w").write(text)
+
+emit(KYVERNO_REL, kyverno_text)
+
+for rel_path in DOC_RELS:
+    path = os.path.join(root, rel_path)
+    if not os.path.isfile(path):
+        print(f"render-verification: missing target {rel_path}", file=sys.stderr)
+        sys.exit(1)
+    lines = open(path).readlines()
+    begins = [i for i, l in enumerate(lines) if BEGIN in l]
+    ends = [i for i, l in enumerate(lines) if END in l]
+    if not begins or not ends:
+        print(f"render-verification: {rel_path} lacks the {BEGIN} / {END} markers", file=sys.stderr)
+        sys.exit(1)
+    rebuilt = "".join(lines[: begins[0] + 1] + snippet_lines + lines[ends[0] :])
+    emit(rel_path, rebuilt)
+
+if failures:
+    sys.exit(1)
+if mode != "check":
+    print(f"render-verification: rendered {KYVERNO_REL} and {len(DOC_RELS)} snippet(s) "
+          f"from catalogue-policy.yaml")
 PY
-}
-
-TEXTS=$(mktemp)
-render_texts > "$TEXTS"
-KYVERNO_TEXT=$(python3 -c 'import sys; sys.stdout.write(open(sys.argv[1],"rb").read().split(b"\0")[0].decode())' "$TEXTS")
-SNIPPET_TEXT=$(python3 -c 'import sys; sys.stdout.write(open(sys.argv[1],"rb").read().split(b"\0")[1].decode())' "$TEXTS")
-rm -f "$TEXTS"
-
-splice() { # file -> rendered copy on stdout; fails naming file if markers absent
-  local file="$1"
-  grep -qF "$BEGIN" "$file" && grep -qF "$END" "$file" || {
-    echo "render-verification: $file lacks the ${BEGIN} / ${END} markers" >&2
-    return 1
-  }
-  awk -v begin="$BEGIN" -v end="$END" -v snip="$SNIPPET_TEXT" '
-    index($0, begin) { print; print snip; skipping=1; next }
-    index($0, end)   { skipping=0 }
-    !skipping { print }
-  ' "$file"
-}
-
-rc=0
-# The Kyverno artifact.
-KY="$ROOT/$KYVERNO_REL"
-if [ "$MODE" = check ]; then
-  if [ ! -f "$KY" ] || ! diff -q <(printf '%s\n' "$KYVERNO_TEXT") "$KY" >/dev/null 2>&1; then
-    echo "::error file=$KYVERNO_REL::render-verification: $KYVERNO_REL differs from its rendered form (Req 7.9); edit catalogue-policy.yaml and re-run scripts/render-verification.sh"
-    rc=1
-  fi
-else
-  # Trailing newline is not cosmetic: yamllint's new-line-at-end-of-file rule
-  # is an error in this repo, so an artifact without one fails validate.
-  printf '%s\n' "$KYVERNO_TEXT" > "$KY"
-fi
-
-# The docs snippets.
-for rel in "${TARGET_DOCS[@]}"; do
-  file="$ROOT/$rel"
-  [ -f "$file" ] || { echo "render-verification: missing target $rel" >&2; exit 1; }
-  rendered=$(splice "$file") || exit 1
-  if [ "$MODE" = check ]; then
-    if ! diff -q <(printf '%s\n' "$rendered") "$file" >/dev/null 2>&1; then
-      echo "::error file=$rel::render-verification: $rel snippet differs from its rendered form (Req 7.9); edit catalogue-policy.yaml and re-run scripts/render-verification.sh"
-      rc=1
-    fi
-  else
-    printf '%s\n' "$rendered" > "$file"
-  fi
-done
-
-if [ "$MODE" = check ] && [ "$rc" -ne 0 ]; then exit 1; fi
-[ "$MODE" = render ] && echo "render-verification: rendered $KYVERNO_REL and ${#TARGET_DOCS[@]} snippet(s) from catalogue-policy.yaml"
-exit 0
