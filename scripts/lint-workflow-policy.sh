@@ -35,7 +35,14 @@ def err(wf, msg):
 
 for path in sorted(glob.glob(os.path.join(root, ".github", "workflows", "*.yml"))):
     wf = os.path.basename(path)
-    doc = yaml.safe_load(open(path)) or {}
+    # GitHub refuses to run a workflow whose YAML does not parse, and says so
+    # only on the run page: no job starts, so a required check simply never
+    # appears. Catch it here, by name, rather than crashing with a traceback.
+    try:
+        doc = yaml.safe_load(open(path)) or {}
+    except yaml.YAMLError as exc:
+        err(wf, f"is not parseable YAML, so GitHub would run none of its jobs: {str(exc).strip()}".replace("\n", " "))
+        continue
     decl = declared.get(wf)
     if decl is None:
         err(wf, "workflow has no declaration in catalogue-policy.yaml's workflows section")

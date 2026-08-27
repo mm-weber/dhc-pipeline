@@ -153,6 +153,20 @@ else
   fail "undeclared workflow fails naming it" "exit=$rc" "$out"
 fi
 
+# 8: an unparseable workflow fails naming the file, with no traceback. GitHub
+# refuses to run a workflow whose YAML does not parse and reports it only on
+# the run page, so the lint is the local place that catches it; a plain step
+# name carrying a colon and a space is the shape that bit this repo (a sed
+# over step names, 2026-08-26).
+fresh
+printf 'name: broken\non:\n  pull_request:\npermissions:\n  contents: read\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - name: lint: docs/CONVENTIONS.md\n        run: "true"\n' > "$SB/.github/workflows/plain.yml"
+out=$("$LINT" "$SB" 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "plain.yml" <<<"$out" && ! grep -qF "Traceback" <<<"$out"; then
+  pass "unparseable workflow fails naming the file, no traceback"
+else
+  fail "unparseable workflow fails naming the file, no traceback" "exit=$rc" "$out"
+fi
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all lint-workflow-policy tests passed"
