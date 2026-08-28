@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install-tool.sh <kind|kyverno|helm|ct> [<destdir>]
+# install-tool.sh <kind|kyverno|helm|ct|syft> [<destdir>]
 #
 # Install one workflow tool pinned to an exact version and verified against a
 # sha256 recorded in this file (Req 7.5, docs/CONVENTIONS.md "Pinning").
@@ -69,6 +69,10 @@ HELM_SHA256="c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3"
 CT_VERSION="3.14.0"
 CT_SHA256="d16f0583616885423826241164ce1f6589c6fe5332fa74f374ebd2bd3cb3fe1f"
 
+# renovate: datasource=github-releases depName=anchore/syft
+SYFT_VERSION="1.51.1"
+SYFT_SHA256="8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3"
+
 err() { printf '::error::install-tool: %s\n' "$1" >&2; }
 
 # All pinned assets are linux/amd64; on any other architecture the checksum
@@ -126,8 +130,17 @@ case "$TOOL" in
     member=""
     extras="etc/lintconf.yaml etc/chart_schema.yaml"
     ;;
+  syft)
+    version="$SYFT_VERSION"
+    shipped="$SYFT_SHA256"
+    asset="syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+    url="${BASE_URL}/anchore/syft/releases/download/v${SYFT_VERSION}/${asset}"
+    tarball=yes
+    member=""
+    extras=""
+    ;;
   *)
-    err "usage: install-tool.sh <kind|kyverno|helm|ct> [<destdir>] — got '${TOOL}'"
+    err "usage: install-tool.sh <kind|kyverno|helm|ct|syft> [<destdir>], got '${TOOL}'"
     exit 1
     ;;
 esac

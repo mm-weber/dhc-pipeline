@@ -49,6 +49,14 @@ CT_PIN=d16f0583616885423826241164ce1f6589c6fe5332fa74f374ebd2bd3cb3fe1f
 HELM_DEP=helm/helm
 CT_DEP=helm/chart-testing
 
+# syft generates the SBOMs the release arm attests per platform manifest
+# (Req 2.9); its archive is a github tarball with the binary at the root.
+SYFT_VER=1.51.1
+SYFT_ASSET="syft_${SYFT_VER}_linux_amd64.tar.gz"
+SYFT_URLDIR="anchore/syft/releases/download/v${SYFT_VER}"
+SYFT_PIN=8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3
+SYFT_DEP=anchore/syft
+
 DEFAULT_ARCH=x86_64
 ARCH="$DEFAULT_ARCH"
 
@@ -56,6 +64,7 @@ KIND_MARKER="kind v${KIND_VER} (dhc-test-fixture)"
 KYVERNO_MARKER="kyverno v${KYVERNO_VER} (dhc-test-fixture)"
 HELM_MARKER="helm v${HELM_VER} (dhc-test-fixture)"
 CT_MARKER="ct v${CT_VER} (dhc-test-fixture)"
+SYFT_MARKER="syft v${SYFT_VER} (dhc-test-fixture)"
 
 list_real_bin() { find /usr/local/bin -maxdepth 1 -printf '%f\n' 2>/dev/null | sort; }
 BIN_BEFORE=$(list_real_bin)
@@ -208,6 +217,17 @@ make_ct_asset() { # marker
   rm -rf "$stage"
 }
 
+make_syft_asset() { # marker
+  local stage
+  stage=$(mktemp -d "$SB/stage.XXXXXX")
+  printf '#!/bin/sh\necho "%s"\n' "$1" > "$stage/syft"
+  chmod +x "$stage/syft"
+  printf 'Apache License 2.0\n' > "$stage/LICENSE"
+  mkdir -p "$UP/$SYFT_URLDIR"
+  tar -czf "$UP/$SYFT_URLDIR/$SYFT_ASSET" -C "$stage" syft LICENSE
+  rm -rf "$stage"
+}
+
 setup() { # fresh sandbox: all assets served, empty destdir, shipped pins in force
   SB=$(mktemp -d)
   UP="$SB/upstream"
@@ -219,6 +239,7 @@ setup() { # fresh sandbox: all assets served, empty destdir, shipped pins in for
   make_kyverno_asset "$KYVERNO_MARKER"
   make_helm_asset "$HELM_MARKER"
   make_ct_asset "$CT_MARKER"
+  make_syft_asset "$SYFT_MARKER"
 }
 
 write_pins() { # record the fixtures' real digests — the offline success path
@@ -228,6 +249,7 @@ write_pins() { # record the fixtures' real digests — the offline success path
   (cd "$UP/$KYVERNO_URLDIR" && sha256sum "$KYVERNO_ASSET") >> "$PINS"
   (cd "$UP" && sha256sum "$HELM_ASSET") >> "$PINS"
   (cd "$UP/$CT_URLDIR" && sha256sum "$CT_ASSET") >> "$PINS"
+  (cd "$UP/$SYFT_URLDIR" && sha256sum "$SYFT_ASSET") >> "$PINS"
 }
 
 asset_sha() { sha256sum "$1" | cut -d' ' -f1; }
@@ -379,6 +401,10 @@ assert_rc     "with no pin override the ct fixture is rejected" 1
 assert_absent "nothing is installed when the shipped pin does not match (ct)" ct
 assert_out    "the shipped ct pin is the documented digest" "$CT_PIN"
 
+setup; invoke syft
+assert_absent "nothing is installed when the shipped pin does not match (syft)" syft
+assert_out    "the shipped syft pin is the documented digest" "$SYFT_PIN"
+
 # --- 6: an asset with no recorded pin ---------------------------------------
 
 setup; write_pins
@@ -421,6 +447,7 @@ assert_pin_block kind KIND "$KIND_DEP" "$KIND_VER" "$KIND_PIN"
 assert_pin_block kyverno KYVERNO "$KYVERNO_DEP" "$KYVERNO_VER" "$KYVERNO_PIN"
 assert_pin_block helm HELM "$HELM_DEP" "$HELM_VER" "$HELM_PIN"
 assert_pin_block ct CT "$CT_DEP" "$CT_VER" "$CT_PIN"
+assert_pin_block syft SYFT "$SYFT_DEP" "$SYFT_VER" "$SYFT_PIN"
 
 # --- 10: what the source must and must not contain --------------------------
 

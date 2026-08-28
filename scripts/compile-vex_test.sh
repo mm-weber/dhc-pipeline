@@ -97,14 +97,27 @@ src b.json "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" n
 run >/dev/null
 check "another image's statement is dropped" "pkg:oci/grafana@$DIGEST" "$(products)"
 
-# 7: a document left with no statements is not written at all — an empty
-#    document is a file Trivy reads and learns nothing from. Named rather than
-#    counted, so this cannot pass by writing nothing at all.
+# 7: every source document merges into ONE compiled document per digest, named
+#    after the published image (ADR 0003). Two sources in, one file out: with
+#    several OpenVEX attestations on a digest `trivy --vex oci` applies one
+#    chosen at random (ADR 0004), so exactly one document is the invariant.
 fresh
 src a.json "pkg:oci/grafana@13.0.4-alpine3.23?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" fixed
 src b.json "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" not_affected
 run >/dev/null
-check "emptied document is not written, surviving one is" "b.json" "$(ls "$SB/out" | tr '\n' ' ' | sed 's/ $//')"
+check "sources merge into one named document" "grafana.openvex.json" "$(ls "$SB/out" | tr '\n' ' ' | sed 's/ $//')"
+check "and it carries the surviving statement" "1" "$(jq '.statements | length' "$SB/out/grafana.openvex.json")"
+
+# 7b: the document is written even when nothing applies (ADR 0003 measured
+#     vexctl, Trivy, cosign and Kyverno all accept an empty statement list).
+#     Before ADR 0003 an emptied document was skipped, which left a published
+#     digest with no OpenVEX attestation at all and no way to tell "compiled
+#     nothing" from "never compiled".
+fresh
+src a.json "pkg:oci/grafana@13.0.4-alpine3.23?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" fixed
+run >/dev/null
+check "an empty document is still written" "grafana.openvex.json" "$(ls "$SB/out" | tr '\n' ' ' | sed 's/ $//')"
+check "with zero statements"               "0"                    "$(jq '.statements | length' "$SB/out/grafana.openvex.json")"
 
 # --- the parts that must survive compilation --------------------------------
 
@@ -283,6 +296,92 @@ fresh
 src a.json "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" not_affected
 run_in_root grafana "$DIGEST" 13.1.1-alpine3.23 >/dev/null
 check "no definition tree falls back to the given name" "pkg:oci/grafana@$DIGEST" "$(products)"
+
+# --- release-arm inputs: manifest digests and the attested scan report -------
+#
+# Req 2.9 attests one document to the index AND to every platform manifest, so
+# a consumer pinning either resolves the same claims; Req 2.12 turns whatever
+# the release-time scan still reports into published under_investigation
+# statements, derived from that report and carrying its timestamp.
+
+DOC="$SB/out/grafana.openvex.json"
+MANIFEST="sha256:1111111111111111111111111111111111111111111111111111111111111111"
+doc() { jq "$@" "$SB/out/grafana.openvex.json"; }
+
+# A trivy report in the shape the release scan writes: post-suppression
+# findings are what remains uncovered.
+report() { # $1 = filename, $2 = CVE, [$3 = package purl]
+  cat > "$SB/$1" <<JSON
+{"SchemaVersion":2,"CreatedAt":"2026-08-28T06:00:00Z",
+ "ArtifactName":"ghcr.io/mm-weber/dhc/grafana",
+ "Results":[{"Target":"grafana","Class":"os-pkgs","Vulnerabilities":[
+   {"VulnerabilityID":"$2","PkgName":"openssl","Severity":"HIGH",
+    "PkgIdentifier":{"PURL":"${3:-pkg:apk/alpine/openssl@3.5.0}"}}]}]}
+JSON
+}
+
+# 24: one document covers the index and every scanned platform manifest, so a
+#     consumer pinning a platform digest gets the same claims (Req 6.29).
+fresh
+src a.json "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" not_affected
+COMPILE_VEX_MANIFEST_DIGESTS="$MANIFEST" run >/dev/null
+check "index digest is a product"    "pkg:oci/grafana@$DIGEST"   "$(doc -r '.statements[0].products[]."@id"' | grep -F "$DIGEST")"
+check "manifest digest is a product" "pkg:oci/grafana@$MANIFEST" "$(doc -r '.statements[0].products[]."@id"' | grep -F "$MANIFEST")"
+
+# 25: an uncovered finding in the attested report is published as
+#     under_investigation rather than passing unremarked (Req 2.12).
+fresh
+report scan.json CVE-2026-99999
+COMPILE_VEX_SCAN_REPORTS="$SB/scan.json" run >/dev/null
+check "uncovered finding gets a statement"  "CVE-2026-99999"       "$(doc -r '.statements[0].vulnerability.name')"
+check "with status under_investigation"     "under_investigation"  "$(doc -r '.statements[0].status')"
+check "carrying the report's timestamp"     "2026-08-28T06:00:00Z" "$(doc -r '.statements[0].timestamp')"
+# Subcomponents hang off the product, which is where OpenVEX 0.2.0 puts them
+# and where every document under triage/vex/ carries them.
+check "scoped to the package it was found in" "pkg:apk/alpine/openssl@3.5.0" "$(doc -r '.statements[0].products[0].subcomponents[0]."@id"')"
+contains "and saying what it derives from" "$(doc -r '.statements[0].status_notes')" "release-time scan report"
+
+# 26: a finding a source statement already covers is not restated as
+#     under_investigation: that would publish two answers to one question.
+fresh
+src a.json "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" not_affected
+report scan.json CVE-2026-00001
+COMPILE_VEX_SCAN_REPORTS="$SB/scan.json" run >/dev/null
+check "covered finding keeps its one statement" "1"            "$(doc '.statements | length')"
+check "and keeps the source status"             "not_affected" "$(doc -r '.statements[0].status')"
+
+# 27: every platform manifest is scanned separately, so the same finding
+#     arrives once per report; the document states it once.
+fresh
+report scan-amd64.json CVE-2026-99999
+report scan-arm64.json CVE-2026-99999
+COMPILE_VEX_SCAN_REPORTS="$SB/scan-amd64.json $SB/scan-arm64.json" run >/dev/null
+check "one statement per finding, not per report" "1" "$(doc '.statements | length')"
+
+# 28: first seen is the property a clock is measured from (cluster B), so a
+#     finding already stated on a previous release keeps that timestamp
+#     instead of resetting it on every rebuild.
+fresh
+report scan.json CVE-2026-99999
+cat > "$SB/previous.json" <<'JSON'
+{"@context":"https://openvex.dev/ns/v0.2.0","@id":"https://openvex.dev/docs/dhc/previous",
+ "author":"dhc-pipeline triage","version":1,
+ "statements":[{"vulnerability":{"name":"CVE-2026-99999"},
+   "products":[{"@id":"pkg:oci/grafana@sha256:0000000000000000000000000000000000000000000000000000000000000000"}],
+   "status":"under_investigation","timestamp":"2026-07-01T00:00:00Z"}]}
+JSON
+COMPILE_VEX_SCAN_REPORTS="$SB/scan.json" COMPILE_VEX_PREVIOUS="$SB/previous.json" run >/dev/null
+check "first seen carries forward"          "2026-07-01T00:00:00Z" "$(doc -r '.statements[0].timestamp')"
+check "and the product is this build's"     "pkg:oci/grafana@$DIGEST" "$(doc -r '.statements[0].products[0]."@id"')"
+
+# 29: a report the scan never produced is a usage error, not a clean compile:
+#     silently treating a missing report as "nothing uncovered" is exactly the
+#     inert-looks-correct failure this lane exists to prevent (Req 2.26 is the
+#     workflow's answer; the compiler refuses rather than guesses).
+fresh
+out=$(COMPILE_VEX_SCAN_REPORTS="$SB/absent.json" run; echo "rc=$?")
+contains "a missing scan report fails loudly" "$out" "absent.json"
+contains "and exits non-zero"                 "$out" "rc=2"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

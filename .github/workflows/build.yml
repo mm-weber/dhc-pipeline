@@ -152,10 +152,25 @@ jobs:
         run: |
           set -euo pipefail
           f="image/${NAME}/image.yaml"
+          # Declared values live in one committed place (Req 7.7, task 9.8): the
+          # registry namespace every release criterion binds through, and the
+          # fail-closed switch Req 2.13 reads.
+          registry=$(yq '.verification.registry' catalogue-policy.yaml | tr -d '"')
+          fail_closed=$(yq '.release.fail_closed' catalogue-policy.yaml | tr -d '"')
           # tr strips quotes so this works under either yq (mikefarah on the
           # runner emits raw scalars; python-yq would quote them).
           img=$(yq '.image' "$f" | tr -d '"')
+          # The definition names its published repository, the policy file names
+          # the namespace. A definition pointing elsewhere would publish where
+          # the rendered verification policy admits nothing, so it is a refusal
+          # rather than a surprise at consumption time.
+          case "$img" in
+            "${registry}/"*) ;;
+            *) echo "::error file=${f}::${NAME}: image '${img}' is outside the declared registry namespace '${registry}' (catalogue-policy.yaml, Req 2.2, 7.7)"; exit 1 ;;
+          esac
           echo "image=$img" >> "$GITHUB_OUTPUT"
+          echo "registry=$registry" >> "$GITHUB_OUTPUT"
+          echo "fail_closed=$fail_closed" >> "$GITHUB_OUTPUT"
           {
             echo 'tags<<TAGS'
             yq '.tags[]' "$f" | tr -d '"' | sed "s#^#${img}:#"
@@ -187,12 +202,17 @@ jobs:
           # finding 1.3). Req 2.6 forbids publishing a platform nothing scans,
           # so arm64 comes back only after something scans it — task 8.3.
           platforms: linux/amd64
-          push: ${{ github.ref == 'refs/heads/main' }}
+          # Req 2.7: on main the image is pushed BY DIGEST and carries no tag
+          # until its own scan, signature and attestations exist. Until task 9.1
+          # this step pushed the tags itself, which published the artifact and
+          # only then looked at it: the tag is the promise, so it goes last
+          # (`docker buildx imagetools create` below).
+          push: false
           # Single-arch, so the PR path loads it into the docker daemon for the
-          # scan gate below. main pushes instead, and the rescan cron (task 7.2)
-          # is what scans the published image.
+          # scan gate below.
           load: ${{ github.event_name == 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ github.event_name == 'pull_request' && steps.meta.outputs.tags || '' }}
+          outputs: ${{ github.ref == 'refs/heads/main' && format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true', steps.meta.outputs.image) || '' }}
           # Warm the Go module + compile layers across runs so repeat builds of
           # a large upstream (cert-manager) aren't cache-cold every time.
           cache-from: type=gha,scope=${{ matrix.name }}
@@ -200,12 +220,15 @@ jobs:
           # BuildKit SLSA provenance, attached only when we push (Req 2.2).
           provenance: ${{ github.ref == 'refs/heads/main' && 'mode=max' || 'false' }}
 
-      # ---- PR-only: CVE scan gate (Req 6.1, 6.6) ----
+      # ---- CVE scanning: the gate on a PR, the release-time scan on main ----
       # Real tools do the work: Trivy suppresses via our OpenVEX and reports the
       # remaining HIGH/CRITICAL; Grype corroborates a CRITICAL; a jq count is the
-      # only glue. Authoring VEX statements is task 7.3 — here we just consume them.
-      - name: install trivy + grype
-        if: github.event_name == 'pull_request'
+      # only glue. Authoring VEX statements is task 7.3, here we consume them.
+      # Both arms scan (Req 2.8): the gate scans the PR build, the release arm
+      # scans the pushed digest per platform manifest. syft generates the SBOMs
+      # attested to each manifest (Req 2.9), pinned and checksum-verified like
+      # every other workflow tool (Req 7.5).
+      - name: install trivy + grype + syft
         run: |
           set -euo pipefail
           # Installed as the runner user into a temp dir on PATH, not as root
@@ -215,6 +238,7 @@ jobs:
           # than just the branch it came from.
           mkdir -p "${RUNNER_TEMP}/bin"
           scripts/install-scanners.sh "${RUNNER_TEMP}/bin"
+          scripts/install-tool.sh syft "${RUNNER_TEMP}/bin"
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
       # Trivy builds the `pkg:oci/...` product purl a VEX statement has to match
@@ -306,24 +330,13 @@ jobs:
           # attests on the release path.
           mapfile -t built_tags < <(printf '%s\n' "$TAGS" | sed 's|.*:||' | sort -u)
           scripts/compile-vex.sh triage/vex "$VEXDIR" "$NAME" "$DIGEST" "${built_tags[@]}"
-          vex=()
-          for f in "$VEXDIR"/*.json; do [ -e "$f" ] && vex+=(--vex "$f"); done
-          accepted="triage/accepted-risk/${NAME}.yaml"
-          ignore=()
-          if [ -f "$accepted" ]; then ignore=(--ignorefile "$accepted"); fi
-          # One scan → JSON of the POST-suppression findings. --show-suppressed
-          # keeps the suppressed ones in the report under
-          # ExperimentalModifiedFindings (verified: it does NOT put them back
-          # into .Vulnerabilities, so the gate counts below are unaffected).
-          # Without it, a statement or exception that silently fails to match
-          # looks exactly like one that worked. exit-code 0 keeps us in control:
-          # the Grype second opinion must still run when a CRITICAL is present.
-          trivy image "${vex[@]}" "${ignore[@]}" \
-            --severity HIGH,CRITICAL \
-            --pkg-types os,library \
-            --show-suppressed \
-            --format json --output trivy.json \
-            --no-progress --exit-code 0 "$ref"
+          # One scan, one script, the same inputs the release arm applies to the
+          # pushed digest (task 9.1). Two copies of this invocation drift on the
+          # first flag either arm gains, and a gate that stops predicting what
+          # release does is worse than no gate: scripts/scan-image.sh is where
+          # --vex, --ignorefile, --show-suppressed and --exit-code 0 live, with
+          # its own tests.
+          scripts/scan-image.sh "$ref" "$NAME" "$VEXDIR" trivy.json
           high=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")]     | length' trivy.json)
           crit=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy.json)
           echo "high=$high" >> "$GITHUB_OUTPUT"
@@ -351,10 +364,12 @@ jobs:
                      | "| \(.Finding.VulnerabilityID) | \(.Status) | \(.Statement // "-") | \(.Finding.PkgName) |"' \
                  trivy.json | sort -u
             else
-              # From the array already built above, not a fresh glob: an empty
-              # triage/vex/ makes `ls *.json` fail, and under `set -euo pipefail`
-              # that kills the step before the summary is ever written.
-              vexn=$(( ${#vex[@]} / 2 ))
+              # Counted from the one compiled document, which is always written
+              # now, empty included (ADR 0003): "compiled nothing" and "never
+              # compiled" have to look different, and before that document
+              # existed an empty triage/vex/ made this glob fail and killed the
+              # step under `set -euo pipefail` before the summary was written.
+              vexn=$(jq '[.statements[]?] | length' "$VEXDIR"/*.json)
               echo "_none_ — ${vexn} statement(s) on file."
               if [ "$vexn" -gt 0 ]; then
                 echo "> ⚠️ Statements exist but suppressed nothing here — the product identifier below is what they must match."
@@ -590,71 +605,214 @@ jobs:
             grype.txt
           if-no-files-found: ignore
 
-      # ---- release-only: sign + SBOM (main branch) ----
+      # ---- release path on main: scan the pushed digest, then sign, attest, tag ----
+      #
+      # Order is the promise (Req 2.7 to 2.9). The image above was pushed BY
+      # DIGEST and carries no tag; nothing here publishes it until its own scan,
+      # signature and attestations exist, and the tag is applied last. Until
+      # task 9.1 the build pushed tags itself and the only scan ever run was the
+      # pull request's, against a different artifact than the one signed.
       - name: install cosign
         if: github.ref == 'refs/heads/main'
         uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
-
-      - name: cosign sign (keyless)
-        if: github.ref == 'refs/heads/main'
-        env:
-          REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
-        run: cosign sign --yes "$REF"
-
-      - name: generate SPDX SBOM (Syft)
-        if: github.ref == 'refs/heads/main'
-        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84 # v0.20.9
         with:
-          image: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
-          format: spdx-json
-          output-file: sbom.spdx.json
-          upload-artifact: false
+          # Pinned to the v2 line deliberately (ADR 0003, measured): cosign v3
+          # writes a bundle layout Kyverno 1.18.2 and Trivy 0.72.0 cannot find,
+          # so a v3 signature is invisible to both consumers this catalogue
+          # makes promises to. CI was on v2 only by the installer's default,
+          # which is not a pin. Renovate tracks it (Req 7.5, 7.6).
+          # renovate: datasource=github-releases depName=sigstore/cosign
+          cosign-release: v2.6.0
 
-      - name: attest SBOM to image
+      # Every platform manifest of the pushed index, by its own digest. The
+      # index also carries BuildKit's attestation manifests, which sit under
+      # unknown/unknown and are NOT platform manifests (Req 2 terms): scanning
+      # or SBOM-ing one of those would describe the provenance blob rather than
+      # the image, and attesting to it would put claims where no consumer looks.
+      - name: enumerate platform manifests
+        id: manifests
         if: github.ref == 'refs/heads/main'
         env:
           REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
-        run: cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$REF"
+        run: |
+          set -euo pipefail
+          raw=$(docker buildx imagetools inspect --raw "$REF")
+          if [ "$(jq -r 'has("manifests")' <<<"$raw")" = "true" ]; then
+            digests=$(jq -r '.manifests[]
+              | select((.platform.os // "unknown") != "unknown")
+              | select((.annotations["vnd.docker.reference.type"] // "") == "")
+              | .digest' <<<"$raw")
+          else
+            # A single image manifest is its own platform manifest.
+            digests="${REF##*@}"
+          fi
+          [ -n "$digests" ] || { echo "::error::${REF}: no platform manifest found, so nothing can be scanned or attested (Req 2.26)"; exit 1; }
+          {
+            echo 'digests<<DIGESTS'
+            printf '%s\n' "$digests"
+            echo DIGESTS
+          } >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$digests" | sed 's/^/platform manifest: /'
 
-      - name: attest OpenVEX to image (Req 6.4)
+      # Req 2.8: scan the pushed digest, once per platform manifest, with the
+      # same inputs the gate applied to the pull request build. By the
+      # manifest's own digest, so no --platform is needed and no silent
+      # downgrade to the runner's architecture is possible (task 8.3 measured
+      # that --platform without --image-src remote is ignored).
+      - name: release-time scan of the pushed digest (Req 2.8)
+        id: relscan
         if: github.ref == 'refs/heads/main'
         env:
-          REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+          IMAGE: ${{ steps.meta.outputs.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          MANIFESTS: ${{ steps.manifests.outputs.digests }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          mapfile -t manifests < <(printf '%s\n' "$MANIFESTS")
+          mapfile -t built_tags < <(printf '%s\n' "$TAGS" | sed 's|.*:||' | sort -u)
+          # Pass 1: the source statements alone, stamped for the index and every
+          # platform manifest (Req 6.29), so the scan below is suppressed by
+          # exactly what a consumer will later read off the digest.
+          COMPILE_VEX_MANIFEST_DIGESTS="${manifests[*]}" \
+            scripts/compile-vex.sh triage/vex .vexrelease "$NAME" "$DIGEST" "${built_tags[@]}"
+          uncovered=0
+          for m in "${manifests[@]}"; do
+            out="trivy-${m#sha256:}.json"
+            scripts/scan-image.sh "${IMAGE}@${m}" "$NAME" .vexrelease "$out" --remote
+            n=$(jq '[.Results[]?.Vulnerabilities[]?] | length' "$out")
+            uncovered=$((uncovered + n))
+            echo "${m}: ${n} uncovered within the decision aperture"
+          done
+          echo "uncovered=$uncovered" >> "$GITHUB_OUTPUT"
+
+      # Req 2.13. The switch is declared, not hardcoded (catalogue-policy.yaml,
+      # task 9.8): with it enabled an uncovered finding stops the release before
+      # anything is signed, attested or tagged. Default off, so the catalogue
+      # ships with a published status instead of a stall (Req 2.12) and framing
+      # A's promise is about knowledge rather than a clean scan.
+      - name: fail-closed release gate (Req 2.13)
+        if: github.ref == 'refs/heads/main' && steps.meta.outputs.fail_closed == 'true' && steps.relscan.outputs.uncovered != '0'
+        env:
+          NAME: ${{ matrix.name }}
+          UNCOVERED: ${{ steps.relscan.outputs.uncovered }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          echo "::error::${NAME}: ${UNCOVERED} uncovered finding(s) in the release-time scan of ${DIGEST} and the declared fail-closed setting is enabled, so this digest is signed by nothing, attested by nothing and carries no tag (Req 2.13). It stays frozen and pullable by digest; the ways out are the same four the gate offers."
+          exit 1
+
+      # Req 2.9 + 6.37: the scan report becomes a verifiable input rather than a
+      # log line. The compiled document's under_investigation statements are
+      # derived from these reports, so what a consumer reads on the digest and
+      # what the catalogue decided from are the same artifact.
+      - name: attest each platform manifest's scan report (Req 2.9)
+        if: github.ref == 'refs/heads/main'
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+          MANIFESTS: ${{ steps.manifests.outputs.digests }}
+        run: |
+          set -euo pipefail
+          mapfile -t manifests < <(printf '%s\n' "$MANIFESTS")
+          for m in "${manifests[@]}"; do
+            report="trivy-${m#sha256:}.json"
+            trivy convert --format cosign-vuln --output "vuln-${m#sha256:}.json" "$report"
+            cosign attest --yes --type vuln \
+              --predicate "vuln-${m#sha256:}.json" "${IMAGE}@${m}"
+          done
+
+      # Req 2.12: whatever the release-time scan still reports is uncovered by
+      # construction, and it is published as under_investigation carrying that
+      # report's timestamp rather than passing unremarked. Pass 2 reads the
+      # reports pass 1 could not have seen.
+      - name: compile the digest's OpenVEX document (Req 2.12, 6.37)
+        if: github.ref == 'refs/heads/main'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          MANIFESTS: ${{ steps.manifests.outputs.digests }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          mapfile -t manifests < <(printf '%s\n' "$MANIFESTS")
+          mapfile -t built_tags < <(printf '%s\n' "$TAGS" | sed 's|.*:||' | sort -u)
+          reports=""
+          for m in "${manifests[@]}"; do reports="${reports} trivy-${m#sha256:}.json"; done
+          COMPILE_VEX_MANIFEST_DIGESTS="${manifests[*]}" \
+          COMPILE_VEX_SCAN_REPORTS="${reports# }" \
+          COMPILE_VEX_REPORT=vexreport.json \
+            scripts/compile-vex.sh triage/vex .vexattest "$NAME" "$DIGEST" "${built_tags[@]}"
+          {
+            echo "### OpenVEX for ${NAME}@${DIGEST}"
+            echo
+            jq -r '"- statements from source: \(.compiled)\n- under investigation (uncovered at release): \(.under_investigation)\n- products dropped: \(.dropped)"' vexreport.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Req 2.9. Recursive signing covers the index and every child manifest, so
+      # a consumer pinning either resolves a signature. Attestations are made
+      # explicitly per target rather than relying on --recursive, whose coverage
+      # of children on v2.6.0 is unmeasured here: a claim that silently lands on
+      # the index alone would leave a platform-digest consumer with nothing.
+      - name: sign and attest (Req 2.9)
+        if: github.ref == 'refs/heads/main'
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          MANIFESTS: ${{ steps.manifests.outputs.digests }}
+          NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          mapfile -t manifests < <(printf '%s\n' "$MANIFESTS")
+          index="${IMAGE}@${DIGEST}"
+          doc=$(ls .vexattest/*.json)
+
+          cosign sign --yes --recursive "$index"
+
+          # One SBOM pair per platform manifest: SPDX is the interchange format
+          # consumers expect, CycloneDX carries the apk pull checksums Syft's
+          # SPDX output drops (measured 2026-08-22), which is what task 9.2's
+          # publish-on-change comparison reads.
+          for m in "${manifests[@]}"; do
+            ref="${IMAGE}@${m}"
+            syft scan "registry:${ref}" -o spdx-json="sbom-${m#sha256:}.spdx.json" \
+                                        -o cyclonedx-json="sbom-${m#sha256:}.cdx.json"
+            cosign attest --yes --type spdxjson  --predicate "sbom-${m#sha256:}.spdx.json" "$ref"
+            cosign attest --yes --type cyclonedx --predicate "sbom-${m#sha256:}.cdx.json"  "$ref"
+            cosign attest --yes --type openvex   --predicate "$doc" "$ref"
+          done
+          # The same one document on the index too (ADR 0003: exactly one per
+          # digest, because with several `trivy --vex oci` applies one at random).
+          cosign attest --yes --type openvex --predicate "$doc" "$index"
+
+      # Req 2.7/2.9: the tag is the promise, so it is applied only now, after the
+      # scan, the signature and every attestation exist. imagetools create writes
+      # a new index from the same children, so the run asserts the tag resolves
+      # to the digest that was actually signed: a tag pointing at anything else
+      # would publish an unsigned artifact under a promised name.
+      - name: apply definition-derived tags (Req 2.7, 2.9)
+        if: github.ref == 'refs/heads/main'
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
           DIGEST: ${{ steps.build.outputs.digest }}
           TAGS: ${{ steps.meta.outputs.tags }}
           NAME: ${{ matrix.name }}
         run: |
           set -euo pipefail
-          # A triage decision is only portable if it travels with the artifact:
-          # the statement in git is the source, the attestation is what a
-          # downstream consumer can actually verify against the digest they run.
-          #
-          # Req 6.34. What is attested is COMPILED, never the source. A consumer
-          # feeds this predicate to their own scanner, and a product carrying a
-          # published tag matches nothing there — measured, so attesting source
-          # would publish a document that is inert for exactly the audience it
-          # exists for. Attestation is the ideal case for a digest: it is bound
-          # to one immutable artifact, so this predicate stays correct for it
-          # forever, with none of the staleness that makes a hand-written digest
-          # wrong in source.
-          #
-          # Compiling also decides which documents belong to this image, which
-          # this step used to do with its own jq name-match. Same rule, tested
-          # (compile-vex.sh drops another image's products and never writes an
-          # emptied document), so what lands in $VEXATTEST is what to attest —
-          # and attaching grafana's statements to cert-manager would not be
-          # noise, it would be a false claim.
-          VEXATTEST=.vexattest
-          mapfile -t built_tags < <(printf '%s\n' "$TAGS" | sed 's|.*:||' | sort -u)
-          scripts/compile-vex.sh triage/vex "$VEXATTEST" "$NAME" "$DIGEST" "${built_tags[@]}"
-          shopt -s nullglob
-          n=0
-          for f in "$VEXATTEST"/*.json; do
-            echo "attesting $(basename "$f")"
-            cosign attest --yes --type openvex --predicate "$f" "$REF"
-            n=$((n + 1))
+          mapfile -t tags < <(printf '%s\n' "$TAGS")
+          args=()
+          for t in "${tags[@]}"; do args+=(--tag "$t"); done
+          docker buildx imagetools create "${args[@]}" "${IMAGE}@${DIGEST}"
+          for t in "${tags[@]}"; do
+            # The registry's own answer for what the tag resolves to, rather
+            # than a local re-hash of pretty-printed manifest bytes.
+            got=$(docker buildx imagetools inspect "$t" --format '{{ .Manifest.Digest }}')
+            if [ "$got" != "$DIGEST" ]; then
+              echo "::error::${NAME}: tag ${t} resolves to ${got}, not the signed digest ${DIGEST}; that tag would publish an artifact nothing here signed (Req 2.9, 2.10)"
+              exit 1
+            fi
+            echo "${t} -> ${DIGEST} ✓"
           done
-          echo "${NAME}: ${n} OpenVEX statement(s) attested" >> "$GITHUB_STEP_SUMMARY"
+          echo "${NAME}: published ${#tags[@]} tag(s) on a signed, attested digest" >> "$GITHUB_STEP_SUMMARY"
 
   # Static fan-in for branch protection: the matrix legs above are named
   # dynamically (build <image>), so no leg name can be a required check — a PR
