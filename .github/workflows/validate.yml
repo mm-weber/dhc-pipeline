@@ -24,7 +24,7 @@ jobs:
 
       # Fast deterministic gate; the authoritative definition validator is
       # the dhi.io/build frontend compiling each changed definition (build.yml)
-      - name: pin + definition lint — docs/CONVENTIONS.md (Req 1.5, 1.6, 7.4)
+      - name: pin + definition lint against docs/CONVENTIONS.md (Req 1.5, 1.6, 7.4)
         run: scripts/lint-pins.sh
 
       # Pin + sha256 live in the script (Req 7.5). Invoked by path because the
@@ -40,8 +40,21 @@ jobs:
       # in the gate: a malformed exception should be rejected at review time, not
       # discovered when some unrelated PR rebuilds the image it covers.
       # Runs after yamllint, which installs PyYAML as a dependency.
-      - name: accepted-risk lint — risk treatment lane (Req 6.11, 6.12)
+      - name: accepted-risk lint for the risk treatment lane (Req 6.11, 6.12)
         run: scripts/lint-accepted-risk.sh
+
+      # catalogue-policy.yaml is the one committed home of declared values
+      # (Req 7.7). The rendered verification artifacts must equal what its
+      # verification section declares (Req 7.8, 7.9), and every workflow's
+      # literal schedule cron and permissions blocks must match its workflows
+      # section (Req 7.10). GitHub reads those only as literal workflow YAML,
+      # so this lint is what binds them. Both read YAML via PyYAML, installed
+      # by the yamllint step above.
+      - name: verification renderings drift check (Req 7.8, 7.9)
+        run: scripts/render-verification.sh --check
+
+      - name: workflow schedule + permissions vs policy file (Req 7.10)
+        run: scripts/lint-workflow-policy.sh
 
       - name: definition-lib unit tests (directory vs published name)
         run: scripts/definition-lib_test.sh
@@ -63,6 +76,12 @@ jobs:
 
       - name: verify-arch-pins unit tests (Req 1.3)
         run: scripts/verify-arch-pins_test.sh
+
+      - name: render-verification unit tests (Req 7.8, 7.9)
+        run: scripts/render-verification_test.sh
+
+      - name: lint-workflow-policy unit tests (Req 7.10)
+        run: scripts/lint-workflow-policy_test.sh
 
       - name: govulncheck-report unit tests (Req 6.13)
         run: scripts/govulncheck-report_test.sh
@@ -130,18 +149,18 @@ jobs:
         working-directory: test
         run: go test ./harness/... ./checks/... ./install/...
 
-      # The CVE rescan reporter (task 7.2) is its own stdlib-only module — a pure,
+      # The CVE rescan reporter (task 7.2) is its own stdlib-only module: a pure,
       # unit-tested tool that the daily rescan.yml drives to open issues
       # unattended. Gate it here (same Go toolchain) so a broken reporter can
       # never merge.
-      - name: rescan tool — gofmt
+      - name: rescan tool gofmt
         working-directory: triage/rescan
         run: test -z "$(gofmt -l .)" || { echo 'gofmt needed:'; gofmt -l .; exit 1; }
 
-      - name: rescan tool — go vet
+      - name: rescan tool go vet
         working-directory: triage/rescan
         run: go vet ./...
 
-      - name: rescan tool — go test
+      - name: rescan tool go test
         working-directory: triage/rescan
         run: go test ./...

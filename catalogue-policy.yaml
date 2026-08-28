@@ -1,0 +1,89 @@
+# catalogue-policy.yaml: the one committed home of every declared value
+# (Req 7.7). Workflows read the release switches at run time; the
+# verification section is the source scripts/render-verification.sh renders
+# policies/verify-catalogue-images.yaml and the consumer snippets from
+# (Req 7.8), drift-checked in validate (Req 7.9); the workflows section is
+# what scripts/lint-workflow-policy.sh holds every literal schedule cron and
+# permissions block against (Req 7.10). Every value here is a fork switch.
+
+release:
+  # Req 2.21 reads enabled; Req 2.4 binds the disabled branch (images stay
+  # private). Flipped true at the 2026-08-13 public release.
+  public: true
+  # Req 2.12/2.13: off = an uncovered finding releases as under_investigation;
+  # on = sign nothing, tag nothing, red run.
+  fail_closed: false
+  # Req 2.15/2.17: on-change discards a scheduled rebuild whose package set
+  # equals the published one; always publishes every rebuild.
+  publish_policy: on-change
+  # Req 2.14's daily rebuild cron; task 9.2 wires it into build.yml as the
+  # literal GitHub requires, and lint-workflow-policy keeps the two equal.
+  # Before the 06:17 rescan so the rescan sees fresh digests.
+  schedule: &build_cron "47 4 * * *"
+  # Req 7.7 admitted platforms; arm64 returns with task 8.3.
+  platforms:
+    - linux/amd64
+
+verification:
+  # The registry namespace the criteria bind through (Req 2.2, 2.7, 2.21,
+  # 2.23). Inside this section because the rendering needs it for the
+  # imageReferences glob (review 4.7); task 14.1 records the placement.
+  registry: ghcr.io/mm-weber/dhc
+  issuer: https://token.actions.githubusercontent.com
+  # Roles are attestor lists a fork extends; no role is widened (Req 2.23).
+  roles:
+    releaser:
+      identity: https://github.com/mm-weber/dhc-pipeline/.github/workflows/build.yml@refs/heads/main
+      attests: [spdxjson, cyclonedx, vuln, openvex]
+    re-attester:
+      identity: https://github.com/mm-weber/dhc-pipeline/.github/workflows/rescan.yml@refs/heads/main
+      attests: [openvex, vuln]
+  # What the rendered policy demands on every admitted image (Req 2.23): the
+  # signature and SPDX SBOM solely from the releaser; OpenVEX from either role.
+  required:
+    signature: releaser
+    attestations:
+      spdxjson: [releaser]
+      openvex: [releaser, re-attester]
+
+# Cluster B's aperture, ceilings and windows land here (task 10.1); declared
+# empty rather than absent so every reader finds the section.
+triage: {}
+
+# Req 7.10's declared map: schedule cron and permissions per workflow, plus
+# explicit per-job permissions blocks. Jobs without an entry inherit the
+# workflow default and need none.
+workflows:
+  build.yml:
+    schedule: *build_cron # not yet wired; task 9.2 adds the literal trigger
+    permissions:
+      contents: read
+    jobs:
+      release:
+        permissions:
+          contents: read
+          packages: write
+          id-token: write
+  rescan.yml:
+    schedule: "17 6 * * *"
+    permissions:
+      contents: read
+      packages: read
+      issues: write
+  renovate.yml:
+    schedule: "0 */4 * * *"
+    permissions:
+      contents: read
+  validate.yml:
+    schedule: null
+    permissions:
+      contents: read
+  chart.yml:
+    schedule: null
+    permissions:
+      contents: read
+  e2e.yml:
+    schedule: null
+    permissions:
+      contents: read
+      packages: read

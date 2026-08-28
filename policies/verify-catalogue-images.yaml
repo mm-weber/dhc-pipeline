@@ -1,0 +1,57 @@
+# Rendered by scripts/render-verification.sh from catalogue-policy.yaml's
+# verification section (Req 7.8); do not edit: edit the policy file and
+# re-render. validate.yml fails on any drift (Req 7.9).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-catalogue-images
+  annotations:
+    policies.kyverno.io/title: Verify Catalogue Images
+    policies.kyverno.io/category: dhc-supply-chain
+    policies.kyverno.io/description: >-
+      Admits an image from ghcr.io/mm-weber/dhc solely on a cosign keyless
+      signature from the declared releaser identity, with the required
+      attestations present from their declared roles (Req 2.23).
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: require-signature-and-attestations
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      verifyImages:
+        - imageReferences:
+            - "ghcr.io/mm-weber/dhc/*"
+          attestors:
+            - entries:
+                - keyless:
+                    subject: https://github.com/mm-weber/dhc-pipeline/.github/workflows/build.yml@refs/heads/main
+                    issuer: https://token.actions.githubusercontent.com
+                    rekor:
+                      url: https://rekor.sigstore.dev
+          attestations:
+            - type: https://spdx.dev/Document
+              attestors:
+                - entries:
+                    - keyless:
+                        subject: https://github.com/mm-weber/dhc-pipeline/.github/workflows/build.yml@refs/heads/main
+                        issuer: https://token.actions.githubusercontent.com
+                        rekor:
+                          url: https://rekor.sigstore.dev
+            - type: https://openvex.dev/ns
+              attestors:
+                - entries:
+                    - keyless:
+                        subject: https://github.com/mm-weber/dhc-pipeline/.github/workflows/build.yml@refs/heads/main
+                        issuer: https://token.actions.githubusercontent.com
+                        rekor:
+                          url: https://rekor.sigstore.dev
+                    - keyless:
+                        subject: https://github.com/mm-weber/dhc-pipeline/.github/workflows/rescan.yml@refs/heads/main
+                        issuer: https://token.actions.githubusercontent.com
+                        rekor:
+                          url: https://rekor.sigstore.dev
