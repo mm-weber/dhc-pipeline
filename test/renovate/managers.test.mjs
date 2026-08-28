@@ -337,13 +337,17 @@ check(
   }
 
   const pins = extract(scannerMgr, read("scripts/install-tool.sh"));
-  check("tool pins: install-tool.sh yields exactly four deps", pins.length === 4, `${pins.length}`);
+  // Every pinned tool, counted: a pin the manager does not see is a pin nobody
+  // bumps, and a stale tool fails silently (Req 7.6). syft joined with the
+  // release arm's per-manifest SBOMs (task 9.1).
+  check("tool pins: install-tool.sh yields exactly five deps", pins.length === 5, `${pins.length}`);
 
   for (const [tool, depName] of [
     ["kind", "kubernetes-sigs/kind"],
     ["kyverno", "kyverno/kyverno"],
     ["helm", "helm/helm"],
     ["ct", "helm/chart-testing"],
+    ["syft", "anchore/syft"],
   ]) {
     const dep = pins.find((d) => d.depName === depName);
     check(`tool pins: ${tool} is tracked as ${depName}`, !!dep);
