@@ -137,11 +137,10 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      # Currently unused: this builds linux/amd64 only (see `platforms:` below),
-      # so nothing is emulated. Kept because it costs a few seconds and is what
-      # task 8.3 needs back the moment arm64 returns. The DHI frontend
-      # cross-compiles (GOARCH) so arm64 assembly runs no arm64 code anyway;
-      # multi-platform buildx still expects binfmt to be registered.
+      # binfmt for the arm64 half of the release build (restored by task 9.3;
+      # the PR gate still builds amd64 only). The DHI frontend cross-compiles
+      # (GOARCH) so arm64 assembly runs little arm64 code, but multi-platform
+      # buildx expects binfmt to be registered either way.
       - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
       - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
@@ -189,6 +188,25 @@ jobs:
           echo "registry=$registry" >> "$GITHUB_OUTPUT"
           echo "fail_closed=$fail_closed" >> "$GITHUB_OUTPUT"
           echo "publish_policy=$publish_policy" >> "$GITHUB_OUTPUT"
+          # Req 2.1: main builds every platform the definition declares. The
+          # policy file ADMITS platforms (Req 7.7), so a declared platform the
+          # policy does not admit is refused here by name, rather than
+          # becoming a published platform nothing agreed to stand behind.
+          admitted=$(yq '.release.platforms[]' catalogue-policy.yaml | tr -d '"')
+          platforms=""
+          while read -r p; do
+            [ -n "$p" ] || continue
+            if ! printf '%s\n' "$admitted" | grep -qxF "$p"; then
+              echo "::error file=${f}::${NAME}: declared platform '${p}' is not admitted by catalogue-policy.yaml release.platforms (Req 2.1, 7.7)"
+              exit 1
+            fi
+            platforms="${platforms:+${platforms},}${p}"
+          done < <(yq '.platforms[]' "$f" | tr -d '"')
+          if [ -z "$platforms" ]; then
+            echo "::error file=${f}::${NAME}: no platforms declared (Req 2.1)"
+            exit 1
+          fi
+          echo "platforms=$platforms" >> "$GITHUB_OUTPUT"
           {
             echo 'tags<<TAGS'
             yq '.tags[]' "$f" | tr -d '"' | sed "s#^#${img}:#"
@@ -240,7 +258,10 @@ jobs:
         with:
           context: image/${{ matrix.name }}
           file: image/${{ matrix.name }}/image.yaml
-          platforms: linux/amd64
+          # Every platform the definition declares (Req 2.1), like the push
+          # below — a comparator that sees fewer platforms than the release
+          # would publish cannot prove equality for what it never looked at.
+          platforms: ${{ steps.meta.outputs.platforms }}
           push: false
           outputs: type=oci,dest=${{ runner.temp }}/local-oci.tar
           cache-from: type=gha,scope=${{ matrix.name }}
@@ -256,6 +277,7 @@ jobs:
           NAME: ${{ matrix.name }}
           TAGS: ${{ steps.meta.outputs.tags }}
           POLICY: ${{ steps.meta.outputs.publish_policy }}
+          PLATFORMS: ${{ steps.meta.outputs.platforms }}
           LOCAL_DIGEST: ${{ steps.buildlocal.outputs.digest }}
         run: |
           set -euo pipefail
@@ -271,8 +293,16 @@ jobs:
           # (requirements.md, Terms), the last line meta emitted.
           fullref=$(printf '%s\n' "$TAGS" | tail -n 1)
           mkdir -p "${RUNNER_TEMP}/psd"
-          syft -q "oci-archive:${RUNNER_TEMP}/local-oci.tar" --platform linux/amd64 \
-            -o "cyclonedx-json=${RUNNER_TEMP}/psd/linux-amd64.cdx.json"
+          # One SBOM and one comparison pair per declared platform (Req 2.15
+          # says per platform manifest; task 9.3 made this a list).
+          pairs=()
+          IFS=',' read -r -a plats <<< "$PLATFORMS"
+          for p in "${plats[@]}"; do
+            cdx="${RUNNER_TEMP}/psd/${p//\//-}.cdx.json"
+            syft -q "oci-archive:${RUNNER_TEMP}/local-oci.tar" --platform "$p" \
+              -o "cyclonedx-json=${cdx}"
+            pairs+=("${p}=${cdx}")
+          done
           {
             echo "### Publish-on-change — ${NAME} (${fullref})"
             echo
@@ -280,7 +310,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           scripts/package-set-diff.sh "$NAME" "$fullref" "$localdigest" \
             "${RUNNER_TEMP}/psd/verdict" \
-            "linux/amd64=${RUNNER_TEMP}/psd/linux-amd64.cdx.json" \
+            "${pairs[@]}" \
             | tee -a "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           cat "${RUNNER_TEMP}/psd/verdict" >> "$GITHUB_OUTPUT"
@@ -304,14 +334,16 @@ jobs:
         with:
           context: image/${{ matrix.name }}
           file: image/${{ matrix.name }}/image.yaml
-          # linux/amd64 only (Req 2.1). The release path built arm64 too until
-          # 2026-08-04, and nothing ever scanned it: every scan step below is
-          # pull_request-gated, the PR gate builds amd64, and rescan.yml passes
-          # no --platform so Trivy resolves the published index to the runner's
-          # own arch. arm64 was signed, SBOM'd and attested unread (review
-          # finding 1.3). Req 2.6 forbids publishing a platform nothing scans,
-          # so arm64 comes back only after something scans it — task 8.3.
-          platforms: linux/amd64
+          # Every declared platform on main (Req 2.1); the PR gate stays amd64
+          # (it loads a single image for the scan gate, and the cost worth
+          # gating on is the build, not the platform count). arm64 left on
+          # 2026-08-04 because nothing scanned it — it was signed, SBOM'd and
+          # attested unread (review finding 1.3) — and returns with task 9.3
+          # because now everything does: the release-time scan covers every
+          # platform manifest of the pushed digest (Req 2.8, 2.26) and the
+          # rescan enumerates and scans every platform manifest of every
+          # tag-referenced digest daily, by its own digest (Req 2.22).
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || steps.meta.outputs.platforms }}
           # Req 2.7: on main the image is pushed BY DIGEST and carries no tag
           # until its own scan, signature and attestations exist. Until task 9.1
           # this step pushed the tags itself, which published the artifact and
