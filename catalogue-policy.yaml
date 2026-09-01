@@ -55,7 +55,7 @@ triage: {}
 # workflow default and need none.
 workflows:
   build.yml:
-    schedule: *build_cron # not yet wired; task 9.2 adds the literal trigger
+    schedule: *build_cron # the literal trigger in build.yml, held equal here
     permissions:
       contents: read
     jobs:

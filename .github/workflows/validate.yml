@@ -101,6 +101,29 @@ jobs:
       - name: VEX compiler unit tests (Req 6.28-6.30)
         run: scripts/compile-vex_test.sh
 
+      # Task 9.1 shipped this suite without enumerating it here, so CI never
+      # ran it; found and fixed in task 9.2, and the completeness check below
+      # is what keeps the list honest from now on.
+      - name: scan invocation unit tests (Req 2.8, 2.26)
+        run: scripts/scan-image_test.sh
+
+      - name: publish-on-change comparator unit tests (Req 2.15-2.17)
+        run: scripts/package-set-diff_test.sh
+
+      # Every script suite must be enumerated above: a suite that exists but
+      # never runs in CI passes locally forever and proves nothing (the
+      # scan-image omission, and the same class as the missing-required-check
+      # lesson of 2026-08-26).
+      - name: every script test suite is enumerated in this workflow
+        run: |
+          set -euo pipefail
+          missing=0
+          for t in scripts/*_test.sh; do
+            grep -qF "run: $t" .github/workflows/validate.yml || {
+              echo "::error file=.github/workflows/validate.yml::${t} exists but no step runs it"; missing=1; }
+          done
+          exit "$missing"
+
       # Renovate config: validate the schema, then prove the custom managers
       # actually extract the right deps from the definitions (Req 3.2).
       - name: renovate config + manager fixtures

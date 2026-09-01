@@ -21,6 +21,14 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Req 2.14: the daily rebuild of the active set. The cron is DECLARED in
+  # catalogue-policy.yaml (release.schedule) and lint-workflow-policy.sh holds
+  # this literal equal to it; 04:47 UTC sits before the 06:17 rescan so the
+  # rescan's first enumeration of the day sees tonight's digests. Whether a
+  # scheduled rebuild actually publishes is the comparator's verdict plus the
+  # declared publish policy (Req 2.15-2.17), decided per definition below.
+  schedule:
+    - cron: "47 4 * * *"
   workflow_dispatch:
     inputs:
       image:
@@ -59,6 +67,14 @@ jobs:
           if [ "$EVENT" = "workflow_dispatch" ]; then
             if [ -n "$DISPATCH_IMAGE" ]; then names=$(printf '%s\n' "$DISPATCH_IMAGE")
             else names=$(all_defs); fi
+          elif [ "$EVENT" = "schedule" ]; then
+            # Req 2.14: the daily rebuild covers every active definition.
+            # `github.event.before` is empty on a schedule, so the push-diff
+            # fallback below would diff HEAD~1 and rebuild nothing (independent
+            # review 1.10). Until task 14.2 re-sources every matrix from the
+            # policy file's active set, the definition directories ARE the
+            # active set — the same source the dispatch-all branch reads.
+            names=$(all_defs)
           elif [ "$EVENT" = "pull_request" ]; then
             git fetch --no-tags --depth=1 origin "$BASE_REF"
             changed=$(git diff --name-only "origin/${BASE_REF}...HEAD")
@@ -157,6 +173,7 @@ jobs:
           # fail-closed switch Req 2.13 reads.
           registry=$(yq '.verification.registry' catalogue-policy.yaml | tr -d '"')
           fail_closed=$(yq '.release.fail_closed' catalogue-policy.yaml | tr -d '"')
+          publish_policy=$(yq '.release.publish_policy' catalogue-policy.yaml | tr -d '"')
           # tr strips quotes so this works under either yq (mikefarah on the
           # runner emits raw scalars; python-yq would quote them).
           img=$(yq '.image' "$f" | tr -d '"')
@@ -171,6 +188,7 @@ jobs:
           echo "image=$img" >> "$GITHUB_OUTPUT"
           echo "registry=$registry" >> "$GITHUB_OUTPUT"
           echo "fail_closed=$fail_closed" >> "$GITHUB_OUTPUT"
+          echo "publish_policy=$publish_policy" >> "$GITHUB_OUTPUT"
           {
             echo 'tags<<TAGS'
             yq '.tags[]' "$f" | tr -d '"' | sed "s#^#${img}:#"
@@ -189,7 +207,99 @@ jobs:
           NAME: ${{ matrix.name }}
         run: scripts/verify-arch-pins.sh "image/${NAME}"
 
+      # Above the build rather than after it since task 9.2: the scheduled
+      # comparator below needs syft before anything is pushed.
+      - name: install trivy + grype + syft
+        run: |
+          set -euo pipefail
+          # Installed as the runner user into a temp dir on PATH, not as root
+          # into /usr/local/bin. The old form piped a remote script straight
+          # into `sudo sh`; fetching two pinned binaries never needed root, and
+          # dropping it removes the reason that install was dangerous rather
+          # than just the branch it came from.
+          mkdir -p "${RUNNER_TEMP}/bin"
+          scripts/install-scanners.sh "${RUNNER_TEMP}/bin"
+          scripts/install-tool.sh syft "${RUNNER_TEMP}/bin"
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+
+      # ---- Daily rebuild, publish-on-change (task 9.2, Req 2.14-2.17) ----
+      # The scheduled path builds LOCALLY first: same definition, same pins,
+      # same provenance mode, exported to an OCI archive instead of pushed.
+      # scripts/package-set-diff.sh compares the canonicalised package set of
+      # that build against the CycloneDX SBOM attested to the digest the full
+      # release tag points at. Equal under the on-change policy: this run
+      # stops here, nothing pushed, signed, attested or tagged (Req 2.15),
+      # and the run ends green. Different, or nothing published under the
+      # tag, or the always policy: the release proceeds below exactly as a
+      # merge would, with the diff in the summary (Req 2.16, 2.17). A manual
+      # dispatch never compares: a human asking for a release gets one.
+      - id: buildlocal
+        name: scheduled rebuild, local only (Req 2.14)
+        if: github.event_name == 'schedule'
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: image/${{ matrix.name }}
+          file: image/${{ matrix.name }}/image.yaml
+          platforms: linux/amd64
+          push: false
+          outputs: type=oci,dest=${{ runner.temp }}/local-oci.tar
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          # The same provenance mode as the push below, so the comparator's
+          # index-digest measurement compares builds, not configurations.
+          provenance: mode=max
+
+      - id: psd
+        name: publish-on-change comparator (Req 2.15-2.17)
+        if: github.event_name == 'schedule'
+        env:
+          NAME: ${{ matrix.name }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          POLICY: ${{ steps.meta.outputs.publish_policy }}
+          LOCAL_DIGEST: ${{ steps.buildlocal.outputs.digest }}
+        run: |
+          set -euo pipefail
+          # The action reads the local build's index digest from BuildKit
+          # metadata; the archive's own index.json is the fallback so the
+          # reproducibility measurement never silently reads "unmeasured".
+          localdigest="${LOCAL_DIGEST:-}"
+          if [ -z "$localdigest" ]; then
+            localdigest=$(tar -xOf "${RUNNER_TEMP}/local-oci.tar" index.json \
+              | jq -r '.manifests[0].digest // "-"')
+          fi
+          # The full release tag is the third of the definition's three tags
+          # (requirements.md, Terms), the last line meta emitted.
+          fullref=$(printf '%s\n' "$TAGS" | tail -n 1)
+          mkdir -p "${RUNNER_TEMP}/psd"
+          syft -q "oci-archive:${RUNNER_TEMP}/local-oci.tar" --platform linux/amd64 \
+            -o "cyclonedx-json=${RUNNER_TEMP}/psd/linux-amd64.cdx.json"
+          {
+            echo "### Publish-on-change — ${NAME} (${fullref})"
+            echo
+            echo '```text'
+          } >> "$GITHUB_STEP_SUMMARY"
+          scripts/package-set-diff.sh "$NAME" "$fullref" "$localdigest" \
+            "${RUNNER_TEMP}/psd/verdict" \
+            "linux/amd64=${RUNNER_TEMP}/psd/linux-amd64.cdx.json" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat "${RUNNER_TEMP}/psd/verdict" >> "$GITHUB_OUTPUT"
+          verdict=$(sed -n 's/^verdict=//p' "${RUNNER_TEMP}/psd/verdict" | tail -1)
+          publish=true
+          if [ "$POLICY" = "on-change" ] && [ "$verdict" = "equal" ]; then
+            publish=false
+            echo "discarded: package set equal to the one published under ${fullref}; nothing pushed, signed, attested or tagged (Req 2.15)" \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
       - id: build
+        # A discarded scheduled rebuild stops HERE: everything from the push
+        # to the tags carries this guard, so Req 2.15's "pushing nothing,
+        # signing nothing and attesting nothing" is one skipped chain rather
+        # than nine conditions that can drift apart. On the gha cache this
+        # build is a replay of the local one above.
+        if: github.event_name != 'schedule' || steps.psd.outputs.publish == 'true'
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: image/${{ matrix.name }}
@@ -228,19 +338,6 @@ jobs:
       # scans the pushed digest per platform manifest. syft generates the SBOMs
       # attested to each manifest (Req 2.9), pinned and checksum-verified like
       # every other workflow tool (Req 7.5).
-      - name: install trivy + grype + syft
-        run: |
-          set -euo pipefail
-          # Installed as the runner user into a temp dir on PATH, not as root
-          # into /usr/local/bin. The old form piped a remote script straight
-          # into `sudo sh`; fetching two pinned binaries never needed root, and
-          # dropping it removes the reason that install was dangerous rather
-          # than just the branch it came from.
-          mkdir -p "${RUNNER_TEMP}/bin"
-          scripts/install-scanners.sh "${RUNNER_TEMP}/bin"
-          scripts/install-tool.sh syft "${RUNNER_TEMP}/bin"
-          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
-
       # Trivy builds the `pkg:oci/...` product purl a VEX statement has to match
       # out of the image's RepoDigest. A buildx `load:` image has none — never
       # pushed, never pulled — so on the PR path the CycloneDX root component
@@ -617,7 +714,7 @@ jobs:
       # task 9.1 the build pushed tags itself and the only scan ever run was the
       # pull request's, against a different artifact than the one signed.
       - name: install cosign
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true')
         uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
         with:
           # Pinned to the v2 line deliberately (ADR 0003, measured): cosign v3
@@ -635,7 +732,7 @@ jobs:
       # the image, and attesting to it would put claims where no consumer looks.
       - name: enumerate platform manifests
         id: manifests
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true')
         env:
           REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
         run: |
@@ -665,7 +762,7 @@ jobs:
       # that --platform without --image-src remote is ignored).
       - name: release-time scan of the pushed digest (Req 2.8)
         id: relscan
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true')
         env:
           IMAGE: ${{ steps.meta.outputs.image }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -697,7 +794,7 @@ jobs:
       # ships with a published status instead of a stall (Req 2.12) and framing
       # A's promise is about knowledge rather than a clean scan.
       - name: fail-closed release gate (Req 2.13)
-        if: github.ref == 'refs/heads/main' && steps.meta.outputs.fail_closed == 'true' && steps.relscan.outputs.uncovered != '0'
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true') && steps.meta.outputs.fail_closed == 'true' && steps.relscan.outputs.uncovered != '0'
         env:
           NAME: ${{ matrix.name }}
           UNCOVERED: ${{ steps.relscan.outputs.uncovered }}
@@ -711,7 +808,7 @@ jobs:
       # derived from these reports, so what a consumer reads on the digest and
       # what the catalogue decided from are the same artifact.
       - name: attest each platform manifest's scan report (Req 2.9)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true')
         env:
           IMAGE: ${{ steps.meta.outputs.image }}
           MANIFESTS: ${{ steps.manifests.outputs.digests }}
@@ -730,7 +827,7 @@ jobs:
       # report's timestamp rather than passing unremarked. Pass 2 reads the
       # reports pass 1 could not have seen.
       - name: compile the digest's OpenVEX document (Req 2.12, 6.37)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true')
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           MANIFESTS: ${{ steps.manifests.outputs.digests }}
@@ -758,7 +855,7 @@ jobs:
       # of children on v2.6.0 is unmeasured here: a claim that silently lands on
       # the index alone would leave a platform-digest consumer with nothing.
       - name: sign and attest (Req 2.9)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true')
         env:
           IMAGE: ${{ steps.meta.outputs.image }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -794,7 +891,7 @@ jobs:
       # to the digest that was actually signed: a tag pointing at anything else
       # would publish an unsigned artifact under a promised name.
       - name: apply definition-derived tags (Req 2.7, 2.9)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true')
         env:
           IMAGE: ${{ steps.meta.outputs.image }}
           DIGEST: ${{ steps.build.outputs.digest }}
