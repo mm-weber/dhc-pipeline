@@ -83,12 +83,48 @@ if [ -f "$DEF_FILE" ]; then
 fi
 
 python3 - "$SRC" "$OUT" "$IMAGE" "$DIGEST" "$DEFINITION" "$@" <<'PY'
-import glob, json, os, sys
+import datetime, glob, json, os, sys
 
 src, out, image, digest, definition = sys.argv[1:6]
 tags = set(sys.argv[6:])
 # `definition` is what built this, `image` what it publishes as. They differ for
 # a variant, and the report keeps both.
+
+# One document per digest, covering the index and every platform manifest
+# (Req 6.29, ADR 0003): several OpenVEX attestations on one digest make
+# `trivy --vex oci` apply one of them at random (ADR 0004), so "exactly one" is
+# the invariant, not tidiness. The manifest digests arrive by environment
+# because every positional slot is spoken for, the seam this script already
+# uses for COMPILE_VEX_ROOT and COMPILE_VEX_REPORT.
+digests = [digest] + [d for d in os.environ.get("COMPILE_VEX_MANIFEST_DIGESTS", "").split() if d != digest]
+
+# Req 2.12 / 6.37. The release-time scan reports are a named compiler input:
+# whatever they still report is uncovered, and it is published as
+# under_investigation rather than passing unremarked. A path that does not
+# exist is a usage error, never "nothing uncovered": that silence is the
+# inert-looks-correct failure this lane exists to prevent.
+scan_reports = os.environ.get("COMPILE_VEX_SCAN_REPORTS", "").split()
+for path in scan_reports:
+    if not os.path.isfile(path):
+        print(f"compile-vex: scan report '{path}' does not exist, so what it would have "
+              f"reported is unknown; refusing to compile as if nothing were uncovered", file=sys.stderr)
+        sys.exit(2)
+
+# The previously attested document, so a finding already stated keeps its first
+# seen timestamp instead of resetting on every rebuild (cluster B's clocks).
+previous = os.environ.get("COMPILE_VEX_PREVIOUS", "")
+first_seen = {}
+if previous:
+    if not os.path.isfile(previous):
+        print(f"compile-vex: previously attested document '{previous}' does not exist", file=sys.stderr)
+        sys.exit(2)
+    with open(previous) as fh:
+        for st in (json.load(fh).get("statements") or []):
+            vuln = st.get("vulnerability")
+            name = (vuln.get("name") if isinstance(vuln, dict) else vuln) or ""
+            ts = st.get("timestamp")
+            if name and ts and name not in first_seen:
+                first_seen[name] = ts
 
 def parse(pid):
     """(name, version) for a pkg:oci purl, or (None, None) if it is not one."""
@@ -118,9 +154,15 @@ def drop(kind, cve, pid, reason):
     drops.append({"kind": kind, "cve": cve, "product": pid, "reason": reason})
     dropped += 1
 
+merged = []          # every surviving source statement, in file then document order
+covered = set()       # CVEs a source statement answers, so 2.12 does not restate them
+author = "dhc-pipeline triage"
+
 for path in sorted(glob.glob(os.path.join(src, "*.json"))):
     with open(path) as fh:
         doc = json.load(fh)
+    if doc.get("author"):
+        author = doc["author"]
 
     statements = []
     for st in doc.get("statements") or []:
@@ -142,22 +184,80 @@ for path in sorted(glob.glob(os.path.join(src, "*.json"))):
                 continue
             # Req 6.29. Everything else is the claim and carries through
             # untouched: subcomponents scope it to one package, and timestamp
-            # orders supersession (Req 6.22).
-            product["@id"] = f"pkg:oci/{image}@{digest}"
-            products.append(product)
+            # orders supersession (Req 6.22). One product per digest, so a
+            # consumer pinning the index or a platform manifest reads the same
+            # claim.
+            for d in digests:
+                copy = dict(product)
+                copy["@id"] = f"pkg:oci/{image}@{d}"
+                products.append(copy)
         if products:
             st["products"] = products
             statements.append(st)
             compiled += 1
+            if st.get("status") in ("not_affected", "fixed"):
+                covered.add(cve)
 
-    # An emptied document is a file a scanner reads and learns nothing from.
-    if statements:
-        doc["statements"] = statements
-        with open(os.path.join(out, os.path.basename(path)), "w") as fh:
-            json.dump(doc, fh, indent=2)
-            fh.write("\n")
+    merged.extend(statements)
 
-print(f"compile-vex: {compiled} statement(s) compiled for {image}@{digest}, {dropped} product(s) dropped")
+# Req 2.12. Every finding the release-time scan still reports is uncovered by
+# construction (VEX and unexpired exceptions were applied to that scan), so it
+# is published as under_investigation, derived from the report and carrying its
+# timestamp. Keyed by vulnerability and package so two platform manifests
+# reporting the same finding state it once.
+investigating = {}
+for path in scan_reports:
+    with open(path) as fh:
+        rep = json.load(fh)
+    stamp = rep.get("CreatedAt") or ""
+    for result in rep.get("Results") or []:
+        for v in result.get("Vulnerabilities") or []:
+            cve = v.get("VulnerabilityID")
+            if not cve or cve in covered:
+                continue
+            ident = v.get("PkgIdentifier") or {}
+            purl = ident.get("PURL") or ""
+            key = (cve, purl or v.get("PkgName") or "")
+            if key in investigating:
+                continue
+            st = {
+                "vulnerability": {"name": cve},
+                "products": [{"@id": f"pkg:oci/{image}@{d}"} for d in digests],
+                "status": "under_investigation",
+                # First seen, not "seen again": a rebuild must not reset the
+                # clock a decision is measured against.
+                "timestamp": first_seen.get(cve, stamp),
+                "status_notes": (f"uncovered at release time in this digest's attested "
+                                 f"release-time scan report ({os.path.basename(path)}); "
+                                 f"awaiting a triage decision"),
+            }
+            if purl:
+                for product in st["products"]:
+                    product["subcomponents"] = [{"@id": purl}]
+            investigating[key] = st
+
+merged.extend(investigating[k] for k in sorted(investigating))
+
+# One document per digest, written even with zero statements (ADR 0003):
+# vexctl, Trivy, cosign and Kyverno all accept an empty statement list, and a
+# published digest that carries no OpenVEX attestation at all cannot tell
+# "compiled nothing" from "never compiled".
+stamps = [st.get("timestamp") for st in merged if st.get("timestamp")]
+document = {
+    "@context": "https://openvex.dev/ns/v0.2.0",
+    "@id": f"https://openvex.dev/docs/dhc/{image}@{digest}",
+    "author": author,
+    "version": 1,
+    "timestamp": max(stamps) if stamps else
+                 datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "statements": merged,
+}
+with open(os.path.join(out, f"{image}.openvex.json"), "w") as fh:
+    json.dump(document, fh, indent=2)
+    fh.write("\n")
+
+print(f"compile-vex: {compiled} statement(s) compiled for {image}@{digest}, "
+      f"{len(investigating)} under_investigation, {dropped} product(s) dropped")
 
 # Req 6.32. Optional, so every existing caller is unaffected: a workflow that
 # wants to render this in a summary asks for it by naming a path.
@@ -165,7 +265,8 @@ report = os.environ.get("COMPILE_VEX_REPORT", "")
 if report:
     with open(report, "w") as fh:
         json.dump({"image": definition, "product": image, "digest": digest,
-                   "tags": sorted(tags), "compiled": compiled,
+                   "digests": digests, "tags": sorted(tags), "compiled": compiled,
+                   "under_investigation": len(investigating),
                    "dropped": dropped, "drops": drops},
                   fh, indent=2)
         fh.write("\n")
