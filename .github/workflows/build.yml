@@ -337,6 +337,10 @@ jobs:
           # --vex, --ignorefile, --show-suppressed and --exit-code 0 live, with
           # its own tests.
           scripts/scan-image.sh "$ref" "$NAME" "$VEXDIR" trivy.json
+          # scan-image.sh derives this same path to hand Trivy the ignorefile;
+          # the summary below needs it too, to show the file verbatim. Display
+          # only — the scan never reads this copy.
+          accepted="triage/accepted-risk/${NAME}.yaml"
           high=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")]     | length' trivy.json)
           crit=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy.json)
           echo "high=$high" >> "$GITHUB_OUTPUT"
