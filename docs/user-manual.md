@@ -265,11 +265,11 @@ requirement, precisely because every downstream consumer would inherit it.
 | Workflow       | Trigger                    | Job |
 |----------------|----------------------------|-----|
 | `validate.yml` | every PR + main            | yamllint, pin/definition lints, policy self-tests, every script's unit tests, Renovate config + manager fixtures, Go module vet/build/unit tests |
-| `build.yml`    | every PR + main + dispatch | Build affected definitions; PR path runs the CVE **scan gate**; main path releases (push, sign, SBOM, VEX attest) |
+| `build.yml`    | every PR + main + dispatch + daily 04:47 UTC | Build affected definitions; PR path runs the CVE **scan gate**; main path releases (push by digest, scan every platform manifest, sign, SBOMs, VEX, tag last); the nightly rebuilds everything and publishes on change |
 | `chart.yml`    | every PR + main            | Render *every* chart, evaluate with the Kyverno policies; `ct lint` on owned charts |
 | `e2e.yml`      | PR + dispatch              | Per affected component: kind cluster, install the hardened chart, run the Ginkgo suite |
 | `renovate.yml` | cron every 4h + dispatch   | Self-hosted Renovate over the custom managers; postUpgradeTasks recompute derived fields |
-| `rescan.yml`   | cron daily 06:17 UTC + dispatch | Re-scan published images (VEX- and exception-aware), report expiries, file one issue per new CVE |
+| `rescan.yml`   | daily 06:17 UTC + dispatch | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; file new-CVE issues for the supported set; expiry warnings |
 
 Every GitHub Action is pinned to a full commit SHA, and every third-party
 executable a workflow installs is exact-version-pinned and checksum-verified
