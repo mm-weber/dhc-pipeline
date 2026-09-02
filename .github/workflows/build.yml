@@ -82,10 +82,7 @@ jobs:
             # A VEX change must be validated against the images its statements
             # actually name — the whole point of the gate on such a PR is to
             # prove the statement suppresses the finding it claims to. Derive
-            # them from the product purls (pkg:oci/<name>?...). Every statement
-            # is considered, not just the changed ones: trivy is handed the
-            # whole directory via --vex, so any edit changes the gate input for
-            # every image the directory covers.
+            # them from the product purls (pkg:oci/<name>?...).
             #
             # A purl name is the PUBLISHED repository, not a directory: a variant
             # publishes under its runtime sibling's name (docs/CONVENTIONS.md,
@@ -93,10 +90,25 @@ jobs:
             # built only the one of that name, where compilation drops the
             # variant's statements on the tag check (Req 6.30) — the claim never
             # exercised, and nothing red to say so.
-            if printf '%s\n' "$changed" | grep -q '^triage/vex/'; then
+            changed_vex=$(printf '%s\n' "$changed" | grep '^triage/vex/' || true)
+            if [ -n "$changed_vex" ]; then
               . scripts/definition-lib.sh
-              for product in $(jq -r '.statements[]?.products[]?."@id" // empty' triage/vex/*.json 2>/dev/null \
-                               | sed -nE 's#^pkg:oci/([^@?/]+).*#\1#p' | sort -u); do
+              # Only the images whose statements CHANGED, not every image any
+              # statement in the directory names: since compilation (task
+              # 7.9) each image's gate input derives solely from statements
+              # naming it, so an untouched image's input provably cannot
+              # change, and the old whole-directory rule turned every VEX PR
+              # into a full-catalogue triage session (measured 2026-09-02 on
+              # PR #122: a cert-manager statement rebuilt grafana into its
+              # accumulated backlog). Both sides of the change count: a
+              # DELETED or edited statement still rebuilds the images its
+              # BASE version names, so removing a claim re-proves the gate
+              # without it.
+              vexprods=$(for f in $changed_vex; do
+                  { [ -f "$f" ] && cat "$f"; git show "origin/${BASE_REF}:${f}" 2>/dev/null || true; } \
+                    | jq -r '.statements[]?.products[]?."@id" // empty' 2>/dev/null || true
+                done | sed -nE 's#^pkg:oci/([^@?/]+).*#\1#p' | sort -u)
+              for product in $vexprods; do
                 names="$names $(definitions_publishing . "$product" | cut -d/ -f2)"
               done
             fi
@@ -723,7 +735,16 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${CRIT:-0}" -gt 0 ] || [ "${HIGH:-0}" -gt 0 ]; then
-            echo "::error::${NAME}: ${CRIT} CRITICAL / ${HIGH} HIGH uncovered (Req 6.1). Four ways out, strongest first: avoid (drop the component) · fix (version bump, Req 6.5) · prove it does not apply (OpenVEX in triage/vex/, Req 6.4) · accept or transfer for a bounded time (triage/accepted-risk/${NAME}.yaml, Req 6.7). An expired exception counts as uncovered."
+            # The findings are NAMED in the failure, not just counted: the
+            # summary and the report artifact carry the detail, but the error
+            # annotation is what every reader of a red check reaches first
+            # (and the only part an API consumer can reach at all), and
+            # "1 HIGH uncovered" with no name forces archaeology on whoever
+            # has to decide what to do about it (measured 2026-09-02, PR #122).
+            found=$(jq -r '[.Results[]?.Vulnerabilities[]?
+                            | "\(.VulnerabilityID) (\(.Severity) \(.PkgName)@\(.InstalledVersion), fixed: \(.FixedVersion // "none"))"]
+                           | unique | join("; ")' trivy.json)
+            echo "::error::${NAME}: ${CRIT} CRITICAL / ${HIGH} HIGH uncovered (Req 6.1): ${found}. Four ways out, strongest first: avoid (drop the component) · fix (version bump, Req 6.5) · prove it does not apply (OpenVEX in triage/vex/, Req 6.4) · accept or transfer for a bounded time (triage/accepted-risk/${NAME}.yaml, Req 6.7). An expired exception counts as uncovered."
             exit 1
           fi
           echo "${NAME}: no uncovered HIGH/CRITICAL ✓"
