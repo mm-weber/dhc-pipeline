@@ -227,7 +227,7 @@
     - When the sets are equal the comparator also logs whether the rebuilt index digest equals the published one, so reproducibility is measured every night at no cost (`data/reproducible-digests-vs-content-diff-2026-08-22.md`, Decision 6); a `diffoci` spike on its own branch is the later step, and Decision 6 records the condition that would promote digest equality to the primary gate
     - Consequence to accept: each real base change opens one non-automerged chart-pin PR per affected chart; same-tag digest automerge is cluster C (F13)
     - _Requirements: Req 2.14, Req 2.15, Req 2.16, Req 2.17_
-  - [ ] 9.3 Per-platform scanning, then arm64 (absorbs 8.3)
+  - [x] 9.3 Per-platform scanning, then arm64 (absorbs 8.3) [done 2026-09-01]
     - `rescan.yml` enumerates every catalogue tag per repository from the registry tag list (cosign's `sha256-*` tags excluded, Req 2.22) and scans every platform manifest of every tag-referenced digest by the manifest's own digest (`<repo>@sha256:<manifest>`), which needs no `--platform`, cannot be silently downgraded (8.3's measurement: `--platform` without `--image-src remote` is ignored) and yields a RepoDigest equal to the digest the compiler stamps; 9.1's release-time scan does the same over the freshly pushed index (Req 2.8, 2.26). The ten pre-2026-08-04 tags are covered in place by this enumeration
     - Only then `platforms: linux/amd64,linux/arm64` on main (Req 2.1 as amended); the PR gate stays amd64 (cost is the build, not the scan, per 8.3); arm64 e2e out of scope. Until this task lands the release path stays amd64-only against an amended Req 2.1, which is the spec-ahead-of-implementation state every open task in this ledger is in
     - _Requirements: Req 2.1, Req 2.22_

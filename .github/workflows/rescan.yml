@@ -56,98 +56,103 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: install trivy + grype
+      - name: install trivy + grype + crane
         run: |
           set -euo pipefail
-          # As the runner user into a temp dir on PATH — see build.yml.
+          # As the runner user into a temp dir on PATH — see build.yml. crane
+          # lists the registry's tags for the enumeration (task 9.3).
           mkdir -p "${RUNNER_TEMP}/bin"
           scripts/install-scanners.sh "${RUNNER_TEMP}/bin"
+          scripts/install-tool.sh crane "${RUNNER_TEMP}/bin"
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
-      - name: scan published images
+      # Req 2.22: every catalogue tag in every catalogue repository, resolved
+      # to platform manifests. Hard-fail, unlike every scan below: the
+      # enumeration IS the daily promise, and a partial one that looks
+      # complete would silently shrink what the catalogue watches.
+      - name: enumerate the catalogue (Req 2.22)
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT"
+          scripts/enumerate-catalogue.sh . "$OUT/enumeration.tsv"
+
+      - name: scan every platform manifest of every tag-referenced digest
         id: scan
         run: |
-          # No `set -e`: an unpublished image or a transient scan failure must skip,
-          # not abort the whole rescan (Req 6 soft-fail).
+          # No `set -e`: a transient scan failure must skip, not abort the
+          # whole rescan (Req 6 soft-fail). The enumeration above already
+          # hard-failed if the WORLD was unreadable; from here each miss is
+          # one manifest, counted and named.
           set -uo pipefail
-          mkdir -p "$OUT/trivy"
-          scanned=0
-          for d in image/*/; do
-            name=$(basename "$d")
-            f="${d}image.yaml"
-            [ -f "$f" ] || continue
-            img=$(yq '.image' "$f" | tr -d '"')
-            tag=$(yq '.tags[0]' "$f" | tr -d '"')
-            ref="${img}:${tag}"
-            # Accepted risk, same contract as the PR gate: without this the cron
-            # refiles an issue every day for a finding that was already decided,
-            # and the acceptance is defeated by noise. The expiry still ends it —
-            # Trivy stops honouring a lapsed entry on its own (Req 6.9).
-            accepted="triage/accepted-risk/${name}.yaml"
-            ignore=()
-            if [ -f "$accepted" ]; then ignore=(--ignorefile "$accepted"); fi
-            # Req 6.28-6.30, same contract as the PR gate: source is never handed
-            # to a scanner. Trivy builds its product identifier from the digest,
-            # so a statement carrying a tag matches nothing. Compiling needs the
-            # digest this tag resolves to, which for a published image comes from
-            # the registry rather than from a local daemon.
-            #
-            # Every declared tag is passed, not just the one being scanned: they
-            # all name this same build, so a statement scoped to any of them
-            # applies here.
-            # Req 6.32/6.33: every path writes a report, so the summary can tell
-            # "compiled nothing" from "never compiled". Those two produce an
-            # identical green run and an identical empty issue set, which is the
-            # inert-versus-correct problem one level up.
-            mkdir -p "$OUT/vex"
-            vexdir="$OUT/vex/${name}"
-            report="$OUT/vex/${name}.report.json"
-            vex=()
-            digest=$(docker buildx imagetools inspect "$ref" --format '{{.Manifest.Digest}}' 2>/dev/null)
-            if [ -n "$digest" ]; then
-              # Which tags this image HAS, not which tags the definition would
-              # publish. Those drift by design: a definition describes the
-              # release it would build now, the registry holds the one published
-              # last. Passing the definition's tags applied a `fixed` claim
-              # written for 13.1.1 to a published 13.0.4 — Req 6.30's exact
-              # failure, arriving through the caller. `$tag` is the one we
-              # resolved the digest from, so the list is never empty.
-              scanned_tags=()
-              while read -r t; do
-                [ -n "$t" ] || continue
-                if [ "$t" = "$tag" ]; then
-                  scanned_tags+=("$t")
-                elif [ "$(docker buildx imagetools inspect "${img}:${t}" \
-                          --format '{{.Manifest.Digest}}' 2>/dev/null)" = "$digest" ]; then
-                  scanned_tags+=("$t")
-                fi
-              done < <(yq '.tags[]' "$f" | tr -d '"')
-              echo "tags resolving to ${digest}: ${scanned_tags[*]}"
-              COMPILE_VEX_REPORT="$report" \
-                scripts/compile-vex.sh triage/vex "$vexdir" "$name" "$digest" "${scanned_tags[@]}" || true
-              for v in "$vexdir"/*.json; do [ -e "$v" ] && vex+=(--vex "$v"); done
-            else
-              # Over-reporting is the safe direction here: excused findings come
-              # back as issues rather than a real one being silently excused.
-              echo "::warning::could not resolve a digest for ${ref} — scanning it with no VEX applied, so already-decided findings may refile"
-              jq -n --arg image "$name" --arg ref "$ref" \
-                '{image: $image, digest: "", ref: $ref, compiled: 0, dropped: 0, drops: []}' > "$report"
-            fi
-            echo "::group::scan ${ref}"
-            if trivy image "${vex[@]}" "${ignore[@]}" --severity HIGH,CRITICAL --pkg-types os,library \
-               --format json --output "$OUT/trivy/${name}.json" --no-progress --exit-code 0 "$ref"; then
-              scanned=$((scanned + 1))
-            else
-              echo "::warning::scan failed or image not published: ${ref} (skipped)"
-              rm -f "$OUT/trivy/${name}.json"
-            fi
-            echo "::endgroup::"
+          mkdir -p "$OUT/trivy" "$OUT/trivy-superseded" "$OUT/vex"
+
+          # One compile per tag-referenced digest, one scan per unique
+          # platform manifest. Several tags share a digest by design (9, 9.1
+          # and 9.1.2 usually name one build), so work is keyed by digest and
+          # tags become attribution. Scans address <repo>@<manifest-digest>:
+          # a digest ref needs no --platform and cannot be silently
+          # downgraded to the runner's own architecture (task 8.3's
+          # measurement, the reason this task exists).
+          declare -A tags_of=() manifests_of=() platform_of=() status_of=()
+          while IFS=$'\t' read -r repo tag digest platform manifest status; do
+            key="${repo}@${digest}"
+            case " ${tags_of[$key]:-} " in *" ${tag} "*) ;; *) tags_of[$key]="${tags_of[$key]:-} ${tag}" ;; esac
+            mkey="${repo}@${manifest}"
+            case " ${manifests_of[$key]:-} " in *" ${manifest} "*) ;; *) manifests_of[$key]="${manifests_of[$key]:-} ${manifest}" ;; esac
+            platform_of[$mkey]="$platform"
+            # A digest is supported if ANY tag referencing it is (Terms):
+            # its findings belong in issues the moment one supported tag
+            # serves it.
+            [ "$status" = "supported" ] && status_of[$key]=supported
+            : "${status_of[$key]:=superseded}"
+          done < "$OUT/enumeration.tsv"
+
+          scanned=0; failed=0
+          for key in "${!tags_of[@]}"; do
+            repo="${key%@*}"; digest="${key#*@}"
+            name="${repo##*/}"
+            read -r -a tags <<< "${tags_of[$key]}"
+            read -r -a manifests <<< "${manifests_of[$key]}"
+            d7="${digest#sha256:}"; d7="${d7:0:12}"
+            vexdir="$OUT/vex/${name}__${d7}"
+            report="$OUT/vex/${name}__${d7}.report.json"
+            # Req 6.28-6.30, same contract as the PR gate and the release arm:
+            # source is never handed to a scanner, and the compiled document
+            # is stamped with the index digest AND every platform manifest
+            # digest — the scan below reads <repo>@<manifest>, so Trivy's
+            # product identity is the MANIFEST digest, and a document without
+            # it suppresses nothing. The tags are the registry's own for this
+            # digest, so a claim scoped to another release stays dropped
+            # (Req 6.30). Req 6.32/6.33: every path writes a report, so
+            # "compiled nothing" and "never compiled" stay distinguishable.
+            COMPILE_VEX_REPORT="$report" COMPILE_VEX_MANIFEST_DIGESTS="${manifests[*]}" \
+              scripts/compile-vex.sh triage/vex "$vexdir" "$name" "$digest" "${tags[@]}" || true
+            outdir="$OUT/trivy"
+            [ "${status_of[$key]}" = "superseded" ] && outdir="$OUT/trivy-superseded"
+            for m in "${manifests[@]}"; do
+              ref="${repo}@${m}"
+              p="${platform_of[${repo}@${m}]}"
+              out="${outdir}/${name}__${d7}__${p//\//-}.json"
+              echo "::group::scan ${ref} (${p}, ${status_of[$key]}, tags:${tags_of[$key]})"
+              if scripts/scan-image.sh "$ref" "$name" "$vexdir" "$out" --remote; then
+                scanned=$((scanned + 1))
+              else
+                echo "::warning::scan failed for ${ref} (${p}) — skipped, counted"
+                failed=$((failed + 1))
+                rm -f "$out"
+              fi
+              echo "::endgroup::"
+            done
           done
           echo "scanned=${scanned}" >> "$GITHUB_OUTPUT"
-          # Union of post-VEX HIGH/CRITICAL CVE IDs across all reports.
+          echo "failed=${failed}" >> "$GITHUB_OUTPUT"
+          # Union of post-VEX HIGH/CRITICAL CVE IDs across SUPPORTED reports
+          # only: a superseded digest keeps its daily scan and its artifacts,
+          # and sits outside the scope of issues and clocks (Terms; its
+          # findings accrue by design, the frozen-digest pattern).
           jq -r '.Results[]?.Vulnerabilities[]?.VulnerabilityID' "$OUT"/trivy/*.json 2>/dev/null \
             | grep -E '^CVE-' | sort -u > "$OUT/cves.txt" || true
-          echo "distinct HIGH/CRITICAL CVEs: $(grep -c . "$OUT/cves.txt" || echo 0)"
+          echo "distinct HIGH/CRITICAL CVEs (supported set): $(grep -c . "$OUT/cves.txt" || echo 0)"
 
       # Req 6.10 — an acceptance that lapses unnoticed is the failure mode this
       # whole lane exists to prevent, and Trivy is silent about it: a lapsed
@@ -264,7 +269,10 @@ jobs:
           set -euo pipefail
           {
             echo "### Daily rescan"
-            echo "- images scanned: ${{ steps.scan.outputs.scanned || 0 }}"
+            if [ -f "$OUT/enumeration.tsv" ]; then
+              echo "- enumerated: $(wc -l < "$OUT/enumeration.tsv") platform manifest rows, $(cut -f1 "$OUT/enumeration.tsv" | sort -u | wc -l) repositories, $(cut -f1,2 "$OUT/enumeration.tsv" | sort -u | wc -l) tags ($(awk -F'\t' '$6=="superseded"' "$OUT/enumeration.tsv" | cut -f1,2 | sort -u | wc -l) superseded)"
+            fi
+            echo "- platform manifests scanned: ${{ steps.scan.outputs.scanned || 0 }} (failed: ${{ steps.scan.outputs.failed || 0 }})"
             echo "- new CVE issues filed: ${{ steps.report.outputs.count || 0 }}"
             echo
             # Req 6.33. Without this the run is green whether every statement

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install-tool.sh <kind|kyverno|helm|ct|syft> [<destdir>]
+# install-tool.sh <kind|kyverno|helm|ct|syft|crane> [<destdir>]
 #
 # Install one workflow tool pinned to an exact version and verified against a
 # sha256 recorded in this file (Req 7.5, docs/CONVENTIONS.md "Pinning").
@@ -73,6 +73,10 @@ CT_SHA256="d16f0583616885423826241164ce1f6589c6fe5332fa74f374ebd2bd3cb3fe1f"
 SYFT_VERSION="1.51.1"
 SYFT_SHA256="8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3"
 
+# renovate: datasource=github-releases depName=google/go-containerregistry
+CRANE_VERSION="0.22.0"
+CRANE_SHA256="edb74d53fad9a596860f59d1c5d04a43dfb5f441dc71f57060dd0bf39483c833"
+
 err() { printf '::error::install-tool: %s\n' "$1" >&2; }
 
 # All pinned assets are linux/amd64; on any other architecture the checksum
@@ -139,8 +143,20 @@ case "$TOOL" in
     member=""
     extras=""
     ;;
+  crane)
+    # Lists registry tags for the rescan enumeration (Req 2.22, task 9.3).
+    # The one asset here whose filename carries no version — only the URL
+    # path does, so a Renovate bump still changes the fetched bytes.
+    version="$CRANE_VERSION"
+    shipped="$CRANE_SHA256"
+    asset="go-containerregistry_Linux_x86_64.tar.gz"
+    url="${BASE_URL}/google/go-containerregistry/releases/download/v${CRANE_VERSION}/${asset}"
+    tarball=yes
+    member=""
+    extras=""
+    ;;
   *)
-    err "usage: install-tool.sh <kind|kyverno|helm|ct|syft> [<destdir>], got '${TOOL}'"
+    err "usage: install-tool.sh <kind|kyverno|helm|ct|syft|crane> [<destdir>], got '${TOOL}'"
     exit 1
     ;;
 esac

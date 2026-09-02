@@ -57,6 +57,15 @@ SYFT_URLDIR="anchore/syft/releases/download/v${SYFT_VER}"
 SYFT_PIN=8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3
 SYFT_DEP=anchore/syft
 
+# crane lists registry tags for the rescan enumeration (Req 2.22, task 9.3);
+# a github tarball with the binary at the root, and the one asset here whose
+# filename carries NO version — only the URL path does.
+CRANE_VER=0.22.0
+CRANE_ASSET="go-containerregistry_Linux_x86_64.tar.gz"
+CRANE_URLDIR="google/go-containerregistry/releases/download/v${CRANE_VER}"
+CRANE_PIN=edb74d53fad9a596860f59d1c5d04a43dfb5f441dc71f57060dd0bf39483c833
+CRANE_DEP=google/go-containerregistry
+
 DEFAULT_ARCH=x86_64
 ARCH="$DEFAULT_ARCH"
 
@@ -65,6 +74,7 @@ KYVERNO_MARKER="kyverno v${KYVERNO_VER} (dhc-test-fixture)"
 HELM_MARKER="helm v${HELM_VER} (dhc-test-fixture)"
 CT_MARKER="ct v${CT_VER} (dhc-test-fixture)"
 SYFT_MARKER="syft v${SYFT_VER} (dhc-test-fixture)"
+CRANE_MARKER="crane v${CRANE_VER} (dhc-test-fixture)"
 
 list_real_bin() { find /usr/local/bin -maxdepth 1 -printf '%f\n' 2>/dev/null | sort; }
 BIN_BEFORE=$(list_real_bin)
@@ -228,6 +238,17 @@ make_syft_asset() { # marker
   rm -rf "$stage"
 }
 
+make_crane_asset() { # marker
+  local stage
+  stage=$(mktemp -d "$SB/stage.XXXXXX")
+  printf '#!/bin/sh\necho "%s"\n' "$1" > "$stage/crane"
+  chmod +x "$stage/crane"
+  printf 'Apache License 2.0\n' > "$stage/LICENSE"
+  mkdir -p "$UP/$CRANE_URLDIR"
+  tar -czf "$UP/$CRANE_URLDIR/$CRANE_ASSET" -C "$stage" crane LICENSE
+  rm -rf "$stage"
+}
+
 setup() { # fresh sandbox: all assets served, empty destdir, shipped pins in force
   SB=$(mktemp -d)
   UP="$SB/upstream"
@@ -240,6 +261,7 @@ setup() { # fresh sandbox: all assets served, empty destdir, shipped pins in for
   make_helm_asset "$HELM_MARKER"
   make_ct_asset "$CT_MARKER"
   make_syft_asset "$SYFT_MARKER"
+  make_crane_asset "$CRANE_MARKER"
 }
 
 write_pins() { # record the fixtures' real digests — the offline success path
@@ -250,6 +272,7 @@ write_pins() { # record the fixtures' real digests — the offline success path
   (cd "$UP" && sha256sum "$HELM_ASSET") >> "$PINS"
   (cd "$UP/$CT_URLDIR" && sha256sum "$CT_ASSET") >> "$PINS"
   (cd "$UP/$SYFT_URLDIR" && sha256sum "$SYFT_ASSET") >> "$PINS"
+  (cd "$UP/$CRANE_URLDIR" && sha256sum "$CRANE_ASSET") >> "$PINS"
 }
 
 asset_sha() { sha256sum "$1" | cut -d' ' -f1; }
@@ -404,6 +427,10 @@ assert_out    "the shipped ct pin is the documented digest" "$CT_PIN"
 setup; invoke syft
 assert_absent "nothing is installed when the shipped pin does not match (syft)" syft
 assert_out    "the shipped syft pin is the documented digest" "$SYFT_PIN"
+
+setup; invoke crane
+assert_absent "nothing is installed when the shipped pin does not match (crane)" crane
+assert_out    "the shipped crane pin is the documented digest" "$CRANE_PIN"
 
 # --- 6: an asset with no recorded pin ---------------------------------------
 

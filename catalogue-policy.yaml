@@ -20,9 +20,13 @@ release:
   # literal GitHub requires, and lint-workflow-policy keeps the two equal.
   # Before the 06:17 rescan so the rescan sees fresh digests.
   schedule: &build_cron "47 4 * * *"
-  # Req 7.7 admitted platforms; arm64 returns with task 8.3.
+  # Req 7.7 admitted platforms. arm64 restored by task 9.3 (absorbing 8.3):
+  # the release-time scan covers every platform manifest of the pushed digest
+  # and the rescan scans every platform manifest of every tag-referenced
+  # digest by its own digest, so no admitted platform goes unscanned.
   platforms:
     - linux/amd64
+    - linux/arm64
 
 verification:
   # The registry namespace the criteria bind through (Req 2.2, 2.7, 2.21,
