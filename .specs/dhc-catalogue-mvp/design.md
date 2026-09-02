@@ -123,7 +123,7 @@ graph TB
 5. **VEX-gated scanning (Req 6)**
    - **Decision**: Trivy PR gate fails only on findings not covered by our OpenVEX; triage outcomes are commits (VEX statement or bump PR), giving auditable history.
 
-6. **Publish with status: scan what you sign (Req 2.7 to 2.25, 6.35, 6.36; review F3, F9, F6, 2026-08-21)**
+6. **Publish with status: scan what you sign (Req 2.7 to 2.25, 6.35, 6.36; review F3, F9, F6, 2026-08-21; as built 2026-09-02, tasks 9.1 to 9.6)**
    - **Context**: Every scan step in `build.yml` was `pull_request`-gated while the release arm
      rebuilt, pushed, signed and attested without any scan (review A finding 1.3, left open
      since 2026-08-04). Package versions float by design, so the released bytes could differ
@@ -901,15 +901,16 @@ release. Getting 6.30's tag set right is what stops that.
 `chart.yml` (ct lint + kyverno over rendered charts), `e2e.yml` (kind matrix),
 `renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).
 
-**Platforms: `linux/amd64` only as built (Req 2.1, amended 2026-08-22 to require every declared platform, with task 9.3 carrying the sequencing; Req 2.22).** The catalogue built and
+**Platforms: every declared platform as built since task 9.3 (2026-09-02; Req 2.1 as amended 2026-08-22, Req 2.22).** The release arm scans each platform manifest of the pushed digest by its own digest and the rescan enumerates and scans every platform manifest of every tag-referenced digest daily, so arm64 returned once both existed; the PR gate stays amd64. The history that ordered it: the catalogue built and
 published both arches until 2026-08-04, when measurement showed nothing ever
 scanned the arm64 half. Every scan step in `build.yml` is `pull_request`-gated
 and the PR gate builds amd64 only, while `rescan.yml` passes no `--platform`, so
 Trivy resolves the published index to the runner's own architecture. arm64 was
 therefore built, pushed, signed, SBOM'd and attested with no gate ever reading
-it, which is the concrete case in review finding 1.3. Shipping one platform is
-the cheap correction; scanning two is the larger change, deferred to task 8.3
-(absorbed by task 9.3 on 2026-08-22).
+it, which is the concrete case in review finding 1.3. Shipping one platform was
+the cheap correction; scanning two was the larger change, deferred to task 8.3
+(absorbed by task 9.3 on 2026-08-22 and built on 2026-09-02; the first full
+sweep is recorded in triage/LOG.md the same day).
 
 Measured on the published `grafana:13-alpine3.23` index, both platforms carry an
 identical HIGH/CRITICAL set (11 each, same CVE, package and version), so nothing

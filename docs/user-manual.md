@@ -76,7 +76,7 @@ directory sits in the middle: every scan, PR-side or scheduled, consumes it.
 ```
 change (human or machine) ─► pull request
   ─► gates: validate · build + scan gate · chart policy · e2e on kind
-  ─► merge ─► release: push (amd64) · cosign sign · SBOM · provenance
+  ─► merge ─► release: push by digest (amd64 + arm64) · scan every platform manifest · sign · SBOMs · VEX · tag last
               · VEX attest (compiled per digest)
   ─► published: ghcr.io/mm-weber/dhc
 
@@ -143,10 +143,14 @@ platform is published unscanned (Req 2.6).
 
 ### Verify what you pull
 
-Every published image is signed and carries three attestations bound to its
-digest: an SPDX SBOM, BuildKit SLSA provenance, and OpenVEX (Req 2.2,
-Req 6.4). All signing is cosign keyless via GitHub OIDC — verification pins
-the workflow identity, not a key:
+Every published image is signed recursively (the index and each platform
+manifest) and carries attestations bound to its digests: on every platform
+manifest an SPDX SBOM, a CycloneDX SBOM, the release-time scan report and
+the OpenVEX document; on the index each platform's SPDX SBOM and the same
+OpenVEX document (Req 2.9, 6.4; the index is what a tag resolves to, so
+admission is checked there). BuildKit SLSA provenance is attached by the
+build itself (Req 2.2). All signing is cosign keyless via GitHub OIDC —
+verification pins the workflow identity, not a key:
 
 <!-- render-verification:begin -->
 ```sh
@@ -172,8 +176,13 @@ What each artifact gives you:
 
 - **Signature** — the image was pushed by this repository's release workflow,
   not by anyone holding a long-lived key.
-- **SBOM** (Syft, SPDX) — a signed inventory of contents, joinable to advisory
-  databases via purls.
+- **SBOM** (Syft; SPDX on the index and each platform manifest, CycloneDX on
+  each platform manifest) — a signed inventory of contents, joinable to
+  advisory databases via purls. The CycloneDX copy carries the apk pull
+  checksums the nightly publish-on-change comparison reads (Req 2.15).
+- **Scan report** (Trivy, cosign `vuln` predicate) — the release-time scan of
+  exactly this platform manifest, the input the VEX document's
+  `under_investigation` statements derive from (Req 2.12).
 - **Provenance** (BuildKit, `mode=max`) — the builder, the invocation, and
   every input with its *resolved* digest. This is what connects the SBOM's
   claims to verifiable materials (see [concepts.md](concepts.md), "The trust
@@ -291,19 +300,25 @@ The heart of the PR path. For each affected definition (matrix), the job:
 
 1. **Detects what's affected.** Changed `image/*/image.yaml` files map
    directly. Three deliberate extras: a change under `triage/vex/` builds
-   every image its statements *name* (resolved through product purls and
-   `definition-lib.sh`, because a variant publishes under its sibling's name);
+   every image the *changed* statements name, on both sides of the diff
+   (resolved through product purls and `definition-lib.sh`, because a
+   variant publishes under its sibling's name; since the compiler produces
+   each image's gate input from statements naming it alone, an untouched
+   image's input cannot change);
    a changed `triage/accepted-risk/<image>.yaml` rebuilds exactly that image,
    so "the exception suppresses what it claims" is re-proved (Req 6.9); and a
    change to `build.yml` itself builds hardened-app as a canary.
 2. **Verifies per-arch pins.** `verify-arch-pins.sh` fetches every per-arch
    pinned artifact and checks the recorded checksums against the bytes
-   upstream actually serves — the only thing keeping the (currently unbuilt)
-   arm64 pins honest (Req 1.3).
+   upstream actually serves, so a pin the PR gate never builds (arm64: the
+   gate is amd64-only) is still checked before it can reach a release
+   (Req 1.3).
 3. **Builds** linux/amd64 through the real `dhi.io/build` frontend (the
    frontend compiling the definition *is* the authoritative schema validation,
    Req 1.5), with a per-image GHA cache. PRs `load:` the image into the
-   daemon; main pushes instead.
+   daemon; main builds every platform the definition declares and the policy
+   admits (`catalogue-policy.yaml` `release.platforms`), and pushes by digest
+   instead.
 4. **Pushes to a throwaway local registry.** Trivy constructs the `pkg:oci/…`
    product purl a VEX statement must match from the image's *RepoDigest*. A
    buildx-loaded image has none, so no statement could ever match (upstream
@@ -321,9 +336,10 @@ The heart of the PR path. For each affected definition (matrix), the job:
 7. **Grype second opinion** whenever a CRITICAL survives — different DB,
    different matcher, informational (Req 6.6).
 8. **Gate.** Any surviving HIGH or CRITICAL fails the job (Req 6.1), with an
-   error message that names the four ways out, strongest first: avoid · fix ·
-   prove it does not apply · accept/transfer for a bounded time. Scan reports
-   upload as artifacts either way.
+   error message that names each finding (id, package, installed and fixed
+   version) and the four ways out, strongest first: avoid · fix · prove it
+   does not apply · accept/transfer for a bounded time. Scan reports upload
+   as artifacts either way.
 
 Measured, not inferred: the local-registry step exists because it was
 measured — with no RepoDigest, *every* OpenVEX product form (digest-pinned,
@@ -370,17 +386,50 @@ provisions an ephemeral kind cluster and runs the Ginkgo suite (Req 5.2):
   cluster-wide describes, per-pod logs, and `kind export logs` — all uploaded
   as artifacts.
 
-### The release path (merge to main)
+### The release path (merge to main, the nightly, or a dispatch)
 
-The same build job, different arms: on main the affected images are rebuilt
-and **pushed** to ghcr with their definition-derived tags, then per image
-digest: `cosign sign` (keyless) → Syft SPDX SBOM →
-`cosign attest --type spdxjson` → `compile-vex.sh` for *this* digest →
-`cosign attest --type openvex` per surviving document (Req 2.2, Req 6.34).
-BuildKit provenance (`mode=max`) is attached by the build itself. A failed
-build publishes nothing and reports the failing step (Req 2.5). The PR-side
-scan does not re-run here — the published image is picked up by the daily
-rescan instead.
+The same build job, different arm. On main the affected images are rebuilt
+for every declared platform and released in this order, and the order is the
+design (Req 2.7 to 2.13; "look first, sign what you looked at, label last"):
+
+1. **Push by digest, no tag.** The image lands in the registry addressed by
+   content only; nobody pulling a tag sees a change yet.
+2. **Enumerate the platform manifests** of the pushed index (BuildKit's
+   attestation manifests excluded).
+3. **Scan the pushed digest itself**, one platform manifest at a time by its
+   own digest, through `scan-image.sh`, the same script and inputs the PR
+   gate uses (compiled VEX + accepted-risk file). No report for any manifest
+   means nothing is signed and nothing is tagged (Req 2.26).
+4. **Fail-closed switch** (`catalogue-policy.yaml` `release.fail_closed`):
+   when on, an uncovered finding stops here, unsigned and untagged (Req 2.13).
+   Off by default: the finding becomes an `under_investigation` statement and
+   the release completes (Req 2.12).
+5. **Attest each manifest's scan report** (`trivy convert --format
+   cosign-vuln`, `cosign attest --type vuln`).
+6. **Compile the OpenVEX document a second time**, folding in what the scan
+   still reports as `under_investigation` with that report's timestamp.
+7. **Sign and attest**: `cosign sign --recursive` (index and every platform
+   manifest); per manifest, Syft's SPDX and CycloneDX SBOMs and the one
+   OpenVEX document; on the index, each platform's SPDX and the same OpenVEX
+   document (ADR 0003: exactly one VEX document per digest).
+8. **Tags last.** The definition-derived tags move to the new digest, and the
+   run re-reads each tag and asserts it resolves to the digest that was
+   signed; any mismatch is a red run with the tags untouched.
+
+A failed step publishes nothing and reports itself (Req 2.5). BuildKit
+provenance (`mode=max`) is attached by the build itself.
+
+**The nightly** (`build.yml` on the `47 4 * * *` cron, Req 2.14) runs the
+same arm for every definition, but builds locally first and asks
+`package-set-diff.sh` whether anything changed: the canonicalised package set
+(purl plus apk pull checksum, per platform manifest) of the local build is
+compared with the one in the CycloneDX SBOM attested to the digest the full
+release tag points at. Equal, under the default `on-change` publish policy:
+the run stops before the push, publishes nothing, stays green, and logs
+whether the digests happened to match (a free reproducibility measurement).
+Different, or nothing published yet, or the `always` policy: the release
+arm above runs and the summary shows the difference (Req 2.15 to 2.17). A
+manual dispatch never compares: a human asking for a release gets one.
 
 ### Reading job summaries
 
@@ -434,7 +483,8 @@ branch protection.
 | Cron                      | Schedule                 | Produces                                          | Watch it at |
 |---------------------------|--------------------------|---------------------------------------------------|-------------|
 | Renovate (`renovate.yml`) | every 4h (Req 3.1)       | Bump PRs; the Dependency Dashboard issue          | Actions tab · issue #5 |
-| Rescan (`rescan.yml`)     | daily 06:17 UTC (Req 6.2)| New-CVE issues; expiry warnings; VEX compile report | Actions tab · `cve`-labeled issues |
+| Rebuild (`build.yml`)     | daily 04:47 UTC (Req 2.14)| Fresh digests for every definition whose package set changed; a discard line for the rest | Actions tab · the run summary per image |
+| Rescan (`rescan.yml`)     | daily 06:17 UTC (Req 6.2, 2.22)| Enumeration of every catalogue tag; the visibility invariant and the admission proof (Req 2.21, 2.24); every platform manifest scanned by digest; new-CVE issues for the supported set; expiry warnings; VEX compile report | Actions tab · `cve`-labeled issues |
 
 Both are dispatchable on demand (Renovate with dry-run and debug knobs). A
 healthy quiet day is: Renovate runs green and opens nothing; rescan runs
@@ -696,7 +746,7 @@ name: Hardened App 0.1.x        # display name carries <major.minor>.x
 image: ghcr.io/mm-weber/dhc/hardened-app   # publish repo — bare, no digest
 variant: runtime
 tags: [0-alpine3.23, 0.1-alpine3.23, 0.1.0-alpine3.23]   # the alias fan
-platforms: [linux/amd64, linux/arm64]      # declared; releases build amd64
+platforms: [linux/amd64, linux/arm64]      # declared; main builds every declared platform the policy admits
 vars:                           # THE BUMP SURFACE — Renovate rewrites this block
   COMMIT_SHA: 90a8da0c…
   GOLANG_REFERENCE: dhi.io/golang:1.26.5-alpine3.23-dev@sha256:…  # builder, pinned
@@ -914,7 +964,12 @@ documentation — each states what it enforces and why it exists.
 | `refresh-grafana.sh` | `<dir>` | postUpgradeTask, repackage archetype: three-source build-id resolution, per-arch sha re-pin, existence-gated (ADR 0002) |
 | `verify-arch-pins.sh` | `<dir>` | Fetch + verify every per-arch pin against upstream's actual bytes (Req 1.3) |
 | `install-scanners.sh` | `[destdir]` | trivy + grype, exact version + recorded sha256, both verified before either installs (Req 7.5) |
-| `install-tool.sh` | `<kind\|kyverno\|helm\|ct> [destdir]` | One pinned, verified tool per call (deliberate sibling, not a generalisation) |
+| `install-tool.sh` | `<kind\|kyverno\|helm\|ct\|syft\|crane> [destdir]` | One pinned, verified tool per call (deliberate sibling, not a generalisation) |
+| `scan-image.sh` | `<ref> <definition> <vex-dir> <out.json> [--remote] [--platform P]` | The one Trivy invocation both arms call: compiled VEX + accepted-risk file, `--show-suppressed`, refuses on a failed scan or a missing report (Req 2.8, 2.26) |
+| `package-set-diff.sh` | `<definition> <published-ref> <local-index-digest\|-> <verdict-out> <platform>=<cdx.json>…` | Publish-on-change comparator: canonical package set (purl + pull checksum) of the local build vs the attested CycloneDX; `equal` or `different` with a named reason, never raw bytes (Req 2.15–2.17) |
+| `enumerate-catalogue.sh` | `<root> <out.tsv>` | Every catalogue tag in every repository via crane, resolved to platform manifests, classified supported or superseded; refuses a partial world (Req 2.22) |
+| `check-visibility.sh` | `<root> <enumeration.tsv>` | Daily invariant: anonymous pull token per repository and anonymous manifest GET per tag, bare curl, every failure named (Req 2.21) |
+| `verify-catalogue.sh` | `<root> <enumeration.tsv> <report.json>` | Daily admission proof: the rendered policy through the kyverno CLI against the live registry over every tag-referenced digest (must admit) and the declared control (must reject) (Req 2.24) |
 | `render-chart.sh` | `<chart-dir>` | Render either chart shape to stdout for the policy gate |
 | `accepted-risk-report.sh` | `<trivy.json> <file>` | Per-binary suppression table + dead-entry report (Req 6.26, 6.27) |
 | `govulncheck-report.sh` | `label=file …` | Reachability table; module-level collapses to "not measured" (Req 6.16) |

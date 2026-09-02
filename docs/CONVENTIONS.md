@@ -62,7 +62,7 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
 - Every GitHub Action is pinned to a full commit SHA, and **every third-party
   executable a workflow installs is pinned to an exact version and verified
   against a checksum recorded here** (Req 7.5). Trivy and grype
-  (`scripts/install-scanners.sh`) and kind, kyverno, helm and ct
+  (`scripts/install-scanners.sh`) and kind, kyverno, helm, ct, syft and crane
   (`scripts/install-tool.sh`) meet both halves with digests recorded in-repo;
   govulncheck is exact-pinned with the Go module sumdb as its checksum control
   (`build.yml`), the renovate/json5 test installs are exact-pinned with
@@ -80,7 +80,36 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
   advisory **database** still updates on every run. Version and DB are
   separately versioned, and only the version gets pinned.
 - Humans never bump pins by hand when Renovate is able to; hand-bumps are reserved
-  for CVE fix-forwards (Req 6.5) and say so in the PR description.
+  for CVE fix-forwards (Req 6.5) and say so in the PR description. A fix-forward
+  on a compile-from-source image between upstream releases is a `go/bump@v2`
+  step in the definition's fetch phase (the sandbox has no egress, so a `runs:`
+  step cannot fetch a module; measured 2026-07-26, established 2026-09-02):
+  each bumped module carries a `# renovate:` marker so the pin stays tracked,
+  the pin is a floor a later upstream requirement wins over, and its LOG
+  entry names the upstream version at which the step is dropped.
+- **Packages from package repositories are not pinned in definitions, by
+  design (Req 1.9).** A definition names its apk repositories and package
+  names, never versions: the DHI model ships base fixes by rebuilding, no
+  versioned apk syntax exists in any input, and pinning would reinvent a
+  datasource and turn every base advisory into a bump PR. What floats is apk
+  alone; everything else in a definition (frontend, builder, every upstream
+  source) is digest- or checksum-pinned and moves through the merge path.
+  Three mechanisms make the float safe rather than blind:
+  - **The resolved set is recorded per digest.** Each platform manifest's
+    resolved package set, with apk pull checksums, is in the SPDX and
+    CycloneDX SBOMs attested to that manifest (and each platform's SPDX to
+    the index, which is what a tag resolves to), so "what exactly is in
+    this digest" is a signed answer, not a rebuild.
+  - **The pushed digest is scanned before it is tagged.** The release arm
+    scans every platform manifest of the digest it just pushed, by that
+    manifest's own digest, with the same inputs as the PR gate; only then
+    does it sign, attest and, last, tag (Req 2.7 to 2.9).
+  - **The daily rebuild is the delivery mechanism for base fixes.** Every
+    definition rebuilds daily (Req 2.14); a rebuild whose canonicalised
+    package set equals the published one is discarded, and one that differs,
+    which is how an apk fix arrives, publishes through the same release arm
+    with the difference in the run summary (Req 2.15, 2.16; a fork sets the
+    publish policy to `always` to publish every rebuild, Req 2.17).
 
 ## Definitions (Req 1.5, ADR 0001)
 
