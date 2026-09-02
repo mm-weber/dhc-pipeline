@@ -263,6 +263,17 @@
       dependencyDashboardApproval: true,
     },
     {
+      // The grafana definition tracks a minor line ("Grafana 13.1.x"), and a
+      // patch release on that line is the fix lane for a between-releases
+      // finding (Req 6.5). Without this, one branch per major carried every
+      // 13.x update, so the open 13.2.0 minor PR swallowed the 13.1.5
+      // security patch and no PR ever offered it (measured 2026-09-02, the
+      // day grafana shipped 13.1.5 / 13.2.1 together). Patch and minor now
+      // travel as separate PRs; the minor still stages behind the gate.
+      matchDepNames: ["grafana/grafana"],
+      separateMinorPatch: true,
+    },
+    {
       // Req 3.5: digest-only and patch updates of an upstream source automerge,
       // gated on CI success (Renovate withholds merge until checks pass).
       matchDatasources: ["github-tags"],
