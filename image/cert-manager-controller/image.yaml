@@ -14,7 +14,7 @@ dates:
   release: "2026-06-25"
 vars:
   COMMIT_SHA: 24e33194fb39488eff2bbf10c6dc640f407cad44
-  GOLANG_REFERENCE: dhi.io/golang:1.26.5-alpine3.23-dev@sha256:d9a9b4cb0c4aea8719d708092b43ae4f83072c4c53dbc2e9d5353764905ab004
+  GOLANG_REFERENCE: dhi.io/golang:1.27.0-alpine3.23-dev@sha256:517245c50e9fbacc29da5fe29ceea42b03e4883395b8de3828ab7acda3ca4ab8
   SEMVER_MAJOR_MINOR_VERSION: "1.21"
   SEMVER_MAJOR_VERSION: "1"
   SEMVER_VERSION: 1.21.1
@@ -32,7 +32,7 @@ contents:
     - tzdata
   builds:
     - name: cert-manager-controller
-      uses: dhi.io/golang:1.26.5-alpine3.23-dev@sha256:d9a9b4cb0c4aea8719d708092b43ae4f83072c4c53dbc2e9d5353764905ab004
+      uses: dhi.io/golang:1.27.0-alpine3.23-dev@sha256:517245c50e9fbacc29da5fe29ceea42b03e4883395b8de3828ab7acda3ca4ab8
       work-dir: /go/src/github.com/cert-manager/cert-manager
       caches:
         - path: /go/pkg/mod
@@ -53,6 +53,26 @@ contents:
             uid: 0
             gid: 0
       pipeline:
+        # CVE-2026-56854: golang.org/x/crypto below 0.55.0 (GO-2026-6303).
+        # Upstream 1.21.1 pins 0.53.0 and no release carries the fix, so the
+        # module is bumped in the frontend's FETCH phase — the only phase with
+        # egress: a `runs:` go get was tried on 2026-07-26 and the sandbox
+        # refused it, by design (triage/LOG.md, GHSA-hrxh-6v49-42gf). Schema
+        # primary-verified against docker-hardened-images/catalog, where etcd
+        # bumps x/crypto and grpc the same way. Bumped in the cmd submodule
+        # because the binary resolves through ITS go.mod, and MVS makes this a
+        # floor, not a ceiling: a later upstream requirement wins. DROP this
+        # step when upstream's go.mod reaches 0.55.0+ (triage/LOG.md
+        # 2026-09-02).
+        - name: bump x/crypto (CVE-2026-56854)
+          uses: go/bump@v2
+          work-dir: /go/src/github.com/cert-manager/cert-manager/cmd/controller
+          with:
+            deps:
+              # renovate: datasource=go depName=golang.org/x/crypto
+              - golang.org/x/crypto@v0.55.0
+            download: true
+            tidy: true
         # No test step: cmd/* submodules share the monorepo's suite, which
         # needs upstream's make tooling; functional verification is the e2e
         # suite's job (Req 5.5). Upstream ldflags recipe: make/00_mod.mk.

@@ -1086,3 +1086,58 @@ Verified the scope actually moved rather than the prose alone: compiled against
 this build's tags gives 4 statements and 0 drops, and compiled against the old
 13.1.2 tags drops all three re-scoped products and keeps only the versionless
 claim.
+
+---
+
+## 2026-09-02 — FIX by fetch-phase module bump — CVE-2026-56854, `golang.org/x/crypto` v0.53.0 (#112, cert-manager half)
+
+*Images: cert-manager-controller, cert-manager-webhook, cert-manager-cainjector.
+Grafana's half of #112 is a repackaged upstream binary, cannot be patched, and
+stays under_investigation in the nightly attestations; the issue remains open
+for it.*
+
+GO-2026-6303: `x/crypto/ssh` below 0.55.0 does not enforce the source-address
+critical option for non-public-key auth callbacks. Upstream v1.21.1 pins
+v0.53.0; the newest release, checked against the releases API, carries no fix.
+The version-bump path is closed, exactly the GHSA-hrxh-6v49-42gf shape from
+2026-07-26.
+
+**The mechanism that entry asked for is now established.** The July attempt
+patched via a `runs:` step and the sandbox refused it (no egress, by design).
+The frontend's fetch phase is where dependency surgery belongs, and the action
+is `go/bump@v2` — primary-verified this time, not secondary: Docker's own
+catalog uses it 936 times, including etcd bumping `golang.org/x/crypto` and
+`google.golang.org/grpc@v1.82.1` (the very version #28 wanted) with `deps:`,
+`download: true`, `tidy: true`, per cmd-submodule `work-dir`. Bumped in each
+`cmd/*` submodule because the binary resolves through *its* `go.mod`
+(`replace … => ../../`), and minimal version selection makes the pin a floor:
+a later upstream requirement wins, an accidental downgrade cannot happen.
+
+**Decision: fix.** Chosen over a `not_affected` statement deliberately, to
+exercise the remediation lane end to end (owner call, 2026-09-02). The
+inapplicability evidence exists and is recorded as defence in depth, not as
+the justification: the advisory's entry points (`ssh.NewServerConn`,
+`connection.serverAuthenticate`) are absent from all three binaries' function
+tables, measured 2026-09-01 with a positive control that finds those symbols
+in a deliberately vulnerable build. None of the three serves SSH.
+
+**Machine-readable form:** a `fixed` statement
+(`triage/vex/CVE-2026-56854.openvex.json`) scoped to `1.21.1-alpine3.23`,
+subcomponent `pkg:golang/golang.org/x/crypto`, per the CVE-2026-21728
+precedent. Digests published before the bump genuinely carry v0.53.0 and are
+outside its scope. Timing: the statement and the bump merge together, and the
+merge itself publishes fixed digests through the release arm within minutes,
+so the window in which the tag-scoped claim could meet an unfixed digest in a
+rescan compile is practically zero; a failed merge build would announce
+itself red.
+
+**Also in this change:** the Go toolchain image moves 1.26.5 → 1.27.0 (the
+#113 busybox fix, applied to these three definitions at last), which is what
+lets them build at all; and the bump pin is tracked by a new Renovate manager
+(marker comment above the `deps:` line, `go` datasource), because a security
+pin must not go invisible (Req 7.6).
+
+**Exit condition:** drop the `go/bump` step from all three definitions when
+an upstream release pins `golang.org/x/crypto` at v0.55.0 or newer; the
+Renovate release PR for that version is the reminder, this entry is the
+record.
