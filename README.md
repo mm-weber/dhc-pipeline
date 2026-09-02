@@ -1,16 +1,5 @@
 # dhc-pipeline
 
-> [!WARNING]
-> **Work in progress; this repository will be archived soon.** It is the
-> proving ground for a hardened-image operating model that restarts as a
-> fresh successor repository once the remaining implementation tasks land
-> (see `.specs/dhc-catalogue-mvp/tasks.md`, task 12). When that happens this
-> repository is archived intact, history and all, and the catalogue it
-> publishes under `ghcr.io/mm-weber/dhc` is archived with it: existing
-> digests stay pullable and verifiable, but no new digests, tags, scans or
-> statements will follow here. Do not build anything on this catalogue that
-> expects continuity; wait for the successor.
-
 A miniature [Docker Hardened Images](https://docs.docker.com/dhi/)-style
 catalogue, built as a skill-building project and then **operated**: image
 definitions in native `dhi.io/build` syntax, upstream Helm charts adapted to

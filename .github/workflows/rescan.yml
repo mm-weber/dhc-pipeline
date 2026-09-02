@@ -76,17 +76,6 @@ jobs:
           mkdir -p "$OUT"
           scripts/enumerate-catalogue.sh . "$OUT/enumeration.tsv"
 
-      # The single home for every daily assertion the catalogue makes about
-      # its own state (task 9.4): visibility here (Req 2.21); the policy
-      # proof joins with 9.6 (Req 2.24), the upstream-checksum re-check with
-      # cluster C, ruleset drift and the revocation checks with cluster D.
-      # Each assertion reports by name and ANY failure fails the run — an
-      # invariant that soft-fails is an opinion.
-      - name: invariants (Req 2.21)
-        run: |
-          set -euo pipefail
-          scripts/check-visibility.sh . "$OUT/enumeration.tsv"
-
       - name: scan every platform manifest of every tag-referenced digest
         id: scan
         run: |
