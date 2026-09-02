@@ -71,6 +71,11 @@ contents:
             deps:
               # renovate: datasource=go depName=golang.org/x/crypto
               - golang.org/x/crypto@v0.55.0
+              # CVE-2026-84304, fixed in 1.83.1; upstream pins 1.82.1 and no
+              # release carries the fix. Same lane, same exit condition
+              # (triage/LOG.md 2026-09-02). cainjector carries no grpc.
+              # renovate: datasource=go depName=google.golang.org/grpc
+              - google.golang.org/grpc@v1.83.1
             download: true
             tidy: true
         # No test step: cmd/* submodules share the monorepo's suite, which

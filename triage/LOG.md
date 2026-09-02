@@ -1137,7 +1137,20 @@ lets them build at all; and the bump pin is tracked by a new Renovate manager
 (marker comment above the `deps:` line, `go` datasource), because a security
 pin must not go invisible (Req 7.6).
 
+**Second finding, same pass — CVE-2026-84304, `google.golang.org/grpc`
+v1.82.1 (controller and webhook; cainjector carries no grpc).** Surfaced by
+this very PR's gate once the x/crypto CRITICAL and the eight go1.26.5 stdlib
+HIGHs (cleared by the 1.27.0 toolchain) stopped drowning it, and named by the
+gate's new failure annotation on its first day in service. Fixed in 1.83.1;
+upstream pins 1.82.1 and no release carries it, so the same `go/bump` step
+gains `google.golang.org/grpc@v1.83.1` in the two definitions that have the
+module, with its own Renovate marker and a `fixed` statement
+(`triage/vex/CVE-2026-84304.openvex.json`) scoped to the two products. This
+is the direct descendant of the 2026-07-26 grpc entry: upstream's own move
+to 1.82.1 retired that finding, a new advisory arrived on the version they
+moved to, and the between-releases lane now exists to answer it same-day.
+
 **Exit condition:** drop the `go/bump` step from all three definitions when
-an upstream release pins `golang.org/x/crypto` at v0.55.0 or newer; the
-Renovate release PR for that version is the reminder, this entry is the
-record.
+an upstream release pins `golang.org/x/crypto` at v0.55.0 or newer AND
+`google.golang.org/grpc` at v1.83.1 or newer; the Renovate release PR for
+those versions is the reminder, this entry is the record.

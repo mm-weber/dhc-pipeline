@@ -580,6 +580,18 @@ check(
       d?.currentValue,
     );
   }
+  for (const role of ["controller", "webhook"]) {
+    const deps = extract(goBumpMgr, read(`image/cert-manager-${role}/image.yaml`));
+    check(
+      `go-bump pins: cert-manager-${role} tracks google.golang.org/grpc`,
+      has(deps, { depName: "google.golang.org/grpc", datasource: "go" }),
+      JSON.stringify(deps),
+    );
+  }
+  check(
+    "go-bump pins: cainjector carries no grpc pin (no grpc in its module)",
+    !has(extract(goBumpMgr, read("image/cert-manager-cainjector/image.yaml")), { depName: "google.golang.org/grpc" }),
+  );
   check(
     "go-bump pins: manager reads definition files",
     filePatternMatches(goBumpMgr, "image/cert-manager-controller/image.yaml"),
