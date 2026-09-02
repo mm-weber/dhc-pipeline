@@ -16,6 +16,12 @@
   // rebases conflicted PRs, so a PR could sit behind main with stale CI (e.g.
   // after a test/tooling change) and never go green until manually rebased.
   rebaseWhen: "behind-base-branch",
+  // Renovate creates no new branch once this many exist (branchConcurrentLimit
+  // inherits it; both default to 10). Ten open bumps is this catalogue's
+  // steady state: tool minors staging behind their gates, digest pins, the
+  // tracked grafana minor. Measured 2026-09-02: at exactly ten, the 13.1.5
+  // security patch was skipped silently on every run ("Reached branch limit").
+  prConcurrentLimit: 20,
 
   customManagers: [
     {
@@ -296,10 +302,14 @@
     {
       // The repackage counterpart (ADR 0002): Renovate bumps only the version
       // inside the tarball url, so this re-pins both per-arch checksums from
-      // dl.grafana.com and regenerates the version-derived fields. Scoped to
-      // github-releases, which only grafana uses. Allowlisted alongside
+      // dl.grafana.com and regenerates the version-derived fields. Scoped by
+      // name, not by datasource: the pinned tools in scripts/install-*.sh are
+      // github-releases too, and keyed on the datasource this task ran on
+      // their branches (measured 2026-09-02: a kyverno rebase executed
+      // "refresh-grafana.sh scripts", failed, and the failed-artifact status
+      // write aborted the whole run). Allowlisted alongside
       // refresh-definition.sh in renovate.yml.
-      matchDatasources: ["github-releases"],
+      matchDepNames: ["grafana/grafana"],
       postUpgradeTasks: {
         commands: ["scripts/refresh-grafana.sh {{{packageFileDir}}}"],
         fileFilters: ["image/**/image.yaml"],
