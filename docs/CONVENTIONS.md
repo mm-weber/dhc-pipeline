@@ -252,7 +252,7 @@ bounded time, stays internal, and **must never be written as a VEX** (Req 6.8) â
 that would launder a business decision into a machine-readable claim of technical
 inapplicability, and every consumer would inherit it. Exceptions carry a treatment
 (`accept` / `transfer`), an owner, the reason avoidance and remediation were
-unavailable, and an `expired_at` no more than 90 days out;
+unavailable, a `decided_at`, and an `expired_at` no later than that decision date plus the policy file's largest ceiling (`catalogue-policy.yaml` `triage.ceilings`; the gate and the rescan then hold each entry to the tier its finding earns: the KEV ceiling when CISA lists it, else its severity's ceiling, Req 6.50, 6.51);
 `scripts/lint-accepted-risk.sh` enforces that and rejects any Trivy ignore file
 living anywhere else (Req 6.11, 6.12).
 

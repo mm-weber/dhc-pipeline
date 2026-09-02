@@ -39,7 +39,6 @@ jobs:
         shell: bash {0}
     env:
       REGISTRY: ghcr.io/mm-weber/dhc
-      KEV_URL: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
       OUT: ${{ github.workspace }}/rescan-out
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -77,23 +76,6 @@ jobs:
           set -euo pipefail
           mkdir -p "$OUT"
           scripts/enumerate-catalogue.sh . "$OUT/enumeration.tsv"
-
-      # The single home for every daily assertion the catalogue makes about
-      # its own state (task 9.4): visibility here (Req 2.21); the policy
-      # proof joins with 9.6 (Req 2.24), the upstream-checksum re-check with
-      # cluster C, ruleset drift and the revocation checks with cluster D.
-      # Each assertion reports by name and ANY failure fails the run — an
-      # invariant that soft-fails is an opinion.
-      - name: invariants (Req 2.21, 2.24)
-        run: |
-          set -euo pipefail
-          scripts/check-visibility.sh . "$OUT/enumeration.tsv"
-          # Req 2.24: the rendered admission policy, applied by the kyverno
-          # CLI against the live registry, must admit every tag-referenced
-          # digest and reject the declared unsigned control. The proof lives
-          # here rather than in kyverno test fixtures because the set it
-          # must admit changes daily (task 9.6).
-          scripts/verify-catalogue.sh . "$OUT/enumeration.tsv" "$OUT/verify-catalogue.json"
 
       - name: scan every platform manifest of every tag-referenced digest
         id: scan
@@ -173,6 +155,35 @@ jobs:
             | grep -E '^CVE-' | sort -u > "$OUT/cves.txt" || true
           echo "distinct HIGH/CRITICAL CVEs (supported set): $(grep -c . "$OUT/cves.txt" || echo 0)"
 
+      # The single home for every daily assertion the catalogue makes about
+      # its own state (task 9.4): visibility (Req 2.21), the admission proof
+      # (Req 2.24, task 9.6) and the exception tiers (Req 6.51, task 10.1);
+      # the upstream-checksum re-check joins with cluster C, ruleset drift
+      # and the revocation checks with cluster D. It runs after the scans
+      # because the tiers read the day's reports. Each assertion reports by
+      # name and ANY failure fails the run — an invariant that soft-fails is
+      # an opinion.
+      - name: invariants (Req 2.21, 2.24, 6.51)
+        run: |
+          set -euo pipefail
+          scripts/check-visibility.sh . "$OUT/enumeration.tsv"
+          # Req 2.24: the rendered admission policy, applied by the kyverno
+          # CLI against the live registry, must admit every tag-referenced
+          # digest and reject the declared unsigned control. The proof lives
+          # here rather than in kyverno test fixtures because the set it
+          # must admit changes daily (task 9.6).
+          scripts/verify-catalogue.sh . "$OUT/enumeration.tsv" "$OUT/verify-catalogue.json"
+          # Req 6.51, 6.60: every unexpired exception re-evaluated against
+          # today's severity and KEV status. The feed is fetched here, once,
+          # and an outage is a NON-EVALUATION that fails the run (fail closed,
+          # the owner's call); the issue enrichment below reuses the file.
+          feed=$(scripts/triage-policy.sh . kev-feed)
+          if ! curl -fsSL --max-time 60 "$feed" -o "$OUT/kev.json"; then
+            echo "::error::the CISA KEV feed (${feed}) is unavailable: the exception tiers were not evaluated today, which is a failure of this run, not a pass (Req 6.60)"
+            exit 1
+          fi
+          scripts/check-exceptions.sh rescan . "$OUT/trivy" "$OUT/kev.json"
+
       # Req 6.10 — an acceptance that lapses unnoticed is the failure mode this
       # whole lane exists to prevent, and Trivy is silent about it: a lapsed
       # entry simply stops suppressing. The daily cron is the right place to say
@@ -210,8 +221,10 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t cves < <(grep -E '^CVE-' "$OUT/cves.txt" 2>/dev/null || true)
-          # CISA KEV catalogue (best-effort; empty on feed outage → nothing marked KEV).
-          curl -fsSL "$KEV_URL" -o "$OUT/kev.json" || echo '{"vulnerabilities":[]}' > "$OUT/kev.json"
+          # The CISA KEV catalogue was fetched by the invariants step above,
+          # fail-closed (Req 6.60); a missing file here means that step did
+          # not run, which is itself a failure.
+          [ -s "$OUT/kev.json" ] || { echo "::error::no KEV catalogue on disk; the invariants step must run first"; exit 1; }
           # EPSS bulk lookup, comma-separated CVEs (best-effort). MVP catalogue CVE
           # counts sit well under the API's per-request limit; batch if that changes.
           if [ "${#cves[@]}" -gt 0 ]; then
@@ -244,6 +257,7 @@ jobs:
         run: |
           set -euo pipefail
           go -C triage/rescan run ./cmd/rescan-report \
+            --aperture "$(scripts/triage-policy.sh . aperture)" \
             --trivy "$OUT/trivy" --epss "$OUT/epss.json" --kev "$OUT/kev.json" --existing "$OUT/existing.json" \
             > "$OUT/issues.json"
           n=$(jq 'length' "$OUT/issues.json")
@@ -272,8 +286,12 @@ jobs:
           # Labels must exist before use; create idempotently.
           gh label create cve               --color B60205 --description "CVE tracked by the rescan cron" 2>/dev/null || true
           gh label create security          --color D93F0B --description "Security finding" 2>/dev/null || true
-          gh label create severity:high     --color FBCA04 --description "HIGH severity" 2>/dev/null || true
-          gh label create severity:critical --color B60205 --description "CRITICAL severity" 2>/dev/null || true
+          # One label per aperture severity (Req 6.49): a fork's wider
+          # aperture files issues under labels that exist.
+          for sev in $(scripts/triage-policy.sh . aperture | tr ',' ' '); do
+            case "$sev" in CRITICAL) color=B60205 ;; HIGH) color=FBCA04 ;; *) color=0E8A16 ;; esac
+            gh label create "severity:$(printf '%s' "$sev" | tr '[:upper:]' '[:lower:]')" --color "$color" --description "${sev} severity" 2>/dev/null || true
+          done
           jq -c '.[]' "$OUT/issues.json" | while read -r issue; do
             title=$(jq -r '.title'  <<<"$issue")
             body=$(jq -r '.body'    <<<"$issue")

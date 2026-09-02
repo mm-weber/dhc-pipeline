@@ -563,7 +563,7 @@ HIGH/CRITICAL survives suppression — the gate is red
        │
        └─ "it applies; we ship anyway" ─► ACCEPT / TRANSFER    [risk lane]
              triage/accepted-risk/<image>.yaml + LOG.md
-             internal · never attested · expires ≤ 90 days
+             internal · never attested · expires within its tier's ceiling
              └─ expiry lapses ──► finding re-reds the gate  ↻
 ```
 
@@ -659,7 +659,8 @@ vulnerabilities:
               the plugin would remove the datasource … remediation is measured
               closed — the newest release is itself built with go1.26.3"
     statement: "transfer: waiting on a release built with go1.26.4+"
-    expired_at: 2026-11-02                          # ≤ 90 days out — enforced
+    decided_at: 2026-09-02                          # the clock starts here (Req 6.7)
+    expired_at: 2026-11-02                          # ≤ decided_at + the tier's ceiling — enforced
 ```
 
 The rules, all machine-enforced by `lint-accepted-risk.sh` (Req 6.11, 6.24,
@@ -675,9 +676,17 @@ The rules, all machine-enforced by `lint-accepted-risk.sh` (Req 6.11, 6.24,
   (Req 6.26).
 - **`blocked:` is the honesty field** — why avoid *and* fix were unavailable.
   Presence machine-checked, content judged at review.
-- **`expired_at` ≤ 90 days.** Trivy stops honouring a lapsed entry silently;
+- **`expired_at` within the ceiling from `decided_at`.** The policy file
+  (`catalogue-policy.yaml` `triage`) declares the clocks: 90 days for a HIGH
+  finding, 30 for a CRITICAL, 14 for anything CISA lists as actively
+  exploited, whatever its severity. `validate` bounds every entry by the
+  largest ceiling; the PR gate and the daily rescan hold each entry to the
+  tier its finding actually earns in the scan report, re-checking KEV every
+  day, and fail on a breach by name (Req 6.50, 6.51). If the KEV feed is
+  unreachable the check does not run and the PR or rescan fails closed
+  (Req 6.59, 6.60). Trivy stops honouring a lapsed entry silently;
   the finding then re-reds the gate on its own (Req 6.9). The daily rescan
-  warns 14 days ahead (Req 6.10).
+  warns inside the policy's warning window, 14 days as declared (Req 6.10).
 - **Transfer = acceptance with an external owner.** It requires an upstream
   issue to point at — draft it in `triage/upstream/` first (measured
   evidence, re-runnable checks), file it deliberately, then reference it.
@@ -723,7 +732,7 @@ and KEV order the queue; they never justify a status.
 ### Expiries
 
 Expiry happens with time, not with a commit — so the daily rescan is what
-raises it, listing every exception already lapsed or lapsing within 14 days
+raises it, listing every exception already lapsed or lapsing within the policy's warning window
 (Req 6.10). Each one needs a fresh decision: fix (has a remedy shipped
 since?), avoid, prove it does not apply, or re-accept with a new expiry *and
 a reason it is still the right call*. Doing nothing is also a decision — the
@@ -957,7 +966,9 @@ documentation — each states what it enforces and why it exists.
 |--------|------------|------|
 | `lint-pins.sh` | `[root]` | Digest pins everywhere (64-hex, anchored), no floating tags, definition version-coherence, variant source parity (Req 1.2, 1.6) |
 | `lint-vex-product.sh` | `[root]` | VEX product identity + status/version rules (Req 6.17–6.21, 6.31) |
-| `lint-accepted-risk.sh` | `[root]` | Exception fields, 90-day ceiling, per-binary paths, no stray ignore files; doubles as the expiry reporter (Req 6.11, 6.12) |
+| `lint-accepted-risk.sh` | `[root]` | Exception fields incl. `decided_at`, the policy's largest ceiling from the decision date, per-binary paths, no stray ignore files; doubles as the expiry reporter (Req 6.7, 6.10–6.12) |
+| `triage-policy.sh` | `<root> <query>` | The one reader of the policy's `triage` section: aperture, ceilings, KEV ceiling, warning window, feed URL; refuses a section with holes (Req 6.49) |
+| `check-exceptions.sh` | `gate <root> <image> <trivy.json> <kev.json>` / `rescan <root> <reports-dir> <kev.json>` | Exception ceilings tiered by the finding's severity and KEV status; no KEV set is a refusal, never a pass (Req 6.50, 6.51, 6.59, 6.60) |
 | `compile-vex.sh` | `<src> <out> <definition> <digest> [tag…]` | Render VEX source per build: stamp digest, drop out-of-scope, record every drop via `COMPILE_VEX_REPORT` (Req 6.28–6.32) |
 | `definition-lib.sh` | *sourced* | The one directory-↔-published-name mapping; every consumer goes through it |
 | `refresh-definition.sh` | `<dir>` | postUpgradeTask, from-source archetype: recompute checksum/vars/tags/ldflags from the bumped ref |
@@ -1045,7 +1056,7 @@ automerge is limited to from-source patch/digest bumps on green CI.
   (`pkg:golang/…`, versionless).
 - **Accepted-risk exception** — a time-boxed, owner-carrying, per-image +
   per-binary entry recording that a real finding ships anyway (`accept`) or
-  waits on upstream (`transfer`). Internal; expires ≤ 90 days.
+  waits on upstream (`transfer`). Internal; expires within its tier's ceiling.
 - **Treatment** — one of the four responses to real risk: avoid, mitigate
   (fix), transfer, accept. `not_affected` is deliberately not a treatment —
   it claims there was never a risk to treat.

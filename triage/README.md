@@ -52,8 +52,8 @@ An acceptance without one is indistinguishable from an unfixed bug. Trivy stops
 honouring an entry the moment `expired_at` passes — silently, with nothing logged
 — so the finding reappears, the gate goes red, and somebody has to decide again.
 **Risk acceptance decays back to un-triaged on its own.** That is why the ceiling
-is 90 days (`scripts/lint-accepted-risk.sh`) and why the daily rescan reports
-anything within 14 days of lapsing (Req 6.10).
+is the policy file's largest ceiling from `decided_at` (`scripts/lint-accepted-risk.sh`, reading `catalogue-policy.yaml` `triage.ceilings`: 90 days for HIGH, 30 for CRITICAL, 14 for anything CISA lists as exploited, enforced per finding by `scripts/check-exceptions.sh` in the gate and the rescan) and why the daily rescan reports
+anything within the policy's warning window of lapsing (Req 6.10).
 
 ### Authoring an exception
 
@@ -141,7 +141,7 @@ Scan and feed failures soft-fail (skip + warn) so a transient outage never turns
 the cron permanently red.
 
 The cron also **reports every accepted-risk exception that has expired or expires
-within 14 days** (Req 6.10), reusing `scripts/lint-accepted-risk.sh` so there is
+within the policy's warning window** (Req 6.10; 14 days as declared), reusing `scripts/lint-accepted-risk.sh` so there is
 one implementation of "expired" and the notice can never disagree with the gate.
 Expiry happens with *time*, not with a commit, so the cron is the right place to
 raise it — reddening whichever PR happens to run that day would blame the wrong

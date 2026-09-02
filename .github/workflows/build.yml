@@ -482,14 +482,22 @@ jobs:
           # the summary below needs it too, to show the file verbatim. Display
           # only — the scan never reads this copy.
           accepted="triage/accepted-risk/${NAME}.yaml"
-          high=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")]     | length' trivy.json)
+          # Counted over the declared aperture (Req 6.49, task 10.1), never a
+          # hard-coded pair: a fork that widens it sees every severity it named.
+          aperture=$(scripts/triage-policy.sh . aperture)
+          uncovered=$(jq --arg ap "$aperture" '($ap | split(",")) as $sevs
+                        | [.Results[]?.Vulnerabilities[]? | select(.Severity as $s | $sevs | index($s))] | length' trivy.json)
+          breakdown=$(jq -r --arg ap "$aperture" '($ap | split(",")) as $sevs
+                        | [.Results[]?.Vulnerabilities[]?] as $v
+                        | [$sevs[] | . as $s | "\([$v[] | select(.Severity == $s)] | length) \($s)"] | join(", ")' trivy.json)
           crit=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy.json)
-          echo "high=$high" >> "$GITHUB_OUTPUT"
+          echo "uncovered=$uncovered" >> "$GITHUB_OUTPUT"
+          echo "breakdown=$breakdown" >> "$GITHUB_OUTPUT"
           echo "crit=$crit" >> "$GITHUB_OUTPUT"
           {
             echo "### Trivy — ${ref}"
             echo
-            echo "Uncovered: **${crit} CRITICAL**, **${high} HIGH**"
+            echo "Uncovered within the aperture (${aperture}): **${uncovered}** (${breakdown})"
             echo
             # Split by Source, not by eyeball: the two lanes answer different
             # questions and conflating them in one "suppressed" count is how a
@@ -596,7 +604,7 @@ jobs:
             # name and could be wrong in exactly the same silent way. Taken from
             # the same report, versionless, which is the form that survives a
             # rebuild.
-            if [ $((crit + high)) -gt 0 ]; then
+            if [ "${uncovered}" -gt 0 ]; then
               echo "#### Subcomponent identifiers (uncovered findings)"
               echo
               echo '```'
@@ -609,7 +617,7 @@ jobs:
             # artifact to learn what to triage; this is the list you act on.
             echo "#### Still uncovered"
             echo
-            if [ $((crit + high)) -gt 0 ]; then
+            if [ "${uncovered}" -gt 0 ]; then
               # Target = the binary the finding is in, and on a repackage image
               # that is the whole triage question: a module in the main
               # entrypoint and the same module in a bundled plugin are different
@@ -726,15 +734,34 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Scan gate — fail on uncovered HIGH/CRITICAL
+      # Req 6.50, 6.59: every exception in this image's file is held to the
+      # tier its finding earns in THIS report (KEV first, then severity), with
+      # the KEV feed fetched fresh. A feed outage fails the pull request by
+      # name rather than evaluating with an empty KEV set, which would hand
+      # every exploited finding the widest tier: fail closed, the owner's
+      # call over fail-open (task 10.1).
+      - name: exception tiers against KEV (Req 6.50)
         if: github.event_name == 'pull_request'
         env:
-          HIGH: ${{ steps.trivy.outputs.high }}
-          CRIT: ${{ steps.trivy.outputs.crit }}
           NAME: ${{ matrix.name }}
         run: |
           set -euo pipefail
-          if [ "${CRIT:-0}" -gt 0 ] || [ "${HIGH:-0}" -gt 0 ]; then
+          feed=$(scripts/triage-policy.sh . kev-feed)
+          if ! curl -fsSL --max-time 60 "$feed" -o kev.json; then
+            echo "::error::${NAME}: the CISA KEV feed (${feed}) is unavailable, so the exception tiers cannot be evaluated; this pull request fails closed (Req 6.59)"
+            exit 1
+          fi
+          scripts/check-exceptions.sh gate . "$NAME" trivy.json kev.json
+
+      - name: Scan gate — fail on uncovered findings within the aperture
+        if: github.event_name == 'pull_request'
+        env:
+          UNCOVERED: ${{ steps.trivy.outputs.uncovered }}
+          BREAKDOWN: ${{ steps.trivy.outputs.breakdown }}
+          NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          if [ "${UNCOVERED:-0}" -gt 0 ]; then
             # The findings are NAMED in the failure, not just counted: the
             # summary and the report artifact carry the detail, but the error
             # annotation is what every reader of a red check reaches first
@@ -744,10 +771,10 @@ jobs:
             found=$(jq -r '[.Results[]?.Vulnerabilities[]?
                             | "\(.VulnerabilityID) (\(.Severity) \(.PkgName)@\(.InstalledVersion), fixed: \(.FixedVersion // "none"))"]
                            | unique | join("; ")' trivy.json)
-            echo "::error::${NAME}: ${CRIT} CRITICAL / ${HIGH} HIGH uncovered (Req 6.1): ${found}. Four ways out, strongest first: avoid (drop the component) · fix (version bump, Req 6.5) · prove it does not apply (OpenVEX in triage/vex/, Req 6.4) · accept or transfer for a bounded time (triage/accepted-risk/${NAME}.yaml, Req 6.7). An expired exception counts as uncovered."
+            echo "::error::${NAME}: ${UNCOVERED} uncovered within the aperture (${BREAKDOWN}; Req 6.1): ${found}. Four ways out, strongest first: avoid (drop the component) · fix (version bump, Req 6.5) · prove it does not apply (OpenVEX in triage/vex/, Req 6.4) · accept or transfer for a bounded time (triage/accepted-risk/${NAME}.yaml, Req 6.7). An expired exception counts as uncovered."
             exit 1
           fi
-          echo "${NAME}: no uncovered HIGH/CRITICAL ✓"
+          echo "${NAME}: nothing uncovered within the aperture ✓"
 
       - name: upload scan reports
         if: always() && github.event_name == 'pull_request'

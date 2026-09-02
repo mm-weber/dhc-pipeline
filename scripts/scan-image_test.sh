@@ -26,6 +26,9 @@ fresh() { # sandbox with a compiled vex dir, an exception file and a stub trivy
   SB=$(mktemp -d)
   mkdir -p "$SB/vex" "$SB/triage/accepted-risk" "$SB/bin"
   printf '{"statements":[]}\n' > "$SB/vex/grafana.openvex.json"
+  # The aperture comes from the policy file in the working directory
+  # (Req 6.49): what the scanner is asked for is what the catalogue declared.
+  printf 'triage:\n  aperture: [CRITICAL, HIGH]\n  ceilings: {CRITICAL: 30d, HIGH: 90d}\n  kev_ceiling: 14d\n  expiry_warning: 14d\n  kev_feed: https://example.invalid/kev.json\n' > "$SB/catalogue-policy.yaml"
   cat > "$SB/bin/trivy" <<'STUB'
 #!/usr/bin/env bash
 # Record the invocation, then write the report trivy would have written.
@@ -60,12 +63,18 @@ has "by path"                          "triage/accepted-risk/grafana.yaml"
 has "keeps suppressed findings"        "--show-suppressed"
 has "writes json"                      "--format"
 has "to the named report"              "$SB/report.json"
-has "within the decision aperture"     "HIGH,CRITICAL"
+has "within the declared aperture, in its order" "CRITICAL,HIGH"
 has "over os and library packages"     "os,library"
 has "never fails on findings itself"   "--exit-code"
 has "and names the ref last"           "$REF"
 check_last=$(tail -1 "$SB/argv")
 [ "$check_last" = "$REF" ] && pass "the ref is the final argument" || fail "the ref is the final argument" "$check_last"
+
+# 1b: a fork's wider aperture reaches the scanner unchanged.
+fresh
+printf 'triage:\n  aperture: [CRITICAL, HIGH, MEDIUM]\n  ceilings: {CRITICAL: 30d, HIGH: 90d, MEDIUM: 180d}\n  kev_ceiling: 14d\n  expiry_warning: 14d\n  kev_feed: https://example.invalid/kev.json\n' > "$SB/catalogue-policy.yaml"
+(cd "$SB" && run) >/dev/null
+has "a wider aperture is scanned as declared" "CRITICAL,HIGH,MEDIUM"
 
 # 2: no exception file is a normal state (most definitions have none), and it
 #    must not silently turn into an empty --ignorefile.

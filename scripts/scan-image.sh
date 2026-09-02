@@ -61,10 +61,15 @@ accepted="triage/accepted-risk/${DEFINITION}.yaml"
 [ -n "$REMOTE" ] && args+=(--image-src remote)
 [ -n "$PLATFORM" ] && args+=(--platform "$PLATFORM")
 
+# The decision aperture is declared, not a constant (Req 6.49, task 10.1):
+# both arms scan exactly the severities the policy file names, in its order.
+HERE="$(cd "$(dirname "$0")" && pwd)"
+APERTURE=$("$HERE/triage-policy.sh" . aperture)
+
 rm -f "$OUT"
 rc=0
 trivy image "${args[@]}" \
-  --severity HIGH,CRITICAL \
+  --severity "$APERTURE" \
   --pkg-types os,library \
   --show-suppressed \
   --format json --output "$OUT" \

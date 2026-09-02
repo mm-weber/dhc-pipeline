@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mm-weber/dhc-pipeline/triage/rescan"
 )
@@ -28,11 +29,16 @@ func main() {
 	epssFile := flag.String("epss", "", "EPSS response JSON (FIRST.org) — optional")
 	kevFile := flag.String("kev", "", "CISA KEV catalog JSON — optional")
 	existingFile := flag.String("existing", "", "JSON array of already-open CVE IDs — optional")
+	apertureFlag := flag.String("aperture", "", "decision aperture, comma-separated severities in rank order (catalogue-policy.yaml triage.aperture) — required")
 	flag.Parse()
 
 	if *trivyDir == "" {
 		fatal("--trivy <dir> is required")
 	}
+	if *apertureFlag == "" {
+		fatal("--aperture <CRITICAL,HIGH,…> is required: the decision aperture is declared, never assumed (Req 6.49)")
+	}
+	aperture := strings.Split(*apertureFlag, ",")
 
 	reports, err := loadTrivy(*trivyDir)
 	if err != nil {
@@ -40,6 +46,7 @@ func main() {
 	}
 
 	in := rescan.Inputs{
+		Aperture: aperture,
 		Reports:  reports,
 		EPSS:     map[string]rescan.EPSSScore{},
 		KEV:      map[string]bool{},

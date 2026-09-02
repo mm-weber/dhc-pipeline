@@ -88,7 +88,7 @@ func TestAggregate_MergesImagesAndMaxSeverity(t *testing.T) {
 		),
 	}
 
-	got := Aggregate(reports)
+	got := Aggregate(reports, defaultAperture)
 
 	a, ok := findFinding(got, "CVE-2024-1111")
 	if !ok {
@@ -124,7 +124,7 @@ func TestAggregate_IgnoresLowerSeverities(t *testing.T) {
 		),
 	}
 
-	got := Aggregate(reports)
+	got := Aggregate(reports, defaultAperture)
 
 	if _, ok := findFinding(got, "CVE-2024-1111"); !ok {
 		t.Fatalf("expected HIGH finding CVE-2024-1111 to be kept, got %v", findingCVEs(got))
@@ -146,7 +146,7 @@ func TestAggregate_DeterministicOrder(t *testing.T) {
 		),
 	}
 
-	got := Aggregate(reports)
+	got := Aggregate(reports, defaultAperture)
 
 	// CRITICAL findings first (id ascending), then HIGH findings (id ascending).
 	want := []string{"CVE-2024-0002", "CVE-2024-0009", "CVE-2024-0003", "CVE-2024-0008"}
@@ -161,6 +161,7 @@ func TestAggregate_DeterministicOrder(t *testing.T) {
 
 func TestBuildIssues_ExcludesExisting(t *testing.T) {
 	in := Inputs{
+		Aperture: defaultAperture,
 		Reports: []TrivyReport{
 			rep(grafanaRef,
 				vuln("CVE-2024-0001", "libcrypto3", "3.1.4-r5", "3.1.4-r6", "CRITICAL", "keep", "https://x/1"),
@@ -184,6 +185,7 @@ func TestBuildIssues_ExcludesExisting(t *testing.T) {
 
 func TestBuildIssues_EnrichesEPSSAndKEV(t *testing.T) {
 	in := Inputs{
+		Aperture: defaultAperture,
 		Reports: []TrivyReport{
 			rep(grafanaRef,
 				vuln("CVE-2024-0001", "libcrypto3", "3.1.4-r5", "3.1.4-r6", "CRITICAL", "both maps", "https://x/1"),
@@ -237,6 +239,7 @@ func TestBuildIssues_EnrichesEPSSAndKEV(t *testing.T) {
 func TestBuildIssues_BodyHasMarkerAndRequiredSections(t *testing.T) {
 	// Same CVE in two images with two different packages: one fixed, one not.
 	in := Inputs{
+		Aperture: defaultAperture,
 		Reports: []TrivyReport{
 			rep(grafanaRef, vuln("CVE-2024-0001", "libcrypto3", "3.1.4-r5", "3.1.4-r6", "CRITICAL",
 				"openssl: buffer overflow", "https://avd.aquasec.com/nvd/cve-2024-0001")),
@@ -281,6 +284,7 @@ func TestBuildIssues_BodyHasMarkerAndRequiredSections(t *testing.T) {
 
 func TestBuildIssues_TitleAndLabels(t *testing.T) {
 	in := Inputs{
+		Aperture: defaultAperture,
 		Reports: []TrivyReport{
 			// two-image case (real tags exercise the :tag strip)
 			rep(grafanaRef, vuln("CVE-2024-1000", "libcrypto3", "3.1.4-r5", "3.1.4-r6", "CRITICAL", "t", "https://x/1000")),
@@ -324,6 +328,7 @@ func TestBuildIssues_TitleAndLabels(t *testing.T) {
 
 func TestBuildIssues_OrderByCritThenEPSSThenID(t *testing.T) {
 	in := Inputs{
+		Aperture: defaultAperture,
 		Reports: []TrivyReport{
 			rep(grafanaRef,
 				vuln("CVE-2024-0100", "p", "1", "2", "CRITICAL", "t", "https://x/100"),
@@ -453,6 +458,7 @@ func TestBuildIssues_Golden(t *testing.T) {
 	}
 
 	got := BuildIssues(Inputs{
+		Aperture: defaultAperture,
 		Reports:  []TrivyReport{grafana, valkey},
 		EPSS:     epss,
 		KEV:      kev,
@@ -530,4 +536,49 @@ func mustParseTrivy(t *testing.T, name string) TrivyReport {
 		t.Fatalf("ParseTrivy %s: %v", name, err)
 	}
 	return r
+}
+
+// The decision aperture is declared in catalogue-policy.yaml (Req 6.49) and
+// handed in; the reporter never hard-codes CRITICAL and HIGH (task 10.1).
+var defaultAperture = []string{"CRITICAL", "HIGH"}
+
+func TestAggregate_WiderApertureKeepsMedium(t *testing.T) {
+	reports := []TrivyReport{
+		rep(grafanaRef,
+			vuln("CVE-2024-1111", "libcrypto3", "3.1.4-r5", "3.1.4-r6", "HIGH", "keep", "https://x/1111"),
+			vuln("CVE-2024-5000", "zlib", "1.3-r0", "1.3-r1", "MEDIUM", "a fork keeps me", "https://x/5000"),
+			vuln("CVE-2024-6000", "musl", "1.2-r0", "1.2-r1", "LOW", "still dropped", "https://x/6000"),
+		),
+	}
+	got := Aggregate(reports, []string{"CRITICAL", "HIGH", "MEDIUM"})
+	cves := findingCVEs(got)
+	if len(got) != 2 || cves[0] != "CVE-2024-1111" || cves[1] != "CVE-2024-5000" {
+		t.Fatalf("wider aperture: want HIGH then MEDIUM, LOW dropped; got %v", cves)
+	}
+	if got[1].Severity != "MEDIUM" {
+		t.Errorf("MEDIUM finding severity = %q, want MEDIUM", got[1].Severity)
+	}
+}
+
+func TestBuildIssues_LabelsFollowTheAperture(t *testing.T) {
+	in := Inputs{
+		Aperture: []string{"CRITICAL", "HIGH", "MEDIUM"},
+		Reports: []TrivyReport{rep(grafanaRef,
+			vuln("CVE-2024-7000", "zlib", "1.3-r0", "1.3-r1", "MEDIUM", "m", "https://x/7000"))},
+		EPSS: map[string]EPSSScore{}, KEV: map[string]bool{}, Existing: map[string]bool{},
+	}
+	issues := BuildIssues(in)
+	if len(issues) != 1 {
+		t.Fatalf("want 1 issue, got %d", len(issues))
+	}
+	want := "severity:medium"
+	found := false
+	for _, l := range issues[0].Labels {
+		if l == want {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("labels %v lack %q", issues[0].Labels, want)
+	}
 }
