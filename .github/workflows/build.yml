@@ -933,6 +933,14 @@ jobs:
             cosign attest --yes --type spdxjson  --predicate "sbom-${m#sha256:}.spdx.json" "$ref"
             cosign attest --yes --type cyclonedx --predicate "sbom-${m#sha256:}.cdx.json"  "$ref"
             cosign attest --yes --type openvex   --predicate "$doc" "$ref"
+            # Each platform's SPDX on the INDEX as well (spec amended
+            # 2026-09-02, task 9.6): the index is the digest a tag resolves
+            # to, and admission (signature, SPDX, OpenVEX; Req 2.23) is
+            # checked there, not one level down. The first 9.1 releases put
+            # SBOMs on the platform manifests only, and no such index passed
+            # the policy. CycloneDX stays per manifest: it feeds the
+            # comparator, not admission.
+            cosign attest --yes --type spdxjson  --predicate "sbom-${m#sha256:}.spdx.json" "$index"
           done
           # The same one document on the index too (ADR 0003: exactly one per
           # digest, because with several `trivy --vex oci` applies one at random).

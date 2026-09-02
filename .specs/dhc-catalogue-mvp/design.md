@@ -546,7 +546,7 @@ merge to main, the daily schedule, or a manual dispatch
   ─► compile VEX, pass 2: append affected from unexpired exceptions (6.38) and
       under_investigation for every uncovered finding (2.12)
         fail-closed setting on and anything uncovered ─► sign nothing, tag nothing, red run (2.13)
-  ─► cosign sign, recursive · SBOM attest per platform manifest · one OpenVEX attest on
+  ─► cosign sign, recursive · SBOM attest per platform manifest, each SPDX also on the index · one OpenVEX attest on
       index and platform manifests (ADR 0003)
   ─► apply tags (imagetools create on the index) ─► published (Req 2.10)
 ```

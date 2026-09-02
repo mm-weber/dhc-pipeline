@@ -56,14 +56,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: install trivy + grype + crane
+      - name: install trivy + grype + crane + kyverno
         run: |
           set -euo pipefail
           # As the runner user into a temp dir on PATH — see build.yml. crane
-          # lists the registry's tags for the enumeration (task 9.3).
+          # lists the registry's tags for the enumeration (task 9.3); kyverno
+          # applies the admission policy in the daily proof (task 9.6).
           mkdir -p "${RUNNER_TEMP}/bin"
           scripts/install-scanners.sh "${RUNNER_TEMP}/bin"
           scripts/install-tool.sh crane "${RUNNER_TEMP}/bin"
+          scripts/install-tool.sh kyverno "${RUNNER_TEMP}/bin"
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
       # Req 2.22: every catalogue tag in every catalogue repository, resolved
@@ -82,10 +84,16 @@ jobs:
       # cluster C, ruleset drift and the revocation checks with cluster D.
       # Each assertion reports by name and ANY failure fails the run — an
       # invariant that soft-fails is an opinion.
-      - name: invariants (Req 2.21)
+      - name: invariants (Req 2.21, 2.24)
         run: |
           set -euo pipefail
           scripts/check-visibility.sh . "$OUT/enumeration.tsv"
+          # Req 2.24: the rendered admission policy, applied by the kyverno
+          # CLI against the live registry, must admit every tag-referenced
+          # digest and reject the declared unsigned control. The proof lives
+          # here rather than in kyverno test fixtures because the set it
+          # must admit changes daily (task 9.6).
+          scripts/verify-catalogue.sh . "$OUT/enumeration.tsv" "$OUT/verify-catalogue.json"
 
       - name: scan every platform manifest of every tag-referenced digest
         id: scan

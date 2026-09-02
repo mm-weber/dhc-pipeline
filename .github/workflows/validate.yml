@@ -116,6 +116,9 @@ jobs:
       - name: visibility invariant unit tests (Req 2.21)
         run: scripts/check-visibility_test.sh
 
+      - name: admission proof unit tests (Req 2.24)
+        run: scripts/verify-catalogue_test.sh
+
       # Every script suite must be enumerated above: a suite that exists but
       # never runs in CI passes locally forever and proves nothing (the
       # scan-image omission, and the same class as the missing-required-check

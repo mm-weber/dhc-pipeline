@@ -49,6 +49,12 @@ verification:
     attestations:
       spdxjson: [releaser]
       openvex: [releaser, re-attester]
+  # Req 2.24's must-reject control for the daily proof (task 9.6): a digest
+  # under a catalogue repository (so imageReferences match it) that carries
+  # no signature. The amd64 child manifest of grafana:13.0.4-alpine3.23,
+  # whose index was signed alone by the pre-9.1 path; it persists as long as
+  # that superseded index does. The successor mints its own (task 12.1).
+  control: ghcr.io/mm-weber/dhc/grafana@sha256:46607ae250514e845150142fb10ec1941891684acd0cbd8ea3cc66c202153d01
 
 # Cluster B's aperture, ceilings and windows land here (task 10.1); declared
 # empty rather than absent so every reader finds the section.
