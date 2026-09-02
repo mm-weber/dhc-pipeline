@@ -207,6 +207,21 @@
         "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n(?<packageName>[A-Za-z0-9._-]+)==(?<currentValue>[0-9][^\\s\\\\]*)",
       ],
     },
+    {
+      // Fetch-phase Go module bumps inside definitions (`go/bump@v2` deps
+      // lists), the between-releases CVE patch lane established 2026-09-02
+      // (triage/LOG.md, CVE-2026-56854). A security pin must not go
+      // invisible (Req 7.6): the marker names the module, the go datasource
+      // tracks it, and minimal version selection makes the pin a floor the
+      // next upstream release retires (the release PR is the reminder to
+      // drop the step). Go module versions carry their v, same as the
+      // GOVULNCHECK_VERSION pin above; no extractVersion needed.
+      customType: "regex",
+      managerFilePatterns: ["/^image/.+/image\\.yaml$/"],
+      matchStrings: [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*-\\s*\\S+@(?<currentValue>v[^\\s\"']+)",
+      ],
+    },
   ],
 
   packageRules: [

@@ -54,7 +54,7 @@ function extract(manager, content) {
 }
 
 const read = (rel) => readFileSync(join(root, rel), "utf8");
-const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr, workflowMgr, chartDigestMgr, chartTagMgr, pipMgr] =
+const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr, workflowMgr, chartDigestMgr, chartTagMgr, pipMgr, goBumpMgr] =
   config.customManagers;
 
 // managerFilePatterns is the half extract() cannot exercise: a pattern that
@@ -559,6 +559,48 @@ check(
       pipMgr && JSON.stringify(pipMgr.managerFilePatterns),
     );
   }
+}
+
+// --- go/bump security pins inside definitions (Req 7.6; LOG 2026-09-02) ----
+// The between-releases CVE patch lane: a module bumped in the frontend fetch
+// phase is a real pin, and a pin the manager does not see is a pin nobody
+// retires when upstream catches up.
+{
+  for (const role of ["controller", "webhook", "cainjector"]) {
+    const deps = extract(goBumpMgr, read(`image/cert-manager-${role}/image.yaml`));
+    check(
+      `go-bump pins: cert-manager-${role} tracks golang.org/x/crypto via go datasource`,
+      has(deps, { depName: "golang.org/x/crypto", datasource: "go" }),
+      JSON.stringify(deps),
+    );
+    const d = dep(deps, { depName: "golang.org/x/crypto" });
+    check(
+      `go-bump pins: cert-manager-${role} pin is v-prefixed semver`,
+      /^v\d+\.\d+\.\d+$/.test(d?.currentValue ?? ""),
+      d?.currentValue,
+    );
+  }
+  for (const role of ["controller", "webhook"]) {
+    const deps = extract(goBumpMgr, read(`image/cert-manager-${role}/image.yaml`));
+    check(
+      `go-bump pins: cert-manager-${role} tracks google.golang.org/grpc`,
+      has(deps, { depName: "google.golang.org/grpc", datasource: "go" }),
+      JSON.stringify(deps),
+    );
+  }
+  check(
+    "go-bump pins: cainjector carries no grpc pin (no grpc in its module)",
+    !has(extract(goBumpMgr, read("image/cert-manager-cainjector/image.yaml")), { depName: "google.golang.org/grpc" }),
+  );
+  check(
+    "go-bump pins: manager reads definition files",
+    filePatternMatches(goBumpMgr, "image/cert-manager-controller/image.yaml"),
+  );
+  check(
+    "go-bump pins: nothing hides in the repackage archetype (grafana)",
+    extract(goBumpMgr, read("image/grafana/image.yaml")).length === 0,
+    JSON.stringify(extract(goBumpMgr, read("image/grafana/image.yaml"))),
+  );
 }
 
 if (failures > 0) {
