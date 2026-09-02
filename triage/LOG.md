@@ -1154,3 +1154,54 @@ moved to, and the between-releases lane now exists to answer it same-day.
 an upstream release pins `golang.org/x/crypto` at v0.55.0 or newer AND
 `google.golang.org/grpc` at v1.83.1 or newer; the Renovate release PR for
 those versions is the reminder, this entry is the record.
+
+---
+
+## 2026-09-02 — first full-enumeration rescan: the legacy tags scanned in place (task 9.5, Req 2.22)
+
+Run 33624552846 (11:25 UTC, the first `rescan.yml` after task 9.3 merged) was
+the first time the catalogue looked at everything it has ever published:
+`enumerate-catalogue.sh` walked all 6 repositories into 50 platform-manifest
+rows across 37 tags (16 supported, 21 superseded), the visibility invariant
+(task 9.4) passed on every repository and tag, and every manifest was scanned
+by its own digest — no `--platform`, nothing to downgrade. One issue came out
+of it, #121, CVE-2026-84304 in grpc on the supported cert-manager-controller,
+cert-manager-webhook and grafana digests; the cert-manager half was fixed the
+same afternoon (the entry above, PR #122), grafana's stays open there.
+
+**The ten legacy tags** (cert-manager-controller, -webhook and -cainjector
+`1.20`, `1.20.3`, `1.21.0`; grafana `13.0`, `13.0.4`; valkey `9.0`, `9.0.5`)
+kept their digests, as decided on 2026-08-22: cosign signed their indexes
+only, so a re-point would have served an unsigned manifest. Their arm64
+halves, never read by a scanner since they were published, were scanned for
+the first time. Findings per tag and platform, reproduced locally the same
+day with the same scanner, database and compiled VEX as the run (the run's
+own reports are in its `rescan-33624552846` artifact):
+
+| Tags (one digest) | Platform | Uncovered | Notable |
+|---|---|---|---|
+| cert-manager-controller `1.20`, `1.20.3` | amd64 / arm64 | 1 CRIT / 12 HIGH each | x/crypto CRITICAL; nine go1.26.x stdlib HIGHs; grpc GHSA-hrxh-6v49-42gf (the #28 grpc, upstream's later move retired it for 1.21.x) |
+| cert-manager-controller `1.21.0` | amd64 / arm64 | 1 CRIT / 10 HIGH each | same set minus the two stdlib findings 1.21.0's toolchain already carried fixes for |
+| cert-manager-webhook `1.20`, `1.20.3` / `1.21.0` | amd64 / arm64 | as controller | identical package graph for these findings |
+| cert-manager-cainjector `1.20`, `1.20.3` / `1.21.0` | amd64 / arm64 | 1 CRIT / 11 HIGH, 1 CRIT / 9 HIGH | no grpc in its module, so no GHSA-hrxh |
+| grafana `13.0`, `13.0.4` | amd64 / arm64 | 3 CRIT / 26 HIGH each | CVE-2026-21728 and -28377 reported: their `fixed` statements are scoped to 13.1.3 and correctly did NOT apply here (Req 6.30 doing its job; 13.0.4 is genuinely affected, as the statement's own impact text says); CVE-2026-76905, -77354 and GHSA-r277-6w6q-xmqw appear only on 13.0.x, fixed upstream by 13.1 |
+| grafana `13.1.2` | amd64 | 2 CRIT / 26 HIGH | the current-line backlog, minus the 13.0-only trio |
+| valkey `9.0`, `9.0.5` / `9.1.1`, `9.1.1-compat` | amd64 / arm64 | 0 CRIT / 2 HIGH each | CVE-2026-14456 only (#107) |
+
+**What the arm64 halves showed:** on every legacy index the arm64 manifest
+carries exactly the findings its amd64 sibling carries — same package set,
+built from the same pins in the same run — so the fear the 2026-08-04
+withdrawal encoded ("published, signed, never read") resolves to "nothing
+architecture-specific was hiding". That could only be known by scanning;
+now it is measured, and it will be re-measured every day.
+
+**On issues.** Task 9.5 was written as "whatever those carry becomes
+under_investigation and issues". The Terms adopted since (primitives pass,
+2026-08-26) place a superseded digest outside the scope of issues and
+clocks: its content never changes and its findings accrue by design, so an
+issue per finding would be a daily restatement of "the past is old". The
+enumeration honours the Terms: superseded manifests are scanned daily and
+their reports kept in the run artifact under `trivy-superseded/`, issues
+derive from supported digests only, and this entry is the one place the
+first sweep's findings are written down. That is the standing
+interpretation of 9.5, not a gap.
