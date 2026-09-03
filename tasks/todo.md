@@ -55,10 +55,32 @@ lapse, and a re-compile keeps first-seen and records change (Req 6.8, 6.35,
       last_updated on change, not on no-change), inert entry (no statement), report counts
 - [x] 2. lint-vex-product_test.sh: hand-authored affected / under_investigation / missing
       status fail naming the statement (Req 6.39); existing "other status" cases inverted
-- [ ] 3. compile-vex.sh: read triage/accepted-risk/<definition>.yaml (COMPILE_VEX_EXCEPTIONS
+- [x] 3. compile-vex.sh: read triage/accepted-risk/<definition>.yaml (COMPILE_VEX_EXCEPTIONS
       seam), attribute suppressed findings to entries, emit affected, lapses, carry-forward
-- [ ] 4. lint-vex-product.sh: Req 6.39 rule
+- [x] 4. lint-vex-product.sh: Req 6.39 rule
 - [x] 5. build.yml summary line counts affected and lapsed; docs (triage/README.md statuses,
       user-manual compiler paragraph); tasks.md tick 10.2
 - [ ] 6. Run the whole validate chain locally as CI runs it; rehearse pass 2 against a real
       report (the 13.1.5 rootfs scan) before pushing
+
+## Task 10.3: rescan re-attestation, replacing (2026-09-03)
+
+Goal: the published digest carries today's scan reports and one OpenVEX
+document that reflects today's decisions, and a consumer never gets one of
+several documents at random. Re-attestation replaces (ADR 0004); exactly one
+OpenVEX attestation per tag-referenced digest and platform manifest is an
+invariant proven daily (Req 6.42 to 6.45, 6.55, 6.58). TDD, stubs for the
+tools, the first CI run is the keyless measurement ADR 0004 left open.
+
+- [x] 1. compile-vex.sh: COMPILE_VEX_ISSUES map, carried-forward statements name their open issue
+- [x] 2. check-attestation-count.sh (+ test): exactly one OpenVEX attestation per tag-referenced
+      digest and manifest, from the .att manifests, names every deviation, fails the run
+- [x] 3. reattest.sh (+ test): per digest attest each report --replace, read the previous document
+      through cosign verify-attestation (both roles), vexctl merge when several, compile, differs
+      test on canonical statement sets or wrong count, attest --replace on digest and manifests,
+      JSONL record with the before/after layer lists and Rekor indexes (the measurement)
+- [x] 4. install-tool.sh: vexctl v0.4.4 pinned (+ test fixture)
+- [x] 5. rescan.yml: permissions, cosign + vexctl, issues map before the compile, the re-attest step,
+      the count invariant, the summary table; catalogue-policy.yaml permissions
+- [ ] 6. docs: user manual (rescan row, verification), tasks.md tick; SC2154 sweep, actionlint,
+      yamllint, every suite; first run dispatched after merge is the measurement, recorded in LOG

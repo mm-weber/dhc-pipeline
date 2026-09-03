@@ -124,6 +124,10 @@ jobs:
 
       - name: exception tiering unit tests (Req 6.50, 6.51)
         run: scripts/check-exceptions_test.sh
+      - name: re-attestation, replacing (task 10.3, Req 6.42, 6.43, 6.58)
+        run: scripts/reattest_test.sh
+      - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)
+        run: scripts/check-attestation-count_test.sh
 
       # Every script suite must be enumerated above: a suite that exists but
       # never runs in CI passes locally forever and proves nothing (the
