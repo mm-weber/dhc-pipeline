@@ -7,6 +7,7 @@
 #   Req 6.19 — the suppression is scoped by versionless subcomponent purls
 #   Req 6.20 — a product version is a tag that definition publishes
 #   Req 6.21 — a 'fixed' statement carries a version
+#   Req 6.39 — a source statement records not_affected or fixed, nothing else
 #   Req 6.31 — a versionless product says why its claim survives a bump
 #
 # A wrong product identifier produces no error of any kind. Trivy suppresses a
@@ -120,6 +121,16 @@ check_product() { # rel, cve, product purl, subcomponent count, status, status_n
     return
   fi
 
+  # Req 6.39. The hand-authored lane holds two answers to "does this apply?":
+  # not_affected and fixed. Accepted risk and transfers are exceptions under
+  # triage/accepted-risk/ (Req 6.8) that compile-vex.sh publishes as affected,
+  # and under_investigation is what it derives from the attested report. Any
+  # other status here is a decision written in the wrong lane, where nothing
+  # time-boxes it and nothing publishes it with its reasoning, so it is named.
+  case "$status" in
+    not_affected|fixed) ;;
+    *) report "$rel" 6.39 "$cve product '$purl' records status '${status:-<none>}': a source statement may only record not_affected or fixed. Accepted risk and transfers belong in triage/accepted-risk/ (Req 6.8) and are published as affected by the compiler; under_investigation is derived from the attested scan report" ;;
+  esac
   # A remedy is always about particular versions, so a fixed claim has to name
   # one. Compared case-sensitively: OpenVEX status labels are a closed set of
   # lower-case strings, so no consumer reads 'Fixed' as the fixed label.
