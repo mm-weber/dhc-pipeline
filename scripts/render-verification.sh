@@ -100,7 +100,14 @@ spec:
 for alias in ["spdxjson", "openvex", "cyclonedx", "vuln"]:
     if alias not in att:
         continue
-    parts.append(f"            - type: {PREDICATE[alias]}\n              attestors:\n                - entries:\n")
+    # One attestor set per type. Kyverno requires as many entries of a set
+    # to verify as the set has, unless `count` says otherwise (RequiredCount
+    # in api/kyverno/v1/image_verification_types.go, measured on 1.18.2 on
+    # 2026-09-03 against the live catalogue, where an OpenVEX document signed
+    # by one role was rejected with "requiredCount: 2"). Several roles mean
+    # "any one of them", which is count: 1; a single role needs no count.
+    head = "                - count: 1\n                  entries:\n" if len(att[alias]) > 1 else "                - entries:\n"
+    parts.append(f"            - type: {PREDICATE[alias]}\n              attestors:\n{head}")
     for role in att[alias]:
         parts.append(keyless(role, 20))
 kyverno_text = "".join(parts)
