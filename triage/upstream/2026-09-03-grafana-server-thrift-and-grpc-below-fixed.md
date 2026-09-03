@@ -98,3 +98,14 @@ the plugin's own **v12.4.7** (2026-08-27) is built with `go1.26.7` and grpc
 1.83.1 and clears every advisory the bundled copy carries. Whatever selects the
 bundled version at release time picked the older one. Tracked separately on the
 plugin's tracker (grafana/grafana-zipkin-datasource#94).
+
+---
+
+## Erratum, not filed (2026-09-03, same day)
+
+The "Related" paragraph above infers that Grafana's release picked the older
+plugin. Measured afterwards: v12.4.7 is not on the grafana.com plugin catalog
+(`api/plugins/zipkin` reports 12.4.6 as latest; `versions/12.4.7` is a 404),
+and Grafana bundles the catalog's latest, so no Grafana build could have
+picked 12.4.7. The bundling half is the plugin's catalog publish, tracked on
+grafana-zipkin-datasource#94; nothing in the ask above changes.

@@ -14,10 +14,19 @@ work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
 cd "$work"
 zip="${plugin}-${ver}.linux_amd64.zip"
 api="https://grafana.com/api/plugins/${plugin}/versions/${ver}"
-echo "\$ curl -s ${api} | jq -c '{version, createdAt, status}'"
-curl -fsS --max-time 30 "$api" | jq -c '{version, createdAt, status}'
-echo "\$ curl -sSL -o ${zip} '${api}/download?os=linux&arch=amd64'"
-curl -fsSL --max-time 300 -o "$zip" "${api}/download?os=linux&arch=amd64"
+# The catalog package is what Grafana bundles; when a version is not on the
+# catalog (yet), fall back to the GitHub release asset and say so.
+if curl -fsS --max-time 30 "$api" -o version.json 2>/dev/null; then
+  echo "\$ curl -s ${api} | jq -c '{version, createdAt, status}'"
+  jq -c '{version, createdAt, status}' version.json
+  echo "\$ curl -sSL -o ${zip} '${api}/download?os=linux&arch=amd64'"
+  curl -fsSL --max-time 300 -o "$zip" "${api}/download?os=linux&arch=amd64"
+else
+  repo="grafana/grafana-${plugin}-datasource"
+  echo "# ${api} -> 404: version not on the plugin catalog; using the GitHub release asset"
+  echo "\$ gh release download v${ver} -R ${repo} -p '${zip}'"
+  gh release download "v${ver}" -R "$repo" -p "$zip" --dir .
+fi
 echo "\$ sha256sum ${zip}"
 sha256sum "$zip"
 echo "\$ unzip -q ${zip}"

@@ -6,6 +6,10 @@
 [grafana/grafana-zipkin-datasource#94](https://github.com/grafana/grafana-zipkin-datasource/issues/94)
 (no label applied). The issue body is this file from `## Summary` down,
 unmodified.
+**Follow-up:** 2026-09-03, the comment under `## Follow-up comment` below,
+pasted unmodified; its numbers reproduce with
+[`checks/plugin-release-toolchain.sh zipkin 12.4.7 ...`](checks/plugin-release-toolchain.sh)
+and [`checks/grafana-server-pins.sh 13.1.5 33098073184`](checks/grafana-server-pins.sh).
 
 ---
 
@@ -161,3 +165,77 @@ while the Grafana releases beside it keep shipping.
 ---
 
 Happy to re-run any of the above, or to supply the full `govulncheck` JSON.
+
+---
+
+## Follow-up comment
+
+Follow-up, 2026-09-03. The plugin side of this is done, and one step short of
+reaching anyone.
+
+**v12.4.7 (tagged 2026-08-27) is built with go1.26.7 and clears everything ever
+attached to this issue**: the five stdlib advisories in the report, the five
+dependency advisories the follow-ups added, and the nine that the v12.4.6 build
+introduced (below). Measured on the GitHub release asset:
+
+```
+# https://grafana.com/api/plugins/zipkin/versions/12.4.7 -> 404: version not on the plugin catalog; using the GitHub release asset
+$ gh release download v12.4.7 -R grafana/grafana-zipkin-datasource -p 'zipkin-12.4.7.linux_amd64.zip'
+$ sha256sum zipkin-12.4.7.linux_amd64.zip
+132de6762432bdd57b4eadb8288adb374ea402b01651a81a0dacd706f5d988e1  zipkin-12.4.7.linux_amd64.zip
+$ unzip -q zipkin-12.4.7.linux_amd64.zip
+$ go version -m zipkin/gpx_grafana-zipkin-datasource_linux_amd64 | head -3
+zipkin/gpx_grafana-zipkin-datasource_linux_amd64: go1.26.7
+	path	github.com/grafana/grafana-zipkin-datasource/pkg
+	mod	github.com/grafana/grafana-zipkin-datasource	v0.0.0-20260827110051-9e42c5e91f17	
+$ trivy --version | head -1; trivy rootfs --scanners vuln --format json -o scan.json .
+Version: 0.72.0
+CVE-2026-27145: 0 finding(s)
+CVE-2026-42504: 0 finding(s)
+CVE-2026-42507: 0 finding(s)
+CVE-2026-39822: 0 finding(s)
+CVE-2026-42505: 0 finding(s)
+CVE-2026-25681: 0 finding(s)
+CVE-2026-27136: 0 finding(s)
+CVE-2026-33814: 0 finding(s)
+CVE-2026-56852: 0 finding(s)
+GHSA-hrxh-6v49-42gf: 0 finding(s)
+CVE-2026-33818: 0 finding(s)
+CVE-2026-39821: 0 finding(s)
+CVE-2026-46600: 0 finding(s)
+CVE-2026-56853: 0 finding(s)
+CVE-2026-56858: 0 finding(s)
+CVE-2026-56859: 0 finding(s)
+CVE-2026-56860: 0 finding(s)
+CVE-2026-56862: 0 finding(s)
+CVE-2026-84304: 0 finding(s)
+$ HIGH/CRITICAL remaining:
+none
+```
+
+**It has not reached the plugin catalog.** The catalog still serves 12.4.6 as
+latest, and Grafana bundles the catalog's latest at build time, so no Grafana
+build can pick 12.4.7 until it is published there:
+
+```
+$ curl -s https://grafana.com/api/plugins/zipkin | jq -c '{slug, version, versionStatus, updatedAt}'
+{"slug":"zipkin","version":"12.4.6","versionStatus":"active","updatedAt":"2026-08-27T11:11:21.000Z"}
+$ curl -s https://grafana.com/api/plugins/zipkin/versions | jq -r '.items[] | "\(.version)\t\(.createdAt)"' | head -2
+12.4.6	2026-08-13T19:21:58.000Z
+12.4.5	2026-05-18T15:33:19.000Z
+$ curl -s -o /dev/null -w '%{http_code}\n' https://grafana.com/api/plugins/zipkin/versions/12.4.7
+404
+```
+
+**What ships today.** Grafana 13.1.5 (2026-09-02) bundles the catalog's 12.4.6,
+which is built with go1.26.4 and links grpc v1.82.1 (read from the binary in
+`grafana_13.1.5_33098073184_linux_amd64.deb`, `go version -m`:
+`v0.0.0-20260813190447-0dec2cc60c80`). Trivy 0.72.0 reports ten advisories
+against that binary: CVE-2026-33818, CVE-2026-39821, CVE-2026-39822,
+CVE-2026-46600, CVE-2026-56853, CVE-2026-56858, CVE-2026-56859, CVE-2026-56860,
+CVE-2026-56862, CVE-2026-84304. All ten are absent from v12.4.7.
+
+**Ask:** publish 12.4.7 to the catalog. The next Grafana build then bundles it
+on its own. I will close this once a Grafana release ships with 12.4.7; if you
+would rather close it now that the plugin side is done, that works too, the
+bundling half is noted on grafana/grafana#131921.

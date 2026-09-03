@@ -18,8 +18,10 @@ vulnerabilities:
   # The bundled zipkin plugin, third round. Grafana 13.1.5 ships zipkin v12.4.6
   # (built 2026-08-13 with go1.26.4, grpc v1.82.1) while the plugin's own
   # v12.4.7 (2026-08-27) is built with go1.26.7 and grpc v1.83.1 and clears every
-  # finding below. The fix exists and is released; what is missing is Grafana
-  # bundling it. Same tracker as the earlier rounds (#94), one re-decision date.
+  # finding below. The fix exists as a GitHub release only: the grafana.com
+  # plugin catalog still serves 12.4.6 as latest, and Grafana bundles the
+  # catalog's latest, so no Grafana build can pick 12.4.7 until it is published
+  # there. Same tracker as the earlier rounds (#94), one re-decision date.
   #
   # Reachability is NOT claimed: this binary is stripped, so govulncheck stops at
   # module level, which Req 6.16 treats as unmeasured. Transfer is the honest
@@ -39,8 +41,9 @@ vulnerabilities:
               plugins-bundled/zipkin/ removes the datasource and the image stops
               being a drop-in Grafana. Remediation is closed to us, we repackage
               a prebuilt tarball. The exit is now visible: v12.4.7 is built with
-              go1.26.7, past the go1.26.5 fix; 13.1.5 bundled v12.4.6"
-    statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+              go1.26.7, past the go1.26.5 fix, but is not on the plugin catalog
+              yet, so 13.1.5 bundled v12.4.6"
+    statement: "transfer: waiting on zipkin v12.4.7+ reaching the plugin catalog, then a grafana release bundling it"
     expired_at: 2026-11-02
 
   - id: CVE-2026-33818
@@ -51,8 +54,8 @@ vulnerabilities:
     issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
     ref: "LOG.md#transfer-the-zipkin-plugin-again-nine-findings-one-stale-bundle"
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
-              (v12.4.7, go1.26.7) not yet bundled by a grafana release"
-    statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+              (v12.4.7, go1.26.7) not yet on the plugin catalog, so not bundled"
+    statement: "transfer: waiting on zipkin v12.4.7+ reaching the plugin catalog, then a grafana release bundling it"
     expired_at: 2026-11-02
 
   - id: CVE-2026-39821
@@ -63,8 +66,8 @@ vulnerabilities:
     issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
     ref: "LOG.md#transfer-the-zipkin-plugin-again-nine-findings-one-stale-bundle"
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
-              (v12.4.7, go1.26.7) not yet bundled by a grafana release"
-    statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+              (v12.4.7, go1.26.7) not yet on the plugin catalog, so not bundled"
+    statement: "transfer: waiting on zipkin v12.4.7+ reaching the plugin catalog, then a grafana release bundling it"
     expired_at: 2026-11-02
 
   - id: CVE-2026-46600
@@ -75,8 +78,8 @@ vulnerabilities:
     issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
     ref: "LOG.md#transfer-the-zipkin-plugin-again-nine-findings-one-stale-bundle"
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
-              (v12.4.7, go1.26.7) not yet bundled by a grafana release"
-    statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+              (v12.4.7, go1.26.7) not yet on the plugin catalog, so not bundled"
+    statement: "transfer: waiting on zipkin v12.4.7+ reaching the plugin catalog, then a grafana release bundling it"
     expired_at: 2026-11-02
 
   - id: CVE-2026-56853
@@ -87,8 +90,8 @@ vulnerabilities:
     issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
     ref: "LOG.md#transfer-the-zipkin-plugin-again-nine-findings-one-stale-bundle"
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
-              (v12.4.7, go1.26.7) not yet bundled by a grafana release"
-    statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+              (v12.4.7, go1.26.7) not yet on the plugin catalog, so not bundled"
+    statement: "transfer: waiting on zipkin v12.4.7+ reaching the plugin catalog, then a grafana release bundling it"
     expired_at: 2026-11-02
 
   - id: CVE-2026-56858
@@ -99,8 +102,8 @@ vulnerabilities:
     issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
     ref: "LOG.md#transfer-the-zipkin-plugin-again-nine-findings-one-stale-bundle"
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
-              (v12.4.7, go1.26.7) not yet bundled by a grafana release"
-    statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+              (v12.4.7, go1.26.7) not yet on the plugin catalog, so not bundled"
+    statement: "transfer: waiting on zipkin v12.4.7+ reaching the plugin catalog, then a grafana release bundling it"
     expired_at: 2026-11-02
 
   - id: CVE-2026-56859
@@ -111,8 +114,8 @@ vulnerabilities:
     issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
     ref: "LOG.md#transfer-the-zipkin-plugin-again-nine-findings-one-stale-bundle"
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
-              (v12.4.7, go1.26.7) not yet bundled by a grafana release"
-    statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+              (v12.4.7, go1.26.7) not yet on the plugin catalog, so not bundled"
+    statement: "transfer: waiting on zipkin v12.4.7+ reaching the plugin catalog, then a grafana release bundling it"
     expired_at: 2026-11-02
 
   - id: CVE-2026-56860
@@ -123,8 +126,8 @@ vulnerabilities:
     issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
     ref: "LOG.md#transfer-the-zipkin-plugin-again-nine-findings-one-stale-bundle"
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
-              (v12.4.7, go1.26.7) not yet bundled by a grafana release"
-    statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+              (v12.4.7, go1.26.7) not yet on the plugin catalog, so not bundled"
+    statement: "transfer: waiting on zipkin v12.4.7+ reaching the plugin catalog, then a grafana release bundling it"
     expired_at: 2026-11-02
 
   - id: CVE-2026-56862
@@ -135,8 +138,8 @@ vulnerabilities:
     issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
     ref: "LOG.md#transfer-the-zipkin-plugin-again-nine-findings-one-stale-bundle"
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
-              (v12.4.7, go1.26.7) not yet bundled by a grafana release"
-    statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+              (v12.4.7, go1.26.7) not yet on the plugin catalog, so not bundled"
+    statement: "transfer: waiting on zipkin v12.4.7+ reaching the plugin catalog, then a grafana release bundling it"
     expired_at: 2026-11-02
 
   # The plugin's own grpc pin (v1.82.1), the same advisory the server binary
@@ -149,8 +152,8 @@ vulnerabilities:
     issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
     ref: "LOG.md#transfer-the-zipkin-plugin-again-nine-findings-one-stale-bundle"
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
-              (v12.4.7 links grpc v1.83.1) not yet bundled by a grafana release"
-    statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+              (v12.4.7 links grpc v1.83.1) not yet on the plugin catalog, so not bundled"
+    statement: "transfer: waiting on zipkin v12.4.7+ reaching the plugin catalog, then a grafana release bundling it"
     expired_at: 2026-11-02
 
   # ---------------------------------------------------------------------------

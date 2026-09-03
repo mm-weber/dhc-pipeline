@@ -1254,8 +1254,12 @@ purl moved and the entries went inert. Fail-closed, as designed: an entry that
 matches nothing suppresses nothing.
 
 The plugin's own **v12.4.7** (2026-08-27) is built with go1.26.7 and links
-grpc v1.83.1, which clears all nine. The fix exists and is released; Grafana
-bundled the older one. **Decision: transfer**, extending the existing #94
+grpc v1.83.1, which clears all nine, measured on its GitHub release asset. It
+is not on the grafana.com plugin catalog: the catalog's latest is 12.4.6
+(`api/plugins/zipkin`, 2026-09-03) and `versions/12.4.7` is a 404. Grafana
+bundles the catalog's latest, so 13.1.5 could not have picked it; the missing
+step is the catalog publish, which is the plugin's, and the ask on #94 says
+so. **Decision: transfer**, extending the existing #94
 transfer to the nine, all on the 2026-11-02 re-decision date (the 39822 entry
 joins it: its earlier 60-day window was for an exit nobody had landed, and
 the exit has landed). Reachability is not claimed: the binary is stripped,
