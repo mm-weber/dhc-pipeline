@@ -6,6 +6,9 @@
 [grafana/grafana-elasticsearch-datasource#410](https://github.com/grafana/grafana-elasticsearch-datasource/issues/410)
 (label `type/bug`). The issue body is this file from `## Summary` down,
 unmodified.
+**Closed:** 2026-09-03 by us, with the comment under `## Closing comment`
+below, pasted unmodified; its numbers reproduce with
+[`checks/plugin-release-toolchain.sh elasticsearch 12.8.1 ...`](checks/plugin-release-toolchain.sh).
 
 ---
 
@@ -178,3 +181,47 @@ public.
 ---
 
 Happy to re-run any of the above, or to supply the full `govulncheck` JSON.
+
+---
+
+## Closing comment
+
+Closing this: the `go` directive moved and a release built with it has shipped.
+
+**`go.mod` at the `v12.8.1` tag declares `go 1.26.7`**, moved by
+[#399](https://github.com/grafana/grafana-elasticsearch-datasource/pull/399)
+("chore(deps): update backend dependencies", 2026-08-26), the dependency update
+this issue pointed at as active.
+
+**The published v12.8.1 package is built with go1.26.7 and carries none of the
+five advisories.** Measured 2026-09-03 on the linux/amd64 package the grafana.com
+plugin catalog serves (the v12.8.1 GitHub release has no assets, so this is the
+artifact; it is also exactly what Grafana bundles):
+
+```
+$ curl -s https://grafana.com/api/plugins/elasticsearch/versions/12.8.1 | jq -c '{version, createdAt, status}'
+{"version":"12.8.1","createdAt":"2026-08-27T11:47:01.000Z","status":"active"}
+$ curl -sSL -o elasticsearch-12.8.1.linux_amd64.zip 'https://grafana.com/api/plugins/elasticsearch/versions/12.8.1/download?os=linux&arch=amd64'
+$ sha256sum elasticsearch-12.8.1.linux_amd64.zip
+d2a2cb8533f06a5ff7372e59b576b146675114af42ee69d4d5721e3e5a7efbeb  elasticsearch-12.8.1.linux_amd64.zip
+$ unzip -q elasticsearch-12.8.1.linux_amd64.zip
+$ go version -m elasticsearch/gpx_grafana_elasticsearch_datasource_linux_amd64 | head -3
+elasticsearch/gpx_grafana_elasticsearch_datasource_linux_amd64: go1.26.7
+	path	github.com/grafana/grafana-elasticsearch-datasource/pkg
+	mod	github.com/grafana/grafana-elasticsearch-datasource	v0.0.0-20260827113638-54d6b3f9241d	
+$ trivy --version | head -1; trivy rootfs --scanners vuln --format json -o scan.json .
+Version: 0.72.0
+CVE-2026-27145: 0 finding(s)
+CVE-2026-42504: 0 finding(s)
+CVE-2026-42507: 0 finding(s)
+CVE-2026-39822: 0 finding(s)
+CVE-2026-42505: 0 finding(s)
+$ HIGH/CRITICAL remaining:
+none
+```
+
+**Grafana 13.1.5 bundles that build.** Its `data/plugins-bundled/elasticsearch/`
+carries v12.8.1 (`plugin.json` updated 2026-08-27), `go version -m` reports
+go1.26.7, and Trivy reports no vulnerabilities against that binary.
+
+Thanks for the fix.
