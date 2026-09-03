@@ -54,11 +54,14 @@ import os, sys, yaml
 pods = [d for d in yaml.safe_load_all(open(sys.argv[1])) if d]
 fail_names = os.environ.get("STUB_FAIL", "").split()
 err_names = os.environ.get("STUB_ERROR", "").split()
+# STUB_FLAKE: the names in STUB_FAIL fail only inside a multi-pod batch and
+# pass when applied alone, the shape measured on kyverno 1.18.2 on 2026-09-03.
+flaky = bool(os.environ.get("STUB_FLAKE")) and len(pods) > 1
 results = []
 for p in pods:
     n = p["metadata"]["name"]
     if n in err_names: r = "error"
-    elif n in fail_names: r = "fail"
+    elif n in fail_names and (flaky or not os.environ.get("STUB_FLAKE")): r = "fail"
     elif n.startswith("control"): r = "pass" if os.environ.get("STUB_PASS_CONTROL") else "fail"
     else: r = "pass"
     results.append({"result": r, "policy": "verify-catalogue-images", "rule": "require-signature-and-attestations",
@@ -69,7 +72,7 @@ PY
 STUB
   chmod +x "$SB/bin/kyverno"
   export STUB_ARGV="$SB/argv"
-  unset STUB_FAIL STUB_ERROR STUB_PASS_CONTROL
+  unset STUB_FAIL STUB_ERROR STUB_PASS_CONTROL STUB_FLAKE
   : > "$SB/argv"
 }
 run() { PATH="$SB/bin:$PATH" "$VERIFY" "$SB/root" "$SB/enum.tsv" "$SB/report.json" 2>&1; }
@@ -133,5 +136,27 @@ out=$(run); rc=$?
 grep -q "control" <<<"$out" && pass "saying what is missing" || fail "saying what is missing" "$out"
 
 echo
+# --- batch artefact: rejected in the batch, admitted alone -------------------
+#
+# Measured 2026-09-03 (three runs): kyverno 1.18.2 rejected exactly the first
+# ten pods of a nineteen-pod batch with identical attestation shapes on both
+# sides of the line. A rejection is therefore re-applied alone. A digest the
+# policy admits alone is admitted (Req 2.24 is about the policy, not the
+# batch), named as a batch artefact; one the policy rejects alone fails.
+fresh; export STUB_FAIL="admit-001 admit-002" STUB_FLAKE=1
+out=$(run); rc=$?
+[ "$rc" -eq 0 ] && pass "a batch-only rejection does not fail the proof" || fail "rc=$rc" "$out"
+grep -q "::warning::verify-catalogue: admitted alone, rejected in the batch" <<<"$out" && pass "and is named as a batch artefact" || fail "warning" "$out"
+[ "$(grep -c '^kyverno apply' "$SB/argv")" -eq 3 ] && pass "each rejected digest is re-applied alone" || fail "applies" "$(cat "$SB/argv")"
+[ "$(python3 -c 'import yaml,sys; print(len([d for d in yaml.safe_load_all(open(sys.argv[1])) if d]))' "$SB/argv.pods")" = "1" ] && pass "with a single-pod resource" || fail "single pod" "$(cat "$SB/argv.pods")"
+[ "$(jq -r '.resources[] | select(.name=="admit-001") | .batch_flake' "$SB/report.json")" = "true" ] && pass "and the report records it" || fail "report" "$(cat "$SB/report.json")"
+grep -q "2 admitted alone" <<<"$out" && pass "the summary counts the artefacts" || fail "summary" "$out"
+
+fresh; export STUB_FAIL="admit-001"
+out=$(run); rc=$?
+[ "$rc" -eq 1 ] && pass "a rejection that persists alone fails the proof" || fail "rc=$rc" "$out"
+grep -q "NOT ADMITTED" <<<"$out" && grep -q "alone as well" <<<"$out" && pass "and says it was rejected alone as well" || fail "message" "$out"
+[ "$(grep -c '^kyverno apply' "$SB/argv")" -eq 2 ] && pass "after one re-apply" || fail "applies" "$(cat "$SB/argv")"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all verify-catalogue tests passed"
