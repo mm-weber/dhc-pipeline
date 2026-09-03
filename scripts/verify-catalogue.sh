@@ -120,7 +120,11 @@ for d in docs:
             rank = {"error": 3, "fail": 2, "pass": 1}
             cur = verdict.get(n, ("none", ""))
             if rank.get(r.get("result"), 0) >= rank.get(cur[0], 0):
-                verdict[n] = (r.get("result"), (r.get("message") or "")[:200])
+                # The whole reason, not its first line: Kyverno names the
+                # attestation type, the counts and the subject it received,
+                # and the first live run (2026-09-03) cut off exactly the
+                # part that said why. Capped only where GitHub would.
+                verdict[n] = (r.get("result"), (r.get("message") or "")[:4000])
 rows = [line.rstrip("\n").split("\t") for line in open(sys.argv[2])]
 failures = []
 admitted = 0
@@ -143,7 +147,7 @@ for name, ref, tags in rows:
             failures.append(f"NOT ADMITTED: tag-referenced digest {ref} (tags: {tags}): {msg}")
         else:
             failures.append(f"{result.upper()} on {ref} (tags: {tags}): {msg}; not verified is not admitted")
-json.dump({"control": rows[-1][1], "resources": [{"name": n, "ref": ref, "tags": tags, "result": verdict.get(n, ("missing", ""))[0]} for n, ref, tags in rows],
+json.dump({"control": rows[-1][1], "resources": [{"name": n, "ref": ref, "tags": tags, "result": verdict.get(n, ("missing", ""))[0], "message": verdict.get(n, ("missing", ""))[1]} for n, ref, tags in rows],
            "failures": failures}, open(sys.argv[3], "w"), indent=2)
 for f in failures:
     print(f"::error::verify-catalogue: {f}", file=sys.stderr)
