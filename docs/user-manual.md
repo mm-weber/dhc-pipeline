@@ -166,15 +166,16 @@ cosign verify-attestation $ISSUER $BUILD --type spdxjson "$REF" \
 cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" 2>/dev/null \
   || cosign verify-attestation $ISSUER $RESCAN --type openvex "$REF" \
   | jq -r '.payload | @base64d | fromjson | .predicate'      # VEX: releaser or re-attester
-# Exactly one OpenVEX attestation is on every tag-referenced digest and platform
-# manifest (Req 6.44; ADR 0004): the daily rescan replaces it when the decisions
-# change and proves the count. Whichever role signed it, the line above returns
-# one document, never several to merge.
 # BuildKit provenance is attached at build time and is not verified by the
 # policy above (Req 2.25); inspect it with the buildx CLI plugin:
 docker buildx imagetools inspect "$REF" --format '{{ json .Provenance }}'
 ```
 <!-- render-verification:end -->
+
+Exactly one OpenVEX attestation is on every tag-referenced digest and platform
+manifest (Req 6.44; ADR 0004): the daily rescan replaces it when the decisions
+change and proves the count. Whichever role signed it, the recipe above returns
+one document, never several to merge.
 
 What each artifact gives you:
 
