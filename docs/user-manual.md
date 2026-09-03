@@ -172,6 +172,11 @@ docker buildx imagetools inspect "$REF" --format '{{ json .Provenance }}'
 ```
 <!-- render-verification:end -->
 
+Exactly one OpenVEX attestation is on every tag-referenced digest and platform
+manifest (Req 6.44; ADR 0004): the daily rescan replaces it when the decisions
+change and proves the count. Whichever role signed it, the recipe above returns
+one document, never several to merge.
+
 What each artifact gives you:
 
 - **Signature** — the image was pushed by this repository's release workflow,
@@ -270,7 +275,7 @@ requirement, precisely because every downstream consumer would inherit it.
 | `chart.yml`    | every PR + main            | Render *every* chart, evaluate with the Kyverno policies; `ct lint` on owned charts |
 | `e2e.yml`      | PR + dispatch              | Per affected component: kind cluster, install the hardened chart, run the Ginkgo suite |
 | `renovate.yml` | cron every 4h + dispatch   | Self-hosted Renovate over the custom managers; postUpgradeTasks recompute derived fields |
-| `rescan.yml`   | daily 06:17 UTC + dispatch | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; file new-CVE issues for the supported set; expiry warnings |
+| `rescan.yml`   | daily 06:17 UTC + dispatch | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set; expiry warnings |
 
 Every GitHub Action is pinned to a full commit SHA, and every third-party
 executable a workflow installs is exact-version-pinned and checksum-verified

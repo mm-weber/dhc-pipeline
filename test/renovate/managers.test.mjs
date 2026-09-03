@@ -340,8 +340,9 @@ check(
   // Every pinned tool, counted: a pin the manager does not see is a pin nobody
   // bumps, and a stale tool fails silently (Req 7.6). syft joined with the
   // release arm's per-manifest SBOMs (task 9.1), crane with the rescan's
+  // enumeration (9.3), vexctl with the rescan's re-attestation merge (10.3),
   // tag enumeration (task 9.3).
-  check("tool pins: install-tool.sh yields exactly six deps", pins.length === 6, `${pins.length}`);
+  check("tool pins: install-tool.sh yields exactly seven deps", pins.length === 7, `${pins.length}`);
 
   for (const [tool, depName] of [
     ["kind", "kubernetes-sigs/kind"],
@@ -350,6 +351,7 @@ check(
     ["ct", "helm/chart-testing"],
     ["syft", "anchore/syft"],
     ["crane", "google/go-containerregistry"],
+    ["vexctl", "openvex/vexctl"],
   ]) {
     const dep = pins.find((d) => d.depName === depName);
     check(`tool pins: ${tool} is tracked as ${depName}`, !!dep);

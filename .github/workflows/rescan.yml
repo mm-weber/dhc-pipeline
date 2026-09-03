@@ -21,7 +21,13 @@ on:
 
 permissions:
   contents: read
-  packages: read # pull the ghcr.io/mm-weber/dhc images
+  # Task 10.3 (Req 6.42, 6.43): the rescan attests today's scan reports and,
+  # on change, the OpenVEX document to the published digests, replacing. That
+  # is a push to the .att manifests (packages: write) signed keyless
+  # (id-token: write), as the re-attester role in catalogue-policy.yaml, which
+  # attests openvex and vuln only; it cannot mint a signed digest (Req 2.23).
+  packages: write
+  id-token: write
   issues: write # file new-CVE issues
 
 jobs:
@@ -55,7 +61,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: install trivy + grype + crane + kyverno
+      # cosign stays on the v2 line: --replace exists there and its bundles are
+      # what Trivy and Kyverno read (ADR 0003, ADR 0004). Same pin as build.yml.
+      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        with:
+          cosign-release: v2.6.0
+      - name: install trivy + grype + crane + kyverno + vexctl
         run: |
           set -euo pipefail
           # As the runner user into a temp dir on PATH — see build.yml. crane
@@ -65,6 +76,7 @@ jobs:
           scripts/install-scanners.sh "${RUNNER_TEMP}/bin"
           scripts/install-tool.sh crane "${RUNNER_TEMP}/bin"
           scripts/install-tool.sh kyverno "${RUNNER_TEMP}/bin"
+          scripts/install-tool.sh vexctl "${RUNNER_TEMP}/bin"
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
       # Req 2.22: every catalogue tag in every catalogue repository, resolved
@@ -155,6 +167,43 @@ jobs:
             | grep -E '^CVE-' | sort -u > "$OUT/cves.txt" || true
           echo "distinct HIGH/CRITICAL CVEs (supported set): $(grep -c . "$OUT/cves.txt" || echo 0)"
 
+      # Task 10.3: the open `cve` issues, finding -> URL, read before the
+      # compile so a statement the compiler writes can name where the finding
+      # is being worked (task 9.1's promise, Req 6.40). The dedup step below
+      # reads the same issues again for its own purpose; both read the marker
+      # `<!-- rescan-cve: <ID> -->`, never the title.
+      - name: open cve issues (finding -> issue)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2016  # $m is a jq binding, not a shell variable
+          gh issue list --state open --label cve --limit 500 --json url,body \
+            --jq '[.[] | (.body | capture("rescan-cve: (?<id>[A-Za-z0-9][A-Za-z0-9._-]*)") // empty) as $m | {key: $m.id, value: .url}] | from_entries' \
+            > "$OUT/issues.json" || echo '{}' > "$OUT/issues.json"
+          echo "open cve issues mapped: $(jq 'length' "$OUT/issues.json")"
+
+      # Req 6.42, 6.43 (task 10.3; ADR 0004): every tag-referenced digest gets
+      # today's scan reports attested with --replace, and its OpenVEX document
+      # re-attested with --replace only when the statement set changed or a
+      # count is wrong. The previous document is read through
+      # cosign verify-attestation against the policy's role identities and
+      # never downloaded unverified (Req 6.58). The JSONL record carries the
+      # .att layer lists and Rekor indexes before and after: the first run is
+      # the keyless measurement ADR 0004 left open.
+      - name: attest today's reports, re-attest OpenVEX on change (Req 6.42, 6.43)
+        id: reattest
+        env:
+          REATTEST_ISSUES: ${{ github.workspace }}/rescan-out/issues.json
+        run: |
+          set -uo pipefail
+          scripts/reattest.sh . "$OUT/enumeration.tsv" "$OUT"
+          rc=$?
+          echo "reattested=$(jq -s '[.[] | select(.reattested == true)] | length' "$OUT/reattest.jsonl")" >> "$GITHUB_OUTPUT"
+          echo "unchanged=$(jq -s '[.[] | select(.reattested == false and .skipped == null and .failed == null)] | length' "$OUT/reattest.jsonl")" >> "$GITHUB_OUTPUT"
+          echo "skipped=$(jq -s '[.[] | select(.skipped != null)] | length' "$OUT/reattest.jsonl")" >> "$GITHUB_OUTPUT"
+          exit "$rc"
+
       # The single home for every daily assertion the catalogue makes about
       # its own state (task 9.4): visibility (Req 2.21), the admission proof
       # (Req 2.24, task 9.6) and the exception tiers (Req 6.51, task 10.1);
@@ -163,7 +212,7 @@ jobs:
       # because the tiers read the day's reports. Each assertion reports by
       # name and ANY failure fails the run — an invariant that soft-fails is
       # an opinion.
-      - name: invariants (Req 2.21, 2.24, 6.51)
+      - name: invariants (Req 2.21, 2.24, 6.44, 6.51)
         run: |
           set -euo pipefail
           scripts/check-visibility.sh . "$OUT/enumeration.tsv"
@@ -183,6 +232,10 @@ jobs:
             exit 1
           fi
           scripts/check-exceptions.sh rescan . "$OUT/trivy" "$OUT/kev.json"
+          # Req 6.44, 6.45 (ADR 0004): exactly one OpenVEX attestation on every
+          # tag-referenced digest and platform manifest, read from the .att
+          # manifests the way a consumer reads them, after today's replaces.
+          scripts/check-attestation-count.sh "$OUT/enumeration.tsv" "$OUT/attestation-count.json"
 
       # Req 6.10 — an acceptance that lapses unnoticed is the failure mode this
       # whole lane exists to prevent, and Trivy is silent about it: a lapsed
@@ -349,6 +402,21 @@ jobs:
               [ "$other" -eq 0 ] || echo "<sub>${other} statement(s) skipped as belonging to other images.</sub>"
             else
               echo "_no image reached compilation_"
+            fi
+            echo
+            echo "#### Re-attestation (Req 6.42, 6.43)"
+            echo
+            if [ -f "$OUT/reattest.jsonl" ]; then
+              echo "- re-attested: ${{ steps.reattest.outputs.reattested || 0 }}, unchanged: ${{ steps.reattest.outputs.unchanged || 0 }}, skipped: ${{ steps.reattest.outputs.skipped || 0 }}"
+              echo
+              echo "| Digest | Reports attested | Previous docs | OpenVEX before (index) | Differs | Re-attested | Rekor retained |"
+              echo "|---|---|---|---|---|---|---|"
+              jq -r 'if .skipped then "| `\(.repository | split("/") | last)@\(.digest[0:19])…` | – | – | – | – | skipped: \(.skipped) | – |"
+                     elif .failed then "| `\(.repository | split("/") | last)@\(.digest[0:19])…` | – | – | – | – | **failed: \(.failed)** | – |"
+                     else "| `\(.repository | split("/") | last)@\(.digest[0:19])…` | \(.reports_attested) | \(.previous_documents) | \(.openvex_before.index.openvex) | \(.differs) | \(.reattested)\(if .wrong_count then " (count repaired)" else "" end) | \([.rekor_retained[] | .retained] | if length == 0 then "–" elif all then "yes" else "NO" end) |"
+                     end' "$OUT/reattest.jsonl"
+            else
+              echo "_the re-attestation step did not run_"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 

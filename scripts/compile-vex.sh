@@ -119,6 +119,25 @@ for path in scan_reports:
 # seen timestamp instead of resetting on every rebuild (cluster B's clocks).
 previous = os.environ.get("COMPILE_VEX_PREVIOUS", "")
 first_seen = {}
+# Task 10.3. The open `cve` issues, finding -> issue URL, so a statement the
+# compiler writes names where the finding is being worked (task 9.1's promise).
+# A path that does not exist is a usage error, never "no open issues".
+issues_path = os.environ.get("COMPILE_VEX_ISSUES", "")
+issues = {}
+if issues_path:
+    if not os.path.isfile(issues_path):
+        print(f"compile-vex: issue map '{issues_path}' does not exist, so which findings have "
+              f"an open issue is unknown; refusing to compile as if none had", file=sys.stderr)
+        sys.exit(2)
+    with open(issues_path) as fh:
+        issues = {str(k): str(v) for k, v in (json.load(fh) or {}).items() if v}
+def with_issue(st):
+    """Append the finding's open issue to the notes; the link is content, so a
+    link that appears or changes is a recorded change (Req 6.40)."""
+    url = issues.get(vuln_name(st))
+    if url:
+        st["status_notes"] = f"{st.get('status_notes', '')}; tracked in {url}".lstrip("; ")
+    return st
 # Req 6.40. The statements the compiler itself wrote last time (affected,
 # under_investigation), keyed by finding and package, so this compile can keep
 # their timestamp and record a change in last_updated rather than restating.
@@ -167,7 +186,8 @@ def carry_forward(st, purl, stamp):
     def shape(x):
         return (x.get("status"), x.get("action_statement"),
                 tuple(sorted(sub.get("@id", "") for p in (x.get("products") or [])
-                             for sub in (p.get("subcomponents") or []))))
+                             for sub in (p.get("subcomponents") or []))),
+                tuple(re.findall(r"https://\S+/issues/\d+", x.get("status_notes") or "")))
     if shape(prev) != shape(st):
         st["last_updated"] = stamp
     elif prev.get("last_updated"):
@@ -366,7 +386,7 @@ for path in scan_reports:
                     product["subcomponents"] = [{"@id": purl}]
             # First seen, not "seen again": a rebuild must not reset the clock
             # a decision is measured against.
-            carry_forward(st, purl, stamp)
+            carry_forward(with_issue(st), purl, stamp)
             investigating[key] = st
         # Req 6.38. What the ignorefile suppressed is in the report by name
         # (--show-suppressed, Req 6.55), each finding attributed to its entry's
@@ -415,7 +435,7 @@ for path in scan_reports:
             if purl:
                 for product in st["products"]:
                     product["subcomponents"] = [{"@id": purl}]
-            carry_forward(st, purl, stamp)
+            carry_forward(with_issue(st), purl, stamp)
             affected[key] = st
 merged.extend(affected[k] for k in sorted(affected))
 merged.extend(investigating[k] for k in sorted(investigating))

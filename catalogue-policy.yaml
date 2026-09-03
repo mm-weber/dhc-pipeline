@@ -106,7 +106,8 @@ workflows:
     schedule: "17 6 * * *"
     permissions:
       contents: read
-      packages: read
+      packages: write # re-attestation pushes .att manifests (task 10.3, Req 6.42, 6.43)
+      id-token: write # keyless signing as the re-attester role
       issues: write
   renovate.yml:
     schedule: "0 */4 * * *"

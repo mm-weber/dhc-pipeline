@@ -77,6 +77,10 @@ SYFT_SHA256="8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3"
 CRANE_VERSION="0.22.0"
 CRANE_SHA256="edb74d53fad9a596860f59d1c5d04a43dfb5f441dc71f57060dd0bf39483c833"
 
+# renovate: datasource=github-releases depName=openvex/vexctl
+VEXCTL_VERSION="0.4.4"
+VEXCTL_SHA256="d315e2778af88b999ad4bba30a08aa2677ed701638e16c341b6d57b43c1e064d"
+
 err() { printf '::error::install-tool: %s\n' "$1" >&2; }
 
 # All pinned assets are linux/amd64; on any other architecture the checksum
@@ -155,8 +159,20 @@ case "$TOOL" in
     member=""
     extras=""
     ;;
+  vexctl)
+    # Merges several OpenVEX documents into one, field-preserving (ADR 0003's
+    # measurement): the rescan's carry-forward input when a digest still
+    # carries more than one OpenVEX attestation (task 10.3, Req 6.43).
+    version="$VEXCTL_VERSION"
+    shipped="$VEXCTL_SHA256"
+    asset="vexctl-linux-amd64"
+    url="${BASE_URL}/openvex/vexctl/releases/download/v${VEXCTL_VERSION}/${asset}"
+    tarball=""
+    member=""
+    extras=""
+    ;;
   *)
-    err "usage: install-tool.sh <kind|kyverno|helm|ct|syft|crane> [<destdir>], got '${TOOL}'"
+    err "usage: install-tool.sh <kind|kyverno|helm|ct|syft|crane|vexctl> [<destdir>], got '${TOOL}'"
     exit 1
     ;;
 esac
