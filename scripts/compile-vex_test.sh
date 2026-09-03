@@ -574,5 +574,43 @@ out=$(COMPILE_VEX_EXCEPTIONS="$SB/absent.yaml" COMPILE_VEX_SCAN_REPORTS="$SB/sca
 contains "no exception file is not an error" "$out" "rc=0"
 check "and the uncovered finding is still stated" "under_investigation" "$(doc -r '.statements[0].status')"
 
+# --- task 10.3: a carried-forward statement names its open issue ------------
+#
+# The rescan files one issue per finding (Req 6.3) and promised the link back
+# in the published statement (task 9.1). An open `cve` issue for a finding the
+# compiler states as affected or under_investigation is named in that
+# statement's status notes, which is a content change and so is what triggers
+# the one re-attestation that publishes it (Req 6.40).
+
+# 37: the issue URL lands in the notes of compiler-written statements only.
+fresh
+exceptions CVE-2026-56853 2026-11-02
+report_suppressed scan.json CVE-2026-56853 "transfer: waiting on a release built with go1.26.7"
+src a.json "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" not_affected
+printf '{"CVE-2026-56853":"https://github.com/acme/dhc/issues/77","CVE-2026-00001":"https://github.com/acme/dhc/issues/78"}\n' > "$SB/issues.json"
+COMPILE_VEX_ISSUES="$SB/issues.json" run_x >/dev/null
+contains "the affected statement names its issue" "$(doc -r '.statements[] | select(.status=="affected") | .status_notes')" "issues/77"
+check "a source statement is left as authored" "null" "$(doc -r '.statements[] | select(.status=="not_affected") | .status_notes')"
+
+# 38: an issue that appears later is a content change: the carried-forward
+#     statement keeps first seen and records the change (Req 6.40).
+fresh
+exceptions CVE-2026-56853 2026-11-02 "transfer: waiting on a release built with go1.26.7"
+report_suppressed scan.json CVE-2026-56853 "transfer: waiting on a release built with go1.26.7"
+run_x >/dev/null
+same=$(doc -r '.statements[0].action_statement')
+previous_affected "$same"
+printf '{"CVE-2026-56853":"https://github.com/acme/dhc/issues/77"}\n' > "$SB/issues.json"
+COMPILE_VEX_ISSUES="$SB/issues.json" COMPILE_VEX_PREVIOUS="$SB/previous.json" run_x >/dev/null
+check "first seen kept"                   "2026-07-01T00:00:00Z" "$(doc -r '.statements[0].timestamp')"
+check "and the new link is a recorded change" "2026-08-28T06:00:00Z" "$(doc -r '.statements[0].last_updated')"
+
+# 39: a map that does not exist is a usage error, never "no issues".
+fresh
+report scan.json CVE-2026-99999
+out=$(COMPILE_VEX_ISSUES="$SB/absent.json" COMPILE_VEX_SCAN_REPORTS="$SB/scan.json" run; echo "rc=$?")
+contains "a missing issue map fails loudly" "$out" "absent.json"
+contains "and exits non-zero"               "$out" "rc=2"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
