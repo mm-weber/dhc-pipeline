@@ -310,11 +310,11 @@ doc() { jq "$@" "$SB/out/grafana.openvex.json"; }
 
 # A trivy report in the shape the release scan writes: post-suppression
 # findings are what remains uncovered.
-report() { # $1 = filename, $2 = CVE, [$3 = package purl]
+report() { # $1 = filename, $2 = CVE, [$3 = package purl], [$4 = target]
   cat > "$SB/$1" <<JSON
 {"SchemaVersion":2,"CreatedAt":"2026-08-28T06:00:00Z",
  "ArtifactName":"ghcr.io/mm-weber/dhc/grafana",
- "Results":[{"Target":"grafana","Class":"os-pkgs","Vulnerabilities":[
+ "Results":[{"Target":"${4:-grafana}","Class":"os-pkgs","Vulnerabilities":[
    {"VulnerabilityID":"$2","PkgName":"openssl","Severity":"HIGH",
     "PkgIdentifier":{"PURL":"${3:-pkg:apk/alpine/openssl@3.5.0}"}}]}]}
 JSON
@@ -382,6 +382,197 @@ fresh
 out=$(COMPILE_VEX_SCAN_REPORTS="$SB/absent.json" run; echo "rc=$?")
 contains "a missing scan report fails loudly" "$out" "absent.json"
 contains "and exits non-zero"                 "$out" "rc=2"
+
+# --- task 10.2: affected from exceptions, carry-forward, lapses ---------------
+#
+# Req 6.38: an unexpired accepted-risk exception naming a finding this digest's
+# attested scan report lists compiles to a published `affected` statement,
+# carrying the decision (treatment, statement, issue, binaries, expiry) and the
+# finding's first-seen time. Req 6.41: an expired one compiles to nothing, and
+# the finding it named, if the report still lists it, is `under_investigation`
+# with a note naming the lapse. Req 6.40: a statement carried forward keeps its
+# timestamp and records change in last_updated.
+
+# An exception file in the shape triage/accepted-risk/<image>.yaml holds. Named
+# as the scan names its --ignorefile, because the compiler attributes a
+# suppression to the file it was handed by that name and to no other.
+exceptions() { # $1 = CVE, $2 = expired_at, [$3 = statement text], [$4 = treatment]
+  mkdir -p "$SB/accepted-risk"
+  cat > "$SB/accepted-risk/grafana.yaml" <<YAML
+vulnerabilities:
+  - id: $1
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: ${4:-transfer}
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer-example"
+    blocked: "avoidance declined; remediation closed to us"
+    statement: "${3:-transfer: waiting on a release built with go1.26.7}"
+    decided_at: 2026-08-10
+    expired_at: $2
+YAML
+}
+# A report in the shape the release scan writes with --show-suppressed: the
+# ignorefile's suppressions are kept, each attributed to its entry's statement.
+report_suppressed() { # $1 = filename, $2 = CVE, $3 = statement text, [$4 = purl]
+  cat > "$SB/$1" <<JSON
+{"SchemaVersion":2,"CreatedAt":"2026-08-28T06:00:00Z",
+ "ArtifactName":"ghcr.io/mm-weber/dhc/grafana",
+ "Results":[{"Target":"usr/share/grafana/data/plugins-bundled/zipkin/gpx_grafana-zipkin-datasource_linux_amd64",
+   "Class":"lang-pkgs","Type":"gobinary",
+   "ExperimentalModifiedFindings":[
+     {"Type":"vulnerability","Status":"ignored","Statement":"$3","Source":"triage/accepted-risk/grafana.yaml",
+      "Finding":{"VulnerabilityID":"$2","PkgName":"stdlib","Severity":"HIGH",
+                 "PkgIdentifier":{"PURL":"${4:-pkg:golang/stdlib@v1.26.4}"}}}]}]}
+JSON
+}
+run_x() { COMPILE_VEX_EXCEPTIONS="$SB/accepted-risk/grafana.yaml" COMPILE_VEX_SCAN_REPORTS="$SB/scan.json" run; }
+
+# 30: an unexpired exception naming a suppressed finding compiles to affected,
+#     carrying the decision and the finding's first-seen time (Req 6.38).
+fresh
+exceptions CVE-2026-56853 2026-11-02 "transfer: waiting on a release built with go1.26.7"
+report_suppressed scan.json CVE-2026-56853 "transfer: waiting on a release built with go1.26.7"
+run_x >/dev/null
+check "one statement"                          "1"                    "$(doc '.statements | length')"
+check "status affected"                        "affected"             "$(doc -r '.statements[0].status')"
+check "names the finding"                      "CVE-2026-56853"       "$(doc -r '.statements[0].vulnerability.name')"
+check "product is this digest"                 "pkg:oci/grafana@$DIGEST" "$(doc -r '.statements[0].products[0]."@id"')"
+check "scoped to the package it was found in"  "pkg:golang/stdlib@v1.26.4" "$(doc -r '.statements[0].products[0].subcomponents[0]."@id"')"
+check "first seen is the report's timestamp"   "2026-08-28T06:00:00Z" "$(doc -r '.statements[0].timestamp')"
+check "decision clock starts at decided_at"    "2026-08-10T00:00:00Z" "$(doc -r '.statements[0].action_statement_timestamp')"
+contains "action statement carries the treatment" "$(doc -r '.statements[0].action_statement')" "transfer"
+contains "and the statement text"                 "$(doc -r '.statements[0].action_statement')" "waiting on a release built with go1.26.7"
+contains "and the upstream issue"                 "$(doc -r '.statements[0].action_statement')" "grafana-zipkin-datasource/issues/94"
+contains "and the binaries"                       "$(doc -r '.statements[0].action_statement')" "plugins-bundled/zipkin/*"
+contains "and the expiry"                         "$(doc -r '.statements[0].action_statement')" "2026-11-02"
+check "and does not say the treatment twice"  "1" "$(doc -r '.statements[0].action_statement' | grep -o 'transfer:' | wc -l | tr -d ' ')"
+
+# 30b: one entry per binary (Req 6.23), so the same package at the same version
+#      in two binaries arrives as two suppressions under two entries; the
+#      document states the finding once and carries both decisions.
+fresh
+mkdir -p "$SB/accepted-risk"
+cat > "$SB/accepted-risk/grafana.yaml" <<'YAML'
+vulnerabilities:
+  - id: CVE-2026-84304
+    purls: ["pkg:golang/google.golang.org/grpc"]
+    paths: ["usr/share/grafana/bin/grafana"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana/issues/131921"
+    ref: "LOG.md#x"
+    blocked: "inside the server binary"
+    statement: "transfer: waiting on a grafana release carrying grpc-go 1.83.1"
+    decided_at: 2026-09-03
+    expired_at: 2026-11-02
+  - id: CVE-2026-84304
+    purls: ["pkg:golang/google.golang.org/grpc"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#y"
+    blocked: "as above, other binary"
+    statement: "transfer: waiting on zipkin v12.4.7+ reaching the plugin catalog"
+    decided_at: 2026-09-03
+    expired_at: 2026-11-02
+YAML
+cat > "$SB/scan.json" <<'JSON'
+{"SchemaVersion":2,"CreatedAt":"2026-08-28T06:00:00Z","ArtifactName":"ghcr.io/mm-weber/dhc/grafana",
+ "Results":[
+  {"Target":"usr/share/grafana/bin/grafana","Class":"lang-pkgs","Type":"gobinary",
+   "ExperimentalModifiedFindings":[{"Type":"vulnerability","Status":"ignored","Source":"triage/accepted-risk/grafana.yaml",
+     "Statement":"transfer: waiting on a grafana release carrying grpc-go 1.83.1",
+     "Finding":{"VulnerabilityID":"CVE-2026-84304","PkgName":"google.golang.org/grpc","Severity":"HIGH","PkgIdentifier":{"PURL":"pkg:golang/google.golang.org/grpc@v1.82.1"}}}]},
+  {"Target":"usr/share/grafana/data/plugins-bundled/zipkin/gpx_grafana-zipkin-datasource_linux_amd64","Class":"lang-pkgs","Type":"gobinary",
+   "ExperimentalModifiedFindings":[{"Type":"vulnerability","Status":"ignored","Source":"triage/accepted-risk/grafana.yaml",
+     "Statement":"transfer: waiting on zipkin v12.4.7+ reaching the plugin catalog",
+     "Finding":{"VulnerabilityID":"CVE-2026-84304","PkgName":"google.golang.org/grpc","Severity":"HIGH","PkgIdentifier":{"PURL":"pkg:golang/google.golang.org/grpc@v1.82.1"}}}]}]}
+JSON
+run_x >/dev/null
+check "one statement for one finding and package"  "1" "$(doc '.statements | length')"
+contains "carrying the server binary's decision"   "$(doc -r '.statements[0].action_statement')" "grafana/issues/131921"
+contains "and the plugin's"                         "$(doc -r '.statements[0].action_statement')" "zipkin-datasource/issues/94"
+
+# 31: a finding a source statement covers is never restated as affected: the
+#     source statement is the answer (Req 6.38 "that no source statement covers").
+fresh
+src a.json "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" not_affected
+exceptions CVE-2026-00001 2026-11-02
+report_suppressed scan.json CVE-2026-00001 "transfer: waiting on a release built with go1.26.7"
+run_x >/dev/null
+check "covered finding keeps its one statement" "1"            "$(doc '.statements | length')"
+check "and it is the source statement"          "not_affected" "$(doc -r '.statements[0].status')"
+
+# 32: an expired exception compiles to nothing, and the finding it named, still
+#     reported (its suppression lapsed with it), is under_investigation naming
+#     the lapse, so the decision clock restarts without losing first seen (6.41).
+fresh
+exceptions CVE-2026-56853 2026-08-01
+report scan.json CVE-2026-56853 "pkg:golang/stdlib@v1.26.4" \
+  "usr/share/grafana/data/plugins-bundled/zipkin/gpx_grafana-zipkin-datasource_linux_amd64"
+run_x >/dev/null
+check "no affected statement from a lapsed exception" "0" "$(doc '[.statements[] | select(.status=="affected")] | length')"
+check "the finding is under_investigation"            "under_investigation" "$(doc -r '.statements[0].status')"
+contains "with a note naming the lapse"               "$(doc -r '.statements[0].status_notes')" "expired"
+contains "and when"                                   "$(doc -r '.statements[0].status_notes')" "2026-08-01"
+
+# 33: carry-forward (Req 6.40). A statement the compiler wrote before keeps its
+#     timestamp; an unchanged one carries no last_updated, a changed one is
+#     stamped with this compile's report timestamp.
+previous_affected() { # $1 = action statement text
+  cat > "$SB/previous.json" <<JSON
+{"@context":"https://openvex.dev/ns/v0.2.0","@id":"https://openvex.dev/docs/dhc/previous",
+ "author":"dhc-pipeline triage","version":1,
+ "statements":[{"vulnerability":{"name":"CVE-2026-56853"},
+   "products":[{"@id":"pkg:oci/grafana@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                "subcomponents":[{"@id":"pkg:golang/stdlib@v1.26.4"}]}],
+   "status":"affected","timestamp":"2026-07-01T00:00:00Z",
+   "action_statement":"$1","action_statement_timestamp":"2026-08-10T00:00:00Z"}]}
+JSON
+}
+fresh
+exceptions CVE-2026-56853 2026-11-02 "transfer: waiting on a release built with go1.26.7"
+report_suppressed scan.json CVE-2026-56853 "transfer: waiting on a release built with go1.26.7"
+run_x >/dev/null
+same=$(doc -r '.statements[0].action_statement')
+previous_affected "$same"
+COMPILE_VEX_PREVIOUS="$SB/previous.json" run_x >/dev/null
+check "first seen carries forward"            "2026-07-01T00:00:00Z" "$(doc -r '.statements[0].timestamp')"
+check "unchanged content sets no last_updated" "null"                "$(doc -r '.statements[0].last_updated')"
+previous_affected "transfer: an earlier wording of the same decision"
+COMPILE_VEX_PREVIOUS="$SB/previous.json" run_x >/dev/null
+check "changed content keeps first seen"      "2026-07-01T00:00:00Z" "$(doc -r '.statements[0].timestamp')"
+check "and records the change"                "2026-08-28T06:00:00Z" "$(doc -r '.statements[0].last_updated')"
+
+# 34: an exception naming a finding the report lists nowhere compiles to
+#     nothing: an affected statement about a finding this digest does not
+#     carry would be an invented claim (Req 6.38 "naming a finding in that
+#     document's digest").
+fresh
+exceptions CVE-2026-77777 2026-11-02
+report scan.json CVE-2026-99999
+run_x >/dev/null
+check "no statement for a finding the digest does not carry" "0" "$(doc '[.statements[] | select(.vulnerability.name=="CVE-2026-77777")] | length')"
+
+# 35: the compile report counts what this lane produced, so a job summary can
+#     render it without grepping prose (Req 6.32).
+fresh
+exceptions CVE-2026-56853 2026-11-02
+report_suppressed scan.json CVE-2026-56853 "transfer: waiting on a release built with go1.26.7"
+COMPILE_VEX_REPORT="$SB/report.json" run_x >/dev/null
+check "report counts affected statements" "1" "$(jq '.affected' "$SB/report.json")"
+check "and lapses"                        "0" "$(jq '.lapsed' "$SB/report.json")"
+
+# 36: an exception file that does not exist is the common case (most images
+#     carry no exceptions) and compiles as before, never as an error.
+fresh
+report scan.json CVE-2026-99999
+out=$(COMPILE_VEX_EXCEPTIONS="$SB/absent.yaml" COMPILE_VEX_SCAN_REPORTS="$SB/scan.json" run; echo "rc=$?")
+contains "no exception file is not an error" "$out" "rc=0"
+check "and the uncovered finding is still stated" "under_investigation" "$(doc -r '.statements[0].status')"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
