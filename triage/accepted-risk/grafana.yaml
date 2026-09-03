@@ -13,6 +13,11 @@
 # a path matching nothing is silent in Trivy — no warning, exit 0, nothing
 # suppressed. See docs in triage/README.md and the measurements in
 # triage/upstream/checks/trivy-paths-scoping.sh.
+#
+# decided_at is the decision clock's start (Req 6.7): expired_at may run at
+# most the policy ceiling for the finding's tier from it (Req 6.11, 6.50).
+# The twelve entries below were decided on 2026-09-03, the 13.1.5 session that
+# rewrote this file (task 10.1 introduced the field the day before).
 vulnerabilities:
   # ---------------------------------------------------------------------------
   # The bundled zipkin plugin, third round. Grafana 13.1.5 ships zipkin v12.4.6
@@ -41,6 +46,7 @@ vulnerabilities:
               a prebuilt tarball. The exit is now visible: v12.4.7 is built with
               go1.26.7, past the go1.26.5 fix; 13.1.5 bundled v12.4.6"
     statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+    decided_at: 2026-09-03
     expired_at: 2026-11-02
 
   - id: CVE-2026-33818
@@ -53,6 +59,7 @@ vulnerabilities:
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
               (v12.4.7, go1.26.7) not yet bundled by a grafana release"
     statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+    decided_at: 2026-09-03
     expired_at: 2026-11-02
 
   - id: CVE-2026-39821
@@ -65,6 +72,7 @@ vulnerabilities:
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
               (v12.4.7, go1.26.7) not yet bundled by a grafana release"
     statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+    decided_at: 2026-09-03
     expired_at: 2026-11-02
 
   - id: CVE-2026-46600
@@ -77,6 +85,7 @@ vulnerabilities:
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
               (v12.4.7, go1.26.7) not yet bundled by a grafana release"
     statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+    decided_at: 2026-09-03
     expired_at: 2026-11-02
 
   - id: CVE-2026-56853
@@ -89,6 +98,7 @@ vulnerabilities:
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
               (v12.4.7, go1.26.7) not yet bundled by a grafana release"
     statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+    decided_at: 2026-09-03
     expired_at: 2026-11-02
 
   - id: CVE-2026-56858
@@ -101,6 +111,7 @@ vulnerabilities:
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
               (v12.4.7, go1.26.7) not yet bundled by a grafana release"
     statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+    decided_at: 2026-09-03
     expired_at: 2026-11-02
 
   - id: CVE-2026-56859
@@ -113,6 +124,7 @@ vulnerabilities:
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
               (v12.4.7, go1.26.7) not yet bundled by a grafana release"
     statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+    decided_at: 2026-09-03
     expired_at: 2026-11-02
 
   - id: CVE-2026-56860
@@ -125,6 +137,7 @@ vulnerabilities:
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
               (v12.4.7, go1.26.7) not yet bundled by a grafana release"
     statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+    decided_at: 2026-09-03
     expired_at: 2026-11-02
 
   - id: CVE-2026-56862
@@ -137,6 +150,7 @@ vulnerabilities:
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
               (v12.4.7, go1.26.7) not yet bundled by a grafana release"
     statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+    decided_at: 2026-09-03
     expired_at: 2026-11-02
 
   # The plugin's own grpc pin (v1.82.1), the same advisory the server binary
@@ -151,6 +165,7 @@ vulnerabilities:
     blocked: "as CVE-2026-39822: same binary, same upstream, same released fix
               (v12.4.7 links grpc v1.83.1) not yet bundled by a grafana release"
     statement: "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+    decided_at: 2026-09-03
     expired_at: 2026-11-02
 
   # ---------------------------------------------------------------------------
@@ -180,6 +195,7 @@ vulnerabilities:
               Fixed on grafana main (thrift v0.24.0) and not yet in a 13.x
               release; 13.1.5, the newest, still links the April pseudo-version"
     statement: "transfer: waiting on a grafana release carrying apache/thrift 0.24.0 (grafana/grafana#131921)"
+    decided_at: 2026-09-03
     expired_at: 2026-11-02
 
   - id: CVE-2026-84304
@@ -193,4 +209,5 @@ vulnerabilities:
               main pins grpc v1.83.0, one patch release short of the 1.83.1
               fix, so the ask upstream is a bump plus a backport"
     statement: "transfer: waiting on a grafana release carrying grpc-go 1.83.1 (grafana/grafana#131921)"
+    decided_at: 2026-09-03
     expired_at: 2026-11-02

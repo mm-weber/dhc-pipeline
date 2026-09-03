@@ -7,9 +7,13 @@
 # its expired_at stops suppressing (verified, and silently: nothing is logged).
 # Everything that makes such an entry *reviewable* is ours to enforce:
 #
-#   Req 6.11 — every entry names a treatment, an owner, the reasoning it came
-#              from, why avoidance and remediation were unavailable, and an
-#              expiry no more than 90 days out.
+#   Req 6.7, 6.11 — every entry names a treatment, an owner, the reasoning it
+#              came from, why avoidance and remediation were unavailable, the
+#              date it was decided, and an expiry no later than that decision
+#              date plus the policy file's largest ceiling (task 10.1: the
+#              clock starts at decided_at, not at whatever day the lint runs;
+#              the per-finding tier is check-exceptions.sh's job, Req 6.50).
+#   Req 6.10 — entries lapsing within the policy's warning window are reported.
 #   Req 6.12 — no Trivy ignore file lives anywhere else, because Trivy picks up
 #              .trivyignore from the working directory by default and that path
 #              has no owner, no expiry and no review trail.
@@ -20,8 +24,11 @@ set -euo pipefail
 
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 LANE="triage/accepted-risk"
-MAX_DAYS=90      # Req 6.11 ceiling
-NOTICE_DAYS=14   # Req 6.10 notice window
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# The clocks are declared, not constants (Req 6.49): the largest ceiling
+# bounds every entry, the warning window is what the rescan reports in.
+MAX_DAYS=$("$HERE/triage-policy.sh" "$ROOT" largest-ceiling)
+NOTICE_DAYS=$("$HERE/triage-policy.sh" "$ROOT" expiry-warning)
 violations=0
 
 # --- Req 6.12: no suppression channel outside the lane ----------------------
@@ -48,7 +55,7 @@ except ImportError:
     print(f"::error file={rel}::risk treatment (Req 6.11): PyYAML is required to lint the accepted-risk lane")
     sys.exit(1)
 
-REQUIRED = ["id", "treatment", "owner", "ref", "blocked", "statement", "expired_at"]
+REQUIRED = ["id", "treatment", "owner", "ref", "blocked", "statement", "decided_at", "expired_at"]
 TREATMENTS = ("accept", "transfer")
 WHY = {
     "id": "the CVE or advisory this exception covers",
@@ -57,6 +64,7 @@ WHY = {
     "ref": "the triage/LOG.md entry holding the reasoning",
     "blocked": "why avoidance and remediation were unavailable",
     "statement": "the one-line rationale Trivy renders in its report",
+    "decided_at": "the date this decision was made, where its ceiling starts",
     "expired_at": "the date this decision stops applying",
 }
 
@@ -154,12 +162,24 @@ for index, entry in enumerate(entries):
         errors += 1
         continue
 
+    raw_decided = entry.get("decided_at")
+    decided = as_date(raw_decided) if raw_decided is not None else None
+    if raw_decided is not None and decided is None:
+        print(f"::error file={rel},line={line}::risk treatment (Req 6.7): {label} has decided_at '{raw_decided}' — not a YYYY-MM-DD date, so its ceiling cannot be measured")
+        errors += 1
+        continue
+    if decided is not None:
+        span = (expiry - decided).days
+        if span < 0:
+            print(f"::error file={rel},line={line}::risk treatment (Req 6.11): {label} expired_at {expiry} is before its decided_at {decided} — a clock running backwards")
+            errors += 1
+        elif span > max_days:
+            print(f"::error file={rel},line={line}::risk treatment (Req 6.11): {label} runs {span} days from its decided_at {decided} to {expiry} — more than the policy's largest ceiling of {max_days} days is an indefinite acceptance wearing a date")
+            errors += 1
+
     days = (expiry - today).days
     if days < 0:
         print(f"::error file={rel},line={line}::risk treatment (Req 6.11): {label} expired_at {expiry} is in the past — Trivy already counts this finding again, so re-decide the risk or drop the entry")
-        errors += 1
-    elif days > max_days:
-        print(f"::error file={rel},line={line}::risk treatment (Req 6.11): {label} expired_at {expiry} is {days} days out — more than {max_days} days is an indefinite acceptance wearing a date")
         errors += 1
     elif days <= notice_days:
         owner = entry.get("owner", "?")

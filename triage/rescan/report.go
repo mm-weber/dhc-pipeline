@@ -80,6 +80,10 @@ type Issue struct {
 
 // ---- inputs to BuildIssues (all data, no I/O) ----
 type Inputs struct {
+	// Aperture is the decision aperture in rank order, first = most severe,
+	// as declared in catalogue-policy.yaml (Req 6.49). Nothing outside it is
+	// reported; nothing inside it is hard-coded here (task 10.1).
+	Aperture []string
 	Reports  []TrivyReport
 	EPSS     map[string]EPSSScore
 	KEV      map[string]bool
@@ -91,9 +95,10 @@ type Inputs struct {
 // are de-duplicated and sorted (Images ascending; Packages by Name). Non-
 // HIGH/CRITICAL severities are ignored. Result sorted: CRITICAL before HIGH,
 // then CVE id ascending.
-func Aggregate(reports []TrivyReport) []Finding {
+func Aggregate(reports []TrivyReport, aperture []string) []Finding {
 	type agg struct {
 		rank   int
+		sev    string
 		images map[string]bool
 		pkgs   map[string]Package
 		title  string
@@ -103,9 +108,9 @@ func Aggregate(reports []TrivyReport) []Finding {
 	for _, report := range reports {
 		for _, result := range report.Results {
 			for _, v := range result.Vulnerabilities {
-				rank := sevRank(v.Severity)
+				rank := sevRank(v.Severity, aperture)
 				if rank == 0 {
-					continue // ignore anything that is not HIGH/CRITICAL
+					continue // outside the declared aperture
 				}
 				a := byCVE[v.VulnerabilityID]
 				if a == nil {
@@ -114,6 +119,7 @@ func Aggregate(reports []TrivyReport) []Finding {
 				}
 				if rank > a.rank {
 					a.rank = rank
+					a.sev = strings.ToUpper(v.Severity)
 				}
 				a.images[report.ArtifactName] = true
 				if _, seen := a.pkgs[v.PkgName]; !seen {
@@ -149,7 +155,7 @@ func Aggregate(reports []TrivyReport) []Finding {
 
 		findings = append(findings, Finding{
 			CVE:      cve,
-			Severity: canonicalSev(a.rank),
+			Severity: a.sev,
 			Images:   images,
 			Packages: pkgs,
 			Title:    a.title,
@@ -158,33 +164,25 @@ func Aggregate(reports []TrivyReport) []Finding {
 	}
 
 	sort.Slice(findings, func(i, j int) bool {
-		ri, rj := sevRank(findings[i].Severity), sevRank(findings[j].Severity)
+		ri, rj := sevRank(findings[i].Severity, aperture), sevRank(findings[j].Severity, aperture)
 		if ri != rj {
-			return ri > rj // CRITICAL before HIGH
+			return ri > rj // most severe first, in the aperture's own order
 		}
 		return findings[i].CVE < findings[j].CVE
 	})
 	return findings
 }
 
-// sevRank ranks a Trivy severity: CRITICAL > HIGH > everything-else (0).
-func sevRank(s string) int {
-	switch strings.ToUpper(s) {
-	case "CRITICAL":
-		return 2
-	case "HIGH":
-		return 1
-	default:
-		return 0
+// sevRank ranks a Trivy severity by its position in the declared aperture:
+// the first entry ranks highest, anything outside the aperture is 0.
+func sevRank(s string, aperture []string) int {
+	s = strings.ToUpper(s)
+	for i, a := range aperture {
+		if strings.ToUpper(a) == s {
+			return len(aperture) - i
+		}
 	}
-}
-
-// canonicalSev turns a rank back into the canonical severity string.
-func canonicalSev(rank int) string {
-	if rank == 2 {
-		return "CRITICAL"
-	}
-	return "HIGH"
+	return 0
 }
 
 // BuildIssues aggregates, drops CVEs already tracked (in.Existing[cve]==true),
@@ -199,7 +197,7 @@ func BuildIssues(in Inputs) []Issue {
 	}
 
 	var items []enriched
-	for _, f := range Aggregate(in.Reports) {
+	for _, f := range Aggregate(in.Reports, in.Aperture) {
 		if in.Existing[f.CVE] {
 			continue // already-tracked CVE: no new issue
 		}
@@ -213,9 +211,9 @@ func BuildIssues(in Inputs) []Issue {
 	}
 
 	sort.Slice(items, func(i, j int) bool {
-		ri, rj := sevRank(items[i].f.Severity), sevRank(items[j].f.Severity)
+		ri, rj := sevRank(items[i].f.Severity, in.Aperture), sevRank(items[j].f.Severity, in.Aperture)
 		if ri != rj {
-			return ri > rj // CRITICAL block first
+			return ri > rj // most severe block first
 		}
 		if items[i].epss.Score != items[j].epss.Score {
 			return items[i].epss.Score > items[j].epss.Score // EPSS descending
