@@ -17,7 +17,7 @@ anything is implemented (amend the spec first, then /spec-implement).
       amendment sequence A–D in the review's section 6; F12 terms memo
       landed as `data/dhi-terms-2026-08-21.md`, obligations folded into
       clusters C and D)
-- [ ] 3. Spec amendments per accepted point: EARS criteria in
+- [x] 3. Spec amendments per accepted point: EARS criteria in
       `requirements.md`, rationale in `design.md`, task entries in `tasks.md`,
       one PR per cluster (the review's section 6 overrode the one-PR-per-decision
       rule for spec amendments; implementation stays one PR per task)
@@ -35,8 +35,30 @@ anything is implemented (amend the spec first, then /spec-implement).
             next
       - [ ] C. upstream trust (F2, F10, F8, chart tracking, `/main` lint)
       - [ ] D. catalogue posture (F1, F11, F12, F7, register; new Req 9)
-- [ ] 4. Only then: implementation PRs via /spec-implement, TDD where code
+- [x] 4. Only then: implementation PRs via /spec-implement, TDD where code
 
 ## Review
 
 (to fill when done)
+
+## Task 10.2: compiler emits `affected` from exceptions, carry-forward, lapses (2026-09-03)
+
+Goal: every known finding carries a published status. An accepted or
+transferred finding is visible to a consumer as `affected` with the decision
+attached, a lapsed exception is visible as `under_investigation` naming the
+lapse, and a re-compile keeps first-seen and records change (Req 6.8, 6.35,
+6.37 to 6.41). TDD: tests first, red, then the compiler and the lint.
+
+- [x] 1. compile-vex_test.sh: cases for affected (fields, products, subcomponents,
+      first seen), covered-by-source suppression, expired exception (no affected,
+      under_investigation with lapse note), carry-forward (timestamp kept,
+      last_updated on change, not on no-change), inert entry (no statement), report counts
+- [x] 2. lint-vex-product_test.sh: hand-authored affected / under_investigation / missing
+      status fail naming the statement (Req 6.39); existing "other status" cases inverted
+- [ ] 3. compile-vex.sh: read triage/accepted-risk/<definition>.yaml (COMPILE_VEX_EXCEPTIONS
+      seam), attribute suppressed findings to entries, emit affected, lapses, carry-forward
+- [ ] 4. lint-vex-product.sh: Req 6.39 rule
+- [x] 5. build.yml summary line counts affected and lapsed; docs (triage/README.md statuses,
+      user-manual compiler paragraph); tasks.md tick 10.2
+- [ ] 6. Run the whole validate chain locally as CI runs it; rehearse pass 2 against a real
+      report (the 13.1.5 rootfs scan) before pushing
