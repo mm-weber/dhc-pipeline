@@ -926,7 +926,7 @@ jobs:
           {
             echo "### OpenVEX for ${NAME}@${DIGEST}"
             echo
-            jq -r '"- statements from source: \(.compiled)\n- under investigation (uncovered at release): \(.under_investigation)\n- products dropped: \(.dropped)"' vexreport.json
+            jq -r '"- statements from source: \(.compiled)\n- affected (from unexpired exceptions, Req 6.38): \(.affected)\n- under investigation (uncovered at release): \(.under_investigation), of which lapsed exceptions: \(.lapsed)\n- products dropped: \(.dropped)"' vexreport.json
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Req 2.9. Recursive signing covers the index and every child manifest, so

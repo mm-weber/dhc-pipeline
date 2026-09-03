@@ -515,23 +515,33 @@ run_case "versionless with no status_notes at all fails" 1 "Req 6.31"
 # "fixed must carry one" is status-dependent.
 fresh; vex_status '"under_investigation"' "$CVE1" "$GRAFANA_PINNED" "$TEMPO"
 run_case "a digest fails on a status other than fixed too" 1 "Req 6.20"
+# Since task 10.2 the hand-authored lane holds only not_affected and fixed
+# (Req 6.39): accepted risk and transfers are exceptions under
+# triage/accepted-risk/ and compile to affected; under_investigation is what
+# the compiler derives from the attested report. Any other source status is a
+# decision written in the wrong lane, and the lint names the statement.
 fresh; vex_status '"affected"' "$CVE1" "$GRAFANA_TAGGED" "$TEMPO"
-run_case "a published tag passes on a status other than fixed too" 0
+run_case "a hand-authored affected fails, naming the statement" 1 "Req 6.39"
+run_case "and names the CVE"                                   1 "$CVE1"
 fresh; vex_status '"affected"' "$CVE1" "$GRAFANA_PRODUCT" "$TEMPO"
-run_case "affected with a versionless product passes" 0
+run_case "affected with a versionless product fails too" 1 "Req 6.39"
+fresh; vex_status '"under_investigation"' "$CVE1" "$GRAFANA_TAGGED" "$TEMPO"
+run_case "a hand-authored under_investigation fails" 1 "Req 6.39"
+fresh; vex_status '"not_affected"' "$CVE1" "$GRAFANA_TAGGED" "$TEMPO"
+refute_case "not_affected is still the hand-authored lane" 0 "Req 6.39"
 
 # 38: OpenVEX makes status required, so a statement without one is already
 # broken — it must not be broken into a free pass for a pinned product
 fresh; vex_status "" "$CVE1" "$GRAFANA_PINNED" "$TEMPO"
 run_case "a statement with no status fails on a versioned product" 1 "Req 6.20"
 fresh; vex_status "" "$CVE1" "$GRAFANA_PRODUCT" "$TEMPO"
-run_case "a statement with no status and a versionless product passes" 0
+run_case "a statement with no status is not in the hand-authored lane either" 1 "Req 6.39"
 
 # 39: present but empty is not present
 fresh; vex_status '""' "$CVE1" "$GRAFANA_PINNED" "$TEMPO"
 run_case "an empty status fails on a versioned product" 1 "Req 6.20"
 fresh; vex_status '""' "$CVE1" "$GRAFANA_PRODUCT" "$TEMPO"
-run_case "an empty status and a versionless product passes" 0
+run_case "an empty status fails the same way" 1 "Req 6.39"
 
 # 40: and neither is a status that is not a string. jq hands a stringified
 # array or object to any comparison that assumed one, and an object whose
@@ -541,7 +551,7 @@ run_case "an array status is not the fixed label" 1 "Req 6.20"
 fresh; vex_status '{"label": "fixed"}' "$CVE1" "$GRAFANA_PINNED" "$TEMPO"
 run_case "an object status that merely contains fixed is not the fixed label" 1 "Req 6.20"
 fresh; vex_status 'null' "$CVE1" "$GRAFANA_PRODUCT" "$TEMPO"
-run_case "a null status with a versionless product passes" 0
+run_case "a null status is not in the hand-authored lane" 1 "Req 6.39"
 
 # 41: OpenVEX status labels are a closed set of lower-case strings (spec,
 # Status Labels), so "Fixed" is not the fixed label: no consumer reads it as
@@ -551,7 +561,7 @@ run_case "a null status with a versionless product passes" 0
 fresh; vex_status '"Fixed"' "$CVE1" "$GRAFANA_PINNED" "$TEMPO"
 run_case "a status differing only in case is not the fixed label" 1 "Req 6.20"
 fresh; vex_status '"FIXED"' "$CVE1" "$GRAFANA_PRODUCT" "$TEMPO"
-run_case "an upper-case status does not demand a version" 0
+run_case "an upper-case status is not a hand-authored label either" 1 "Req 6.39"
 
 # 42: '@' delimits the version only before the qualifiers; inside a qualifier
 # value it is an ordinary character. A fixed product whose only '@' sits there

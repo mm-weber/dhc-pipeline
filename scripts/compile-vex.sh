@@ -82,8 +82,13 @@ if [ -f "$DEF_FILE" ]; then
   [ -n "$repo" ] && IMAGE="${repo##*/}"
 fi
 
-python3 - "$SRC" "$OUT" "$IMAGE" "$DIGEST" "$DEFINITION" "$@" <<'PY'
-import datetime, glob, json, os, sys
+# Task 10.2 (Req 6.38). The exception file is keyed by definition, exactly as
+# scan-image.sh keys its --ignorefile, so the suppressions in the attested
+# report and the statements compiled from them come from one file. Absent is
+# the common case (most images carry no exceptions) and compiles as before.
+EXCEPTIONS="${COMPILE_VEX_EXCEPTIONS:-$ROOT/triage/accepted-risk/${DEFINITION}.yaml}"
+COMPILE_VEX_EXCEPTIONS="$EXCEPTIONS" python3 - "$SRC" "$OUT" "$IMAGE" "$DIGEST" "$DEFINITION" "$@" <<'PY'
+import datetime, fnmatch, glob, json, os, re, sys
 
 src, out, image, digest, definition = sys.argv[1:6]
 tags = set(sys.argv[6:])
@@ -114,17 +119,59 @@ for path in scan_reports:
 # seen timestamp instead of resetting on every rebuild (cluster B's clocks).
 previous = os.environ.get("COMPILE_VEX_PREVIOUS", "")
 first_seen = {}
+# Req 6.40. The statements the compiler itself wrote last time (affected,
+# under_investigation), keyed by finding and package, so this compile can keep
+# their timestamp and record a change in last_updated rather than restating.
+previous_written = {}
+def vuln_name(st):
+    vuln = st.get("vulnerability")
+    return (vuln.get("name") if isinstance(vuln, dict) else vuln) or ""
+def first_subcomponent(st):
+    for product in st.get("products") or []:
+        for sub in product.get("subcomponents") or []:
+            if sub.get("@id"):
+                return sub["@id"]
+    return ""
 if previous:
     if not os.path.isfile(previous):
         print(f"compile-vex: previously attested document '{previous}' does not exist", file=sys.stderr)
         sys.exit(2)
     with open(previous) as fh:
         for st in (json.load(fh).get("statements") or []):
-            vuln = st.get("vulnerability")
-            name = (vuln.get("name") if isinstance(vuln, dict) else vuln) or ""
+            name = vuln_name(st)
             ts = st.get("timestamp")
             if name and ts and name not in first_seen:
                 first_seen[name] = ts
+            if name and st.get("status") in ("affected", "under_investigation"):
+                previous_written.setdefault((name, first_subcomponent(st)), st)
+def previous_for(cve, purl):
+    """The statement this compiler wrote for (finding, package) last time, or
+    the closest one it wrote for the finding: a previous document may predate
+    subcomponent scoping, and first seen is a property of the finding."""
+    for key in ((cve, purl), (cve, "")):
+        if key in previous_written:
+            return previous_written[key]
+    for (name, _), st in previous_written.items():
+        if name == cve:
+            return st
+    return None
+def carry_forward(st, purl, stamp):
+    """Req 6.40: timestamp is first seen, for life; last_updated records a change
+    to the decision-bearing content (status, action statement, packages)."""
+    cve = vuln_name(st)
+    prev = previous_for(cve, purl)
+    st["timestamp"] = (prev.get("timestamp") if prev and prev.get("timestamp") else
+                       first_seen.get(cve, stamp))
+    if prev is None:
+        return
+    def shape(x):
+        return (x.get("status"), x.get("action_statement"),
+                tuple(sorted(sub.get("@id", "") for p in (x.get("products") or [])
+                             for sub in (p.get("subcomponents") or []))))
+    if shape(prev) != shape(st):
+        st["last_updated"] = stamp
+    elif prev.get("last_updated"):
+        st["last_updated"] = prev["last_updated"]
 
 def parse(pid):
     """(name, version) for a pkg:oci purl, or (None, None) if it is not one."""
@@ -200,17 +247,91 @@ for path in sorted(glob.glob(os.path.join(src, "*.json"))):
 
     merged.extend(statements)
 
+# Req 6.38 / 6.41. The exceptions: real findings we ship anyway, for a bounded
+# time. Each unexpired one that the attested report lists as suppressed is
+# published as `affected` carrying the decision; an expired one is published as
+# nothing, and the finding it named, now reported again, is under_investigation
+# naming the lapse. Neither is coverage (Req 6.35): Trivy suppresses only
+# not_affected and fixed, and the gate counts only those.
+exceptions_path = os.environ.get("COMPILE_VEX_EXCEPTIONS", "")
+exceptions = []
+if exceptions_path and os.path.isfile(exceptions_path):
+    import yaml
+    with open(exceptions_path) as fh:
+        doc = yaml.safe_load(fh) or {}
+    for e in doc.get("vulnerabilities") or []:
+        if isinstance(e, dict) and e.get("id"):
+            exceptions.append(e)
+exceptions_name = os.path.basename(exceptions_path) if exceptions_path else ""
+def report_date(stamp):
+    """The calendar date of a report timestamp, in UTC. Trivy writes RFC 3339
+    with nanoseconds and a zone offset, which fromisoformat cannot read raw."""
+    if not stamp:
+        return None
+    text = re.sub(r"(\.\d{6})\d+", r"\1", stamp.strip()).replace("Z", "+00:00")
+    try:
+        return datetime.datetime.fromisoformat(text).astimezone(datetime.timezone.utc).date()
+    except ValueError:
+        return None
+def as_date(value):
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    try:
+        return datetime.date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+def expired(entry, today):
+    """Trivy's rule and the lint's: an entry is live through its expiry day."""
+    exp = as_date(entry.get("expired_at"))
+    return exp is not None and today is not None and exp < today
+def scoped_to(entry, target, purl):
+    paths = entry.get("paths") or []
+    if paths and not any(fnmatch.fnmatch(target, p) for p in paths):
+        return False
+    purls = entry.get("purls") or []
+    if purls and purl and not any(purl == p or purl.startswith(p + "@") or purl.startswith(p + "?")
+                                  for p in purls):
+        return False
+    return True
+def action_statement(entry):
+    treatment = entry.get("treatment", "accept")
+    text = str(entry.get("statement", "")).strip()
+    # House style writes the statement as "<treatment>: ..."; do not say it twice.
+    head = text if text.startswith(f"{treatment}:") else f"{treatment}: {text}"
+    parts = [head.rstrip()]
+    if entry.get("issue"):
+        parts.append(f"Upstream issue: {entry['issue']}.")
+    if entry.get("paths"):
+        parts.append("Binaries: " + ", ".join(entry["paths"]) + ".")
+    if entry.get("expired_at"):
+        parts.append(f"Expires: {as_date(entry['expired_at']) or entry['expired_at']}.")
+    return " ".join(parts)
+# The clock an exception is measured against is the attested report's, not the
+# runner's wall clock, so a compile is reproducible from its named inputs.
+report_stamps = []
+for path in scan_reports:
+    with open(path) as fh:
+        report_stamps.append(json.load(fh).get("CreatedAt") or "")
+compile_stamp = max(report_stamps) if report_stamps else \
+    datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+today = report_date(compile_stamp)
 # Req 2.12. Every finding the release-time scan still reports is uncovered by
 # construction (VEX and unexpired exceptions were applied to that scan), so it
 # is published as under_investigation, derived from the report and carrying its
 # timestamp. Keyed by vulnerability and package so two platform manifests
 # reporting the same finding state it once.
 investigating = {}
+affected = {}
+lapsed = 0
 for path in scan_reports:
     with open(path) as fh:
         rep = json.load(fh)
     stamp = rep.get("CreatedAt") or ""
+    basename = os.path.basename(path)
     for result in rep.get("Results") or []:
+        target = result.get("Target") or ""
         for v in result.get("Vulnerabilities") or []:
             cve = v.get("VulnerabilityID")
             if not cve or cve in covered:
@@ -220,22 +341,83 @@ for path in scan_reports:
             key = (cve, purl or v.get("PkgName") or "")
             if key in investigating:
                 continue
+            note = (f"uncovered at release time in this digest's attested "
+                    f"release-time scan report ({basename}); awaiting a triage decision")
+            # Req 6.41. If an expired exception named this finding, the lapse is
+            # why it is reported again, and the note says so: the decision
+            # clock restarts, first seen does not.
+            lapses = [e for e in exceptions if e.get("id") == cve and expired(e, today)
+                      and scoped_to(e, target, purl)]
+            if lapses:
+                e = lapses[0]
+                note = (f"accepted-risk exception ({e.get('treatment', 'accept')}, decided "
+                        f"{as_date(e.get('decided_at')) or 'undated'}) expired on "
+                        f"{as_date(e.get('expired_at'))}; the finding is still listed in this "
+                        f"digest's attested scan report ({basename}); awaiting a new decision")
+                lapsed += 1
             st = {
                 "vulnerability": {"name": cve},
                 "products": [{"@id": f"pkg:oci/{image}@{d}"} for d in digests],
                 "status": "under_investigation",
-                # First seen, not "seen again": a rebuild must not reset the
-                # clock a decision is measured against.
-                "timestamp": first_seen.get(cve, stamp),
-                "status_notes": (f"uncovered at release time in this digest's attested "
-                                 f"release-time scan report ({os.path.basename(path)}); "
-                                 f"awaiting a triage decision"),
+                "status_notes": note,
             }
             if purl:
                 for product in st["products"]:
                     product["subcomponents"] = [{"@id": purl}]
+            # First seen, not "seen again": a rebuild must not reset the clock
+            # a decision is measured against.
+            carry_forward(st, purl, stamp)
             investigating[key] = st
-
+        # Req 6.38. What the ignorefile suppressed is in the report by name
+        # (--show-suppressed, Req 6.55), each finding attributed to its entry's
+        # statement text. Only the file this compile was handed counts: a
+        # suppression from another source is not one of ours to publish.
+        for mod in result.get("ExperimentalModifiedFindings") or []:
+            if mod.get("Type", "vulnerability") != "vulnerability" or mod.get("Status") != "ignored":
+                continue
+            if exceptions_name and os.path.basename(str(mod.get("Source") or "")) != exceptions_name:
+                continue
+            f = mod.get("Finding") or {}
+            cve = f.get("VulnerabilityID")
+            if not cve or cve in covered:
+                continue
+            purl = (f.get("PkgIdentifier") or {}).get("PURL") or ""
+            key = (cve, purl or f.get("PkgName") or "")
+            live = [e for e in exceptions if e.get("id") == cve and not expired(e, today)
+                    and scoped_to(e, target, purl)]
+            exact = [e for e in live if e.get("statement") == mod.get("Statement")]
+            entry = (exact or live or [None])[0]
+            if entry is None:
+                print(f"compile-vex: {cve} is suppressed in {basename} by {exceptions_name} but no "
+                      f"unexpired entry there names it for {target}; publishing nothing for it",
+                      file=sys.stderr)
+                continue
+            if key in affected:
+                # The same package at the same version in another binary, under
+                # its own entry (one entry per binary, Req 6.23): one statement
+                # per finding and package, carrying every decision made about it.
+                have = affected[key]["action_statement"]
+                more = action_statement(entry)
+                if more not in have:
+                    affected[key]["action_statement"] = f"{have} Also: {more}"
+                continue
+            st = {
+                "vulnerability": {"name": cve},
+                "products": [{"@id": f"pkg:oci/{image}@{d}"} for d in digests],
+                "status": "affected",
+                "action_statement": action_statement(entry),
+                "status_notes": (f"accepted-risk exception in {exceptions_name}; real and shipped "
+                                 f"for a bounded time, not coverage (Req 6.8)"),
+            }
+            decided = as_date(entry.get("decided_at"))
+            if decided:
+                st["action_statement_timestamp"] = f"{decided.isoformat()}T00:00:00Z"
+            if purl:
+                for product in st["products"]:
+                    product["subcomponents"] = [{"@id": purl}]
+            carry_forward(st, purl, stamp)
+            affected[key] = st
+merged.extend(affected[k] for k in sorted(affected))
 merged.extend(investigating[k] for k in sorted(investigating))
 
 # One document per digest, written even with zero statements (ADR 0003):
@@ -257,7 +439,8 @@ with open(os.path.join(out, f"{image}.openvex.json"), "w") as fh:
     fh.write("\n")
 
 print(f"compile-vex: {compiled} statement(s) compiled for {image}@{digest}, "
-      f"{len(investigating)} under_investigation, {dropped} product(s) dropped")
+      f"{len(affected)} affected from exceptions, {len(investigating)} under_investigation "
+      f"({lapsed} lapsed exception(s)), {dropped} product(s) dropped")
 
 # Req 6.32. Optional, so every existing caller is unaffected: a workflow that
 # wants to render this in a summary asks for it by naming a path.
@@ -267,6 +450,7 @@ if report:
         json.dump({"image": definition, "product": image, "digest": digest,
                    "digests": digests, "tags": sorted(tags), "compiled": compiled,
                    "under_investigation": len(investigating),
+                   "affected": len(affected), "lapsed": lapsed,
                    "dropped": dropped, "drops": drops},
                   fh, indent=2)
         fh.write("\n")

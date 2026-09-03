@@ -181,8 +181,9 @@ What each artifact gives you:
   advisory databases via purls. The CycloneDX copy carries the apk pull
   checksums the nightly publish-on-change comparison reads (Req 2.15).
 - **Scan report** (Trivy, cosign `vuln` predicate) — the release-time scan of
-  exactly this platform manifest, the input the VEX document's
-  `under_investigation` statements derive from (Req 2.12).
+  exactly this platform manifest, suppressed findings included, the input the
+  VEX document's `under_investigation` and `affected` statements derive from
+  (Req 2.12, 6.38).
 - **Provenance** (BuildKit, `mode=max`) — the builder, the invocation, and
   every input with its *resolved* digest. This is what connects the SBOM's
   claims to verifiable materials (see [concepts.md](concepts.md), "The trust

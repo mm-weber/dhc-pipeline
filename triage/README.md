@@ -162,12 +162,25 @@ things people conflate have to stay apart:
 |---|---|---|
 | `not_affected` | The vulnerable code cannot execute here | OpenVEX statement + `LOG.md` |
 | prioritisation | Real, but low EPSS / not KEV, so it waits | `LOG.md` only |
-| accepted risk | Real and reachable; we ship anyway | `LOG.md` only, with an owner |
+| accepted risk, transfer | Real and reachable; we ship anyway, for a bounded time | exception under `accepted-risk/` + `LOG.md`, with an owner; published as `affected` |
 
-Only the first is a VEX statement. Writing "low risk" or "we accept it" into a
-VEX is **VEX-washing** — it launders a business decision into a machine-readable
-claim of technical inapplicability, and every downstream consumer inherits it.
-EPSS and KEV order the queue; they never justify a status.
+Only the first is a hand-authored VEX statement, and the lint refuses any other
+status under `vex/` (Req 6.39). Writing "low risk" or "we accept it" into a
+VEX as `not_affected` is **VEX-washing** — it launders a business decision into
+a machine-readable claim of technical inapplicability, and every downstream
+consumer inherits it. EPSS and KEV order the queue; they never justify a status.
+
+The published document still says something about every known finding
+(task 10.2). `scripts/compile-vex.sh` reads the attested scan report and the
+exception file and adds, for each unexpired exception the report lists as
+suppressed, an `affected` statement whose action statement carries the
+treatment, the statement text, the upstream issue, the binaries and the expiry,
+with `action_statement_timestamp` from `decided_at` (Req 6.38). An expired
+exception compiles to nothing, and the finding it named, reported again, is
+`under_investigation` with a note naming the lapse (Req 6.41). A statement the
+compiler wrote before keeps its `timestamp` as first seen and records a change
+in `last_updated` (Req 6.40). None of that is coverage: Trivy suppresses only
+`not_affected` and `fixed`, and the gate counts only those (Req 6.35).
 
 ## Authoring a statement
 
