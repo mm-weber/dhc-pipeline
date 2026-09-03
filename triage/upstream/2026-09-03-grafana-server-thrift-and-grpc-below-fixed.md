@@ -2,8 +2,10 @@
 
 **Target repo:** `grafana/grafana`
 **Drafted:** 2026-09-03
-**Filed:** pending. The issue body is this file from `## Summary` down,
-unmodified. Measurements reproduce with
+**Filed:** 2026-09-03 as
+[grafana/grafana#131921](https://github.com/grafana/grafana/issues/131921).
+The issue body is this file from `## Summary` down, unmodified. Measurements
+reproduce with
 [`checks/grafana-server-pins.sh 13.1.5 33098073184`](checks/grafana-server-pins.sh).
 
 ---
