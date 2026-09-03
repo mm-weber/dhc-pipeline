@@ -66,6 +66,14 @@ CRANE_URLDIR="google/go-containerregistry/releases/download/v${CRANE_VER}"
 CRANE_PIN=edb74d53fad9a596860f59d1c5d04a43dfb5f441dc71f57060dd0bf39483c833
 CRANE_DEP=google/go-containerregistry
 
+# vexctl merges several OpenVEX documents into one for the rescan's
+# carry-forward (task 10.3); a bare binary like kind, version in the URL only.
+VEXCTL_VER=0.4.4
+VEXCTL_ASSET="vexctl-linux-amd64"
+VEXCTL_URLDIR="openvex/vexctl/releases/download/v${VEXCTL_VER}"
+VEXCTL_PIN=d315e2778af88b999ad4bba30a08aa2677ed701638e16c341b6d57b43c1e064d
+VEXCTL_DEP=openvex/vexctl
+
 DEFAULT_ARCH=x86_64
 ARCH="$DEFAULT_ARCH"
 
@@ -75,6 +83,7 @@ HELM_MARKER="helm v${HELM_VER} (dhc-test-fixture)"
 CT_MARKER="ct v${CT_VER} (dhc-test-fixture)"
 SYFT_MARKER="syft v${SYFT_VER} (dhc-test-fixture)"
 CRANE_MARKER="crane v${CRANE_VER} (dhc-test-fixture)"
+VEXCTL_MARKER="vexctl v${VEXCTL_VER} (dhc-test-fixture)"
 
 list_real_bin() { find /usr/local/bin -maxdepth 1 -printf '%f\n' 2>/dev/null | sort; }
 BIN_BEFORE=$(list_real_bin)
@@ -183,6 +192,10 @@ assert_source() { # name, present|absent, extended-regex — non-comment lines o
 # kind's asset is the bare binary; kyverno's is a tarball that also carries a
 # licence file, so extracting the whole archive into a PATH directory is
 # visible (same trick as install-scanners_test.sh).
+make_vexctl_asset() { # marker
+  mkdir -p "$UP/$VEXCTL_URLDIR"
+  printf '#!/bin/sh\necho "%s"\n' "$1" > "$UP/$VEXCTL_URLDIR/$VEXCTL_ASSET"
+}
 make_kind_asset() { # marker
   mkdir -p "$UP/$KIND_URLDIR"
   printf '#!/bin/sh\necho "%s"\n' "$1" > "$UP/$KIND_URLDIR/$KIND_ASSET"
@@ -262,6 +275,7 @@ setup() { # fresh sandbox: all assets served, empty destdir, shipped pins in for
   make_ct_asset "$CT_MARKER"
   make_syft_asset "$SYFT_MARKER"
   make_crane_asset "$CRANE_MARKER"
+  make_vexctl_asset "$VEXCTL_MARKER"
 }
 
 write_pins() { # record the fixtures' real digests — the offline success path
@@ -273,6 +287,7 @@ write_pins() { # record the fixtures' real digests — the offline success path
   (cd "$UP/$CT_URLDIR" && sha256sum "$CT_ASSET") >> "$PINS"
   (cd "$UP/$SYFT_URLDIR" && sha256sum "$SYFT_ASSET") >> "$PINS"
   (cd "$UP/$CRANE_URLDIR" && sha256sum "$CRANE_ASSET") >> "$PINS"
+  (cd "$UP/$VEXCTL_URLDIR" && sha256sum "$VEXCTL_ASSET") >> "$PINS"
 }
 
 asset_sha() { sha256sum "$1" | cut -d' ' -f1; }
@@ -432,6 +447,15 @@ setup; invoke crane
 assert_absent "nothing is installed when the shipped pin does not match (crane)" crane
 assert_out    "the shipped crane pin is the documented digest" "$CRANE_PIN"
 
+setup; invoke vexctl
+assert_absent "nothing is installed when the shipped pin does not match (vexctl)" vexctl
+assert_out    "the shipped vexctl pin is the documented digest" "$VEXCTL_PIN"
+
+setup; write_pins; invoke vexctl
+assert_rc        "vexctl: matching checksum installs cleanly" 0
+assert_installed "vexctl is installed and executable" vexctl
+assert_payload   "installed vexctl is the artifact that was verified" vexctl "$VEXCTL_MARKER"
+
 # --- 6: an asset with no recorded pin ---------------------------------------
 
 setup; write_pins
@@ -473,6 +497,7 @@ assert_rc     "a missing tool argument is refused" 1
 assert_pin_block kind KIND "$KIND_DEP" "$KIND_VER" "$KIND_PIN"
 assert_pin_block kyverno KYVERNO "$KYVERNO_DEP" "$KYVERNO_VER" "$KYVERNO_PIN"
 assert_pin_block helm HELM "$HELM_DEP" "$HELM_VER" "$HELM_PIN"
+assert_pin_block vexctl VEXCTL "$VEXCTL_DEP" "$VEXCTL_VER" "$VEXCTL_PIN"
 assert_pin_block ct CT "$CT_DEP" "$CT_VER" "$CT_PIN"
 assert_pin_block syft SYFT "$SYFT_DEP" "$SYFT_VER" "$SYFT_PIN"
 
