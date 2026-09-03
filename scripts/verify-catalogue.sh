@@ -25,9 +25,14 @@
 # measured on kyverno 1.18.2, which prints a text preamble first).
 #
 # Verdicts per resource: pass, fail, or error (the tool could not verify:
-# registry, Rekor or Fulcio unreachable). An error on any resource fails the
-# proof by name: not verified is not admitted. A missing enumeration or an
-# undeclared control refuses (exit 2) rather than passing vacuously.
+# registry, Rekor or Fulcio unreachable). A rejection in the batch is
+# re-applied alone: measured 2026-09-03 on kyverno 1.18.2, three runs, the
+# first ten pods of a nineteen-pod batch were rejected with the same
+# attestation shapes as the nine admitted after them. A digest the policy
+# admits alone is admitted and the batch artefact is named (::warning,
+# recorded); one rejected alone as well fails the proof by name: not
+# verified is not admitted. A missing enumeration or an undeclared control
+# refuses (exit 2) rather than passing vacuously.
 set -euo pipefail
 
 err() { printf '::error::verify-catalogue: %s\n' "$1" >&2; }
@@ -102,34 +107,60 @@ EOF
 kyverno apply "$POLICY" --resource "$WORK/pods.yaml" --registry -p --output-format json \
   > "$WORK/raw" 2>"$WORK/kyverno.err" || true
 
-python3 - "$WORK/raw" "$WORK/map" "$OUT" "$WORK/kyverno.err" <<'PY'
-import json, sys
-raw = open(sys.argv[1]).read()
-starts = [k for k in (raw.find("{"), raw.find("[")) if k >= 0]
-if not starts:
+python3 - "$WORK/raw" "$WORK/map" "$OUT" "$WORK/kyverno.err" "$POLICY" "$WORK" <<'PY'
+import json, subprocess, sys
+def verdicts(raw):
+    """name -> (result, message) from a kyverno JSON report; the worst verdict
+    per resource wins: error > fail > pass."""
+    starts = [k for k in (raw.find("{"), raw.find("[")) if k >= 0]
+    if not starts:
+        return None
+    doc = json.loads(raw[min(starts):])
+    out = {}
+    for d in (doc if isinstance(doc, list) else [doc]):
+        for r in d.get("results", []):
+            for res in r.get("resources", []):
+                n = res.get("name")
+                rank = {"error": 3, "fail": 2, "pass": 1}
+                cur = out.get(n, ("none", ""))
+                if rank.get(r.get("result"), 0) >= rank.get(cur[0], 0):
+                    # The whole reason, not its first line: Kyverno names the
+                    # attestation type, the counts and the subject it received,
+                    # and the first live run (2026-09-03) cut off exactly the
+                    # part that said why. Capped only where GitHub would.
+                    out[n] = (r.get("result"), (r.get("message") or "")[:4000])
+    return out
+verdict = verdicts(open(sys.argv[1]).read())
+if verdict is None:
     print("::error::verify-catalogue: kyverno produced no policy report; stderr: " + open(sys.argv[4]).read().strip()[:500], file=sys.stderr)
     sys.exit(1)
-doc = json.loads(raw[min(starts):])
-docs = doc if isinstance(doc, list) else [doc]
-verdict = {}
-for d in docs:
-    for r in d.get("results", []):
-        for res in r.get("resources", []):
-            n = res.get("name")
-            # the worst verdict per resource wins: error > fail > pass
-            rank = {"error": 3, "fail": 2, "pass": 1}
-            cur = verdict.get(n, ("none", ""))
-            if rank.get(r.get("result"), 0) >= rank.get(cur[0], 0):
-                # The whole reason, not its first line: Kyverno names the
-                # attestation type, the counts and the subject it received,
-                # and the first live run (2026-09-03) cut off exactly the
-                # part that said why. Capped only where GitHub would.
-                verdict[n] = (r.get("result"), (r.get("message") or "")[:4000])
+policy, work = sys.argv[5], sys.argv[6]
 rows = [line.rstrip("\n").split("\t") for line in open(sys.argv[2])]
-failures = []
-admitted = 0
+# One pod per document in the batch file, by name, so a rejected digest can be
+# re-applied alone. Measured 2026-09-03 on kyverno 1.18.2 across three runs:
+# exactly the first ten pods of a nineteen-pod batch were rejected, with the
+# same attestation shapes on both sides of the line. Req 2.24 is a claim
+# about the policy over each digest, so a digest the policy admits alone is
+# admitted, and the batch artefact is named rather than silently absorbed.
+pods = {}
+for chunk in open(f"{work}/pods.yaml").read().split("\n---\n"):
+    for line in chunk.splitlines():
+        if line.strip().startswith("name: "):
+            pods[line.split("name: ", 1)[1].strip()] = chunk.strip() + "\n"
+            break
+def alone(name):
+    path = f"{work}/alone-{name}.yaml"
+    open(path, "w").write(pods[name])
+    r = subprocess.run(["kyverno", "apply", policy, "--resource", path, "--registry", "-p", "--output-format", "json"],
+                       capture_output=True, text=True)
+    v = verdicts(r.stdout) or {}
+    return v.get(name, ("missing", "no result for this resource in the report"))
+failures, warnings = [], []
+admitted = flakes = 0
+record = {}
 for name, ref, tags in rows:
     result, msg = verdict.get(name, ("missing", "no result for this resource in the report"))
+    entry = {"name": name, "ref": ref, "tags": tags, "result": result, "message": msg}
     if name.startswith("control"):
         if result == "fail":
             print(f"verify-catalogue: control rejected as required: {ref}")
@@ -137,22 +168,32 @@ for name, ref, tags in rows:
             failures.append(f"the CONTROL was ADMITTED: {ref}; the policy admits an unsigned digest and proves nothing (Req 2.24)")
         else:
             failures.append(f"control {ref}: {result} ({msg}); not a rejection")
+    elif result == "pass":
+        admitted += 1
     else:
-        if result == "pass":
-            admitted += 1
-        elif result == "fail":
+        a_result, a_msg = alone(name)
+        entry["alone"] = {"result": a_result, "message": a_msg}
+        if a_result == "pass":
+            admitted += 1; flakes += 1
+            entry["batch_flake"] = True
+            warnings.append(f"admitted alone, rejected in the batch of {len(rows) - 1}: {ref} (tags: {tags}); the batch said: {msg}")
+        elif result == "fail" and a_result == "fail":
             # kyverno reports an unverifiable image (no roots, no registry)
             # as "fail" too, so the label claims only what is known: the
             # digest was NOT ADMITTED, and the message says why.
-            failures.append(f"NOT ADMITTED: tag-referenced digest {ref} (tags: {tags}): {msg}")
+            failures.append(f"NOT ADMITTED (alone as well): tag-referenced digest {ref} (tags: {tags}): {a_msg}")
         else:
-            failures.append(f"{result.upper()} on {ref} (tags: {tags}): {msg}; not verified is not admitted")
-json.dump({"control": rows[-1][1], "resources": [{"name": n, "ref": ref, "tags": tags, "result": verdict.get(n, ("missing", ""))[0], "message": verdict.get(n, ("missing", ""))[1]} for n, ref, tags in rows],
-           "failures": failures}, open(sys.argv[3], "w"), indent=2)
+            failures.append(f"{a_result.upper()} on {ref} (tags: {tags}), alone as well: {a_msg}; not verified is not admitted")
+    record[name] = entry
+json.dump({"control": rows[-1][1], "resources": [record[n] for n, _, _ in rows],
+           "batch_flakes": flakes, "failures": failures, "warnings": warnings}, open(sys.argv[3], "w"), indent=2)
+for w in warnings:
+    print(f"::warning::verify-catalogue: {w}", file=sys.stderr)
 for f in failures:
     print(f"::error::verify-catalogue: {f}", file=sys.stderr)
 if failures:
     print(f"::error::verify-catalogue: {len(failures)} admission-proof failure(s) over {len(rows) - 1} tag-referenced digest(s) (Req 2.24)", file=sys.stderr)
     sys.exit(1)
-print(f"verify-catalogue: {admitted} admitted, control rejected; the admission policy holds over every tag-referenced digest (Req 2.24)")
+note = f" ({flakes} admitted alone after a batch rejection)" if flakes else ""
+print(f"verify-catalogue: {admitted} admitted{note}, control rejected; the admission policy holds over every tag-referenced digest (Req 2.24)")
 PY
