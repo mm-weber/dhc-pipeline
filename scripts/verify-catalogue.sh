@@ -107,8 +107,8 @@ EOF
 kyverno apply "$POLICY" --resource "$WORK/pods.yaml" --registry -p --output-format json \
   > "$WORK/raw" 2>"$WORK/kyverno.err" || true
 
-python3 - "$WORK/raw" "$WORK/map" "$OUT" "$WORK/kyverno.err" "$POLICY" "$WORK" <<'PY'
-import json, subprocess, sys
+python3 - "$WORK/raw" "$WORK/map" "$OUT" "$WORK/kyverno.err" "$POLICY" "$WORK" "$ENUM" "$ROOT/catalogue-policy.yaml" <<'PY'
+import json, shutil, subprocess, sys, yaml
 def verdicts(raw):
     """name -> (result, message) from a kyverno JSON report; the worst verdict
     per resource wins: error > fail > pass."""
@@ -148,6 +148,52 @@ for chunk in open(f"{work}/pods.yaml").read().split("\n---\n"):
         if line.strip().startswith("name: "):
             pods[line.split("name: ", 1)[1].strip()] = chunk.strip() + "\n"
             break
+# The cosign second opinion (task 9.6 follow-up, 2026-09-03): Kyverno's
+# rejection reasons are terse, cosign's are not. For a digest the policy
+# rejects alone, ask cosign the same questions the policy asks, one per role
+# and type, on the index and on every platform manifest the enumeration lists,
+# and keep every answer. Identities come from the policy file, as the rendered
+# policy's did; a policy file without roles, or a runner without cosign, is
+# recorded as "not asked", never as a pass.
+enum_path, policy_yaml = sys.argv[7], sys.argv[8]
+pol = (yaml.safe_load(open(policy_yaml)) or {}).get("verification") or {}
+roles = pol.get("roles") or {}
+required = pol.get("required") or {}
+issuer = pol.get("issuer") or ""
+manifests_of = {}
+for line in open(enum_path):
+    parts = line.rstrip("\n").split("\t")
+    if len(parts) >= 5 and parts[0]:
+        key = f"{parts[0]}@{parts[2]}"
+        m = f"{parts[0]}@{parts[4]}"
+        if parts[4] and m != key and m not in manifests_of.setdefault(key, []):
+            manifests_of[key].append(m)
+def cosign_says(args):
+    r = subprocess.run(["cosign"] + args, capture_output=True, text=True)
+    if r.returncode == 0:
+        return "ok"
+    first = next((l for l in (r.stderr or r.stdout).splitlines() if l.strip()), "failed")
+    return first.strip().removeprefix("Error: ")[:300]
+def second_opinion(ref):
+    if not (shutil.which("cosign") and issuer and roles and required.get("signature")):
+        return {"not asked": "cosign or the policy file's verification roles are not available"}
+    answers = {}
+    for target in [ref] + manifests_of.get(ref, []):
+        sig_id = roles.get(required["signature"], {}).get("identity", "")
+        a = {"signature": cosign_says(["verify", "--certificate-oidc-issuer", issuer, "--certificate-identity", sig_id, target])}
+        for alias, who in (required.get("attestations") or {}).items():
+            for role in who:
+                a[f"{alias} by {role}"] = cosign_says(["verify-attestation", "--type", alias, "--certificate-oidc-issuer", issuer,
+                                                       "--certificate-identity", roles.get(role, {}).get("identity", ""), target])
+        answers[target] = a
+    return answers
+def describe(ref, answers):
+    parts = []
+    for target, a in answers.items():
+        label = "index" if target == ref else f"manifest {target.split('@', 1)[1]}"
+        for k, v in a.items():
+            parts.append(f"{label} {k}: {v}")
+    return "; ".join(parts)
 def alone(name):
     path = f"{work}/alone-{name}.yaml"
     open(path, "w").write(pods[name])
@@ -155,7 +201,7 @@ def alone(name):
                        capture_output=True, text=True)
     v = verdicts(r.stdout) or {}
     return v.get(name, ("missing", "no result for this resource in the report"))
-failures, warnings = [], []
+failures, warnings, notices = [], [], []
 admitted = flakes = 0
 record = {}
 for name, ref, tags in rows:
@@ -177,16 +223,21 @@ for name, ref, tags in rows:
             admitted += 1; flakes += 1
             entry["batch_flake"] = True
             warnings.append(f"admitted alone, rejected in the batch of {len(rows) - 1}: {ref} (tags: {tags}); the batch said: {msg}")
-        elif result == "fail" and a_result == "fail":
-            # kyverno reports an unverifiable image (no roots, no registry)
-            # as "fail" too, so the label claims only what is known: the
-            # digest was NOT ADMITTED, and the message says why.
-            failures.append(f"NOT ADMITTED (alone as well): tag-referenced digest {ref} (tags: {tags}): {a_msg}")
         else:
-            failures.append(f"{a_result.upper()} on {ref} (tags: {tags}), alone as well: {a_msg}; not verified is not admitted")
+            entry["cosign"] = second_opinion(ref)
+            notices.append(f"cosign on {ref}: {describe(ref, entry['cosign'])}")
+            if result == "fail" and a_result == "fail":
+                # kyverno reports an unverifiable image (no roots, no registry)
+                # as "fail" too, so the label claims only what is known: the
+                # digest was NOT ADMITTED, and the message says why.
+                failures.append(f"NOT ADMITTED (alone as well): tag-referenced digest {ref} (tags: {tags}): {a_msg}")
+            else:
+                failures.append(f"{a_result.upper()} on {ref} (tags: {tags}), alone as well: {a_msg}; not verified is not admitted")
     record[name] = entry
 json.dump({"control": rows[-1][1], "resources": [record[n] for n, _, _ in rows],
            "batch_flakes": flakes, "failures": failures, "warnings": warnings}, open(sys.argv[3], "w"), indent=2)
+for n in notices:
+    print(f"::notice::verify-catalogue: {n}", file=sys.stderr)
 for w in warnings:
     print(f"::warning::verify-catalogue: {w}", file=sys.stderr)
 for f in failures:

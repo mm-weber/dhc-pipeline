@@ -29,8 +29,43 @@ fresh() {
   cat > "$SB/root/catalogue-policy.yaml" <<EOF
 verification:
   registry: ghcr.io/acme/dhc
+  issuer: https://token.actions.githubusercontent.com
+  roles:
+    releaser:
+      identity: https://github.com/acme/dhc/.github/workflows/build.yml@refs/heads/main
+      attests: [spdxjson, cyclonedx, vuln, openvex]
+    re-attester:
+      identity: https://github.com/acme/dhc/.github/workflows/rescan.yml@refs/heads/main
+      attests: [openvex, vuln]
+  required:
+    signature: releaser
+    attestations:
+      spdxjson: [releaser]
+      openvex: [releaser, re-attester]
   control: ${CONTROL}
 EOF
+  # cosign, the second opinion on a digest the policy rejects alone: each
+  # call answers ok unless STUB_COSIGN_FAIL names it as "<ref substring>|<what>"
+  # entries, what being sig, spdxjson:<role>, or openvex:<role>.
+  cat > "$SB/bin/cosign" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "cosign $*" >> "${STUB_ARGV}"
+ref="${*: -1}"; what="sig"; role=""
+type=""; id=""; prev=""
+for a in "$@"; do
+  [ "$prev" = "--type" ] && type="$a"; [ "$prev" = "--certificate-identity" ] && id="$a"; prev="$a"
+done
+case "$id" in *build.yml*) role=releaser;; *rescan.yml*) role=re-attester;; esac
+[ "$1" = "verify-attestation" ] && what="${type}:${role}"
+IFS=';' read -r -a rules <<< "${STUB_COSIGN_FAIL:-}"
+for r in "${rules[@]}"; do
+  [ -z "$r" ] && continue
+  sub="${r%%|*}"; w="${r#*|}"
+  if [[ "$ref" == *"$sub"* && "$w" == "$what" ]]; then echo "Error: no matching ${what} found for ${ref} (stub)" >&2; exit 1; fi
+done
+echo '{"verified":"stub"}'
+STUB
+  chmod +x "$SB/bin/cosign"
   printf 'apiVersion: kyverno.io/v1\nkind: ClusterPolicy\nmetadata: {name: verify-catalogue-images}\n' > "$SB/root/policies/verify-catalogue-images.yaml"
   # Two tags sharing one digest, a two-platform index, a superseded bare
   # manifest: three unique tag-referenced digests -> three admit Pods.
@@ -72,7 +107,7 @@ PY
 STUB
   chmod +x "$SB/bin/kyverno"
   export STUB_ARGV="$SB/argv"
-  unset STUB_FAIL STUB_ERROR STUB_PASS_CONTROL STUB_FLAKE
+  unset STUB_FAIL STUB_ERROR STUB_PASS_CONTROL STUB_FLAKE STUB_COSIGN_FAIL
   : > "$SB/argv"
 }
 run() { PATH="$SB/bin:$PATH" "$VERIFY" "$SB/root" "$SB/enum.tsv" "$SB/report.json" 2>&1; }
@@ -157,6 +192,28 @@ out=$(run); rc=$?
 [ "$rc" -eq 1 ] && pass "a rejection that persists alone fails the proof" || fail "rc=$rc" "$out"
 grep -q "NOT ADMITTED" <<<"$out" && grep -q "alone as well" <<<"$out" && pass "and says it was rejected alone as well" || fail "message" "$out"
 [ "$(grep -c '^kyverno apply' "$SB/argv")" -eq 2 ] && pass "after one re-apply" || fail "applies" "$(cat "$SB/argv")"
+
+# --- the cosign second opinion on a digest rejected alone --------------------
+#
+# Kyverno's rejection reasons are terse ("unverified image"); cosign's are not.
+# For a digest the policy rejects alone, the proof asks cosign the same
+# questions, one per role and type, on the index and on every platform
+# manifest the enumeration lists, and records each answer, so the next run
+# says which check fails and where rather than that something did.
+fresh; export STUB_FAIL="admit-002" STUB_COSIGN_FAIL="sha256:bbb2|sig;sha256:bbbb|openvex:re-attester"
+out=$(run); rc=$?
+[ "$rc" -eq 1 ] && pass "a digest rejected alone still fails the proof" || fail "rc=$rc" "$out"
+grep -q "::notice::verify-catalogue: cosign on ghcr.io/acme/dhc/valkey@sha256:bbbb" <<<"$out" && pass "cosign's second opinion is annotated" || fail "notice" "$out"
+grep -q "manifest sha256:bbb2 signature: no matching sig" <<<"$out" && pass "naming the platform manifest whose signature fails" || fail "manifest sig" "$out"
+grep -q "index openvex by re-attester: no matching openvex" <<<"$out" && pass "and the attestation and role that fail on the index" || fail "index att" "$out"
+grep -q "index signature: ok" <<<"$out" && pass "and what passes" || fail "ok" "$out"
+[ "$(grep -c 'cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity https://github.com/acme/dhc/.github/workflows/build.yml@refs/heads/main' "$SB/argv")" -eq 3 ] && pass "the signature is checked on the index and both manifests, releaser identity" || fail "verify calls" "$(grep cosign "$SB/argv")"
+[ "$(grep -c 'cosign verify-attestation --type openvex' "$SB/argv")" -eq 6 ] && pass "openvex is checked for both roles on all three" || fail "openvex calls" "$(grep 'verify-attestation' "$SB/argv")"
+[ "$(jq -r '.resources[] | select(.name=="admit-002") | .cosign["ghcr.io/acme/dhc/valkey@sha256:bbb2"].signature' "$SB/report.json")" != "ok" ] && pass "the report keeps every answer" || fail "report" "$(cat "$SB/report.json")"
+grep -q "cosign verify" <(grep -c "" "$SB/argv") || true
+fresh; export STUB_FAIL="admit-001 admit-002" STUB_FLAKE=1
+out=$(run); rc=$?
+[ "$(grep -c '^cosign' "$SB/argv")" -eq 0 ] && pass "a digest admitted alone gets no cosign call" || fail "cosign on flake" "$(grep cosign "$SB/argv")"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all verify-catalogue tests passed"
