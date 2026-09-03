@@ -1205,3 +1205,116 @@ their reports kept in the run artifact under `trivy-superseded/`, issues
 derive from supported digests only, and this entry is the one place the
 first sweep's findings are written down. That is the standing
 interpretation of 9.5, not a gap.
+
+## 2026-09-03: 13.1.5, the grafana backlog session (grafana half of #112, #121)
+
+*Image: grafana. Decisions taken one at a time in a per-group session
+(owner calls, 2026-09-02 and 2026-09-03). Every number below was measured on
+the published 13.1.5 release asset (`grafana_13.1.5_33098073184_linux_amd64.deb`,
+sha256 `15c8ace2…a62e`), extracted and read with `go version -m` and scanned
+with the same Trivy and the same ignorefile the gate uses; the CI gate on the
+bump PR (#132) reported the identical thirteen findings.*
+
+### FIX by upstream bump: x/crypto and the server's stdlib wave
+
+13.1.5 (released 2026-09-02 08:12 UTC) rebuilt `bin/grafana` with **go1.26.6**
+and **x/crypto v0.55.0**. That retires, on the server binary, the eight go1.26.4
+stdlib findings and CVE-2026-56854 (GO-2026-6303). The `not_affected` statement
+drafted for the grafana half of #112 on 2026-09-02 was therefore never
+published: the finding it excused stopped existing before the statement
+landed, and a statement that suppresses nothing says nothing (2026-07-26,
+same reasoning). The bump is Renovate's own commit, carried on this branch
+because the bump cannot merge alone (below).
+
+### Re-scoped, not restated: the three version-scoped statements, a third time
+
+Both pins the arguments rest on are byte-identical in 13.1.5, read out of the
+shipped binary:
+
+```
+github.com/grafana/tempo         v1.5.1-0.20260427112133-525d1bab07e0
+github.com/prometheus/prometheus v0.312.0
+```
+
+So CVE-2026-21728 (#23), CVE-2026-28377 (#27) and the `fixed` half of
+CVE-2026-42151 (#25) move to `13.1.5-alpine3.23`: product plus the sentences
+naming a version, timestamps unchanged, exactly as on 2026-08-13. The
+versionless `not_affected` half of #25 stays untouched.
+
+### TRANSFER: the zipkin plugin again, nine findings, one stale bundle
+
+13.1.5 bundles zipkin **v12.4.6** (built 2026-08-13, go1.26.4, grpc v1.82.1).
+On this build Trivy reports eight stdlib findings (CVE-2026-33818, -39821,
+-46600, -56853, -56858, -56859, -56860, -56862; fixed go1.26.6) and
+CVE-2026-84304 (grpc, fixed 1.83.1), plus CVE-2026-39822, which the existing
+entry still covers. Two of the eight (39821, 46600) had entries already, keyed
+to `x/net` because that is where 13.1.3's zipkin build carried them; the new
+build fixed x/net and reintroduced the same CVEs through the toolchain, so the
+purl moved and the entries went inert. Fail-closed, as designed: an entry that
+matches nothing suppresses nothing.
+
+The plugin's own **v12.4.7** (2026-08-27) is built with go1.26.7 and links
+grpc v1.83.1, which clears all nine. The fix exists and is released; Grafana
+bundled the older one. **Decision: transfer**, extending the existing #94
+transfer to the nine, all on the 2026-11-02 re-decision date (the 39822 entry
+joins it: its earlier 60-day window was for an exit nobody had landed, and
+the exit has landed). Reachability is not claimed: the binary is stripped,
+govulncheck stops at module level, Req 6.16 calls that unmeasured.
+
+### TRANSFER: the server binary's own pins, thrift and grpc (grafana/grafana#131921)
+
+`bin/grafana` 13.1.5 links `github.com/apache/thrift`
+v0.23.1-0.20260429145742-d2acd3c49e58 (CVE-2026-43871, GHSA-8wv5-x4w7-5gww,
+infinite loop in the Go binding, fixed 0.24.0) and `google.golang.org/grpc`
+v1.82.1 (CVE-2026-84304, GHSA-vp52-pcj8-j9qc, heap exhaustion via HTTP/2 DATA
+frame fragmentation, fixed 1.83.1).
+
+- **Fix lane: closed.** A repackaged tarball has no fetch-phase bump (the lane
+  that answered the same grpc advisory on cert-manager the day before), and
+  Renovate is on the newest release. grafana `main` already pins thrift 0.24.0
+  and grpc 1.83.0, so upstream is one bump and one backport away.
+- **Applicability lane: closed by the rules.** Neither advisory has a
+  golang/vulndb report (checked through GO-2026-6355), so govulncheck cannot
+  see them; Req 6.15 requires a symbol- or package-level citation for
+  `vulnerable_code_not_in_execute_path`, and Req 6.16 treats the absence as
+  unmeasured. The thrift pin also predates every change to `lib/go` between it
+  and the 0.24.0 tag, so the commit-ancestry route that works for tempo is
+  closed too. Context recorded, not claimed: the default `[grpc_server]`
+  binds `127.0.0.1:10000`, and the thrift readers are linked through the
+  legacy `jaeger-client-go` tracing client, off unless configured.
+- **Avoid: not available.** Both sit inside the server binary.
+
+**Decision: transfer**, one upstream issue for both,
+[grafana/grafana#131921](https://github.com/grafana/grafana/issues/131921),
+drafted in `upstream/2026-09-03-grafana-server-thrift-and-grpc-below-fixed.md`
+and filed unmodified. Expiry 2026-11-02, inside the 90-day HIGH ceiling and on
+the zipkin re-decision date, so one review covers the whole image.
+
+### Retired: ten entries that now match nothing
+
+The elasticsearch plugin in 13.1.5 is built with go1.26.7, so its three
+transfer entries (CVE-2026-27145, -42504, -39822) cover nothing. The zipkin
+build fixed x/net (v0.56.0) and x/text and moved grpc to 1.82.1, so its
+entries for CVE-2026-25681, -27136, -33814, -56852, GHSA-hrxh-6v49-42gf and
+the x/net-keyed 39821 and 46600 cover nothing either, and 27145 and 42504 are
+gone with go1.26.4. Deleted rather than kept: an ignorefile entry that matches
+nothing is silent in Trivy, and a silent entry is a future false sense of
+coverage. The elasticsearch issue (#410) can close on this evidence.
+
+Measured after the rewrite: the extracted 13.1.5 filesystem, scanned with the
+new ignorefile, leaves exactly the two tempo findings, which the re-scoped
+`fixed` statements cover on the published image.
+
+### The mechanism: why 13.1.5 arrived a day late
+
+Renovate had computed the 13.1.5 update since the morning of 2026-09-02 and
+opened nothing. Two configuration defects, both found by running the pinned
+Renovate at debug level against the repository, fixed in #131: the repository
+sat at exactly Renovate's default cap of ten open branches, so the patch
+branch was skipped silently every run ("Reached branch limit"); and the
+grafana post-upgrade task was keyed on the `github-releases` datasource, which
+the pinned tools share, so a kyverno rebase ran `refresh-grafana.sh` against
+`scripts/`, failed, and the failed-artifact status write (refused, the token
+lacks `statuses: write`) aborted the run before the dashboard rewrite. #130
+(separate patch and minor PRs for grafana) had been necessary but was not
+sufficient. Owner-side follow-up: `statuses: write` on the Renovate token.
