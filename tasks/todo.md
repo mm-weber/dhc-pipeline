@@ -84,3 +84,22 @@ tools, the first CI run is the keyless measurement ADR 0004 left open.
       the count invariant, the summary table; catalogue-policy.yaml permissions
 - [ ] 6. docs: user manual (rescan row, verification), tasks.md tick; SC2154 sweep, actionlint,
       yamllint, every suite; first run dispatched after merge is the measurement, recorded in LOG
+
+## Fix: carry-forward pairs a statement with its own kind (2026-09-04)
+
+Goal: a rescan that changes nothing re-attests nothing. The first no-change
+day after task 10.3 (run 33867898868) replaced the OpenVEX document on three
+grafana digests; for 13.1.2 and 13.1.3 no input had changed. Cause: the
+compiler keyed last time's statements by finding and package only, and a
+package can carry an `affected` (excepted in one binary) and an
+`under_investigation` (uncovered in another) at once, so the second paired
+with the first, its shape differed, and it was re-stamped on every compile.
+
+- [x] 1. Failing case first (compile-vex_test.sh 40): both statuses published, a recompile from
+      the same inputs re-stamps nothing and yields the previous statement set; 40b keeps the
+      transition (under_investigation before the decision pairs with the new affected)
+- [x] 2. compile-vex.sh: previous statements keyed by finding, status and package; own kind
+      first, the other kind for the same package second, unscoped third
+- [x] 3. Measured on real data: today's scan of grafana 13.1.2 compiled against today's attested
+      document differs before the fix (10 statements re-stamped) and is identical after it
+- [x] 4. compile-vex and reattest suites green; the next rescan is the live confirmation

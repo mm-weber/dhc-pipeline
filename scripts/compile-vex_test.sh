@@ -612,5 +612,54 @@ out=$(COMPILE_VEX_ISSUES="$SB/absent.json" COMPILE_VEX_SCAN_REPORTS="$SB/scan.js
 contains "a missing issue map fails loudly" "$out" "absent.json"
 contains "and exits non-zero"               "$out" "rc=2"
 
+# 40: one finding, one package, two statuses (measured 2026-09-04 on grafana
+#     13.1.2): a stdlib CVE is excepted in the zipkin binary (affected) and
+#     uncovered in the server binary (under_investigation), so the document
+#     carries both, and a recompile from the same inputs must pair each with its
+#     own kind. Paired across kinds, the loser is re-stamped on every compile,
+#     the document differs daily, and the digest is re-attested for nothing.
+report_both() { # $1 = filename, $2 = CVE, $3 = statement text, $4 = purl, [$5 = CreatedAt]
+  cat > "$SB/$1" <<JSON
+{"SchemaVersion":2,"CreatedAt":"${5:-2026-08-28T06:00:00Z}",
+ "ArtifactName":"ghcr.io/mm-weber/dhc/grafana",
+ "Results":[
+  {"Target":"usr/share/grafana/bin/grafana","Class":"lang-pkgs","Type":"gobinary",
+   "Vulnerabilities":[{"VulnerabilityID":"$2","PkgName":"stdlib","Severity":"HIGH",
+                       "PkgIdentifier":{"PURL":"$4"}}]},
+  {"Target":"usr/share/grafana/data/plugins-bundled/zipkin/gpx_grafana-zipkin-datasource_linux_amd64",
+   "Class":"lang-pkgs","Type":"gobinary",
+   "ExperimentalModifiedFindings":[
+     {"Type":"vulnerability","Status":"ignored","Statement":"$3","Source":"triage/accepted-risk/grafana.yaml",
+      "Finding":{"VulnerabilityID":"$2","PkgName":"stdlib","Severity":"HIGH",
+                 "PkgIdentifier":{"PURL":"$4"}}}]}]}
+JSON
+}
+canon() { python3 -c 'import json,sys; print(sorted(json.dumps(s, sort_keys=True) for s in json.load(open(sys.argv[1]))["statements"]))' "$1"; }
+fresh
+exceptions CVE-2026-39821 2026-11-02 "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+report_both scan.json CVE-2026-39821 "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+" "pkg:golang/stdlib@v1.26.3"
+run_x >/dev/null
+check "both statuses are published for the finding" "affected under_investigation" "$(doc -r '[.statements[] | select(.vulnerability.name=="CVE-2026-39821") | .status] | sort | join(" ")')"
+cp "$SB/out/grafana.openvex.json" "$SB/previous.json"
+COMPILE_VEX_PREVIOUS="$SB/previous.json" run_x >/dev/null
+check "a recompile from the same inputs re-stamps nothing" "" "$(doc -r '.statements[] | select(.last_updated != null) | "\(.vulnerability.name) \(.status)"')"
+check "and the statement set is the previous one" "true" "$([ "$(canon "$SB/previous.json")" = "$(canon "$SB/out/grafana.openvex.json")" ] && echo true || echo false)"
+
+# 40b: the transition is not a collision. A finding published under_investigation
+#      before its exception was decided pairs with the new affected statement:
+#      first seen stands and the decision is a recorded change (Req 6.40), while
+#      the still-uncovered binary's statement pairs with its own kind, unchanged.
+fresh
+report scan.json CVE-2026-39821 pkg:golang/stdlib@v1.26.3 usr/share/grafana/bin/grafana
+run_x >/dev/null
+check "before the decision: one under_investigation statement" "under_investigation" "$(doc -r '[.statements[] | select(.vulnerability.name=="CVE-2026-39821") | .status] | join(" ")')"
+cp "$SB/out/grafana.openvex.json" "$SB/previous.json"
+exceptions CVE-2026-39821 2026-11-02 "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+"
+report_both scan.json CVE-2026-39821 "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+" "pkg:golang/stdlib@v1.26.3" 2026-09-01T06:00:00Z
+COMPILE_VEX_PREVIOUS="$SB/previous.json" run_x >/dev/null
+check "the decision keeps the finding's first seen" "2026-08-28T06:00:00Z" "$(doc -r '.statements[] | select(.vulnerability.name=="CVE-2026-39821" and .status=="affected") | .timestamp')"
+check "and is a recorded change"                    "2026-09-01T06:00:00Z" "$(doc -r '.statements[] | select(.vulnerability.name=="CVE-2026-39821" and .status=="affected") | .last_updated')"
+check "the uncovered binary's statement is unchanged" "2026-08-28T06:00:00Z null" "$(doc -r '.statements[] | select(.vulnerability.name=="CVE-2026-39821" and .status=="under_investigation") | "\(.timestamp) \(.last_updated)"')"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
