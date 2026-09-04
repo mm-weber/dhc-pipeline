@@ -82,21 +82,18 @@ printf '%s\n' "kyverno $*" >> "${STUB_ARGV}"
 # find the --resource file and enumerate its Pods, answering per name
 res=""; prev=""
 for a in "$@"; do [ "$prev" = "--resource" ] && res="$a"; prev="$a"; done
-cp "$res" "${STUB_ARGV}.pods"
+cat "$res" >> "${STUB_ARGV}.pods"
 echo "Applying 1 policy rule(s) to N resource(s)..."
 python3 - "$res" <<'PY'
 import os, sys, yaml
 pods = [d for d in yaml.safe_load_all(open(sys.argv[1])) if d]
 fail_names = os.environ.get("STUB_FAIL", "").split()
 err_names = os.environ.get("STUB_ERROR", "").split()
-# STUB_FLAKE: the names in STUB_FAIL fail only inside a multi-pod batch and
-# pass when applied alone, the shape measured on kyverno 1.18.2 on 2026-09-03.
-flaky = bool(os.environ.get("STUB_FLAKE")) and len(pods) > 1
 results = []
 for p in pods:
     n = p["metadata"]["name"]
     if n in err_names: r = "error"
-    elif n in fail_names and (flaky or not os.environ.get("STUB_FLAKE")): r = "fail"
+    elif n in fail_names: r = "fail"
     elif n.startswith("control"): r = "pass" if os.environ.get("STUB_PASS_CONTROL") else "fail"
     else: r = "pass"
     results.append({"result": r, "policy": "verify-catalogue-images", "rule": "require-signature-and-attestations",
@@ -107,7 +104,7 @@ PY
 STUB
   chmod +x "$SB/bin/kyverno"
   export STUB_ARGV="$SB/argv"
-  unset STUB_FAIL STUB_ERROR STUB_PASS_CONTROL STUB_FLAKE STUB_COSIGN_FAIL
+  unset STUB_FAIL STUB_ERROR STUB_PASS_CONTROL STUB_COSIGN_FAIL
   : > "$SB/argv"
 }
 run() { PATH="$SB/bin:$PATH" "$VERIFY" "$SB/root" "$SB/enum.tsv" "$SB/report.json" 2>&1; }
@@ -117,6 +114,7 @@ fresh
 out=$(run); rc=$?
 [ "$rc" -eq 0 ] && pass "admit-all, reject-control exits 0" || fail "admit-all, reject-control exits 0" "$out"
 n=$(grep -c "^kind: Pod" "$SB/argv.pods"); [ "$n" = "4" ] && pass "one Pod per unique tag-referenced digest plus the control" || fail "one Pod per unique tag-referenced digest plus the control" "got $n" "$(cat "$SB/argv.pods")"
+[ "$(grep -c '^kyverno apply' "$SB/argv")" -eq 4 ] && pass "each Pod is applied alone, never in a batch" || fail "each Pod is applied alone" "$(cat "$SB/argv")"
 grep -q "image: ghcr.io/acme/dhc/solo@sha256:aaaa$" "$SB/argv.pods" && pass "a digest shared by two tags is one Pod, by index digest" || fail "a digest shared by two tags is one Pod, by index digest" "$(cat "$SB/argv.pods")"
 grep -q "image: ${CONTROL}$" "$SB/argv.pods" && pass "the control is in the resource set" || fail "the control is in the resource set" "$(cat "$SB/argv.pods")"
 grep -q "3 admitted, control rejected" <<<"$out" && pass "summary states both halves" || fail "summary states both halves" "$out"
@@ -171,38 +169,16 @@ out=$(run); rc=$?
 grep -q "control" <<<"$out" && pass "saying what is missing" || fail "saying what is missing" "$out"
 
 echo
-# --- batch artefact: rejected in the batch, admitted alone -------------------
-#
-# Measured 2026-09-03 (three runs): kyverno 1.18.2 rejected exactly the first
-# ten pods of a nineteen-pod batch with identical attestation shapes on both
-# sides of the line. A rejection is therefore re-applied alone. A digest the
-# policy admits alone is admitted (Req 2.24 is about the policy, not the
-# batch), named as a batch artefact; one the policy rejects alone fails.
-fresh; export STUB_FAIL="admit-001 admit-002" STUB_FLAKE=1
-out=$(run); rc=$?
-[ "$rc" -eq 0 ] && pass "a batch-only rejection does not fail the proof" || fail "rc=$rc" "$out"
-grep -q "::warning::verify-catalogue: admitted alone, rejected in the batch" <<<"$out" && pass "and is named as a batch artefact" || fail "warning" "$out"
-[ "$(grep -c '^kyverno apply' "$SB/argv")" -eq 3 ] && pass "each rejected digest is re-applied alone" || fail "applies" "$(cat "$SB/argv")"
-[ "$(python3 -c 'import yaml,sys; print(len([d for d in yaml.safe_load_all(open(sys.argv[1])) if d]))' "$SB/argv.pods")" = "1" ] && pass "with a single-pod resource" || fail "single pod" "$(cat "$SB/argv.pods")"
-[ "$(jq -r '.resources[] | select(.name=="admit-001") | .batch_flake' "$SB/report.json")" = "true" ] && pass "and the report records it" || fail "report" "$(cat "$SB/report.json")"
-grep -q "2 admitted alone" <<<"$out" && pass "the summary counts the artefacts" || fail "summary" "$out"
-
-fresh; export STUB_FAIL="admit-001"
-out=$(run); rc=$?
-[ "$rc" -eq 1 ] && pass "a rejection that persists alone fails the proof" || fail "rc=$rc" "$out"
-grep -q "NOT ADMITTED" <<<"$out" && grep -q "alone as well" <<<"$out" && pass "and says it was rejected alone as well" || fail "message" "$out"
-[ "$(grep -c '^kyverno apply' "$SB/argv")" -eq 2 ] && pass "after one re-apply" || fail "applies" "$(cat "$SB/argv")"
-
-# --- the cosign second opinion on a digest rejected alone --------------------
+# --- the cosign second opinion on a rejected digest --------------------------
 #
 # Kyverno's rejection reasons are terse ("unverified image"); cosign's are not.
-# For a digest the policy rejects alone, the proof asks cosign the same
+# For a digest the policy rejects, the proof asks cosign the same
 # questions, one per role and type, on the index and on every platform
 # manifest the enumeration lists, and records each answer, so the next run
 # says which check fails and where rather than that something did.
 fresh; export STUB_FAIL="admit-002" STUB_COSIGN_FAIL="sha256:bbb2|sig;sha256:bbbb|openvex:re-attester"
 out=$(run); rc=$?
-[ "$rc" -eq 1 ] && pass "a digest rejected alone still fails the proof" || fail "rc=$rc" "$out"
+[ "$rc" -eq 1 ] && pass "a rejected digest fails the proof" || fail "rc=$rc" "$out"
 grep -q "::notice::verify-catalogue: cosign on ghcr.io/acme/dhc/valkey@sha256:bbbb" <<<"$out" && pass "cosign's second opinion is annotated" || fail "notice" "$out"
 grep -q "manifest sha256:bbb2 signature: no matching sig" <<<"$out" && pass "naming the platform manifest whose signature fails" || fail "manifest sig" "$out"
 grep -q "index openvex by re-attester: no matching openvex" <<<"$out" && pass "and the attestation and role that fail on the index" || fail "index att" "$out"
@@ -210,10 +186,9 @@ grep -q "index signature: ok" <<<"$out" && pass "and what passes" || fail "ok" "
 [ "$(grep -c 'cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity https://github.com/acme/dhc/.github/workflows/build.yml@refs/heads/main' "$SB/argv")" -eq 3 ] && pass "the signature is checked on the index and both manifests, releaser identity" || fail "verify calls" "$(grep cosign "$SB/argv")"
 [ "$(grep -c 'cosign verify-attestation --type openvex' "$SB/argv")" -eq 6 ] && pass "openvex is checked for both roles on all three" || fail "openvex calls" "$(grep 'verify-attestation' "$SB/argv")"
 [ "$(jq -r '.resources[] | select(.name=="admit-002") | .cosign["ghcr.io/acme/dhc/valkey@sha256:bbb2"].signature' "$SB/report.json")" != "ok" ] && pass "the report keeps every answer" || fail "report" "$(cat "$SB/report.json")"
-grep -q "cosign verify" <(grep -c "" "$SB/argv") || true
-fresh; export STUB_FAIL="admit-001 admit-002" STUB_FLAKE=1
+fresh
 out=$(run); rc=$?
-[ "$(grep -c '^cosign' "$SB/argv")" -eq 0 ] && pass "a digest admitted alone gets no cosign call" || fail "cosign on flake" "$(grep cosign "$SB/argv")"
+[ "$(grep -c '^cosign' "$SB/argv")" -eq 0 ] && pass "an admitted digest gets no cosign call" || fail "cosign on admitted" "$(grep cosign "$SB/argv")"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all verify-catalogue tests passed"

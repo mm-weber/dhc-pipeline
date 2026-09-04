@@ -24,15 +24,20 @@
 # (`-p --output-format json`: a ClusterReport with one result per resource;
 # measured on kyverno 1.18.2, which prints a text preamble first).
 #
+# One `kyverno apply` per digest, never a batch. Measured 2026-09-03 on
+# kyverno 1.18.2 across four runs: a nineteen-pod batch rejected exactly its
+# first ten and admitted the nine after them, and among the admitted was a
+# digest whose attestations had precisely the shape Kyverno's own code
+# rejects (RequiredCount in image_verification_types.go); the ten were
+# rejected alone as well. A batch verdict is therefore not evidence either
+# way, and a per-digest verdict is what Req 2.24 claims.
+#
 # Verdicts per resource: pass, fail, or error (the tool could not verify:
-# registry, Rekor or Fulcio unreachable). A rejection in the batch is
-# re-applied alone: measured 2026-09-03 on kyverno 1.18.2, three runs, the
-# first ten pods of a nineteen-pod batch were rejected with the same
-# attestation shapes as the nine admitted after them. A digest the policy
-# admits alone is admitted and the batch artefact is named (::warning,
-# recorded); one rejected alone as well fails the proof by name: not
-# verified is not admitted. A missing enumeration or an undeclared control
-# refuses (exit 2) rather than passing vacuously.
+# registry, Rekor or Fulcio unreachable). A rejected digest gets a cosign
+# second opinion, recorded and annotated, so the reason is named. An error
+# on any resource fails the proof by name: not verified is not admitted. A
+# missing enumeration or an undeclared control refuses (exit 2) rather than
+# passing vacuously.
 set -euo pipefail
 
 err() { printf '::error::verify-catalogue: %s\n' "$1" >&2; }
@@ -73,41 +78,39 @@ cut -f1,2,3 "$ENUM" | LC_ALL=C sort -u \
   | LC_ALL=C sort > "$WORK/digests"
 [ -s "$WORK/digests" ] || { err "the enumeration lists no tag-referenced digest; nothing to prove"; exit 2; }
 
-: > "$WORK/pods.yaml"; : > "$WORK/map"
+: > "$WORK/map"
+pod_file() { # <name> <ref> -> path of a one-Pod resource file
+  local f="$WORK/pod-$1.yaml"
+  cat > "$f" <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $1
+spec:
+  containers:
+    - name: c
+      image: $2
+EOF
+  printf '%s' "$f"
+}
 i=0
 while IFS=$'\t' read -r ref tags; do
   i=$((i + 1)); name=$(printf 'admit-%03d' "$i")
   printf '%s\t%s\t%s\n' "$name" "$ref" "$tags" >> "$WORK/map"
-  cat >> "$WORK/pods.yaml" <<EOF
-apiVersion: v1
-kind: Pod
-metadata:
-  name: ${name}
-spec:
-  containers:
-    - name: c
-      image: ${ref}
----
-EOF
+  pod_file "$name" "$ref" >/dev/null
 done < "$WORK/digests"
 printf '%s\t%s\t%s\n' "control-must-reject" "$CONTROL" "(declared control)" >> "$WORK/map"
-cat >> "$WORK/pods.yaml" <<EOF
-apiVersion: v1
-kind: Pod
-metadata:
-  name: control-must-reject
-spec:
-  containers:
-    - name: c
-      image: ${CONTROL}
-EOF
+pod_file "control-must-reject" "$CONTROL" >/dev/null
 
 # kyverno exits non-zero whenever anything fails, and the control MUST fail,
-# so its exit status is not a signal here; the report is.
-kyverno apply "$POLICY" --resource "$WORK/pods.yaml" --registry -p --output-format json \
-  > "$WORK/raw" 2>"$WORK/kyverno.err" || true
+# so its exit status is not a signal here; the report is. One apply per Pod.
+: > "$WORK/kyverno.err"
+while IFS=$'\t' read -r name _ref _tags; do
+  kyverno apply "$POLICY" --resource "$WORK/pod-$name.yaml" --registry -p --output-format json \
+    > "$WORK/raw-$name" 2>>"$WORK/kyverno.err" || true
+done < "$WORK/map"
 
-python3 - "$WORK/raw" "$WORK/map" "$OUT" "$WORK/kyverno.err" "$POLICY" "$WORK" "$ENUM" "$ROOT/catalogue-policy.yaml" <<'PY'
+python3 - "$WORK" "$WORK/map" "$OUT" "$WORK/kyverno.err" "$POLICY" "$WORK" "$ENUM" "$ROOT/catalogue-policy.yaml" <<'PY'
 import json, shutil, subprocess, sys, yaml
 def verdicts(raw):
     """name -> (result, message) from a kyverno JSON report; the worst verdict
@@ -130,24 +133,15 @@ def verdicts(raw):
                     # part that said why. Capped only where GitHub would.
                     out[n] = (r.get("result"), (r.get("message") or "")[:4000])
     return out
-verdict = verdicts(open(sys.argv[1]).read())
-if verdict is None:
-    print("::error::verify-catalogue: kyverno produced no policy report; stderr: " + open(sys.argv[4]).read().strip()[:500], file=sys.stderr)
-    sys.exit(1)
 policy, work = sys.argv[5], sys.argv[6]
 rows = [line.rstrip("\n").split("\t") for line in open(sys.argv[2])]
-# One pod per document in the batch file, by name, so a rejected digest can be
-# re-applied alone. Measured 2026-09-03 on kyverno 1.18.2 across three runs:
-# exactly the first ten pods of a nineteen-pod batch were rejected, with the
-# same attestation shapes on both sides of the line. Req 2.24 is a claim
-# about the policy over each digest, so a digest the policy admits alone is
-# admitted, and the batch artefact is named rather than silently absorbed.
-pods = {}
-for chunk in open(f"{work}/pods.yaml").read().split("\n---\n"):
-    for line in chunk.splitlines():
-        if line.strip().startswith("name: "):
-            pods[line.split("name: ", 1)[1].strip()] = chunk.strip() + "\n"
-            break
+verdict = {}
+for name, _, _ in rows:
+    v = verdicts(open(f"{work}/raw-{name}").read())
+    if v is None:
+        print(f"::error::verify-catalogue: kyverno produced no policy report for {name}; stderr: " + open(sys.argv[4]).read().strip()[:500], file=sys.stderr)
+        sys.exit(1)
+    verdict.update(v)
 # The cosign second opinion (task 9.6 follow-up, 2026-09-03): Kyverno's
 # rejection reasons are terse, cosign's are not. For a digest the policy
 # rejects alone, ask cosign the same questions the policy asks, one per role
@@ -194,15 +188,8 @@ def describe(ref, answers):
         for k, v in a.items():
             parts.append(f"{label} {k}: {v}")
     return "; ".join(parts)
-def alone(name):
-    path = f"{work}/alone-{name}.yaml"
-    open(path, "w").write(pods[name])
-    r = subprocess.run(["kyverno", "apply", policy, "--resource", path, "--registry", "-p", "--output-format", "json"],
-                       capture_output=True, text=True)
-    v = verdicts(r.stdout) or {}
-    return v.get(name, ("missing", "no result for this resource in the report"))
 failures, warnings, notices = [], [], []
-admitted = flakes = 0
+admitted = 0
 record = {}
 for name, ref, tags in rows:
     result, msg = verdict.get(name, ("missing", "no result for this resource in the report"))
@@ -217,25 +204,18 @@ for name, ref, tags in rows:
     elif result == "pass":
         admitted += 1
     else:
-        a_result, a_msg = alone(name)
-        entry["alone"] = {"result": a_result, "message": a_msg}
-        if a_result == "pass":
-            admitted += 1; flakes += 1
-            entry["batch_flake"] = True
-            warnings.append(f"admitted alone, rejected in the batch of {len(rows) - 1}: {ref} (tags: {tags}); the batch said: {msg}")
+        entry["cosign"] = second_opinion(ref)
+        notices.append(f"cosign on {ref}: {describe(ref, entry['cosign'])}")
+        if result == "fail":
+            # kyverno reports an unverifiable image (no roots, no registry)
+            # as "fail" too, so the label claims only what is known: the
+            # digest was NOT ADMITTED, and the message says why.
+            failures.append(f"NOT ADMITTED: tag-referenced digest {ref} (tags: {tags}): {msg}")
         else:
-            entry["cosign"] = second_opinion(ref)
-            notices.append(f"cosign on {ref}: {describe(ref, entry['cosign'])}")
-            if result == "fail" and a_result == "fail":
-                # kyverno reports an unverifiable image (no roots, no registry)
-                # as "fail" too, so the label claims only what is known: the
-                # digest was NOT ADMITTED, and the message says why.
-                failures.append(f"NOT ADMITTED (alone as well): tag-referenced digest {ref} (tags: {tags}): {a_msg}")
-            else:
-                failures.append(f"{a_result.upper()} on {ref} (tags: {tags}), alone as well: {a_msg}; not verified is not admitted")
+            failures.append(f"{result.upper()} on {ref} (tags: {tags}): {msg}; not verified is not admitted")
     record[name] = entry
 json.dump({"control": rows[-1][1], "resources": [record[n] for n, _, _ in rows],
-           "batch_flakes": flakes, "failures": failures, "warnings": warnings}, open(sys.argv[3], "w"), indent=2)
+           "failures": failures, "warnings": warnings}, open(sys.argv[3], "w"), indent=2)
 for n in notices:
     print(f"::notice::verify-catalogue: {n}", file=sys.stderr)
 for w in warnings:
@@ -245,6 +225,5 @@ for f in failures:
 if failures:
     print(f"::error::verify-catalogue: {len(failures)} admission-proof failure(s) over {len(rows) - 1} tag-referenced digest(s) (Req 2.24)", file=sys.stderr)
     sys.exit(1)
-note = f" ({flakes} admitted alone after a batch rejection)" if flakes else ""
-print(f"verify-catalogue: {admitted} admitted{note}, control rejected; the admission policy holds over every tag-referenced digest (Req 2.24)")
+print(f"verify-catalogue: {admitted} admitted, control rejected; the admission policy holds over every tag-referenced digest (Req 2.24)")
 PY

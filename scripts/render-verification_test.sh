@@ -75,6 +75,13 @@ else
   pass "spdx attestor block excludes the re-attester"
 fi
 
+# 2b: "either role" is count: 1. Kyverno's RequiredCount is the number of
+#     entries unless count is set (measured 2026-09-03: a single-role-signed
+#     OpenVEX document failed "requiredCount: 2"); a single-role set needs none.
+vex_block=$(awk '/openvex.dev\/ns/{f=1} f{print}' "$POL")
+grep -qE "^\s+- count: 1$" <<<"$vex_block" && pass "the two-role openvex attestor set says count: 1" || fail "the two-role openvex attestor set says count: 1" "$vex_block"
+grep -qE "^\s+- count:" <<<"$spdx_block" && fail "the single-role spdx attestor set carries no count" "$spdx_block" || pass "the single-role spdx attestor set carries no count"
+
 # 3: snippets rendered between markers in both docs, from policy values
 for doc in "$SB/README.md" "$SB/docs/user-manual.md"; do
   body=$(snippet "render-verification:begin" "render-verification:end" "$doc")

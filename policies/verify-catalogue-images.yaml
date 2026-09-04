@@ -44,7 +44,8 @@ spec:
                           url: https://rekor.sigstore.dev
             - type: https://openvex.dev/ns
               attestors:
-                - entries:
+                - count: 1
+                  entries:
                     - keyless:
                         subject: https://github.com/mm-weber/dhc-pipeline/.github/workflows/build.yml@refs/heads/main
                         issuer: https://token.actions.githubusercontent.com
