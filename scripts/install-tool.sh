@@ -54,7 +54,7 @@ PINS_FILE="${INSTALL_TOOL_PINS:-}"
 ARCH="${INSTALL_TOOL_ARCH:-$(uname -m)}"
 
 # renovate: datasource=github-releases depName=kubernetes-sigs/kind
-KIND_VERSION="0.32.0"
+KIND_VERSION="0.33.0"
 KIND_SHA256="50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54"
 
 # renovate: datasource=github-releases depName=kyverno/kyverno
