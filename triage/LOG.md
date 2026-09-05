@@ -1318,3 +1318,43 @@ the pinned tools share, so a kyverno rebase ran `refresh-grafana.sh` against
 lacks `statuses: write`) aborted the run before the dashboard rewrite. #130
 (separate patch and minor PRs for grafana) had been necessary but was not
 sufficient. Owner-side follow-up: `statuses: write` on the Renovate token.
+
+## 2026-09-04: the first no-change day, and what it measured (task 10.3, ADR 0004)
+
+Two rescans ran on the same commit. The manual one (run 33854524508, 08:39
+UTC) failed at the re-attest step on one write of about ninety: `cosign
+attest --type vuln --replace` on valkey's compat 9.1.2 platform manifest,
+where Rekor answered "already exists" to an upload cosign's client had
+retried, then 404 for that entry by UUID from a lagging replica. The registry
+showed the write never landed, nothing else was writing, and the scheduled
+run three hours later (33867898868, 11:25 UTC) wrote all 35 manifests. A
+Sigstore race, met with a bounded retry (#145): three attempts, each failure
+named, three failures still a failure.
+
+The scheduled run is the measurement ADR 0004 waited for:
+
+| Measured | Result |
+|---|---|
+| platform manifests scanned by digest | 35 of 35, no failures, no new issue |
+| digests re-attested / unchanged | 3 / 16 |
+| previous documents per digest, OpenVEX count before | 1 and 1 on all 19 |
+| Rekor entry of the replaced layer retrievable after the replace | yes, 3 of 3 |
+| OpenVEX attestations per target, counted from the registry | exactly 1 on all 54 |
+
+The three re-attested digests are all grafana. 13.1.5 had been rebuilt that
+morning, and the release job compiles without the open-issue map, so its
+first rescan adds the issue links: a one-time change, by design. 13.1.2 and
+13.1.3 had no input change at all. Their documents carry, for one finding
+and one package, an `affected` statement (excepted in the zipkin binary) and
+an `under_investigation` statement (uncovered in the server binary); the
+compiler paired last time's statements by finding and package only, so the
+second always looked changed and was re-stamped on every compile. Measured
+by recompiling 13.1.2 against its own attested document: ten statements
+re-stamped before the fix, none after (#144). A replace that changes nothing
+is a Rekor entry for nothing.
+
+The daily rebuild of the same morning (run 33856617294) published new digests
+for six of seven components and failed cert-manager-cainjector in the base
+package install, a definition identical to its two siblings that built in
+the same minute; tonight's run retries. The Renovate tool-bump PRs failing
+`validate` are by design: the checksum half of a pin is manual.

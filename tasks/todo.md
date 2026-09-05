@@ -82,8 +82,9 @@ tools, the first CI run is the keyless measurement ADR 0004 left open.
 - [x] 4. install-tool.sh: vexctl v0.4.4 pinned (+ test fixture)
 - [x] 5. rescan.yml: permissions, cosign + vexctl, issues map before the compile, the re-attest step,
       the count invariant, the summary table; catalogue-policy.yaml permissions
-- [ ] 6. docs: user manual (rescan row, verification), tasks.md tick; SC2154 sweep, actionlint,
+- [x] 6. docs: user manual (rescan row, verification), tasks.md tick; SC2154 sweep, actionlint,
       yamllint, every suite; first run dispatched after merge is the measurement, recorded in LOG
+      (ADR 0004 "Measured in CI" and the LOG entry of 2026-09-04)
 
 ## Fix: carry-forward pairs a statement with its own kind (2026-09-04)
 
