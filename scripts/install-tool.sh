@@ -58,7 +58,7 @@ KIND_VERSION="0.32.0"
 KIND_SHA256="50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54"
 
 # renovate: datasource=github-releases depName=kyverno/kyverno
-KYVERNO_VERSION="1.18.2"
+KYVERNO_VERSION="1.19.0"
 KYVERNO_SHA256="cb2feb8356149fd2fe774c894ccf0969f4a60a83867dd913af724f74ffbbc18b"
 
 # renovate: datasource=github-releases depName=helm/helm
