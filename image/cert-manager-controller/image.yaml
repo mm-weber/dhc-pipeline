@@ -70,7 +70,7 @@ contents:
           with:
             deps:
               # renovate: datasource=go depName=golang.org/x/crypto
-              - golang.org/x/crypto@v0.55.0
+              - golang.org/x/crypto@v0.56.0
               # CVE-2026-84304, fixed in 1.83.1; upstream pins 1.82.1 and no
               # release carries the fix. Same lane, same exit condition
               # (triage/LOG.md 2026-09-02). cainjector carries no grpc.
