@@ -1,4 +1,4 @@
-# syntax=dhi.io/build:2-alpine3.23@sha256:96a85b5d18df1c3ec205e4efb1e66167a1d4181eb27644192d0f915cfdab99a3
+# syntax=dhi.io/build:2-alpine3.23@sha256:15a967e8186f3de812454e17a7881bae8a8294aa2d2ecaba85418db5b57de98e
 
 name: Grafana 13.1.x
 image: ghcr.io/mm-weber/dhc/grafana
