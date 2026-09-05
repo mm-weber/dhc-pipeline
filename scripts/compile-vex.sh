@@ -139,8 +139,9 @@ def with_issue(st):
         st["status_notes"] = f"{st.get('status_notes', '')}; tracked in {url}".lstrip("; ")
     return st
 # Req 6.40. The statements the compiler itself wrote last time (affected,
-# under_investigation), keyed by finding and package, so this compile can keep
-# their timestamp and record a change in last_updated rather than restating.
+# under_investigation), keyed by finding, status and package, so this compile
+# can keep their timestamp and record a change in last_updated rather than
+# restating.
 previous_written = {}
 def vuln_name(st):
     vuln = st.get("vulnerability")
@@ -162,23 +163,29 @@ if previous:
             if name and ts and name not in first_seen:
                 first_seen[name] = ts
             if name and st.get("status") in ("affected", "under_investigation"):
-                previous_written.setdefault((name, first_subcomponent(st)), st)
-def previous_for(cve, purl):
-    """The statement this compiler wrote for (finding, package) last time, or
-    the closest one it wrote for the finding: a previous document may predate
-    subcomponent scoping, and first seen is a property of the finding."""
-    for key in ((cve, purl), (cve, "")):
-        if key in previous_written:
-            return previous_written[key]
-    for (name, _), st in previous_written.items():
-        if name == cve:
-            return st
-    return None
+                previous_written.setdefault((name, st["status"], first_subcomponent(st)), st)
+def previous_for(cve, status, purl):
+    """The statement this compiler wrote last time for the same finding and
+    package, its own kind first: an `affected` and an `under_investigation`
+    coexist for one package when one binary is excepted and another is not
+    (grafana 13.1.2, measured 2026-09-04), and paired across kinds the loser
+    was re-stamped on every compile, so the document differed daily. Failing
+    its own kind, the other kind for the same package (a decision made or
+    lapsed: first seen stands, the change is recorded); failing that, the
+    closest statement for the finding, since a previous document may predate
+    subcomponent scoping and first seen is a property of the finding."""
+    mine = [(key, st) for key, st in previous_written.items() if key[0] == cve]
+    if not mine:
+        return None
+    def distance(item):
+        (_, prev_status, sub), _ = item
+        return (sub != purl, prev_status != status, sub != "")
+    return min(mine, key=distance)[1]
 def carry_forward(st, purl, stamp):
     """Req 6.40: timestamp is first seen, for life; last_updated records a change
     to the decision-bearing content (status, action statement, packages)."""
     cve = vuln_name(st)
-    prev = previous_for(cve, purl)
+    prev = previous_for(cve, st.get("status"), purl)
     st["timestamp"] = (prev.get("timestamp") if prev and prev.get("timestamp") else
                        first_seen.get(cve, stamp))
     if prev is None:
