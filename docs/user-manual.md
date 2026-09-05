@@ -543,10 +543,21 @@ ID with an open issue. CRITICALs get a Grype corroboration in the run log
 before filing.
 
 An issue is a triage decision waiting to happen. Work it exactly like a red
-gate (next section); when the decision lands (merged VEX statement,
-exception, or fix-bump), close the issue by hand with a pointer to the
-commit — the cron opens issues, it never closes them. EPSS and KEV order the
-queue; they never justify a status.
+gate (next section); you never close it by hand. The next rescan closes it
+on evidence (task 10.6; Req 6.52 to 6.57). When the finding is absent from
+every supported digest's attested report, the issue closes with the label
+the attested SBOMs justify: `resolved:fixed` when every occurrence of the
+recorded package bumped, `resolved:removed` when the package left every
+SBOM, `resolved:absent` otherwise, naming the scanner and database versions
+so a database regression reads as one. When the finding is still listed but
+covered wherever it is listed, the issue closes as `resolved:accepted` (an
+exception), `resolved:not_affected` or `resolved:fixed` (a statement),
+naming the covering artifact; the weakest grade wins. A closed issue reopens,
+history intact, when its finding is reported again on a supported digest,
+and nothing is filed twice. Every comment names what was examined and what
+was found, never a judgement (Req 6.54); a supported digest that was not
+scanned today blocks every close. EPSS and KEV order the queue; they never
+justify a status.
 
 ### The catalogue status issue
 
