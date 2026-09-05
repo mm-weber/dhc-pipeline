@@ -62,3 +62,42 @@ owner spotted the missing jobs; the local checks run after the sed
    was missing its trailing newline, which this repo lints as an error.
    A generator must satisfy the repo's own linters, so the renderer now
    ends every artifact with a newline and its test asserts it.
+
+## 2026-09-01: moving inline shell into a script leaves dangling references behind
+
+**What happened.** Task 9.1 moved the trivy invocation out of
+`build.yml` into `scripts/scan-image.sh`, and the `accepted=` assignment
+went with it. The step summary that stayed behind still read `$accepted`
+three times; under `set -u` the first read killed the step on its first
+real run. Every script suite was green, because the defect lived in
+workflow shell, which no suite reads. actionlint+shellcheck would not
+have flagged it either: actionlint suppresses SC2154 by default, since
+workflow env vars look unassigned to shellcheck.
+
+**Rules.**
+1. After extracting inline shell into a script, sweep what remains for
+   references to anything the extraction took along, before the first
+   push. The working check: run shellcheck with `--include=SC2154` over
+   each `run:` block with that step's `env:` keys prepended as assigned;
+   on 2026-09-01 that sweep reported exactly the one real defect across
+   all six workflows and nothing else.
+2. A step that has never completed in CI gets a local rehearsal before
+   the next push: extract the `run:` block verbatim, set the step's env,
+   and execute it against a real published digest. Both summary branches
+   (empty triage and populated triage) ran locally before the fix went
+   up, which is how one round-trip replaced several.
+
+## 2026-09-02: this repository squash-merges, so a stacked PR conflicts at the second merge
+
+**What happened.** Task 9.4 was branched from task 9.3's unmerged branch and
+opened as PR #118 with that branch as base. #116 (9.3) was squash-merged, so
+main received one new commit while the 9.3 branch kept its original commits;
+merging #118 then landed the 9.4 commit onto the orphaned 9.3 branch, and the
+owner's follow-up PR offering that branch to main conflicted with main's
+squashed twin of 9.3. Rebuilding the branch as main plus one cherry-picked
+commit (verified byte-identical) resolved it.
+
+**Rule.** Never stack a PR on another open PR here. When a task depends on
+unmerged work, either wait for the merge, or branch from it and, the moment
+the base squash-merges, reset the branch to main and cherry-pick only the
+new commits before anyone merges the dependent PR.

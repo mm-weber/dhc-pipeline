@@ -1,6 +1,6 @@
 # ADR 0004: Re-attestation replaces; exactly one OpenVEX attestation per digest
 
-Date: 2026-08-23 · Status: **accepted** (spike measured) · Requirements: Req 2.9, 6.34, 6.37; cluster B of the 2026-08-21 review (F5 ii) · Supersedes one inference in ADR 0003
+Date: 2026-08-23 · Status: **accepted** (spike measured 2026-08-23, CI measured 2026-09-04) · Requirements: Req 2.9, 6.34, 6.37; cluster B of the 2026-08-21 review (F5 ii) · Supersedes one inference in ADR 0003
 
 ## Context
 
@@ -104,7 +104,38 @@ collection.
 - ADR 0003 is amended: its "Trivy takes the first OpenVEX attestation only"
   is corrected to the measured behaviour. Its decision stands and is
   strengthened, since a random choice is worse than a stale one.
-- Unmeasured here, for the implementing task: `--replace` under keyless
-  signing in CI behaves as with a key (the operation is on the registry
-  manifest, not on the signing method), and Rekor retains the replaced
-  entry (tlog upload was disabled locally; the log is append-only by design).
+- Two questions were left unmeasured here for the implementing task and
+  are answered under "Measured in CI" below: `--replace` under keyless
+  signing, and Rekor's retention of a replaced entry.
+
+## Measured in CI (task 10.3, 2026-09-03 and 2026-09-04)
+
+The rescan re-attests with the workflow's keyless identity (`rescan.yml` on
+`main`), replacing (Req 6.42, 6.43), and records every write with the `.att`
+layer lists and Rekor log indexes before and after (`reattest.jsonl`). The
+two open questions, answered from those records and from the registry:
+
+| Left open on 2026-08-23 | Measured | Evidence |
+|---|---|---|
+| `--replace` under keyless signing behaves as with a key | Yes. Run 33803244102 (2026-09-03, the first rescan after task 10.3 merged) replaced the releaser's document with the re-attester's on 13 of 19 tag-referenced digests, one layer each. On 2026-09-04 all 54 targets (19 indexes, 35 platform manifests) carried exactly one OpenVEX attestation, written by four different runs of both roles, counted from the `.att` manifests; `check-attestation-count.sh` has proven the count daily since | the run's summary; `crane manifest <repo>:sha256-<hex>.att` on 2026-09-04 |
+| Rekor retains the replaced entry | Yes. Run 33867898868 (2026-09-04) replaced three documents; the log index of every replaced layer still answered from Rekor after the replace (`rekor_retained: yes`, 3 of 3) | the run's re-attestation table |
+
+Two things the first days taught, both fixed the same day:
+
+- **Sigstore blips.** Run 33854524508 failed one write of about ninety:
+  Rekor answered "already exists" to an upload cosign's client had retried,
+  then 404 for that entry by UUID from a lagging replica. A new attempt signs
+  with fresh keys and lands a new entry, so `reattest.sh` tries a failed
+  attest up to three times, each failure named (#145). The cost is the first
+  entry staying in the log unused, which decision 2 already accepts.
+- **A document must not differ from itself.** The compiler paired last
+  time's statements by finding and package, and a package that is excepted in
+  one binary and uncovered in another carries two statements, so one was
+  re-stamped on every compile and grafana 13.1.2 and 13.1.3 were re-attested
+  daily with no input change. Pairing is by finding, status and package now
+  (#144). A replace that changes nothing is a Rekor entry for nothing, and the
+  differs test only means something if the compiler is stable.
+
+One expected replace stays: the release job compiles without the open-issue
+map, so the first rescan after a build adds the issue links and replaces that
+document once (grafana 13.1.5 on 2026-09-04, rebuilt that morning).
