@@ -14,12 +14,24 @@ import (
 
 // ---- Trivy image-scan JSON (subset we consume) ----
 type TrivyReport struct {
+	CreatedAt    string        `json:"CreatedAt"`
 	ArtifactName string        `json:"ArtifactName"`
 	Results      []TrivyResult `json:"Results"`
 }
 type TrivyResult struct {
 	Target          string      `json:"Target"`
 	Vulnerabilities []TrivyVuln `json:"Vulnerabilities"`
+	// The findings a VEX statement or an accepted-risk exception suppressed,
+	// present because every scan runs --show-suppressed (Req 6.55): a
+	// finding is "absent" only when it is neither reported nor suppressed.
+	ExperimentalModifiedFindings []TrivyModified `json:"ExperimentalModifiedFindings"`
+}
+type TrivyModified struct {
+	Type      string    `json:"Type"`
+	Status    string    `json:"Status"`
+	Source    string    `json:"Source"`
+	Statement string    `json:"Statement"`
+	Finding   TrivyVuln `json:"Finding"`
 }
 type TrivyVuln struct {
 	VulnerabilityID  string `json:"VulnerabilityID"`

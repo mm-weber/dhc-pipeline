@@ -275,7 +275,7 @@ requirement, precisely because every downstream consumer would inherit it.
 | `chart.yml`    | every PR + main            | Render *every* chart, evaluate with the Kyverno policies; `ct lint` on owned charts |
 | `e2e.yml`      | PR + dispatch              | Per affected component: kind cluster, install the hardened chart, run the Ginkgo suite |
 | `renovate.yml` | cron every 4h + dispatch   | Self-hosted Renovate over the custom managers; postUpgradeTasks recompute derived fields |
-| `rescan.yml`   | daily 06:17 UTC + dispatch | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set; expiry warnings |
+| `rescan.yml`   | daily 06:17 UTC + dispatch | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set; the clocks over the supported set to the catalogue status issue; expiry warnings |
 
 Every GitHub Action is pinned to a full commit SHA, and every third-party
 executable a workflow installs is exact-version-pinned and checksum-verified
@@ -547,6 +547,24 @@ gate (next section); when the decision lands (merged VEX statement,
 exception, or fix-bump), close the issue by hand with a pointer to the
 commit — the cron opens issues, it never closes them. EPSS and KEV order the
 queue; they never justify a status.
+
+### The catalogue status issue
+
+One issue titled "Catalogue status", found by a hidden marker and rewritten
+in place by every rescan, the way Renovate maintains its Dependency Dashboard
+(task 10.4; Req 6.46, 6.47). It is the catalogue's stopwatch. For every
+finding within the aperture on a supported digest it shows when the finding
+was first seen (the attested statement's timestamp), when it was decided
+(the exception's `decided_at` for `affected`, the statement's own timestamp
+for `not_affected` and `fixed`), and when it was fixed (the first day it was
+absent, reported and suppressed alike, from every supported digest of its
+repository). An undecided finding shows its age against the policy file's
+ceiling for its severity, the KEV ceiling when CISA lists it. The table is
+for reading; the fenced JSON block under it is the same data as the run's
+`catalogue-status` artifact, and the next rescan reads it back, so a fix
+date survives the reports being replaced. Superseded digests hold no clocks
+(the support statement in `catalogue-policy.yaml`). A Pages dashboard, if
+one is ever wanted, is presentation over that JSON and nothing else.
 
 ### Clearing a red gate — the four treatments
 
