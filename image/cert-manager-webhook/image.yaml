@@ -75,7 +75,7 @@ contents:
               # release carries the fix. Same lane, same exit condition
               # (triage/LOG.md 2026-09-02). cainjector carries no grpc.
               # renovate: datasource=go depName=google.golang.org/grpc
-              - google.golang.org/grpc@v1.83.1
+              - google.golang.org/grpc@v1.83.2
             download: true
             tidy: true
         # No test step: cmd/* submodules share the monorepo's suite, which
