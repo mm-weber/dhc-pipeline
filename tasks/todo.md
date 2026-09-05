@@ -119,3 +119,31 @@ is the mitigation; three failures are still a failure.
 - [x] 2. reattest.sh: `attest` wraps both call sites, REATTEST_RETRY_DELAY (15 s, tests 0), the
       summary line counts retried writes
 - [x] 3. user manual: the warning in the troubleshooting table; suites and shellcheck green
+
+## Task 10.4: clocks and the status issue (2026-09-05)
+
+Branch: `task-10.4-clocks-status-issue`. Goal: every finding on a supported
+digest gets a stopwatch read from attestations (first seen, decided, fixed),
+and one issue plus one artifact show them against the policy's ceilings
+(Req 6.46, 6.47). The tool is pure data in the tested `rescan` package; I/O
+stays in a thin command and the workflow, like `rescan-report`.
+
+- [x] 1. `status.go` (+ `status_test.go`, TDD): per (repository, finding) over the supported set:
+      first seen from the statement timestamp (never later than previously published), decided
+      from `action_statement_timestamp` (affected) or the statement timestamp (not_affected,
+      fixed), undecided while any supported digest carries it under_investigation or without a
+      statement; fixed as the first day absent, reported and suppressed alike, from every supported
+      digest of its repository, carried forward from the previous status JSON; a repository with no
+      report today invents no absence; age and ceiling (KEV ceiling first, then severity) for
+      undecided findings; medians and counts; issue body with marker, table and fenced
+      `metrics.json` that round-trips
+- [x] 2. `cmd/rescan-status`: reads enumeration.tsv, `reattest/<name>__<12hex>/out/*.openvex.json`,
+      `trivy/<name>__<12hex>__<platform>.json`, kev.json, the policy numbers via triage-policy.sh
+      values passed as flags, the previous JSON; writes metrics.json and the issue body
+- [x] 3. rescan.yml: read the previous fenced JSON from the open "Catalogue status" issue (marker
+      `<!-- catalogue-status -->`), run the tool, create or edit the issue, upload the JSON as the
+      `catalogue-status` artifact, one summary line; SC2154 sweep, actionlint, yamllint,
+      lint-workflow-policy, local rehearsal of the shell with a stub gh
+- [x] 4. tasks.md tick; user manual: the rescan row and a short "Catalogue status" paragraph
+      (rehearsed 2026-09-05 on the real supported set with a stub gh: 13 findings over 7 digests,
+      create then edit, carry-forward identical across two passes)

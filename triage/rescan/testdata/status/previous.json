@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-04",
+  "policy": {"aperture": ["CRITICAL", "HIGH"], "ceilings_days": {"CRITICAL": 30, "HIGH": 90}, "kev_ceiling_days": 14},
+  "repositories": [],
+  "findings": [
+    {"repository": "ghcr.io/mm-weber/dhc/grafana", "id": "CVE-2026-33818", "severity": "HIGH", "kev": false,
+     "status": "undecided", "first_seen": "2026-08-16T06:03:58Z", "over_ceiling": false},
+    {"repository": "ghcr.io/mm-weber/dhc/grafana", "id": "CVE-2026-42504", "severity": "HIGH", "kev": false,
+     "status": "undecided", "first_seen": "2026-08-05T09:27:13Z", "over_ceiling": false}
+  ],
+  "aggregates": {"findings": 2, "undecided": 2, "over_ceiling": 0, "decided": 0, "fixed": 0}
+}

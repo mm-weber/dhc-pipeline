@@ -1,0 +1,281 @@
+{
+  "CreatedAt": "2026-09-05T04:21:12.935401843-07:00",
+  "ArtifactName": "ghcr.io/mm-weber/dhc/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+  "Results": [
+    {
+      "Target": "ghcr.io/mm-weber/dhc/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170 (alpine 3.23)",
+      "Class": "os-pkgs",
+      "Type": "alpine",
+      "Vulnerabilities": [],
+      "ExperimentalModifiedFindings": []
+    },
+    {
+      "Target": "Node.js",
+      "Class": "lang-pkgs",
+      "Type": "node-pkg",
+      "Vulnerabilities": [],
+      "ExperimentalModifiedFindings": []
+    },
+    {
+      "Target": "usr/share/grafana/bin/grafana",
+      "Class": "lang-pkgs",
+      "Type": "gobinary",
+      "Vulnerabilities": [],
+      "ExperimentalModifiedFindings": [
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Source": "triage/accepted-risk/grafana.yaml",
+          "Statement": "transfer: waiting on a grafana release carrying apache/thrift 0.24.0 (grafana/grafana#131921)",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-43871",
+            "PkgName": "github.com/apache/thrift",
+            "InstalledVersion": "v0.23.1-0.20260429145742-d2acd3c49e58",
+            "FixedVersion": "0.24.0",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/github.com/apache/thrift@v0.23.1-0.20260429145742-d2acd3c49e58",
+              "UID": "4de81edfd300448e"
+            }
+          }
+        },
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Source": "triage/accepted-risk/grafana.yaml",
+          "Statement": "transfer: waiting on a grafana release carrying grpc-go 1.83.1 (grafana/grafana#131921)",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-84304",
+            "PkgName": "google.golang.org/grpc",
+            "InstalledVersion": "v1.82.1",
+            "FixedVersion": "1.83.1",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/google.golang.org/grpc@v1.82.1",
+              "UID": "97b0a6bc37c180aa"
+            }
+          }
+        },
+        {
+          "Type": "vulnerability",
+          "Status": "fixed",
+          "Source": "/home/node/.claude/jobs/9d3a10b9/tmp/rehearsal/vex/grafana__837727cbdb70/grafana.openvex.json",
+          "Statement": "",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-21728",
+            "PkgName": "github.com/grafana/tempo",
+            "InstalledVersion": "v1.5.1-0.20260427112133-525d1bab07e0",
+            "FixedVersion": "2.8.4, 2.9.2, 2.10.2",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/github.com/grafana/tempo@v1.5.1-0.20260427112133-525d1bab07e0",
+              "UID": "18b157406ef90a65"
+            }
+          }
+        },
+        {
+          "Type": "vulnerability",
+          "Status": "fixed",
+          "Source": "/home/node/.claude/jobs/9d3a10b9/tmp/rehearsal/vex/grafana__837727cbdb70/grafana.openvex.json",
+          "Statement": "",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-28377",
+            "PkgName": "github.com/grafana/tempo",
+            "InstalledVersion": "v1.5.1-0.20260427112133-525d1bab07e0",
+            "FixedVersion": "2.10.3",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/github.com/grafana/tempo@v1.5.1-0.20260427112133-525d1bab07e0",
+              "UID": "18b157406ef90a65"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "Target": "usr/share/grafana/data/plugins-bundled/elasticsearch/gpx_grafana_elasticsearch_datasource_linux_amd64",
+      "Class": "lang-pkgs",
+      "Type": "gobinary",
+      "Vulnerabilities": [],
+      "ExperimentalModifiedFindings": []
+    },
+    {
+      "Target": "usr/share/grafana/data/plugins-bundled/zipkin/gpx_grafana-zipkin-datasource_linux_amd64",
+      "Class": "lang-pkgs",
+      "Type": "gobinary",
+      "Vulnerabilities": [],
+      "ExperimentalModifiedFindings": [
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Source": "triage/accepted-risk/grafana.yaml",
+          "Statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-39822",
+            "PkgName": "stdlib",
+            "InstalledVersion": "v1.26.4",
+            "FixedVersion": "1.25.12, 1.26.5, 1.27.0-rc.2",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/stdlib@v1.26.4",
+              "UID": "1e3c6e751709df3c"
+            }
+          }
+        },
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Source": "triage/accepted-risk/grafana.yaml",
+          "Statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-56858",
+            "PkgName": "stdlib",
+            "InstalledVersion": "v1.26.4",
+            "FixedVersion": "1.25.13, 1.26.6, 1.27.0-rc.3",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/stdlib@v1.26.4",
+              "UID": "1e3c6e751709df3c"
+            }
+          }
+        },
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Source": "triage/accepted-risk/grafana.yaml",
+          "Statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-39821",
+            "PkgName": "stdlib",
+            "InstalledVersion": "v1.26.4",
+            "FixedVersion": "1.25.13, 1.26.6, 1.27.0-rc.3",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/stdlib@v1.26.4",
+              "UID": "1e3c6e751709df3c"
+            }
+          }
+        },
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Source": "triage/accepted-risk/grafana.yaml",
+          "Statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-46600",
+            "PkgName": "stdlib",
+            "InstalledVersion": "v1.26.4",
+            "FixedVersion": "1.26.6, 1.27.0-rc.3",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/stdlib@v1.26.4",
+              "UID": "1e3c6e751709df3c"
+            }
+          }
+        },
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Source": "triage/accepted-risk/grafana.yaml",
+          "Statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-56853",
+            "PkgName": "stdlib",
+            "InstalledVersion": "v1.26.4",
+            "FixedVersion": "1.25.13, 1.26.6, 1.27.0-rc.3",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/stdlib@v1.26.4",
+              "UID": "1e3c6e751709df3c"
+            }
+          }
+        },
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Source": "triage/accepted-risk/grafana.yaml",
+          "Statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-56859",
+            "PkgName": "stdlib",
+            "InstalledVersion": "v1.26.4",
+            "FixedVersion": "1.25.13, 1.26.6, 1.27.0-rc.3",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/stdlib@v1.26.4",
+              "UID": "1e3c6e751709df3c"
+            }
+          }
+        },
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Source": "triage/accepted-risk/grafana.yaml",
+          "Statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-56860",
+            "PkgName": "stdlib",
+            "InstalledVersion": "v1.26.4",
+            "FixedVersion": "1.25.13, 1.26.6, 1.27.0-rc.3",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/stdlib@v1.26.4",
+              "UID": "1e3c6e751709df3c"
+            }
+          }
+        },
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Source": "triage/accepted-risk/grafana.yaml",
+          "Statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-56862",
+            "PkgName": "stdlib",
+            "InstalledVersion": "v1.26.4",
+            "FixedVersion": "1.25.13, 1.26.6, 1.27.0-rc.3",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/stdlib@v1.26.4",
+              "UID": "1e3c6e751709df3c"
+            }
+          }
+        },
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Source": "triage/accepted-risk/grafana.yaml",
+          "Statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-33818",
+            "PkgName": "stdlib",
+            "InstalledVersion": "v1.26.4",
+            "FixedVersion": "1.25.13, 1.26.6, 1.27.0-rc.3",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/stdlib@v1.26.4",
+              "UID": "1e3c6e751709df3c"
+            }
+          }
+        },
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Source": "triage/accepted-risk/grafana.yaml",
+          "Statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+",
+          "Finding": {
+            "VulnerabilityID": "CVE-2026-84304",
+            "PkgName": "google.golang.org/grpc",
+            "InstalledVersion": "v1.82.1",
+            "FixedVersion": "1.83.1",
+            "Severity": "HIGH",
+            "PkgIdentifier": {
+              "PURL": "pkg:golang/google.golang.org/grpc@v1.82.1",
+              "UID": "ff65e2f77c82218d"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

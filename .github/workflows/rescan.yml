@@ -353,6 +353,77 @@ jobs:
             gh issue create --title "$title" --body "$body" --label "$labels"
           done
 
+      # Task 10.4 (Req 6.46, 6.47): the clocks over the supported set, read
+      # from the attested statements and today's reports, published to one
+      # status issue maintained the way Renovate maintains its dashboard
+      # (found by a hidden marker, edited in place) and to a workflow
+      # artifact. The previous issue body is a named input: its fenced JSON
+      # block carries the fix dates forward, so a report replaced today does
+      # not erase the day a finding first went absent. The computation is the
+      # tested rescan Go package; these steps are its I/O.
+      - name: catalogue status, the previously published data (Req 6.46)
+        id: status_previous
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT/status"
+          # The marker identifies the issue, never the title alone (the cve
+          # issues' convention, the same here).
+          number=$(gh issue list --state open --search '"Catalogue status" in:title' --limit 20 --json number,body \
+                     --jq '[.[] | select(.body | contains("<!-- catalogue-status -->"))] | first | .number // empty' || true)
+          if [ -n "$number" ]; then
+            gh issue view "$number" --json body --jq .body > "$OUT/status/previous.md"
+            echo "previous status issue: #${number}"
+          else
+            : > "$OUT/status/previous.md"
+            echo "no status issue yet: the clocks start from today's evidence"
+          fi
+          echo "number=${number}" >> "$GITHUB_OUTPUT"
+
+      - name: catalogue status, the clocks over the supported set (Req 6.46)
+        id: status
+        run: |
+          set -euo pipefail
+          aperture=$(scripts/triage-policy.sh . aperture)
+          ceilings=""
+          for sev in ${aperture//,/ }; do
+            ceilings="${ceilings:+${ceilings},}${sev}=$(scripts/triage-policy.sh . ceiling "$sev")"
+          done
+          go -C triage/rescan run ./cmd/rescan-status \
+            --enumeration "$OUT/enumeration.tsv" --reattest "$OUT/reattest" --reports "$OUT/trivy" \
+            --kev "$OUT/kev.json" --aperture "$aperture" --ceilings "$ceilings" \
+            --kev-ceiling "$(scripts/triage-policy.sh . kev-ceiling)" \
+            --previous-body "$OUT/status/previous.md" \
+            --run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --out-json "$OUT/status/metrics.json" --out-body "$OUT/status/issue.md"
+          for k in findings undecided over_ceiling decided fixed; do
+            echo "${k}=$(jq ".aggregates.${k}" "$OUT/status/metrics.json")" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: catalogue status, published to the status issue (Req 6.47)
+        id: status_publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUMBER: ${{ steps.status_previous.outputs.number }}
+        run: |
+          set -euo pipefail
+          if [ -n "$NUMBER" ]; then
+            gh issue edit "$NUMBER" --body-file "$OUT/status/issue.md" > /dev/null
+            url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/issues/${NUMBER}"
+          else
+            gh label create status --color 0075CA --description "The catalogue's clocks, maintained by the rescan" 2>/dev/null || true
+            url=$(gh issue create --title "Catalogue status" --label status --body-file "$OUT/status/issue.md")
+          fi
+          echo "url=${url}" >> "$GITHUB_OUTPUT"
+          echo "status issue: ${url}"
+
+      - name: upload the status data (Req 6.47)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: catalogue-status
+          path: rescan-out/status/metrics.json
+
       - name: summary
         if: always()
         run: |
@@ -364,6 +435,7 @@ jobs:
             fi
             echo "- platform manifests scanned: ${{ steps.scan.outputs.scanned || 0 }} (failed: ${{ steps.scan.outputs.failed || 0 }})"
             echo "- new CVE issues filed: ${{ steps.report.outputs.count || 0 }}"
+            echo "- catalogue status: ${{ steps.status_publish.outputs.url || 'not published' }}, ${{ steps.status.outputs.undecided || 0 }} undecided (${{ steps.status.outputs.over_ceiling || 0 }} over ceiling), ${{ steps.status.outputs.decided || 0 }} decided, ${{ steps.status.outputs.fixed || 0 }} fixed"
             echo
             # Req 6.33. Without this the run is green whether every statement
             # applied or none of them did: an unresolved digest suppresses

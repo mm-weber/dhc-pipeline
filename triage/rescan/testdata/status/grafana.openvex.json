@@ -1,0 +1,555 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://openvex.dev/docs/dhc/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+  "author": "dhc-pipeline triage (mm-weber)",
+  "statements": [
+    {
+      "impact_statement": "Grafana 13.1.5 pins github.com/grafana/tempo at v1.5.1-0.20260427112133-525d1bab07e0, the same commit 13.1.1, 13.1.2 and 13.1.3 pinned. Tempo's module path carries no /v2 suffix while its releases are v2.x and v3.x, so its v2+ tags are not consumable through that path and Grafana tracks main by commit on the v1 line. The advisory's affected range, >= 1.3.0 < 2.8.4, therefore sorts every v1-line pseudo-version below the fix by semver no matter how recent the commit is, which is why scanners report this on a build that carries the remedy. The fix is commit 650eb1985a0776789c8564122990f588a742356f (PR #6525, 2026-02-20, 'set default max_result_limit for search to 256*1024'), and GitHub's compare of that commit against the pinned 525d1bab07e0 reports ahead_by 337 with behind_by 0: the pinned tree contains it. Scoped to 13.1.3-alpine3.23 rather than stated for every release because the published 13.0.4-alpine3.23 pins cbe5f845dc7b, which the same comparison puts behind_by 483, and that image is genuinely affected.",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/grafana/tempo"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/grafana/tempo"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/grafana/tempo"
+            }
+          ]
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Commit ancestry against the pinned source, not a version comparison; see triage/LOG.md 2026-08-05.",
+      "timestamp": "2026-08-05T00:00:00Z",
+      "vulnerability": {
+        "name": "CVE-2026-21728"
+      }
+    },
+    {
+      "impact_statement": "Grafana 13.1.5 pins github.com/grafana/tempo at v1.5.1-0.20260427112133-525d1bab07e0, the same commit 13.1.1, 13.1.2 and 13.1.3 pinned. Tempo's module path carries no /v2 suffix while its releases are v2.x and v3.x, so its v2+ tags are not consumable through that path and Grafana tracks main by commit on the v1 line. The advisory's affected range, < 2.10.3, therefore sorts every v1-line pseudo-version below the fix by semver no matter how recent the commit is, which is why scanners report this on a build that carries the remedy. The fix is commit bb8ca663db34a0980c9758b40d918fda3b4dbec3 (PR #6711, 2026-03-17, 'fix(s3): treat SSE-C encryption_key as a secret'), and GitHub's compare of that commit against the pinned 525d1bab07e0 reports ahead_by 218 with behind_by 0: the pinned tree contains it. Scoped to 13.1.3-alpine3.23 rather than stated for every release because the published 13.0.4-alpine3.23 pins cbe5f845dc7b, which the same comparison puts behind_by 602, and that image is genuinely affected.",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/grafana/tempo"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/grafana/tempo"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/grafana/tempo"
+            }
+          ]
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Commit ancestry against the pinned source, not a version comparison; see triage/LOG.md 2026-08-05.",
+      "timestamp": "2026-08-05T00:00:00Z",
+      "vulnerability": {
+        "name": "CVE-2026-28377"
+      }
+    },
+    {
+      "impact_statement": "The vulnerability is in the Prometheus server's config API (/api/v1/status/config), which echoes an Azure OAuth client secret from a running Prometheus server's scrape configuration. This image runs Grafana's dashboard server, which vendors github.com/prometheus/prometheus for PromQL parsing and its Prometheus datasource client. It does not start a Prometheus server and does not serve the Prometheus HTTP API, so the disclosing handler is never routed or invoked. No Prometheus scrape configuration, and therefore no Azure OAuth client secret, exists in this image.",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/prometheus/prometheus"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/prometheus/prometheus"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/prometheus/prometheus"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "status_notes": "version-independent: the claim is about what this image runs rather than about what a release links. A Grafana dashboard server does not start a Prometheus server or serve its HTTP API in any version, so the disclosing handler is never routed; a bump changes which prometheus/prometheus it vendors, not whether that handler is reachable. Architectural analysis of the shipped entrypoint and the advisory's affected component; see triage/LOG.md 2026-07-26.",
+      "timestamp": "2026-07-26T00:00:00Z",
+      "vulnerability": {
+        "name": "CVE-2026-42151"
+      }
+    },
+    {
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/prometheus/prometheus"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/prometheus/prometheus"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/prometheus/prometheus"
+            }
+          ]
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Superseded by the grafana 13.0.4 to 13.1.1 bump and re-scoped to 13.1.5. Upstream 13.0.4 replace-pinned prometheus/prometheus to v0.305.3; 13.1.1 through 13.1.5 all require v0.312.0 with no replace directive, past the 0.311.3 fix. Trivy no longer reports this finding on any of them. See triage/LOG.md 2026-08-03.",
+      "timestamp": "2026-08-03T00:00:00Z",
+      "vulnerability": {
+        "name": "CVE-2026-42151"
+      }
+    },
+    {
+      "action_statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+ Upstream issue: https://github.com/grafana/grafana-zipkin-datasource/issues/94. Binaries: usr/share/grafana/data/plugins-bundled/zipkin/*. Expires: 2026-11-02.",
+      "action_statement_timestamp": "2026-09-03T00:00:00Z",
+      "last_updated": "2026-09-04T11:27:16.883490388Z",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        }
+      ],
+      "status": "affected",
+      "status_notes": "accepted-risk exception in grafana.yaml; real and shipped for a bounded time, not coverage (Req 6.8); tracked in https://github.com/mm-weber/dhc-pipeline/issues/86",
+      "timestamp": "2026-09-04T09:19:44.227575144Z",
+      "vulnerability": {
+        "name": "CVE-2026-33818"
+      }
+    },
+    {
+      "action_statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+ Upstream issue: https://github.com/grafana/grafana-zipkin-datasource/issues/94. Binaries: usr/share/grafana/data/plugins-bundled/zipkin/*. Expires: 2026-11-02.",
+      "action_statement_timestamp": "2026-09-03T00:00:00Z",
+      "last_updated": "2026-09-04T11:27:16.883490388Z",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        }
+      ],
+      "status": "affected",
+      "status_notes": "accepted-risk exception in grafana.yaml; real and shipped for a bounded time, not coverage (Req 6.8); tracked in https://github.com/mm-weber/dhc-pipeline/issues/72",
+      "timestamp": "2026-09-04T09:19:44.227575144Z",
+      "vulnerability": {
+        "name": "CVE-2026-39821"
+      }
+    },
+    {
+      "action_statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+ Upstream issue: https://github.com/grafana/grafana-zipkin-datasource/issues/94. Binaries: usr/share/grafana/data/plugins-bundled/zipkin/*. Expires: 2026-11-02.",
+      "action_statement_timestamp": "2026-09-03T00:00:00Z",
+      "last_updated": "2026-09-04T11:27:16.883490388Z",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        }
+      ],
+      "status": "affected",
+      "status_notes": "accepted-risk exception in grafana.yaml; real and shipped for a bounded time, not coverage (Req 6.8); tracked in https://github.com/mm-weber/dhc-pipeline/issues/26",
+      "timestamp": "2026-09-04T09:19:44.227575144Z",
+      "vulnerability": {
+        "name": "CVE-2026-39822"
+      }
+    },
+    {
+      "action_statement": "transfer: waiting on a grafana release carrying apache/thrift 0.24.0 (grafana/grafana#131921) Upstream issue: https://github.com/grafana/grafana/issues/131921. Binaries: usr/share/grafana/bin/grafana. Expires: 2026-11-02.",
+      "action_statement_timestamp": "2026-09-03T00:00:00Z",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/apache/thrift@v0.23.1-0.20260429145742-d2acd3c49e58"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/apache/thrift@v0.23.1-0.20260429145742-d2acd3c49e58"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/apache/thrift@v0.23.1-0.20260429145742-d2acd3c49e58"
+            }
+          ]
+        }
+      ],
+      "status": "affected",
+      "status_notes": "accepted-risk exception in grafana.yaml; real and shipped for a bounded time, not coverage (Req 6.8)",
+      "timestamp": "2026-09-04T09:19:44.227575144Z",
+      "vulnerability": {
+        "name": "CVE-2026-43871"
+      }
+    },
+    {
+      "action_statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+ Upstream issue: https://github.com/grafana/grafana-zipkin-datasource/issues/94. Binaries: usr/share/grafana/data/plugins-bundled/zipkin/*. Expires: 2026-11-02.",
+      "action_statement_timestamp": "2026-09-03T00:00:00Z",
+      "last_updated": "2026-09-04T11:27:16.883490388Z",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        }
+      ],
+      "status": "affected",
+      "status_notes": "accepted-risk exception in grafana.yaml; real and shipped for a bounded time, not coverage (Req 6.8); tracked in https://github.com/mm-weber/dhc-pipeline/issues/56",
+      "timestamp": "2026-09-04T09:19:44.227575144Z",
+      "vulnerability": {
+        "name": "CVE-2026-46600"
+      }
+    },
+    {
+      "action_statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+ Upstream issue: https://github.com/grafana/grafana-zipkin-datasource/issues/94. Binaries: usr/share/grafana/data/plugins-bundled/zipkin/*. Expires: 2026-11-02.",
+      "action_statement_timestamp": "2026-09-03T00:00:00Z",
+      "last_updated": "2026-09-04T11:27:16.883490388Z",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        }
+      ],
+      "status": "affected",
+      "status_notes": "accepted-risk exception in grafana.yaml; real and shipped for a bounded time, not coverage (Req 6.8); tracked in https://github.com/mm-weber/dhc-pipeline/issues/83",
+      "timestamp": "2026-09-04T09:19:44.227575144Z",
+      "vulnerability": {
+        "name": "CVE-2026-56853"
+      }
+    },
+    {
+      "action_statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+ Upstream issue: https://github.com/grafana/grafana-zipkin-datasource/issues/94. Binaries: usr/share/grafana/data/plugins-bundled/zipkin/*. Expires: 2026-11-02.",
+      "action_statement_timestamp": "2026-09-03T00:00:00Z",
+      "last_updated": "2026-09-04T11:27:16.883490388Z",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        }
+      ],
+      "status": "affected",
+      "status_notes": "accepted-risk exception in grafana.yaml; real and shipped for a bounded time, not coverage (Req 6.8); tracked in https://github.com/mm-weber/dhc-pipeline/issues/88",
+      "timestamp": "2026-09-04T09:19:44.227575144Z",
+      "vulnerability": {
+        "name": "CVE-2026-56858"
+      }
+    },
+    {
+      "action_statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+ Upstream issue: https://github.com/grafana/grafana-zipkin-datasource/issues/94. Binaries: usr/share/grafana/data/plugins-bundled/zipkin/*. Expires: 2026-11-02.",
+      "action_statement_timestamp": "2026-09-03T00:00:00Z",
+      "last_updated": "2026-09-04T11:27:16.883490388Z",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        }
+      ],
+      "status": "affected",
+      "status_notes": "accepted-risk exception in grafana.yaml; real and shipped for a bounded time, not coverage (Req 6.8); tracked in https://github.com/mm-weber/dhc-pipeline/issues/84",
+      "timestamp": "2026-09-04T09:19:44.227575144Z",
+      "vulnerability": {
+        "name": "CVE-2026-56859"
+      }
+    },
+    {
+      "action_statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+ Upstream issue: https://github.com/grafana/grafana-zipkin-datasource/issues/94. Binaries: usr/share/grafana/data/plugins-bundled/zipkin/*. Expires: 2026-11-02.",
+      "action_statement_timestamp": "2026-09-03T00:00:00Z",
+      "last_updated": "2026-09-04T11:27:16.883490388Z",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        }
+      ],
+      "status": "affected",
+      "status_notes": "accepted-risk exception in grafana.yaml; real and shipped for a bounded time, not coverage (Req 6.8); tracked in https://github.com/mm-weber/dhc-pipeline/issues/87",
+      "timestamp": "2026-09-04T09:19:44.227575144Z",
+      "vulnerability": {
+        "name": "CVE-2026-56860"
+      }
+    },
+    {
+      "action_statement": "transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+ Upstream issue: https://github.com/grafana/grafana-zipkin-datasource/issues/94. Binaries: usr/share/grafana/data/plugins-bundled/zipkin/*. Expires: 2026-11-02.",
+      "action_statement_timestamp": "2026-09-03T00:00:00Z",
+      "last_updated": "2026-09-04T11:27:16.883490388Z",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/stdlib@v1.26.4"
+            }
+          ]
+        }
+      ],
+      "status": "affected",
+      "status_notes": "accepted-risk exception in grafana.yaml; real and shipped for a bounded time, not coverage (Req 6.8); tracked in https://github.com/mm-weber/dhc-pipeline/issues/85",
+      "timestamp": "2026-09-04T09:19:44.227575144Z",
+      "vulnerability": {
+        "name": "CVE-2026-56862"
+      }
+    },
+    {
+      "action_statement": "transfer: waiting on a grafana release carrying grpc-go 1.83.1 (grafana/grafana#131921) Upstream issue: https://github.com/grafana/grafana/issues/131921. Binaries: usr/share/grafana/bin/grafana. Expires: 2026-11-02. Also: transfer: waiting on a grafana release that bundles grafana-zipkin-datasource v12.4.7+ Upstream issue: https://github.com/grafana/grafana-zipkin-datasource/issues/94. Binaries: usr/share/grafana/data/plugins-bundled/zipkin/*. Expires: 2026-11-02.",
+      "action_statement_timestamp": "2026-09-03T00:00:00Z",
+      "last_updated": "2026-09-04T11:27:16.883490388Z",
+      "products": [
+        {
+          "@id": "pkg:oci/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/google.golang.org/grpc@v1.82.1"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/google.golang.org/grpc@v1.82.1"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/grafana@sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/google.golang.org/grpc@v1.82.1"
+            }
+          ]
+        }
+      ],
+      "status": "affected",
+      "status_notes": "accepted-risk exception in grafana.yaml; real and shipped for a bounded time, not coverage (Req 6.8); tracked in https://github.com/mm-weber/dhc-pipeline/issues/121",
+      "timestamp": "2026-09-04T09:19:44.227575144Z",
+      "vulnerability": {
+        "name": "CVE-2026-84304"
+      }
+    }
+  ],
+  "timestamp": "2026-09-04T09:19:44.227575144Z",
+  "version": 1
+}
