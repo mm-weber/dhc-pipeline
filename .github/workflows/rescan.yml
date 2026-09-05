@@ -288,6 +288,69 @@ jobs:
             echo '{"data":[]}' > "$OUT/epss.json"
           fi
 
+      # Task 10.6 (Req 6.52 to 6.57): the evidence-based issue lifecycle over
+      # the supported set. Every cve issue, open and closed, meets today's
+      # attested scan reports, the SBOMs attested to the supported platform
+      # manifests (read through verification, Req 6.58) and the merged
+      # triage artifacts; the tested Go package decides what closes, with
+      # which evidence-graded label, and what reopens; gh applies it. Before
+      # the dedup, so a reopened issue is already open when the filer runs
+      # and nothing is filed twice (Req 6.57).
+      - name: issue lifecycle, the evidence (Req 6.52 to 6.57)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT/lifecycle"
+          gh issue list --state all --label cve --limit 500 --json number,state,body,labels > "$OUT/lifecycle/issues.json"
+          echo "cve issues, open and closed: $(jq 'length' "$OUT/lifecycle/issues.json")"
+          trivy version --format json > "$OUT/lifecycle/scanner.json"
+          scripts/fetch-sboms.sh . "$OUT/enumeration.tsv" "$OUT/lifecycle/sbom"
+
+      - name: issue lifecycle, decided on evidence (tested)
+        id: lifecycle
+        run: |
+          set -euo pipefail
+          go -C triage/rescan run ./cmd/rescan-lifecycle \
+            --enumeration "$OUT/enumeration.tsv" --reports "$OUT/trivy" --sboms "$OUT/lifecycle/sbom" \
+            --issues "$OUT/lifecycle/issues.json" --scanner "$OUT/lifecycle/scanner.json" --vex-dir triage/vex \
+            --aperture "$(scripts/triage-policy.sh . aperture)" --out "$OUT/lifecycle/actions.json"
+          for k in close reopen kept; do
+            echo "${k}=$(jq ".${k} | length" "$OUT/lifecycle/actions.json")" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: issue lifecycle, applied (Req 6.52, 6.53, 6.56, 6.57)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The graded labels exist before use, idempotently (Req 6.56).
+          for triple in \
+            "fixed|0E8A16|the attested SBOMs prove the package version bumped, or a fixed statement covers it" \
+            "removed|0E8A16|the package left every supported digest's SBOM" \
+            "not_affected|1D76DB|a not_affected statement covers it on every supported digest listing it" \
+            "accepted|FBCA04|an unexpired accepted-risk exception covers it on every supported digest listing it" \
+            "absent|C5DEF5|absent from every supported digest's report, no SBOM proof of a bump"; do
+            IFS='|' read -r grade color desc <<<"$triple"
+            gh label create "resolved:${grade}" --color "$color" --description "$desc" 2>/dev/null || true
+          done
+          jq -c '.close[]' "$OUT/lifecycle/actions.json" | while read -r action; do
+            number=$(jq -r '.number' <<<"$action"); label=$(jq -r '.label' <<<"$action")
+            jq -r '.comment' <<<"$action" > "$OUT/lifecycle/comment-${number}.md"
+            echo "closing #${number} as ${label}"
+            gh issue edit "$number" --add-label "$label" > /dev/null
+            gh issue close "$number" --comment "$(cat "$OUT/lifecycle/comment-${number}.md")" > /dev/null
+          done
+          jq -c '.reopen[]' "$OUT/lifecycle/actions.json" | while read -r action; do
+            number=$(jq -r '.number' <<<"$action")
+            jq -r '.comment' <<<"$action" > "$OUT/lifecycle/comment-${number}.md"
+            echo "reopening #${number}"
+            gh issue reopen "$number" --comment "$(cat "$OUT/lifecycle/comment-${number}.md")" > /dev/null
+            remove=$(jq -r '.remove_labels | join(",")' <<<"$action")
+            [ -z "$remove" ] || gh issue edit "$number" --remove-label "$remove" > /dev/null
+          done
+          jq -r '.kept[] | "kept open #\(.number) \(.id): \(.reason)"' "$OUT/lifecycle/actions.json"
+
       - name: dedup — already-open CVE issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -435,6 +498,7 @@ jobs:
             fi
             echo "- platform manifests scanned: ${{ steps.scan.outputs.scanned || 0 }} (failed: ${{ steps.scan.outputs.failed || 0 }})"
             echo "- new CVE issues filed: ${{ steps.report.outputs.count || 0 }}"
+            echo "- issues closed on evidence: ${{ steps.lifecycle.outputs.close || 0 }}, reopened: ${{ steps.lifecycle.outputs.reopen || 0 }}, kept open: ${{ steps.lifecycle.outputs.kept || 0 }}"
             echo "- catalogue status: ${{ steps.status_publish.outputs.url || 'not published' }}, ${{ steps.status.outputs.undecided || 0 }} undecided (${{ steps.status.outputs.over_ceiling || 0 }} over ceiling), ${{ steps.status.outputs.decided || 0 }} decided, ${{ steps.status.outputs.fixed || 0 }} fixed"
             echo
             # Req 6.33. Without this the run is green whether every statement

@@ -147,3 +147,33 @@ stays in a thin command and the workflow, like `rescan-report`.
 - [x] 4. tasks.md tick; user manual: the rescan row and a short "Catalogue status" paragraph
       (rehearsed 2026-09-05 on the real supported set with a stub gh: 13 findings over 7 digests,
       create then edit, carry-forward identical across two passes)
+
+## Task 10.6: evidence-based issue lifecycle over the supported set (2026-09-05)
+
+Branch: `task-10.6-issue-lifecycle`. Goal: a cve issue closes when the evidence
+says so and reopens when the finding returns, and the label says which evidence
+(Req 6.52 to 6.57); the tool records no decision (Req 6.54). Pure decision in
+the tested `rescan` package, I/O in a thin command, a verified SBOM read, and
+three workflow steps placed before the dedup so a reopened issue is open when
+the filer runs.
+
+- [x] 1. `lifecycle.go` (+ tests, TDD): parse our own issue template (marker, images, packages);
+      per finding over the supported set: reported, covered (exception, not_affected, fixed, with
+      the covering artifact) or absent; an open issue closes on "absent everywhere" (label from
+      the attested SBOMs: fixed when every occurrence of the package bumped, removed when it left
+      every SBOM, absent otherwise with scanner and database versions) or on "covered wherever
+      listed" (accepted over not_affected over fixed, the weakest grade wins); a supported digest
+      without a report today blocks every close; a closed issue reopens when its finding is
+      reported on a supported digest, resolved labels removed, the latest closed issue per finding
+- [x] 2. `scripts/fetch-sboms.sh` (+ test with a cosign stub): the CycloneDX SBOM of every supported
+      platform manifest through `cosign verify-attestation --type cyclonedx` against the roles that
+      attest it (Req 6.58); a manifest without one is named and skipped
+- [x] 3. `cmd/rescan-lifecycle`: reads issues.json (gh), the enumeration, reports, SBOMs, scanner
+      version, triage/vex sources; writes actions.json; shared input loading with rescan-status
+- [x] 4. rescan.yml: evidence, decision, apply (labels created idempotently) before the dedup step;
+      summary line; SC2154 sweep, actionlint, yamllint, lint-workflow-policy; rehearsal with a stub gh
+- [x] 5. Rehearsal on the real supported set: what today's evidence would do to the open issues
+- [x] 6. tasks.md tick; user manual: the lifecycle paragraph replaces "it never closes them"
+      (rehearsed 2026-09-05: 25 issues, 7 digests, 14 SBOMs; 16 closes, 6 fixed on SBOM proof and 10
+      accepted on the grafana exceptions, 0 reopened, 0 kept; the rehearsal caught the loop's stdin
+      being the enumeration, fixed with a regression case)
