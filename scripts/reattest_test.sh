@@ -75,6 +75,13 @@ case "$1" in
     echo "no matching attestations" >&2; exit 1 ;;
   attest)
     [ -n "${STUB_FAIL_ATTEST:-}" ] && { echo "stub: refused" >&2; exit 1; }
+    # A budget of attempts that fail the way Rekor did on 2026-09-04, then succeed.
+    if [ -s "${STUB_DIR}/attest-fail-budget" ] && [ "$(cat "${STUB_DIR}/attest-fail-budget")" -gt 0 ]; then
+      echo $(( $(cat "${STUB_DIR}/attest-fail-budget") - 1 )) > "${STUB_DIR}/attest-fail-budget"
+      echo "Signature already exists. Fetching and verifying inclusion proof." >&2
+      echo "Error: signing ${@: -1}: [GET /api/v1/log/entries/{entryUUID}][404] getLogEntryByUuidNotFound" >&2
+      exit 1
+    fi
     exit 0 ;;
 esac
 exit 2
@@ -178,16 +185,32 @@ out=$(run --dry-run); rc=$?
 grep -q 'would run: cosign attest --yes --type openvex --replace' <<<"$out" && pass "and says what it would have run" || fail "dry-run output" "$out"
 [ "$(rec '.dry_run')" = "true" ] && pass "and records the dry run" || fail "record" "$(cat "$SB/out/reattest.jsonl")"
 
-# 8: a refused write fails the run, by name
+# 8: a refused write fails the run, by name, after a bounded number of attempts
 fresh
-out=$(STUB_FAIL_ATTEST=1 run); rc=$?
+out=$(REATTEST_RETRY_DELAY=0 STUB_FAIL_ATTEST=1 run); rc=$?
 [ "$rc" -eq 1 ] && pass "a refused attestation fails the run" || fail "rc=$rc" "$out"
-grep -q "cosign attest --type vuln --replace failed for ghcr.io/acme/dhc/grafana@${M1}" <<<"$out" && pass "naming the target" || fail "naming" "$out"
+grep -q "::error::reattest: cosign attest --type vuln --replace failed for ghcr.io/acme/dhc/grafana@${M1}" <<<"$out" && pass "naming the target" || fail "naming" "$out"
+[ "$(calls 'type vuln --replace')" -eq 3 ] && pass "after three attempts, not one and not forever" || fail "attempts" "$(cat "$STUB_ARGV")"
+grep -q "(attempt 2 of 3)" <<<"$out" && pass "each failed attempt named on the way" || fail "attempt warnings" "$out"
+[ "$(rec '.failed')" = "scan report attestation" ] && [ "$(rec '.retries')" = "2" ] && pass "and the record counts the retries" || fail "record" "$(cat "$SB/out/reattest.jsonl")"
 
 # 9: the open-issue map reaches the compiler, so the statement names its issue
 fresh; printf '{"CVE-2026-43871":"https://github.com/acme/dhc/issues/9"}\n' > "$SB/issues.json"
 out=$(REATTEST_ISSUES="$SB/issues.json" run); rc=$?
 grep -q 'issues/9' "$(compiled_doc)" && pass "the compiled statement carries the open issue link" || fail "issue link" "$(cat "$(compiled_doc)")"
+
+# 10: a Sigstore blip is retried, not failed. Measured 2026-09-04 (run
+#     33854524508): Rekor answered "already exists" to an upload cosign's client
+#     had retried, then 404 for the entry by UUID from a lagging replica, and
+#     one of ninety writes failed the day. A new attempt signs with fresh keys
+#     and lands a new entry, so one failed attempt is named and tried again.
+fresh; echo 1 > "$SB/attest-fail-budget"
+out=$(REATTEST_RETRY_DELAY=0 run); rc=$?
+[ "$rc" -eq 0 ] && pass "one failed attempt does not fail the run" || fail "rc=$rc" "$out"
+[ "$(calls 'type vuln --replace')" -eq 2 ] && pass "the write was attempted again" || fail "attempts" "$(cat "$STUB_ARGV")"
+grep -q "::warning::reattest: cosign attest --type vuln --replace failed for ghcr.io/acme/dhc/grafana@${M1} (attempt 1 of 3)" <<<"$out" && pass "and the failed attempt is named" || fail "warning" "$out"
+[ "$(rec '.retries')" = "1" ] && [ "$(rec '.reattested')" = "true" ] && pass "counted in the record, which is otherwise a normal one" || fail "record" "$(cat "$SB/out/reattest.jsonl")"
+grep -q '0 failed, 1 retried' <<<"$out" && pass "and in the summary line" || fail "summary" "$out"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all reattest tests passed"

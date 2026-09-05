@@ -104,3 +104,18 @@ with the first, its shape differed, and it was re-stamped on every compile.
 - [x] 3. Measured on real data: today's scan of grafana 13.1.2 compiled against today's attested
       document differs before the fix (10 statements re-stamped) and is identical after it
 - [x] 4. compile-vex and reattest suites green; the next rescan is the live confirmation
+## Fix: a Sigstore blip is retried, not failed (2026-09-04)
+
+Goal: one failed write out of ninety must not fail the day. Run 33854524508
+(manual, 08:39 UTC) failed at the re-attest step on a single
+`cosign attest --type vuln --replace`: Rekor answered "already exists" to an
+upload cosign's client had retried, then 404 for that entry by UUID from a
+lagging replica. The scheduled run three hours later wrote all 35 manifests.
+A new attempt signs with fresh keys and lands a new entry, so trying again
+is the mitigation; three failures are still a failure.
+
+- [x] 1. Failing cases first (reattest_test.sh 8 and 10): one stubbed blip is retried, named as a
+      warning and counted in the record; a refusal fails after exactly three attempts
+- [x] 2. reattest.sh: `attest` wraps both call sites, REATTEST_RETRY_DELAY (15 s, tests 0), the
+      summary line counts retried writes
+- [x] 3. user manual: the warning in the troubleshooting table; suites and shellcheck green

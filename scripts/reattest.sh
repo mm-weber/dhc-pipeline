@@ -32,6 +32,15 @@
 # PATH: cosign (v2, the line with --replace), trivy, crane, vexctl, curl.
 # REATTEST_ISSUES names the open-issue map handed to the compiler; unset means
 # no issue links. --dry-run runs everything but writes nothing to the registry.
+#
+# A failed attest is tried again, up to three attempts, each failure named as
+# a warning; three failures are a failure. Measured 2026-09-04 (run
+# 33854524508): Rekor answered "already exists" to an upload cosign's client
+# had retried, then 404 for that entry by UUID from a lagging replica, and one
+# write of ninety failed the day. A new attempt signs with fresh keys and lands
+# a new entry, so trying again is the mitigation; the first entry stays in the
+# log unused. REATTEST_RETRY_DELAY is the pause between attempts in seconds
+# (default 15; the tests set 0).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="${1:?usage: reattest.sh <root> <enumeration.tsv> <out-dir> [--dry-run]}"
@@ -80,6 +89,18 @@ registry_write() { # the one seam between "decided" and "pushed"
   if [ -n "$DRY" ]; then echo "reattest (dry-run): would run: $*"; return 0; fi
   "$@"
 }
+ATTEMPTS=3; RETRY_DELAY="${REATTEST_RETRY_DELAY:-15}"
+attest() { # <vuln|openvex> <ref> <cosign attest args...>: up to ATTEMPTS attempts, each failure named
+  local what="$1" ref="$2" attempt; shift 2
+  for attempt in $(seq 1 "$ATTEMPTS"); do
+    if registry_write cosign attest "$@"; then return 0; fi
+    [ "$attempt" -lt "$ATTEMPTS" ] || return 1
+    retries=$((retries + 1)); retried_total=$((retried_total + 1))
+    echo "::warning::reattest: cosign attest --type ${what} --replace failed for ${ref} (attempt ${attempt} of ${ATTEMPTS}); trying again in ${RETRY_DELAY}s"
+    sleep "$RETRY_DELAY"
+  done
+  return 1
+}
 
 declare -A tags_of=() manifests_of=() platform_of=() status_of=()
 while IFS=$'\t' read -r repo tag digest platform manifest status; do
@@ -92,14 +113,14 @@ while IFS=$'\t' read -r repo tag digest platform manifest status; do
   : "${status_of[$key]:=superseded}"
 done < "$TSV"
 
-digests=0; reattested=0; skipped=0; failed=0
+digests=0; reattested=0; skipped=0; failed=0; retried_total=0
 for key in $(printf '%s\n' "${!tags_of[@]}" | sort); do
   repo="${key%@*}"; digest="${key#*@}"; name="${repo##*/}"
   read -r -a tags <<< "${tags_of[$key]}"
   read -r -a manifests <<< "${manifests_of[$key]}"
   hex="${digest#sha256:}"; d12="${hex:0:12}"
   work="$OUT/reattest/${name}__${d12}"; mkdir -p "$work/out"
-  digests=$((digests + 1))
+  digests=$((digests + 1)); retries=0
   echo "::group::re-attest ${repo}@${digest} (${status_of[$key]}, tags:${tags_of[$key]})"
 
   # 0. every platform manifest needs today's report, or the digest is skipped whole
@@ -125,7 +146,7 @@ for key in $(printf '%s\n' "${!tags_of[@]}" | sort); do
     if ! trivy convert --format cosign-vuln --output "$work/vuln-${m#sha256:}.json" "$f"; then
       echo "::error::reattest: trivy convert failed for ${f}"; ok=false; break
     fi
-    if registry_write cosign attest --yes --type vuln --replace --predicate "$work/vuln-${m#sha256:}.json" "${repo}@${m}"; then
+    if attest vuln "${repo}@${m}" --yes --type vuln --replace --predicate "$work/vuln-${m#sha256:}.json" "${repo}@${m}"; then
       reports_attested=$((reports_attested + 1))
     else
       echo "::error::reattest: cosign attest --type vuln --replace failed for ${repo}@${m}"; ok=false; break
@@ -133,7 +154,7 @@ for key in $(printf '%s\n' "${!tags_of[@]}" | sort); do
   done
   if [ "$ok" != true ]; then
     failed=$((failed + 1))
-    jq -cn --arg repo "$repo" --arg digest "$digest" '{repository:$repo, digest:$digest, failed:"scan report attestation"}' >> "$RECORD"
+    jq -cn --arg repo "$repo" --arg digest "$digest" --argjson retries "$retries" '{repository:$repo, digest:$digest, failed:"scan report attestation", retries:$retries}' >> "$RECORD"
     echo "::endgroup::"; continue
   fi
 
@@ -200,10 +221,10 @@ PY
     reason=$([ "$differs" = true ] && echo "statement set differs" || echo "attestation count is not one")
     [ "$previous_n" -eq 0 ] && reason="no previously attested document"
     echo "reattest: ${repo}@${digest}: ${reason} — attesting with --replace on the digest and ${#manifests[@]} platform manifest(s) (Req 6.43)"
-    if registry_write cosign attest --yes --type openvex --replace --predicate "$doc" "${repo}@${digest}"; then
+    if attest openvex "${repo}@${digest}" --yes --type openvex --replace --predicate "$doc" "${repo}@${digest}"; then
       did=true
       for m in "${manifests[@]}"; do
-        registry_write cosign attest --yes --type openvex --replace --predicate "$doc" "${repo}@${m}" || { echo "::error::reattest: cosign attest --type openvex --replace failed for ${repo}@${m}"; did=false; break; }
+        attest openvex "${repo}@${m}" --yes --type openvex --replace --predicate "$doc" "${repo}@${m}" || { echo "::error::reattest: cosign attest --type openvex --replace failed for ${repo}@${m}"; did=false; break; }
       done
     else
       echo "::error::reattest: cosign attest --type openvex --replace failed for ${repo}@${digest}"
@@ -232,9 +253,9 @@ PY
      --argjson before_index "$before_index" --argjson before_manifests "$before_manifests" \
      --argjson differs "$differs" --argjson wrong_count "$wrong_count" --argjson reattested "$did" \
      --argjson after_index "$after_index" --argjson rekor_retained "$retained" --argjson dry "$([ -n "$DRY" ] && echo true || echo false)" \
-     --slurpfile compile "$work/compile-report.json" \
+     --argjson retries "$retries" --slurpfile compile "$work/compile-report.json" \
      '{repository:$repo, digest:$digest, status:$status, tags:$tags, manifests:$manifests,
-       reports_attested:$reports, previous_documents:$previous,
+       reports_attested:$reports, previous_documents:$previous, retries:$retries,
        openvex_before:{index:$before_index, manifests:$before_manifests},
        differs:$differs, wrong_count:$wrong_count, reattested:$reattested, dry_run:$dry,
        openvex_after:{index:$after_index}, rekor_retained:$rekor_retained,
@@ -242,5 +263,5 @@ PY
   echo "::endgroup::"
 done
 
-echo "reattest: ${digests} tag-referenced digest(s): ${reattested} re-attested, $((digests - reattested - skipped - failed)) unchanged, ${skipped} skipped, ${failed} failed"
+echo "reattest: ${digests} tag-referenced digest(s): ${reattested} re-attested, $((digests - reattested - skipped - failed)) unchanged, ${skipped} skipped, ${failed} failed, ${retried_total} retried write(s)"
 [ "$failed" -eq 0 ] || exit 1
