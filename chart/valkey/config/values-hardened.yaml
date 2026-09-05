@@ -27,7 +27,7 @@
 image:
   registry: ghcr.io
   repository: mm-weber/dhc/valkey
-  tag: 9.1.1-alpine3.23-compat@sha256:be04d1605c307b2d52d6370823373f757906141222abe28fff4e0b7adbb040d4
+  tag: 9.1.2-alpine3.23-compat@sha256:5056ef2363af7aaeabf24d563c9c2abca91bce841ff6ef874d1a165283715ea0
 
 # UID/GID 65532 (Req 4.3); the chart defaults to 1000, which no catalogue image
 # has an account for. runAsNonRoot is NOT a chart default at pod level and the
