@@ -70,7 +70,7 @@ contents:
           with:
             deps:
               # renovate: datasource=go depName=golang.org/x/crypto
-              - golang.org/x/crypto@v0.55.0
+              - golang.org/x/crypto@v0.56.0
             download: true
             tidy: true
         # No test step: cmd/* submodules share the monorepo's suite, which
