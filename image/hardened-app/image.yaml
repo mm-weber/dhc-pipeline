@@ -40,6 +40,7 @@ contents:
           - ca-certificates-bundle
         files:
           - url: git+https://github.com/mm-weber/hardened-app.git#v0.1.0
+            # authenticity: signed-commit
             checksum: 90a8da0c20eaf60d75e4faed6f27fef5b1611fc4
             path: /go/src/github.com/mm-weber/hardened-app
             spdx:

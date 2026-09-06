@@ -122,6 +122,57 @@ while IFS= read -r -d '' file; do
     violations=$((violations + 1))
   fi
 
+  # Req 1.10, 1.11 (task 11.2): every definition declares how its upstream's
+  # authenticity is established, and the class fits the archetype: a git
+  # source is verified by GitHub's statement on its tag or commit, a
+  # repackaged tarball by two origins agreeing on its checksum. `none` is a
+  # declaration that nothing is verified, which is the one thing the
+  # catalogue does not ship.
+  if [[ "$file" == "$ROOT"/image/*/image.yaml ]]; then
+    class=$(authenticity_class "$file")
+    c_tar=$(grep -cE 'url:[[:space:]]*["'\'']?https?://' "$file" || true)
+    case "$class" in
+      signed-tag|signed-commit)
+        if [ "$c_git" -eq 0 ] && [ "$c_tar" -gt 0 ]; then
+          echo "::error file=${rel}::authenticity convention (docs/CONVENTIONS.md): class '${class}' names a git signal, but the definition's source is a tarball (Req 1.10)"
+          violations=$((violations + 1))
+        fi ;;
+      cross-origin-checksum)
+        if [ "$c_git" -gt 0 ]; then
+          echo "::error file=${rel}::authenticity convention (docs/CONVENTIONS.md): class 'cross-origin-checksum' belongs to a repackaged tarball, but the definition's source is git+ (Req 1.10)"
+          violations=$((violations + 1))
+        fi ;;
+      none)
+        echo "::error file=${rel}::authenticity convention (docs/CONVENTIONS.md): class 'none' declares that nothing verifies this upstream; declare signed-tag, signed-commit or cross-origin-checksum (Req 1.11)"
+        violations=$((violations + 1)) ;;
+      "")
+        echo "::error file=${rel}::authenticity convention (docs/CONVENTIONS.md): no '# authenticity: <class>' marker beside the source url; declare signed-tag, signed-commit or cross-origin-checksum (Req 1.10, 1.11)"
+        violations=$((violations + 1)) ;;
+      *)
+        echo "::error file=${rel}::authenticity convention (docs/CONVENTIONS.md): unknown authenticity class '${class}'; declare one of ${AUTHENTICITY_CLASSES// /, } (Req 1.10)"
+        violations=$((violations + 1)) ;;
+    esac
+
+    # Req 1.12: dhi.io package repositories are the /main lines only. The
+    # security and els lines are entitlement-gated (the DHI terms memo, Q4);
+    # a definition naming one builds for whoever holds the entitlement and
+    # nobody else.
+    while IFS=$'\t' read -r line_no repo_url; do
+      if ! [[ "$repo_url" =~ ^https://dhi\.io/(apk/[^/]+/[^/]+|deb/[^/]+)/main/?$ ]]; then
+        echo "::error file=${rel},line=${line_no}::authenticity convention (docs/CONVENTIONS.md): dhi.io package repository '${repo_url}' is not of shape dhi.io/apk/<distro>/<release>/main or dhi.io/deb/<distro>/main (Req 1.12)"
+        violations=$((violations + 1))
+      fi
+    done < <(awk '/^[[:space:]]*repositories:[[:space:]]*$/ { inrepo = 1; next }
+                  inrepo && match($0, /^[[:space:]]*-[[:space:]]*/) {
+                    val = substr($0, RSTART + RLENGTH)
+                    sub(/[[:space:]]*#.*$/, "", val); sub(/[[:space:]]+$/, "", val)
+                    gsub(/^["'\'']|["'\'']$/, "", val)
+                    if (val ~ /^https?:\/\/dhi\.io\//) printf "%d\t%s\n", NR, val
+                    next
+                  }
+                  inrepo { inrepo = 0 }' "$file")
+  fi
+
   # A bump PR must leave the definition coherent (docs/CONVENTIONS.md
   # "Upstream tracking", Req 7.4): Renovate turns one version field and the
   # refresh postUpgradeTask regenerates the rest — but a task that refuses

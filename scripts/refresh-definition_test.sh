@@ -10,6 +10,8 @@ SCRIPT="$HERE/refresh-definition.sh"
 FAILURES=0
 OLD_SHA="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 NEW_SHA="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+TAG_SHA="cccccccccccccccccccccccccccccccccccccccc"   # the annotated tag object cert-manager signs
+TODAY="2026-09-06"
 SYNTAX="# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc"
 
 # cert-manager-shaped definition at a given version/major.minor/major.
@@ -34,6 +36,7 @@ contents:
       contents:
         files:
           - url: git+https://github.com/cert-manager/cert-manager.git#v$1
+            # authenticity: signed-tag
             checksum: $OLD_SHA
       pipeline:
         - name: build
@@ -68,6 +71,7 @@ contents:
       contents:
         files:
           - url: git+https://github.com/mm-weber/hardened-app.git#v$1
+            # authenticity: signed-commit
             checksum: $OLD_SHA
       pipeline:
         - name: build
@@ -102,6 +106,7 @@ contents:
       contents:
         files:
           - url: git+https://github.com/valkey-io/valkey.git#$1
+            # authenticity: signed-commit
             checksum: $OLD_SHA
 EOF
 }
@@ -119,9 +124,24 @@ assert_line() { # label file 'exact-full-line' — substring matches don't count
     echo "FAIL $1: expected exact line '$3' in $2"; sed 's/^/    /' "$2"; FAILURES=$((FAILURES+1)); fi
 }
 
+# GitHub's verification statement, served from a file:// tree (Req 3.8): the
+# tag object cert-manager signs, and the commits valkey and hardened-app tag.
+verification_fixture() { # verified(true|false) reason
+  mkdir -p "$SB/api/repos/cert-manager/cert-manager/git/tags" "$SB/api/repos/mm-weber/hardened-app/commits" "$SB/api/repos/valkey-io/valkey/commits"
+  printf '{"tag":"v1","object":{"sha":"%s"},"verification":{"verified":%s,"reason":"%s"}}\n' "$NEW_SHA" "$1" "$2" > "$SB/api/repos/cert-manager/cert-manager/git/tags/$TAG_SHA"
+  for repo in mm-weber/hardened-app valkey-io/valkey; do
+    printf '{"sha":"%s","commit":{"verification":{"verified":%s,"reason":"%s"}}}\n' "$NEW_SHA" "$1" "$2" > "$SB/api/repos/$repo/commits/$NEW_SHA"
+  done
+}
+
 # run the refresh on a sandbox dir after simulating a Renovate ref bump to $newtag
 run_bump() { # deffn old_ver newtag
   SB=$(mktemp -d); mkdir -p "$SB/image/x"
+  verification_fixture true valid
+  # cert-manager tags are annotated and signed; the others are lightweight tags
+  # on signed commits.
+  tagsha=""; [ "$1" = cert_def ] && tagsha="$TAG_SHA"
+  export REFRESH_TAG_SHA_OVERRIDE="$tagsha" DHC_GITHUB_API="file://$SB/api" REFRESH_TODAY="$TODAY"
   "$1" "$2" "${2%.*}" "${2%%.*}" > "$SB/image/x/image.yaml"
   # Renovate changes only the url ref; every derived field still holds its old
   # value at the moment the postUpgradeTask runs. Swap just the #<ref> fragment.
@@ -187,13 +207,53 @@ refute "valkey minor: no stale 9.0.x name" "$F" "9.0.x"
 
 # 7: a name that had already drifted BEFORE the bump is healed, not skipped —
 # the rule anchors on the version shape, not the previous major.minor
-SB=$(mktemp -d); mkdir -p "$SB/image/x"
+SB=$(mktemp -d); mkdir -p "$SB/image/x"; verification_fixture true valid
 cert_def 1.20.3 1.20 1 > "$SB/image/x/image.yaml"
 sed -i 's/^name: cert-manager controller 1.20.x$/name: cert-manager controller 1.19.x/' "$SB/image/x/image.yaml"
 sed -i -E "s@(url: git\\+https://github.com/[^#]+#).*@\\1v1.21.0@" "$SB/image/x/image.yaml"
-REFRESH_SHA_OVERRIDE="$NEW_SHA" "$SCRIPT" "$SB/image/x"
+REFRESH_SHA_OVERRIDE="$NEW_SHA" REFRESH_TAG_SHA_OVERRIDE="$TAG_SHA" DHC_GITHUB_API="file://$SB/api" "$SCRIPT" "$SB/image/x"
 F="$SB/image/x/image.yaml"
 assert_line "drifted name healed on bump" "$F" "name: cert-manager controller 1.21.x"
+
+# --- Req 3.8 (task 11.2): the declared signal is verified before any write ---
+
+# 8: the evidence is written beside the pin, dated, with GitHub's reason
+newtag="v1.21.0"; run_bump cert_def 1.20.3 "$newtag"
+assert_line "signed-tag: the stamp names what was verified and when" "$F" "            # authenticity: signed-tag, verified v1.21.0 (GitHub verification: valid), $TODAY"
+newtag="9.0.6"; run_bump valkey_def 9.0.5 "$newtag"
+assert "signed-commit: the stamp names the commit" "$F" "# authenticity: signed-commit, verified 9.0.6 at ${NEW_SHA:0:12} (GitHub verification: valid), $TODAY"
+
+# 9: signed-tag declared, but the new tag is lightweight: refused by name, nothing written
+SB=$(mktemp -d); mkdir -p "$SB/image/x"; verification_fixture true valid
+cert_def 1.20.3 1.20 1 > "$SB/image/x/image.yaml"
+sed -i -E "s@(url: git\\+https://github.com/[^#]+#).*@\\1v1.21.0@" "$SB/image/x/image.yaml"
+out=$(REFRESH_SHA_OVERRIDE="$NEW_SHA" REFRESH_TAG_SHA_OVERRIDE="" DHC_GITHUB_API="file://$SB/api" "$SCRIPT" "$SB/image/x" 2>&1); rc=$?
+[ "$rc" -ne 0 ] && grep -q "signed-tag declared, but v1.21.0 is a lightweight tag" <<<"$out" && echo "ok   lightweight tag under signed-tag is refused by name" || { echo "FAIL lightweight refusal: rc=$rc"; echo "$out"; FAILURES=$((FAILURES+1)); }
+assert "lightweight refusal: checksum untouched" "$SB/image/x/image.yaml" "checksum: $OLD_SHA"
+assert "lightweight refusal: version untouched"  "$SB/image/x/image.yaml" "VERSION: 1.20.3"
+
+# 10: GitHub reports the commit unsigned (hardened-app today): refused naming the signal and the reason
+SB=$(mktemp -d); mkdir -p "$SB/image/x"; verification_fixture false unsigned
+hardened_def 0.1.0 0.1 0 > "$SB/image/x/image.yaml"
+sed -i -E "s@(url: git\\+https://github.com/[^#]+#).*@\\1v0.2.0@" "$SB/image/x/image.yaml"
+out=$(REFRESH_SHA_OVERRIDE="$NEW_SHA" DHC_GITHUB_API="file://$SB/api" "$SCRIPT" "$SB/image/x" 2>&1); rc=$?
+[ "$rc" -ne 0 ] && grep -q "signed-commit declared, but GitHub reports commit ${NEW_SHA:0:12} (v0.2.0) as not verified (unsigned)" <<<"$out" && echo "ok   unsigned commit under signed-commit is refused, naming the reason" || { echo "FAIL unsigned refusal: rc=$rc"; echo "$out"; FAILURES=$((FAILURES+1)); }
+refute "unsigned refusal: nothing written" "$SB/image/x/image.yaml" "$NEW_SHA"
+
+# 11: no marker at all: refused, and the statement is not even fetched
+SB=$(mktemp -d); mkdir -p "$SB/image/x"
+cert_def 1.20.3 1.20 1 | grep -v '# authenticity:' > "$SB/image/x/image.yaml"
+sed -i -E "s@(url: git\\+https://github.com/[^#]+#).*@\\1v1.21.0@" "$SB/image/x/image.yaml"
+out=$(REFRESH_SHA_OVERRIDE="$NEW_SHA" REFRESH_TAG_SHA_OVERRIDE="$TAG_SHA" DHC_GITHUB_API="file://$SB/nowhere" "$SCRIPT" "$SB/image/x" 2>&1); rc=$?
+[ "$rc" -ne 0 ] && grep -q "no authenticity signal declared" <<<"$out" && echo "ok   a missing marker is refused" || { echo "FAIL missing marker: rc=$rc"; echo "$out"; FAILURES=$((FAILURES+1)); }
+
+# 12: the statement cannot be read (API down): refused, nothing written
+SB=$(mktemp -d); mkdir -p "$SB/image/x"
+cert_def 1.20.3 1.20 1 > "$SB/image/x/image.yaml"
+sed -i -E "s@(url: git\\+https://github.com/[^#]+#).*@\\1v1.21.0@" "$SB/image/x/image.yaml"
+out=$(REFRESH_SHA_OVERRIDE="$NEW_SHA" REFRESH_TAG_SHA_OVERRIDE="$TAG_SHA" DHC_GITHUB_API="file://$SB/nowhere" "$SCRIPT" "$SB/image/x" 2>&1); rc=$?
+[ "$rc" -ne 0 ] && grep -q "could not be read" <<<"$out" && echo "ok   an unreadable statement is a refusal, not a pass" || { echo "FAIL unreadable statement: rc=$rc"; echo "$out"; FAILURES=$((FAILURES+1)); }
+refute "unreadable statement: nothing written" "$SB/image/x/image.yaml" "$NEW_SHA"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all refresh-definition tests passed"

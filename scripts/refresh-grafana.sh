@@ -40,6 +40,9 @@
 # REFRESH_GRAFANA_SHA256_AMD64, REFRESH_GRAFANA_SHA256_ARM64.
 set -euo pipefail
 
+# shellcheck source=scripts/definition-lib.sh
+. "$(cd "$(dirname "$0")" && pwd)/definition-lib.sh"
+
 dir="${1:?usage: refresh-grafana.sh <definition-dir>}"
 f="$dir/image.yaml"
 [ -f "$f" ] || { echo "refresh-grafana: no image.yaml in $dir" >&2; exit 1; }
@@ -95,6 +98,11 @@ new_ver=$(sed -nE 's#.*/grafana/release/([^/[:space:]]+)/.*#\1#p' <<<"$url_line"
 # against nothing. Resolution is REQUIRED either way — it exits non-zero
 # rather than falling back to the /oss/release/ alias, whose objects are
 # rewritten after release.
+# The grafana.com versions API, read once: it names the build id, and it is the
+# second origin of the per-architecture checksum (Req 3.8, below).
+api_url="${REFRESH_GRAFANA_API_URL:-https://grafana.com/api/grafana/versions}"
+api_json=$(curl -fsSL --max-time 60 "${api_url}/${new_ver}" 2>/dev/null) || api_json=""
+
 build_id="${REFRESH_GRAFANA_BUILD_ID:-}"
 if [ -z "$build_id" ]; then
   # '.' and '+' are ERE metacharacters and grafana ships '+security-NN' builds.
@@ -103,8 +111,7 @@ if [ -z "$build_id" ]; then
   # grafana.com versions API. Anchored on '/grafana_' for the same reason as
   # the apt Filename: match — grafana-enterprise ships the same version with
   # the same id under a sibling name, and it is a different artifact.
-  api_url="${REFRESH_GRAFANA_API_URL:-https://grafana.com/api/grafana/versions}"
-  api_id=$(curl -fsSL --max-time 60 "${api_url}/${new_ver}" 2>/dev/null \
+  api_id=$(printf '%s' "$api_json" \
     | grep -oE '/grafana_'"$ver_re"'_[0-9]+_linux_amd64\.tar\.gz' \
     | head -1 | sed -E 's@.*_([0-9]+)_linux_amd64\.tar\.gz$@\1@') || api_id=""
 
@@ -191,6 +198,31 @@ amd64_sha="${REFRESH_GRAFANA_SHA256_AMD64:-}"
 arm64_sha="${REFRESH_GRAFANA_SHA256_ARM64:-}"
 [ -n "$arm64_sha" ] || arm64_sha=$(fetch_sha arm64)
 
+# Req 3.8 (task 11.2), checkpoint 1 of the cross-origin checksum: the versions
+# API states each architecture's sha256 independently of the object store
+# that serves the sidecar. The two must agree, per architecture, before any
+# field is written; a disagreement names both and writes nothing. ADR 0002
+# deferred this on 2026-08-07; the amendment of 2026-08-25 reversed that.
+refuse() { echo "refresh-grafana: refusing to write ${f}: $1 (Req 3.8)" >&2; exit 1; }
+class=$(authenticity_class "$f")
+[ "$class" = "cross-origin-checksum" ] || refuse "authenticity class '${class:-none declared}' is not cross-origin-checksum, the signal a repackaged tarball has (Req 1.10)"
+api_sha() { # arch -> the versions API's sha256 for the linux tarball, or empty
+  printf '%s' "$api_json" | node -e '
+    let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      let o; try { o = JSON.parse(s); } catch { return; }
+      const suffix = "_linux_" + process.argv[1] + ".tar.gz";
+      for (const p of o.packages || []) if (typeof p.url === "string" && p.url.endsWith(suffix)) { process.stdout.write(String(p.sha256 || "")); return; }
+    });' "$1" 2>/dev/null || true
+}
+for arch in amd64 arm64; do
+  side="$([ "$arch" = amd64 ] && printf '%s' "$amd64_sha" || printf '%s' "$arm64_sha")"
+  api=$(api_sha "$arch")
+  [ -n "$api" ] || refuse "cross-origin-checksum: the grafana.com versions API states no sha256 for the ${arch} tarball of v${new_ver}, so the dl.grafana.com sidecar (${side:0:12}…) has no second origin to agree with"
+  [ "$api" = "$side" ] || refuse "cross-origin-checksum: for the ${arch} tarball of v${new_ver} the grafana.com versions API states ${api:0:12}… while the dl.grafana.com sidecar states ${side:0:12}…; two origins disagree"
+done
+today="${REFRESH_TODAY:-$(date -u +%F)}"
+stamp="cross-origin-checksum, verified ${new_ver} (grafana.com versions API and dl.grafana.com sidecars agree, amd64 ${amd64_sha:0:12}…, arm64 ${arm64_sha:0:12}…), ${today}"
+
 # 0) the url. Renovate only changed the version in the path segment; the build
 #    id in the filename still belongs to the old release, so rebuild the whole
 #    line. Also migrates a definition still on the /oss/release/ alias.
@@ -242,4 +274,7 @@ sed -i -E \
   "s|^([[:space:]]*GRAFANA_SHA256:[[:space:]]*).*|\1'#{ target.arch == \"amd64\" ? \"${amd64_sha}\" : \"${arm64_sha}\" }'|" \
   "$f"
 
-echo "refresh-grafana: $dir -> ${new_ver} (amd64 ${amd64_sha:0:12}…, arm64 ${arm64_sha:0:12}…)"
+# 5) the evidence beside the pin (Req 3.8).
+authenticity_stamp "$f" "$stamp"
+
+echo "refresh-grafana: $dir -> ${new_ver} (amd64 ${amd64_sha:0:12}…, arm64 ${arm64_sha:0:12}…); ${stamp}"
