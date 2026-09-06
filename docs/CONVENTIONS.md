@@ -246,20 +246,29 @@ accepted-risk entry — plus a `triage/LOG.md` entry, never by silencing the
 scanner.
 
 The two suppression lanes are **not** interchangeable. VEX states a vulnerability
-does not apply, is attested to the image, and never expires;
-`triage/accepted-risk/` records that it *does* apply and we ship anyway for a
-bounded time, stays internal, and **must never be written as a VEX** (Req 6.8) —
-that would launder a business decision into a machine-readable claim of technical
-inapplicability, and every consumer would inherit it. Exceptions carry a treatment
+does not apply (or that this release carries the remedy), is attested to the
+image, and never expires; `triage/accepted-risk/` records that it *does* apply
+and we ship anyway for a bounded time, and is published in the same attested
+document as an `affected` statement, **never as `not_affected` or `fixed`**
+(Req 6.8): that would launder a business decision into a machine-readable claim
+of technical inapplicability, and every consumer would inherit it. An `affected`
+statement suppresses nothing (Req 6.35); it tells a consumer the truth, with the
+treatment, the upstream issue, the binaries and the expiry in its action
+statement (Req 6.38). Exceptions carry a treatment
 (`accept` / `transfer`), an owner, the reason avoidance and remediation were
 unavailable, a `decided_at`, and an `expired_at` no later than that decision date plus the policy file's largest ceiling (`catalogue-policy.yaml` `triage.ceilings`; the gate and the rescan then hold each entry to the tier its finding earns: the KEV ceiling when CISA lists it, else its severity's ceiling, Req 6.50, 6.51);
 `scripts/lint-accepted-risk.sh` enforces that and rejects any Trivy ignore file
 living anywhere else (Req 6.11, 6.12).
 
-A daily `rescan.yml` cron re-scans the published images for CVEs that land after
-merge; new HIGH/CRITICAL findings (not already tracked, VEX-aware) are enriched
-with EPSS + CISA KEV and filed as one issue per CVE by the unit-tested
-`triage/rescan/` Go tool. See `triage/README.md`.
+A daily `rescan.yml` cron re-scans every platform manifest of every published
+digest for CVEs that land after merge, attests today's reports and re-attests
+the OpenVEX document when the decisions changed, replacing (exactly one
+attestation per digest, Req 6.42 to 6.44). Over the supported set it files one
+issue per new HIGH/CRITICAL finding, closes issues on evidence with graded
+`resolved:*` labels and reopens them on recurrence (Req 6.52 to 6.57), and
+rewrites the catalogue status issue with every finding's clocks (Req 6.46,
+6.47), all through the unit-tested `triage/rescan/` Go tools. See
+`triage/README.md`.
 
 ## Pull requests (Req 7)
 

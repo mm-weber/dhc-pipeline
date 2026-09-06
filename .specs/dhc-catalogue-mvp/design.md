@@ -254,7 +254,7 @@ graph TB
      reporting enabled and no tag on a revoked digest from cluster D (F1, F11). One step, one
      report shape, one place a fork adds an invariant.
 
-7. **Statuses and clocks: every known finding carries a published status, and the clocks are read from attestations (Req 6.38 to 6.54; review F5, F4, F13 i; ADR 0003, ADR 0004; 2026-08-23)**
+7. **Statuses and clocks: every known finding carries a published status, and the clocks are read from attestations (Req 6.38 to 6.54; review F5, F4, F13 i; ADR 0003, ADR 0004; 2026-08-23; as built 2026-09-06, tasks 10.1 to 10.7)**
    - **Context**: the two-lane model published only `not_affected` and `fixed`; an accepted
      or transferred finding was invisible to anyone pulling the image, which review A had
      called out on 2026-08-04 and the v2 draft had silently decided against. The exception
@@ -290,7 +290,8 @@ graph TB
      KEV feed it now fetches (Req 6.50), and the rescan re-evaluates daily because KEV
      status changes after the fact (Req 6.51). The clocks are computed from attestations and
      the enumeration (Req 6.46) and published to one status issue plus a workflow artifact
-     (Req 6.47); native badges now (Req 6.48), Pages later. Issues, clocks and the badge run
+     (Req 6.47); badges were retired before they were built (task 10.5, Req 6.48 removed:
+     the status issue is the publication), Pages later. Issues and clocks run
      over the **supported set**, the digests each definition's current `tags:` reference:
      the industry scopes its promises to version streams because a frozen digest's report
      never changes and its findings accrue by design
@@ -298,8 +299,8 @@ graph TB
      images "start to accrue CVEs", Bitnami moved its back catalogue to a no-updates
      namespace); superseded tag-referenced digests keep every knowledge artifact, daily
      scans, attested reports, the re-attested VEX document and the verification proof, but
-     hold no issues, so the `cve` badge counts work actually waiting rather than a floor
-     that grows with every release. The rescan closes `cve` issues on evidence only
+     hold no issues, so the open `cve` issues and the status issue count work actually
+     waiting rather than a floor that grows with every release. The rescan closes `cve` issues on evidence only
      (Req 6.52 to 6.56) and reopens the same issue when a closed finding returns
      (Req 6.57, the Dependency-Track reactivate pattern: durable identity is the hidden
      marker, history stays on one issue); close labels are graded by evidence, with
@@ -326,6 +327,25 @@ graph TB
      baseline: the daily set restarts at its first release, and retention becomes
      the epoch plus a go-forward policy. Fork switches: every number in the `triage` section, the
      support statement's tag set, and the `resolved:*` closing labels.
+   - **As built** (tasks 10.1 to 10.7, 2026-09-02 to 2026-09-06): as decided, with these
+     measured departures. The previous-statement pairing is by finding, status and
+     package, because one package can carry an `affected` and an `under_investigation`
+     at once and a looser key re-attested two grafana digests daily (#144). A Sigstore
+     write that fails is tried again, three attempts (#145; Rekor answered "already
+     exists" then 404 once in ninety writes). The `resolved:*` labels are declared in
+     `catalogue-policy.yaml` `triage.resolved_labels` and read through
+     `triage-policy.sh`, as the fork switch above implies. The lifecycle runs right after
+     the scan, before the compiler's open-issue map, so a day's documents link only to
+     issues still open; a digest with a platform manifest unscanned or scanned without
+     its VEX blocks every close and gives no reopen evidence; `resolved:fixed` needs the
+     SBOM version at or above the fix on the installed version's release line, and no
+     bump is claimed without every examined manifest's SBOM. The first status run
+     inherits the current statements' first-seen times (a rebuilt digest compiles
+     fresh); from then on first seen is carried forward and never moves later. There is
+     no "keep closed" switch: a hand-closed issue whose finding is still reported
+     reopens, because only a triage artifact retires a reported finding. Measured on
+     2026-09-05 against the real supported set: 25 issues, 7 digests, 14 verified SBOMs,
+     16 closes (6 `fixed` on SBOM proof, 10 `accepted`), no reopen.
 
 8. **Upstream trust: quarantine, declared authenticity, tracked charts (Req 1.3, 1.10 to 1.12, 3.5, 3.7 to 3.12, 4.5, 4.8, 4.9; review F2, F10, F8, F13 ii and iii, F12 d; ADR 0002 amendment; 2026-08-25)**
    - **Context**: from-source patch bumps automerged while their checksum was recomputed

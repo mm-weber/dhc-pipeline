@@ -204,3 +204,35 @@ compiler's issue map (now right after the scan). Left as designed, noted
 in the manual: no "keep closed" switch. Left for later: one policy reader
 for the verification section, a machine-readable block in the cve issue
 template.
+
+## Task 10.7: truth pass over cluster B (2026-09-06)
+
+Branch: `task-10.7-truth-pass`. Goal: every sentence that still describes the
+pre-cluster-B world says what is built (Req 6.8 as amended, Req 7.1): an
+exception is published as `affected` and never as `not_affected` or `fixed`,
+re-attestation replaces, the rescan closes and reopens issues on evidence,
+the status issue carries the clocks, ceilings are per tier from `decided_at`,
+and clocks and issues run over the supported set.
+
+- [x] 1. docs/user-manual.md: the lanes table gains the third verb (`affected`) and an
+      `under_investigation` row, the decision tree and lane prose stop saying "internal, never
+      attested", the workflows and crons rows and the Req 6 map name the lifecycle and the
+      status issue, the glossary gains supported set, status issue and resolved labels
+- [x] 2. docs/CONVENTIONS.md: "must never be written as a VEX" becomes "published as affected,
+      never as not_affected or fixed"; the rescan paragraph gains replace, lifecycle, status
+- [x] 3. triage/README.md and triage/accepted-risk/README.md: the lane quote, the publishing
+      paragraph, the expiry paragraph (lapse to under_investigation), the daily rescan section
+      rewritten as built, decided_at and the ceilings, the supported set
+- [x] 4. triage/accepted-risk/grafana.yaml header and build.yml's attest-step comment: the
+      "never attested" sentence goes
+- [x] 5. design.md decision 7 marked as built, its two stale phrases (badges, cve badge) fixed,
+      an as-built note with the deviations; tasks.md tick
+- [x] 6. README consumer recipe: already the rendered one-verify-attestation-per-type block
+      (task 10.3); verified unchanged, no edit
+
+### Review
+
+Every flagged sentence located by grep before editing, every edit anchored on
+the exact old text; lint-pins (reads CONVENTIONS.md), lint-accepted-risk
+(reads grafana.yaml), yamllint and actionlint on build.yml (nine notes, the
+same nine as main), the render drift check, all clean.
