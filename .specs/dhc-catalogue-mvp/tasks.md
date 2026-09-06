@@ -300,7 +300,7 @@
     - `refresh-grafana.sh` checkpoint 1: per-arch sha256 from the versions API compared against the dl.grafana.com sidecar before any field is written, refusing on disagreement naming both (Req 3.8; reverses ADR 0002's dated deferral, amendment landed with this spec PR)
     - The refresh writes the evidence where the diff carries it: a dated verification comment beside the pin in image.yaml, for example `# authenticity: signed-tag, verified v1.21.1 (GitHub verification: valid), 2026-08-25`; postUpgradeTask stdout never reaches a PR body, measured against the pinned renovate dist (F2 b as revised; independent review 1.4)
     - _Requirements: Req 1.10, Req 1.11, Req 1.12, Req 3.8_
-  - [ ] 11.3 Checkpoints 2 and 3: PR time and daily
+  - [x] 11.3 Checkpoints 2 and 3: PR time and daily
     - `verify-arch-pins.sh` gains the API statement: pinned value, bytes served and the versions-API sha256 must agree per architecture, closing the `REFRESH_GRAFANA_SHA256_*` hand-feed seam (Req 3.9); one comparison function shared with checkpoint 1, one test suite, three call sites
     - Rescan invariants: re-verify each active definition's declared signal daily (Req 3.10 as amended; git archetype: GitHub's verification statement for the pinned ref reports verified; repackage: pinned sha equals sidecar and API), a mismatch fails the run and files an issue labelled as a supply-chain signal (Req 3.10); no grandfather state exists: 11.2's operator prerequisite (a signed hardened-app release bumped through Req 3.8) lands before this task, so day one asserts every definition (independent review 1.1); lapsed compat review-by dates reported in the same step (Req 4.9)
     - _Requirements: Req 3.9, Req 3.10, Req 4.9_

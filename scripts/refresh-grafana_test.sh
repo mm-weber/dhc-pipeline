@@ -499,7 +499,7 @@ sed -i -E "s@(/grafana/release/)[^/]+/@\113.1.1/@" "$SB/image/grafana/image.yaml
 OTHER=$(printf '9%.0s' $(seq 64))
 API=$(api_fixture "$SB/api" 13.1.1 "$NEW_BUILD" "$NEW_AMD64" "$OTHER")
 out=$(REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" REFRESH_GRAFANA_API_URL="$API" REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" "$SCRIPT" "$SB/image/grafana" 2>&1); rc=$?
-if [ "$rc" -ne 0 ] && grep -q "for the arm64 tarball of v13.1.1 the grafana.com versions API states ${OTHER:0:12}… while the dl.grafana.com sidecar states ${NEW_ARM64:0:12}…" <<<"$out"; then
+if [ "$rc" -ne 0 ] && grep -q "the arm64 tarball of v13.1.1: grafana.com versions API ${OTHER:0:12}…, dl.grafana.com sidecar ${NEW_ARM64:0:12}… do not agree" <<<"$out"; then
   echo "ok   disagreeing origins: refused, naming both"
 else
   echo "FAIL disagreeing origins: rc=$rc"; echo "$out" | sed 's/^/    /'; FAILURES=$((FAILURES+1))
@@ -512,7 +512,7 @@ SB=$(mktemp -d); mkdir -p "$SB/image/grafana" "$SB/api-empty"
 grafana_def 13.0.4 13.0 13 > "$SB/image/grafana/image.yaml"
 sed -i -E "s@(/grafana/release/)[^/]+/@\113.1.1/@" "$SB/image/grafana/image.yaml"
 out=$(REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" REFRESH_GRAFANA_API_URL="file://$SB/api-empty" REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" "$SCRIPT" "$SB/image/grafana" 2>&1); rc=$?
-[ "$rc" -ne 0 ] && grep -q "states no sha256 for the amd64 tarball" <<<"$out" && echo "ok   no API entry: no second origin, refused" || { echo "FAIL no API entry: rc=$rc"; echo "$out" | sed 's/^/    /'; FAILURES=$((FAILURES+1)); }
+[ "$rc" -ne 0 ] && grep -q "the amd64 tarball of v13.1.1: grafana.com versions API none, dl.grafana.com sidecar" <<<"$out" && echo "ok   no API entry: no second origin, refused" || { echo "FAIL no API entry: rc=$rc"; echo "$out" | sed 's/^/    /'; FAILURES=$((FAILURES+1)); }
 
 # 20: a definition without the marker, or with a git class, is refused
 SB=$(mktemp -d); mkdir -p "$SB/image/grafana"

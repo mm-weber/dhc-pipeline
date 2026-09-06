@@ -128,6 +128,8 @@ jobs:
         run: scripts/reattest_test.sh
       - name: fetch-sboms unit tests (Req 6.58)
         run: scripts/fetch-sboms_test.sh
+      - name: check-authenticity unit tests (Req 3.10, 4.9)
+        run: scripts/check-authenticity_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)
         run: scripts/check-attestation-count_test.sh
 

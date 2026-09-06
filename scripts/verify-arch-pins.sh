@@ -23,7 +23,18 @@
 #
 # Definitions that pin nothing per arch (built from source, single artifact)
 # are skipped, not failed.
+#
+# Req 3.9 (task 11.3), the third value: the publisher's version statement.
+# Pinned value, bytes served and the statement's sha256 must agree per
+# architecture, and the failure names each. That closes the seam where both
+# pins were once hand-fed through REFRESH_GRAFANA_SHA256_* and no origin was
+# ever asked. The statement's origin is known per download host
+# (definition-lib.sh, version_statement_url); a host with no known origin
+# fails closed, because a pin nobody can cross-check is not verified.
 set -euo pipefail
+
+# shellcheck source=scripts/definition-lib.sh
+. "$(cd "$(dirname "$0")" && pwd)/definition-lib.sh"
 
 dir="${1:?usage: verify-arch-pins.sh <definition-dir>}"
 dir="${dir%/}"
@@ -55,6 +66,20 @@ sha_amd64=${pins%% *}
 # shellcheck disable=SC2034
 sha_arm64=${pins##* }
 
+# The version statement (Req 3.9): one read per definition, before any fetch.
+version=$(awk -F': *' '/^[[:space:]]*SEMVER_VERSION:/{print $2; exit}' "$f" | tr -d '"[:space:]')
+[ -n "$version" ] || version=$(awk -F': *' '/^[[:space:]]*VERSION:/{print $2; exit}' "$f" | tr -d '"[:space:]')
+host=$(printf '%s' "$url_tmpl" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://([^/]*)/.*#\1#')
+stmt_url=$(version_statement_url "$host" "$version")
+if [ -z "$stmt_url" ]; then
+  echo "::error file=${f}::${name}: no version statement origin is known for ${host:-a file url}, so the pins cannot be cross-checked against the publisher (Req 3.9); declare one in definition-lib.sh"
+  exit 1
+fi
+if ! statement=$(curl -fsSL --max-time 60 "$stmt_url"); then
+  echo "::error file=${f}::${name}: could not read the version statement for ${version} at ${stmt_url} (Req 3.9)"
+  exit 1
+fi
+
 # Fetch to a file, never a pipe. `curl … | sha256sum` on a large artifact will
 # happily hash a truncated body and print a confident, wrong digest — the
 # measurement error that cost this repo three wrong diagnoses. -f makes an HTTP
@@ -85,12 +110,13 @@ for arch in amd64 arm64; do
     continue
   fi
 
-  if [ "$got" = "$want" ]; then
-    echo "  ${arch} OK  ${want}  ${url}"
+  stated=$(versions_api_sha "$statement" "$arch")
+  if shas_agree "${name} ${arch}" "pinned=${want}" "served=${got}" "version statement=${stated}" >/dev/null; then
+    echo "  ${arch} OK  ${want}  ${url}  (the version statement agrees)"
   else
-    # Both numbers, always. "Checksum mismatch" without them is the message
+    # Every number, always. "Checksum mismatch" without them is the message
     # that sent us looking in the wrong place for a week.
-    echo "::error file=${f}::${name}: ${arch} MISMATCH — pinned ${want}, upstream served ${got} at ${url}"
+    echo "::error file=${f}::${name}: ${arch} MISMATCH: pinned ${want}, upstream served ${got}, version statement ${stated:-none} at ${url}"
     rc=1
   fi
 done

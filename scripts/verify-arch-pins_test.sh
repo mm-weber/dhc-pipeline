@@ -42,11 +42,19 @@ refute_case() { # name, expected_exit, forbidden_substring
 # Sandbox holds both the definition and the "upstream" artifacts it points at.
 fresh() {
   SB=$(mktemp -d)
-  mkdir -p "$SB/dist"
+  mkdir -p "$SB/dist" "$SB/api"
   printf 'amd64 payload\n' > "$SB/dist/app_amd64.tar.gz"
   printf 'arm64 payload — deliberately different bytes\n' > "$SB/dist/app_arm64.tar.gz"
   SHA_AMD=$(sha256sum "$SB/dist/app_amd64.tar.gz" | cut -d' ' -f1)
   SHA_ARM=$(sha256sum "$SB/dist/app_arm64.tar.gz" | cut -d' ' -f1)
+  # The publisher's version statement (Req 3.9, task 11.3): the third value,
+  # served from a file:// tree for the version the fixture declares.
+  statement "$SHA_AMD" "$SHA_ARM"
+  export DHC_VERSIONS_API="file://$SB/api"
+}
+statement() { # amd64_sha arm64_sha [version]
+  printf '{"version":"%s","packages":[{"os":"linux","arch":"amd64","url":"https://dl.example.com/app_1.0.0_linux_amd64.tar.gz","sha256":"%s"},{"os":"linux","arch":"arm64","url":"https://dl.example.com/app_1.0.0_linux_arm64.tar.gz","sha256":"%s"}]}\n' \
+    "${3:-1.0.0}" "$1" "$2" > "$SB/api/${3:-1.0.0}"
 }
 
 # Writes image.yaml with the catalog's per-arch idiom: one url carrying
@@ -139,6 +147,24 @@ run_case "missing image.yaml fails" 1 "no image.yaml"
 # the alias-vs-per-build distinction this whole episode turned on.
 fresh; write_def "$SHA_AMD" "$SHA_ARM"
 run_case "reports the url verified" 0 "dist/app_amd64.tar.gz"
+
+# --- Req 3.9 (task 11.3): the version statement is the third value -----------
+
+# 10: pinned and served agree, the statement says otherwise for arm64: a failure naming all three
+fresh; write_def "$SHA_AMD" "$SHA_ARM"; statement "$SHA_AMD" "$BOGUS"
+run_case "statement disagrees: fails" 1
+run_case "statement disagrees: names the statement's value" 1 "version statement $BOGUS"
+run_case "statement disagrees: names what was served" 1 "upstream served $SHA_ARM"
+refute_case "statement disagrees: amd64 is not blamed" 1 "amd64 MISMATCH"
+run_case "statement agrees: said so" 1 "amd64 OK"
+
+# 11: no statement for the version: nothing is verified, by name
+fresh; write_def "$SHA_AMD" "$SHA_ARM"; rm "$SB/api/1.0.0"
+run_case "missing statement fails" 1 "could not read the version statement for 1.0.0"
+
+# 12: a host with no known statement origin fails closed
+fresh; write_def "$SHA_AMD" "$SHA_ARM"; unset DHC_VERSIONS_API
+run_case "unknown origin fails closed" 1 "no version statement origin is known"
 
 echo
 if [ "$FAILURES" -eq 0 ]; then echo "all verify-arch-pins tests passed"; else echo "$FAILURES failing assertion(s)"; fi

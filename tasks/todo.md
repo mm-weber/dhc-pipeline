@@ -296,3 +296,35 @@ from the live versions API and dl.grafana.com sidecars, plus the stamp. Four
 suites green (definition-lib, lint-pins, refresh-definition, refresh-grafana),
 shellcheck and yamllint clean, the Renovate manager fixtures still match the
 marked definitions.
+
+## Task 11.3: checkpoints 2 and 3, PR time and daily (2026-09-06)
+
+Branch: `task-11.3-checkpoints`. Goal: a repackage pin is cross-checked at PR
+time against the bytes served and the publisher's version statement (Req 3.9),
+and every definition's declared signal is re-verified daily, a mismatch failing
+the run and filing a supply-chain issue (Req 3.10), with lapsed compat
+review-by dates reported in the same step (Req 4.9). One comparison function
+shared by the three checkpoints. Day one asserts every definition: hardened-app
+0.1.1 landed signed through #153.
+
+- [x] 1. definition-lib.sh: `version_statement_url`, `versions_api_sha`, `shas_agree` (+ tests);
+      refresh-grafana.sh (checkpoint 1) uses them
+- [x] 2. verify-arch-pins.sh (+ tests): pinned, served and version statement agree per architecture,
+      each named on failure; an unknown statement origin fails closed
+- [x] 3. check-authenticity.sh (+ tests): signed-tag, signed-commit and cross-origin-checksum
+      re-verified against the origin, a moved tag is a mismatch, records in JSONL; lapsed compat
+      review-by dates reported
+- [x] 4. rescan.yml: the step after the invariants, supply-chain issues filed from the records
+      (marker `<!-- rescan-signal: <definition> -->`, label `supply-chain`, no duplicates), summary
+      line; validate.yml runs the new suite; lints and the SC2154 sweep
+- [x] 5. Rehearsal against the real upstreams; tasks.md tick
+
+### Review
+
+Rehearsed 2026-09-06: the daily check against the real upstreams verified all
+seven signals (three signed tags, three signed commits, grafana's two origins
+agreeing on both architectures), the workflow step run verbatim with a stub gh
+filed nothing on real data and one correctly formed supply-chain issue on a
+fabricated moved tag. Five suites green (definition-lib, refresh-grafana,
+verify-arch-pins, check-authenticity, plus the lint battery), shellcheck,
+yamllint, actionlint, lint-workflow-policy and the SC2154 sweep clean.
