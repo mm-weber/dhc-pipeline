@@ -7,20 +7,25 @@ package inputs
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/mm-weber/dhc-pipeline/triage/rescan"
 )
 
-// LoadSupported reads the enumeration and, for every supported digest, the
-// document (when reattestDir is given) and the reports. A document or report
-// that does not parse is an error, not an empty input: a computation over
-// half the evidence would be wrong by construction.
-func LoadSupported(enumeration, reattestDir, reportsDir string) ([]rescan.SupportedDigest, error) {
+// LoadSupported reads the enumeration and, for every supported digest, its
+// platform manifests, the document (when reattestDir is given), the reports,
+// and, when vexReportsDir is given, whether today's VEX compile for it
+// resolved (<vexReportsDir>/<name>__<12 hex>.report.json with an empty
+// digest means the scan ran without --vex). A document or report that does
+// not parse is an error, not an empty input: a computation over half the
+// evidence would be wrong by construction.
+func LoadSupported(enumeration, reattestDir, reportsDir, vexReportsDir string) ([]rescan.SupportedDigest, error) {
 	f, err := os.Open(enumeration)
 	if err != nil {
 		return nil, err
@@ -43,8 +48,11 @@ func LoadSupported(enumeration, reattestDir, reportsDir string) ([]rescan.Suppor
 			byKey[k] = d
 			order = append(order, k)
 		}
-		if !contains(d.Tags, cols[1]) {
+		if !slices.Contains(d.Tags, cols[1]) {
 			d.Tags = append(d.Tags, cols[1])
+		}
+		if !slices.Contains(d.Manifests, cols[4]) {
+			d.Manifests = append(d.Manifests, cols[4])
 		}
 	}
 	if err := sc.Err(); err != nil {
@@ -82,16 +90,18 @@ func LoadSupported(enumeration, reattestDir, reportsDir string) ([]rescan.Suppor
 			}
 			d.Reports = append(d.Reports, rep)
 		}
+		if vexReportsDir != "" {
+			if data, err := os.ReadFile(filepath.Join(vexReportsDir, work+".report.json")); err == nil {
+				var rep struct {
+					Digest string `json:"digest"`
+				}
+				if err := json.Unmarshal(data, &rep); err != nil {
+					return nil, fmt.Errorf("%s: %w", filepath.Join(vexReportsDir, work+".report.json"), err)
+				}
+				d.VEXUnresolved = rep.Digest == ""
+			}
+		}
 		out = append(out, *d)
 	}
 	return out, nil
-}
-
-func contains(xs []string, s string) bool {
-	for _, x := range xs {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }

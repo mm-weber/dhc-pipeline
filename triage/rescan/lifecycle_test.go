@@ -217,8 +217,8 @@ func TestLifecycle_Reopen(t *testing.T) {
 		{Number: 86, ID: "CVE-2026-33818", State: "closed", Labels: []string{"cve", "resolved:accepted"}},
 	}
 	a := Lifecycle(in)
-	if len(a.Reopen) != 1 || a.Reopen[0].Number != 40 || !reflect.DeepEqual(a.Reopen[0].RemoveLabels, []string{"resolved:absent"}) {
-		t.Fatalf("the latest closed issue for the finding reopens, its resolved label removed; got %+v", a.Reopen)
+	if len(a.Reopen) != 1 || a.Reopen[0].Number != 39 || !reflect.DeepEqual(a.Reopen[0].RemoveLabels, []string{"resolved:fixed"}) {
+		t.Fatalf("the original (lowest-numbered) closed issue for the finding reopens, history intact, its resolved label removed; got %+v", a.Reopen)
 	}
 	for _, want := range []string{"Req 6.57", cmIdx[:19], cmAmd[:19], "HIGH", "trivy 0.72.0"} {
 		if !strings.Contains(a.Reopen[0].Comment, want) {
@@ -298,9 +298,193 @@ func TestLifecycle_EmptyListsAreLists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"close":[]`, `"reopen":[]`, `"kept":[]`} {
+	for _, want := range []string{`"close":[]`, `"reopen":[]`, `"relabel":[]`, `"kept":[]`} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("the workflow iterates these with jq, so an empty list must be [] not null; got %s", data)
 		}
+	}
+}
+
+// -----------------------------------------------------------------------------
+// the review of 2026-09-05: what the first version got wrong
+// -----------------------------------------------------------------------------
+
+func TestLifecycle_PartialScanBlocksClosesNotReopens(t *testing.T) {
+	in := baseLifecycle()
+	cmArm := "sha256:ad5b94b49f42818db187722f90bf39396f8310a28084ecd299dbbbbbbbbbbbbb"
+	in.Digests[1].Manifests = []string{cmAmd, cmArm} // two platform manifests, one report
+	in.Digests[1].Reports = []TrivyReport{manifestReport(cmRepo, cmAmd, []TrivyVuln{high("CVE-2026-56852")})}
+	in.Issues = []CVEIssue{
+		{Number: 22, ID: "CVE-2026-27145", State: "open", Packages: []Package{{Name: "stdlib", Installed: "v1.26.3"}}},
+		{Number: 39, ID: "CVE-2026-56852", State: "closed", Labels: []string{"resolved:fixed"}},
+	}
+	a := Lifecycle(in)
+	if len(a.Close) != 0 || len(a.Kept) != 1 || !strings.Contains(a.Kept[0].Reason, cmArm[:19]) {
+		t.Errorf("a platform manifest without a report today blocks every close, by name; got %+v", a)
+	}
+	if len(a.Reopen) != 1 || a.Reopen[0].Number != 39 {
+		t.Errorf("positive evidence from the manifest that was scanned still reopens; got %+v", a.Reopen)
+	}
+}
+
+func TestLifecycle_ReopenWithoutResolvedLabelIsAList(t *testing.T) {
+	in := baseLifecycle()
+	in.Digests[1].Reports = []TrivyReport{manifestReport(cmRepo, cmAmd, []TrivyVuln{high("CVE-2026-56852")})}
+	in.Issues = []CVEIssue{{Number: 39, ID: "CVE-2026-56852", State: "closed", Labels: []string{"cve"}}}
+	data, _ := json.Marshal(Lifecycle(in))
+	if !strings.Contains(string(data), `"remove_labels":[]`) {
+		t.Errorf("a hand-closed issue has no resolved label; the list must be [] for the workflow's jq: %s", data)
+	}
+}
+
+func TestLifecycle_FixedNeedsAFixedVersion(t *testing.T) {
+	in := baseLifecycle()
+	in.Issues = []CVEIssue{{Number: 22, ID: "CVE-2026-27145", State: "open",
+		Packages: []Package{{Name: "stdlib", Installed: "v1.26.2", Fixed: "1.25.11, 1.26.4"}}}}
+	in.SBOMs[grafanaAmd] = []SBOMComponent{comp("stdlib", "go1.26.3")}
+	in.SBOMs[cmAmd] = []SBOMComponent{comp("stdlib", "go1.26.3")}
+	if c := closeFor(t, Lifecycle(in), 22); c.Label != "resolved:absent" || !strings.Contains(c.Comment, "not shown as bumped") {
+		t.Errorf("a different version below the recorded fix is no bump: absent; got %+v", c)
+	}
+	in.SBOMs[grafanaAmd] = []SBOMComponent{comp("stdlib", "go1.26.4")}
+	in.SBOMs[cmAmd] = []SBOMComponent{comp("stdlib", "go1.27.0")}
+	if c := closeFor(t, Lifecycle(in), 22); c.Label != "resolved:fixed" {
+		t.Errorf("at or above a recorded fixed version: fixed; got %+v", c)
+	}
+	in.SBOMs[grafanaAmd] = []SBOMComponent{comp("stdlib", "go1.27.0")} // a newer line is above the fix too
+	if c := closeFor(t, Lifecycle(in), 22); c.Label != "resolved:fixed" {
+		t.Errorf("a newer release line counts as bumped; got %+v", c)
+	}
+	if fix, ok := fixForLine("v1.26.2", []string{"1.25.11", " 1.26.4"}); !ok || fix != "1.26.4" {
+		t.Errorf("the fix on the installed version's line: got %q %v", fix, ok)
+	}
+	in.Issues[0].Packages = []Package{{Name: "libssl3", Installed: "3.5.7-r1", Fixed: "3.5.8-r0"}}
+	in.SBOMs = map[string][]SBOMComponent{grafanaAmd: {{Name: "libssl3", Version: "3.5.8-r1"}}, cmAmd: {{Name: "libssl3", Version: "3.5.8-r1"}}}
+	if c := closeFor(t, Lifecycle(in), 22); c.Label != "resolved:fixed" {
+		t.Errorf("an apk release above the fix: fixed; got %+v", c)
+	}
+	for _, tc := range []struct {
+		a, b string
+		want int
+	}{{"go1.26.4", "1.26.4", 0}, {"3.5.8-r1", "3.5.8-r0", 1}, {"v1.26.3", "1.26.4", -1}, {"1.27.0-rc.3", "1.27.0", 1}} {
+		if got, ok := compareVersions(tc.a, tc.b); !ok || got != tc.want {
+			t.Errorf("compareVersions(%q, %q) = %d,%v want %d", tc.a, tc.b, got, ok, tc.want)
+		}
+	}
+	if _, ok := compareVersions("latest", "1.0"); ok {
+		t.Errorf("a version without a number cannot be compared")
+	}
+}
+
+func TestLifecycle_EmptySBOMIsNoEvidence(t *testing.T) {
+	in := baseLifecycle()
+	in.SBOMs[cmAmd] = []SBOMComponent{}
+	in.Issues = []CVEIssue{{Number: 30, ID: "GHSA-r277-6w6q-xmqw", State: "open", Packages: []Package{{Name: "github.com/gone/pkg", Installed: "v1.0.0"}}}}
+	if c := closeFor(t, Lifecycle(in), 30); c.Label != "resolved:absent" || !strings.Contains(c.Comment, cmAmd[:19]) {
+		t.Errorf("a document without components proves no removal: absent, naming the manifest; got %+v", c)
+	}
+}
+
+func TestParseCVEIssue_EmptyInstalledVersion(t *testing.T) {
+	is, ok := ParseCVEIssue(9, "OPEN", nil, issueBody("CVE-2026-00009", nil, "`github.com/x/y`  → fixed in 1.2.3"))
+	if !ok || len(is.Packages) != 1 || is.Packages[0].Installed != "" || is.Packages[0].Fixed != "1.2.3" {
+		t.Fatalf("a package line with no installed version still parses: %+v", is)
+	}
+	in := baseLifecycle()
+	in.Issues = []CVEIssue{is}
+	if c := closeFor(t, Lifecycle(in), 9); c.Label != "resolved:absent" || !strings.Contains(c.Comment, "recorded no installed version") {
+		t.Errorf("no installed version, no bump shown; got %+v", c)
+	}
+}
+
+func TestLifecycle_AbsentListIsPerDigest(t *testing.T) {
+	in := baseLifecycle()
+	second := "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	secondAmd := "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+	in.Digests[0].Reports = []TrivyReport{manifestReport(grafanaRepo, grafanaAmd, nil, exception("CVE-2026-39822"))}
+	in.Digests = append(in.Digests, SupportedDigest{Repository: grafanaRepo, Digest: second, Tags: []string{"12-alpine3.23"},
+		Reports: []TrivyReport{manifestReport(grafanaRepo, secondAmd, nil)}})
+	in.SBOMs[secondAmd] = []SBOMComponent{comp("stdlib", "go1.27.0")}
+	in.Issues = []CVEIssue{{Number: 26, ID: "CVE-2026-39822", State: "open"}}
+	c := closeFor(t, Lifecycle(in), 26)
+	if !strings.Contains(c.Comment, second[:19]) {
+		t.Errorf("a same-repository digest where the finding is absent is named as examined:\n%s", c.Comment)
+	}
+}
+
+func TestLifecycle_ScannerVersionFromTheReports(t *testing.T) {
+	in := baseLifecycle()
+	in.Scanner = Scanner{}
+	in.Issues = []CVEIssue{{Number: 32, ID: "CVE-2026-00098", State: "open"}}
+	if c := closeFor(t, Lifecycle(in), 32); !strings.Contains(c.Comment, "scanner trivy 0.72.0") {
+		t.Errorf("the reports carry the scanner version; got:\n%s", c.Comment)
+	}
+}
+
+func TestLifecycle_StaleResolvedLabels(t *testing.T) {
+	in := baseLifecycle()
+	in.Digests[0].Reports = []TrivyReport{manifestReport(grafanaRepo, grafanaAmd, []TrivyVuln{high("CVE-2026-39822")})}
+	in.Issues = []CVEIssue{
+		{Number: 26, ID: "CVE-2026-39822", State: "open", Labels: []string{"cve", "resolved:fixed"}},
+		{Number: 32, ID: "CVE-2026-00098", State: "open", Labels: []string{"cve", "resolved:absent", "resolved:removed"}},
+	}
+	a := Lifecycle(in)
+	if len(a.Relabel) != 1 || a.Relabel[0].Number != 26 || !reflect.DeepEqual(a.Relabel[0].RemoveLabels, []string{"resolved:fixed"}) {
+		t.Errorf("an open issue that stays open sheds its resolved label; got %+v", a.Relabel)
+	}
+	c := closeFor(t, a, 32)
+	if c.Label != "resolved:absent" || !reflect.DeepEqual(c.RemoveLabels, []string{"resolved:removed"}) {
+		t.Errorf("a close removes the other grades' labels and keeps its own; got %+v", c)
+	}
+}
+
+func TestLifecycle_UnresolvedVEXDigestIsNoEvidence(t *testing.T) {
+	in := baseLifecycle()
+	in.Digests[0].VEXUnresolved = true
+	in.Digests[0].Reports = []TrivyReport{manifestReport(grafanaRepo, grafanaAmd, []TrivyVuln{high("CVE-2026-21728")})}
+	in.Issues = []CVEIssue{
+		{Number: 23, ID: "CVE-2026-21728", State: "closed", Labels: []string{"resolved:fixed"}},
+		{Number: 32, ID: "CVE-2026-00098", State: "open"},
+	}
+	a := Lifecycle(in)
+	if len(a.Reopen) != 0 || len(a.Close) != 0 || len(a.Kept) != 1 || !strings.Contains(a.Kept[0].Reason, "VEX not applied") {
+		t.Errorf("a digest scanned without its VEX reports covered findings as reported: no reopen from it, no close today; got %+v", a)
+	}
+}
+
+func TestLifecycle_SuppressedOutsideTheAperture(t *testing.T) {
+	in := baseLifecycle()
+	medium := [4]string{"CVE-2026-42151", "not_affected", "rescan-out/vex/grafana__837727c/grafana.openvex.json", "The vulnerability is in the Prometheus server"}
+	r := manifestReport(grafanaRepo, grafanaAmd, []TrivyVuln{{VulnerabilityID: "CVE-2026-00060", PkgName: "x", Severity: "MEDIUM"}}, medium)
+	r.Results[0].ExperimentalModifiedFindings[0].Finding.Severity = "MEDIUM"
+	in.Digests[0].Reports = []TrivyReport{r}
+	in.Issues = []CVEIssue{
+		{Number: 25, ID: "CVE-2026-42151", State: "open"},
+		{Number: 60, ID: "CVE-2026-00060", State: "open"},
+	}
+	a := Lifecycle(in)
+	if c := closeFor(t, a, 25); c.Label != "resolved:not_affected" {
+		t.Errorf("a suppressed finding at any severity is covered, and the artifact is named; got %+v", c)
+	}
+	if c := closeFor(t, a, 60); c.Label != "resolved:absent" || !strings.Contains(c.Comment, "below the decision aperture") {
+		t.Errorf("a finding re-rated below the aperture closes with that said; got %+v", c)
+	}
+}
+
+func TestLifecycle_LabelsFromThePolicy(t *testing.T) {
+	in := baseLifecycle()
+	in.Labels = map[string]string{"accepted": "triage:accepted", "fixed": "triage:fixed"}
+	in.Digests[0].Reports = []TrivyReport{manifestReport(grafanaRepo, grafanaAmd, nil, exception("CVE-2026-39822"))}
+	in.Digests[1].Reports = []TrivyReport{manifestReport(cmRepo, cmAmd, []TrivyVuln{high("CVE-2026-56852")})}
+	in.Issues = []CVEIssue{
+		{Number: 26, ID: "CVE-2026-39822", State: "open"},
+		{Number: 39, ID: "CVE-2026-56852", State: "closed", Labels: []string{"triage:fixed"}},
+	}
+	a := Lifecycle(in)
+	if c := closeFor(t, a, 26); c.Label != "triage:accepted" {
+		t.Errorf("the label names come from the policy file; got %+v", c)
+	}
+	if len(a.Reopen) != 1 || !reflect.DeepEqual(a.Reopen[0].RemoveLabels, []string{"triage:fixed"}) {
+		t.Errorf("a declared label is recognised on reopen; got %+v", a.Reopen)
 	}
 }

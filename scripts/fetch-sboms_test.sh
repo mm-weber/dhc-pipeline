@@ -45,14 +45,17 @@ printf 'cosign %s\n' "$*" >> "${STUB_ARGV}"
 ref="${@: -1}"; id=""
 while [ $# -gt 0 ]; do case "$1" in --certificate-identity) id="$2"; shift ;; esac; shift; done
 case "$id|$ref" in
-  *build.yml*"|"*1111*) cat "${STUB_DIR}/envelope.jsonl"; exit 0 ;;
+  *build.yml*"|"*1111*)
+    # one blip when asked for: the first attempt fails the way Rekor did on 2026-09-04
+    if [ -f "${STUB_DIR}/blip-once" ]; then rm -f "${STUB_DIR}/blip-once"; echo "Error: rekor: 502 bad gateway" >&2; exit 1; fi
+    cat "${STUB_DIR}/envelope.jsonl"; exit 0 ;;
   *) echo "Error: no matching attestations" >&2; exit 1 ;;
 esac
 STUB
   chmod +x "$SB/bin/cosign"
   export STUB_ARGV="$SB/argv" STUB_DIR="$SB"; : > "$STUB_ARGV"
 }
-run() { PATH="$SB/bin:$PATH" "$FETCH" "$SB/root" "$SB/enum.tsv" "$SB/out" 2>&1; }
+run() { PATH="$SB/bin:$PATH" FETCH_SBOMS_RETRY_DELAY=0 "$FETCH" "$SB/root" "$SB/enum.tsv" "$SB/out" 2>&1; }
 
 # 1: the supported manifest's SBOM is read through verification with the role that attests cyclonedx
 fresh
@@ -80,12 +83,24 @@ printf 'verification:\n  issuer: https://token.actions.githubusercontent.com\n  
 out=$(run); rc=$?
 [ "$rc" -eq 2 ] && grep -q "no role that attests cyclonedx" <<<"$out" && pass "no attesting role: refused by name (exit 2)" || fail "policy hole" "rc=$rc" "$out"
 
-# 5: the loop reads the enumeration on stdin; a cosign that drains stdin (measured
+# 5: a verify that fails once is tried again (three attempts), a statement without
+#    components is no SBOM, and none verified at all fails the run
+fresh; touch "$SB/blip-once"
+out=$(run); rc=$?
+[ -f "$SB/out/sha256-${M1#sha256:}.cdx.json" ] && [ "$(grep -c "grafana@${M1}" "$STUB_ARGV")" -eq 2 ] && pass "a blip on the first attempt is tried again and read on the second" || fail "retry" "$(cat "$STUB_ARGV")" "$out"
+fresh
+payload=$(printf '{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"https://cyclonedx.org/bom","subject":[],"predicate":{"bomFormat":"CycloneDX"}}' | base64 -w0)
+printf '{"payloadType":"application/vnd.in-toto+json","payload":"%s","signatures":[]}\n' "$payload" > "$SB/envelope.jsonl"
+out=$(run); rc=$?
+[ ! -e "$SB/out/sha256-${M1#sha256:}.cdx.json" ] && [ "$rc" -eq 1 ] && grep -q "none of 2 supported platform manifest(s) verified" <<<"$out" \
+  && pass "a statement without a components list is no SBOM, and none read at all fails the run" || fail "empty predicate" "rc=$rc" "$out" "$(ls "$SB/out")"
+
+# 6: the loop reads the enumeration on stdin; a cosign that drains stdin (measured
 #    with a stub on 2026-09-05) must not eat the rows behind the first one
 fresh
 sed -i '2a cat >/dev/null' "$SB/bin/cosign"
 out=$(run); rc=$?
-[ "$(grep -c 'cosign verify-attestation' "$STUB_ARGV")" -eq 2 ] && pass "every supported manifest is still visited when cosign drains stdin" || fail "rows eaten" "$(cat "$STUB_ARGV")" "$out"
+grep -q "grafana@${M1}" "$STUB_ARGV" && grep -q "grafana@${M2}" "$STUB_ARGV" && pass "every supported manifest is still visited when cosign drains stdin" || fail "rows eaten" "$(cat "$STUB_ARGV")" "$out"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all fetch-sboms tests passed"

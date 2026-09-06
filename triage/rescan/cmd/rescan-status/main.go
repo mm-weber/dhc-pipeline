@@ -34,19 +34,20 @@ import (
 )
 
 func main() {
-	enumeration := flag.String("enumeration", "", "the rescan's enumeration.tsv — required")
-	reattestDir := flag.String("reattest", "", "re-attest work directory (rescan-out/reattest) — required")
-	reportsDir := flag.String("reports", "", "supported-set scan reports (rescan-out/trivy) — required")
-	kevFile := flag.String("kev", "", "CISA KEV catalog JSON — optional")
-	apertureFlag := flag.String("aperture", "", "decision aperture, comma-separated severities in rank order — required")
-	ceilingsFlag := flag.String("ceilings", "", "exception ceilings in days per severity, SEV=days comma-separated — required")
-	kevCeiling := flag.Int("kev-ceiling", 0, "ceiling in days for a KEV-listed finding — required")
-	previousFile := flag.String("previous", "", "previously published metrics.json — optional")
-	previousBody := flag.String("previous-body", "", "the status issue's body, the fenced JSON block is read — optional")
+	enumeration := flag.String("enumeration", "", "the rescan's enumeration.tsv (required)")
+	reattestDir := flag.String("reattest", "", "re-attest work directory (rescan-out/reattest) (required)")
+	reportsDir := flag.String("reports", "", "supported-set scan reports (rescan-out/trivy) (required)")
+	vexReports := flag.String("vex-reports", "", "the scan step's compile reports (rescan-out/vex); a digest whose VEX did not resolve counts as unscanned (optional)")
+	kevFile := flag.String("kev", "", "CISA KEV catalog JSON (optional)")
+	apertureFlag := flag.String("aperture", "", "decision aperture, comma-separated severities in rank order (required)")
+	ceilingsFlag := flag.String("ceilings", "", "exception ceilings in days per severity, SEV=days comma-separated (required)")
+	kevCeiling := flag.Int("kev-ceiling", 0, "ceiling in days for a KEV-listed finding (required)")
+	previousFile := flag.String("previous", "", "previously published metrics.json (optional)")
+	previousBody := flag.String("previous-body", "", "the status issue's body, the fenced JSON block is read (optional)")
 	todayFlag := flag.String("today", "", "YYYY-MM-DD; default: the latest report's date, else now (UTC)")
-	runURL := flag.String("run", "", "the run's URL, recorded in the data — optional")
-	outJSON := flag.String("out-json", "", "where to write metrics.json — required")
-	outBody := flag.String("out-body", "", "where to write the issue body — required")
+	runURL := flag.String("run", "", "the run's URL, recorded in the data (optional)")
+	outJSON := flag.String("out-json", "", "where to write metrics.json (required)")
+	outBody := flag.String("out-body", "", "where to write the issue body (required)")
 	flag.Parse()
 
 	for name, v := range map[string]string{"--enumeration": *enumeration, "--reattest": *reattestDir, "--reports": *reportsDir,
@@ -71,7 +72,7 @@ func main() {
 		ceilings[strings.ToUpper(strings.TrimSpace(parts[0]))] = n
 	}
 
-	digests, err := inputs.LoadSupported(*enumeration, *reattestDir, *reportsDir)
+	digests, err := inputs.LoadSupported(*enumeration, *reattestDir, *reportsDir, *vexReports)
 	if err != nil {
 		fatal(err.Error())
 	}

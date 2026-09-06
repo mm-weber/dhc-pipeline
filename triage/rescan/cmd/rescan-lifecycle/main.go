@@ -27,23 +27,25 @@ import (
 )
 
 func main() {
-	enumeration := flag.String("enumeration", "", "the rescan's enumeration.tsv — required")
-	reportsDir := flag.String("reports", "", "supported-set scan reports (rescan-out/trivy) — required")
-	sbomsDir := flag.String("sboms", "", "verified CycloneDX SBOMs, sha256-<hex>.cdx.json (fetch-sboms.sh) — required")
-	issuesFile := flag.String("issues", "", "gh issue list --json number,state,body,labels — required")
-	scannerFile := flag.String("scanner", "", "trivy version --format json — optional")
-	vexDir := flag.String("vex-dir", "triage/vex", "the OpenVEX source directory, to name covering statements by file")
-	apertureFlag := flag.String("aperture", "", "decision aperture, comma-separated severities in rank order — required")
-	outFile := flag.String("out", "", "where to write actions.json — required")
+	enumeration := flag.String("enumeration", "", "the rescan's enumeration.tsv (required)")
+	reportsDir := flag.String("reports", "", "supported-set scan reports (rescan-out/trivy) (required)")
+	sbomsDir := flag.String("sboms", "", "verified CycloneDX SBOMs, sha256-<hex>.cdx.json (fetch-sboms.sh) (required)")
+	issuesFile := flag.String("issues", "", "gh issue list --json number,state,body,labels (required)")
+	scannerFile := flag.String("scanner", "", "trivy version --format json (required) (Req 6.52 names the versions)")
+	vexDir := flag.String("vex-dir", "", "the OpenVEX source directory, to name covering statements by file (required), absolute (the binary runs under go -C)")
+	vexReports := flag.String("vex-reports", "", "the scan step's compile reports (rescan-out/vex); a digest whose VEX did not resolve is evidence of nothing (optional)")
+	labelsFile := flag.String("labels", "", "the policy's resolved labels, grade -> {name,...} JSON (triage-policy.sh resolved-labels) (optional)")
+	apertureFlag := flag.String("aperture", "", "decision aperture, comma-separated severities in rank order (required)")
+	outFile := flag.String("out", "", "where to write actions.json (required)")
 	flag.Parse()
-	for name, v := range map[string]string{"--enumeration": *enumeration, "--reports": *reportsDir, "--sboms": *sbomsDir,
-		"--issues": *issuesFile, "--aperture": *apertureFlag, "--out": *outFile} {
-		if v == "" {
-			fatal(name + " is required")
+	for _, req := range []struct{ name, value string }{{"--enumeration", *enumeration}, {"--reports", *reportsDir}, {"--sboms", *sbomsDir},
+		{"--issues", *issuesFile}, {"--scanner", *scannerFile}, {"--vex-dir", *vexDir}, {"--aperture", *apertureFlag}, {"--out", *outFile}} {
+		if req.value == "" {
+			fatal(req.name + " is required")
 		}
 	}
 
-	digests, err := inputs.LoadSupported(*enumeration, "", *reportsDir)
+	digests, err := inputs.LoadSupported(*enumeration, "", *reportsDir, *vexReports)
 	if err != nil {
 		fatal(err.Error())
 	}
@@ -75,23 +77,42 @@ func main() {
 		hex := strings.TrimSuffix(strings.TrimPrefix(filepath.Base(f), "sha256-"), ".cdx.json")
 		in.SBOMs["sha256:"+hex] = cs
 	}
-	if *scannerFile != "" {
-		if data, err := os.ReadFile(*scannerFile); err != nil {
-			warn("scanner: %v (versions will read as unknown)", err)
-		} else if s, err := rescan.ParseScanner(data); err != nil {
-			warn("scanner: %v (versions will read as unknown)", err)
-		} else {
-			in.Scanner = s
+	data, err = os.ReadFile(*scannerFile)
+	if err != nil {
+		fatal("scanner: " + err.Error())
+	}
+	if in.Scanner, err = rescan.ParseScanner(data); err != nil {
+		fatal("scanner: " + err.Error())
+	}
+	if *labelsFile != "" {
+		data, err := os.ReadFile(*labelsFile)
+		if err != nil {
+			fatal("labels: " + err.Error())
+		}
+		var declared map[string]struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(data, &declared); err != nil {
+			fatal("labels: " + err.Error())
+		}
+		in.Labels = map[string]string{}
+		for grade, l := range declared {
+			in.Labels[grade] = l.Name
 		}
 	}
 	sources, _ := filepath.Glob(filepath.Join(*vexDir, "*.json"))
+	if len(sources) == 0 {
+		warn("no OpenVEX source under %s: covering statements will be named by the applied document only", *vexDir)
+	}
 	for _, f := range sources {
 		data, err := os.ReadFile(f)
 		if err != nil {
+			warn("%s: %v (not named as a source)", f, err)
 			continue
 		}
 		doc, err := rescan.ParseVEX(data)
 		if err != nil {
+			warn("%s: %v (not named as a source)", f, err)
 			continue
 		}
 		seen := map[string]bool{}

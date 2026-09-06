@@ -429,3 +429,19 @@ func TestBuildStatus_FixtureAttestations(t *testing.T) {
 		t.Errorf("the supported digest is listed as scanned with a document: %+v", s.Repositories)
 	}
 }
+
+func TestBuildStatus_PartialScanInventsNoAbsence(t *testing.T) {
+	in := policyInputs("2026-09-05")
+	arm := "sha256:5cd9002a2e453d1134f8f028bb173cab19a3870171dbba5ce85baf6da2791690"
+	in.Previous = previousWith(FindingClock{Repository: grafanaRepo, ID: "CVE-2026-00014", Severity: "HIGH",
+		Status: "undecided", FirstSeen: "2026-08-20T00:00:00Z"})
+	in.Digests = []SupportedDigest{{Repository: grafanaRepo, Digest: grafanaIdx, Manifests: []string{"sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170", arm},
+		Document: doc(), Reports: []TrivyReport{{CreatedAt: "2026-09-05T06:00:00Z", ArtifactName: grafanaRepo + "@sha256:cc46dc5b6979328a9cadc135f3877d1b1ee15b5eb1d7f085557853329d898170"}}}}
+	f := clock(t, BuildStatus(in), grafanaRepo, "CVE-2026-00014")
+	if f.Status != "undecided" || f.Fixed != "" {
+		t.Errorf("one platform manifest unscanned: the repository was not fully looked at, nothing is declared absent; got %+v", f)
+	}
+	if s := BuildStatus(in); s.Repositories[0].Digests[0].Scanned {
+		t.Errorf("a partially scanned digest is not listed as scanned")
+	}
+}

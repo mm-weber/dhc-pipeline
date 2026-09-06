@@ -174,6 +174,33 @@ the filer runs.
       summary line; SC2154 sweep, actionlint, yamllint, lint-workflow-policy; rehearsal with a stub gh
 - [x] 5. Rehearsal on the real supported set: what today's evidence would do to the open issues
 - [x] 6. tasks.md tick; user manual: the lifecycle paragraph replaces "it never closes them"
+- [x] 7. Review round: see below
       (rehearsed 2026-09-05: 25 issues, 7 digests, 14 SBOMs; 16 closes, 6 fixed on SBOM proof and 10
       accepted on the grafana exceptions, 0 reopened, 0 kept; the rehearsal caught the loop's stdin
       being the enumeration, fixed with a regression case)
+
+### Review (2026-09-05, /code-review of #148, 23 correctness and 14 cleanup candidates)
+
+Confirmed and fixed in the same PR, each with a test: the OpenVEX source
+directory was a relative path under `go -C` (never found; now absolute, and
+the command warns when it finds nothing); a digest with one platform
+manifest unscanned counted as examined (now every manifest needs a report,
+in the status tool too); a reopen of a hand-closed issue serialised
+`remove_labels` as null and would have broken the apply loop on the first
+reopen (lists are lists, and jq guards); "bumped" was any different version
+(now at or above the fix on the installed version's release line); a
+statement without components read as an empty SBOM and graded `removed`
+(no components is no evidence, in the script and the tool); an empty
+installed version dropped the package line; the "absent from" list was
+keyed by repository, not digest; the reopen picked the newest closed issue,
+not the original; an open issue could keep a stale resolved label (a
+relabel pass, and close-then-label order); a digest scanned without its VEX
+was evidence (now it blocks closes and reopens); a suppressed finding
+outside the aperture read as absent; the issue list's page limit was
+silent; the summary counted decided, not applied; the labels were
+hard-coded in two places (now `triage.resolved_labels` in the policy
+file, read through triage-policy.sh); the lifecycle ran after the
+compiler's issue map (now right after the scan). Left as designed, noted
+in the manual: no "keep closed" switch. Left for later: one policy reader
+for the verification section, a machine-readable block in the cve issue
+template.

@@ -6,10 +6,15 @@
 # identities catalogue-policy.yaml admits for cyclonedx (Req 6.58; task 10.6).
 # The release job attests the SBOM to each platform manifest (build.yml), so
 # that is where it is read. Output: <out-dir>/sha256-<manifest hex>.cdx.json,
-# the bare CycloneDX document (the in-toto predicate). A manifest with no
-# verifiable SBOM is named as a warning and skipped, never invented: the
-# lifecycle tool then claims no version bump for it (Req 6.56). Superseded
-# rows are not read; they hold no issues.
+# the bare CycloneDX document (the in-toto predicate), only when it carries a
+# components list: a statement without one is no evidence. A manifest with
+# no verifiable SBOM is named as a warning and skipped, never invented: the
+# lifecycle tool then claims no version bump for it (Req 6.56). A verify that
+# fails is tried again, up to three attempts (Sigstore blips, the class
+# measured on 2026-09-04), FETCH_SBOMS_RETRY_DELAY seconds apart (default
+# 10; the tests set 0). None read at all is a failure of the run (exit 1):
+# an identity or registry problem must not grade every close as absent.
+# Superseded rows are not read; they hold no issues.
 set -uo pipefail
 ROOT="${1:?usage: fetch-sboms.sh <root> <enumeration.tsv> <out-dir>}"
 TSV="${2:?usage: fetch-sboms.sh <root> <enumeration.tsv> <out-dir>}"
@@ -40,14 +45,19 @@ while IFS=$'\t' read -r repo tag digest platform manifest status; do
   total=$((total + 1))
   out="$OUT/sha256-${manifest#sha256:}.cdx.json"
   ok=false; why=""
-  for id in "${IDS[@]}"; do
-    # stdin is the enumeration here; a tool that read it would eat the rows
-    if cosign verify-attestation --type cyclonedx --certificate-oidc-issuer "$ISSUER" --certificate-identity "$id" "$ref" </dev/null 2>"$OUT/.err" \
-         | jq -cn 'first(inputs | .payload | @base64d | fromjson | select(.predicateType == "https://cyclonedx.org/bom") | .predicate)' > "$out.tmp" 2>/dev/null \
-       && [ -s "$out.tmp" ]; then
-      mv "$out.tmp" "$out"; ok=true; break
-    fi
-    why=$(tail -n 1 "$OUT/.err" 2>/dev/null || true)
+  for attempt in 1 2 3; do
+    for id in "${IDS[@]}"; do
+      # stdin is the enumeration here; a tool that read it would eat the rows
+      if cosign verify-attestation --type cyclonedx --certificate-oidc-issuer "$ISSUER" --certificate-identity "$id" "$ref" </dev/null 2>"$OUT/.err" \
+           | jq -cn 'first(inputs | .payload | @base64d | fromjson
+                           | select(.predicateType == "https://cyclonedx.org/bom" and (.predicate.components | type) == "array")
+                           | .predicate)' > "$out.tmp" 2>/dev/null \
+         && [ -s "$out.tmp" ]; then
+        mv "$out.tmp" "$out"; ok=true; break 2
+      fi
+      why=$(tail -n 1 "$OUT/.err" 2>/dev/null || true)
+    done
+    [ "$attempt" -lt 3 ] && sleep "${FETCH_SBOMS_RETRY_DELAY:-10}"
   done
   rm -f "$out.tmp" "$OUT/.err"
   if [ "$ok" = true ]; then
@@ -59,3 +69,7 @@ while IFS=$'\t' read -r repo tag digest platform manifest status; do
   fi
 done < "$TSV"
 echo "fetch-sboms: ${fetched} of ${total} supported platform manifest(s) read through verification, ${missing} without"
+if [ "$total" -gt 0 ] && [ "$fetched" -eq 0 ]; then
+  echo "::error::fetch-sboms: none of ${total} supported platform manifest(s) verified; an identity, registry or Sigstore problem, not evidence about the images" >&2
+  exit 1
+fi

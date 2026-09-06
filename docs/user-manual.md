@@ -555,9 +555,14 @@ exception), `resolved:not_affected` or `resolved:fixed` (a statement),
 naming the covering artifact; the weakest grade wins. A closed issue reopens,
 history intact, when its finding is reported again on a supported digest,
 and nothing is filed twice. Every comment names what was examined and what
-was found, never a judgement (Req 6.54); a supported digest that was not
-scanned today blocks every close. EPSS and KEV order the queue; they never
-justify a status.
+was found, never a judgement (Req 6.54); a supported digest with a platform
+manifest unscanned today, or scanned without its VEX, blocks every close.
+There is no "keep closed" switch: an issue closed by hand while its finding
+is still reported on a supported digest reopens on the next run, because
+the only way to retire a reported finding is a triage artifact (a
+statement, an exception, or a fix). The five labels are declared in
+`catalogue-policy.yaml` (`triage.resolved_labels`). EPSS and KEV order the
+queue; they never justify a status.
 
 ### The catalogue status issue
 
