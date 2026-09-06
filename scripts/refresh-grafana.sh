@@ -100,7 +100,7 @@ new_ver=$(sed -nE 's#.*/grafana/release/([^/[:space:]]+)/.*#\1#p' <<<"$url_line"
 # rewritten after release.
 # The grafana.com versions API, read once: it names the build id, and it is the
 # second origin of the per-architecture checksum (Req 3.8, below).
-api_url="${REFRESH_GRAFANA_API_URL:-https://grafana.com/api/grafana/versions}"
+api_url="${REFRESH_GRAFANA_API_URL:-${DHC_VERSIONS_API:-https://grafana.com/api/grafana/versions}}"
 api_json=$(curl -fsSL --max-time 60 "${api_url}/${new_ver}" 2>/dev/null) || api_json=""
 
 build_id="${REFRESH_GRAFANA_BUILD_ID:-}"
@@ -206,19 +206,12 @@ arm64_sha="${REFRESH_GRAFANA_SHA256_ARM64:-}"
 refuse() { echo "refresh-grafana: refusing to write ${f}: $1 (Req 3.8)" >&2; exit 1; }
 class=$(authenticity_class "$f")
 [ "$class" = "cross-origin-checksum" ] || refuse "authenticity class '${class:-none declared}' is not cross-origin-checksum, the signal a repackaged tarball has (Req 1.10)"
-api_sha() { # arch -> the versions API's sha256 for the linux tarball, or empty
-  printf '%s' "$api_json" | node -e '
-    let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
-      let o; try { o = JSON.parse(s); } catch { return; }
-      const suffix = "_linux_" + process.argv[1] + ".tar.gz";
-      for (const p of o.packages || []) if (typeof p.url === "string" && p.url.endsWith(suffix)) { process.stdout.write(String(p.sha256 || "")); return; }
-    });' "$1" 2>/dev/null || true
-}
 for arch in amd64 arm64; do
   side="$([ "$arch" = amd64 ] && printf '%s' "$amd64_sha" || printf '%s' "$arm64_sha")"
-  api=$(api_sha "$arch")
-  [ -n "$api" ] || refuse "cross-origin-checksum: the grafana.com versions API states no sha256 for the ${arch} tarball of v${new_ver}, so the dl.grafana.com sidecar (${side:0:12}…) has no second origin to agree with"
-  [ "$api" = "$side" ] || refuse "cross-origin-checksum: for the ${arch} tarball of v${new_ver} the grafana.com versions API states ${api:0:12}… while the dl.grafana.com sidecar states ${side:0:12}…; two origins disagree"
+  api=$(versions_api_sha "$api_json" "$arch")
+  if ! msg=$(shas_agree "the ${arch} tarball of v${new_ver}" "grafana.com versions API=${api}" "dl.grafana.com sidecar=${side}"); then
+    refuse "cross-origin-checksum: ${msg}"
+  fi
 done
 today="${REFRESH_TODAY:-$(date -u +%F)}"
 stamp="cross-origin-checksum, verified ${new_ver} (grafana.com versions API and dl.grafana.com sidecars agree, amd64 ${amd64_sha:0:12}…, arm64 ${arm64_sha:0:12}…), ${today}"

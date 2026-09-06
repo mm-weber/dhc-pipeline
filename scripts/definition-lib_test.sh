@@ -113,5 +113,21 @@ def app 'image: ghcr.io/mm-weber/dhc/app'
 definitions_publishing "$SB" nope >/dev/null; rc=$?
 check "unknown name exits 0" "0" "$rc"
 
+# --- the cross-origin checksum helpers (Req 3.8 to 3.10; task 11.3) ----------
+
+A=$(printf 'a%.0s' $(seq 64)); B=$(printf 'b%.0s' $(seq 64))
+check "shas_agree: three equal digests agree" "0" "$(shas_agree x "pinned=$A" "served=$A" "statement=$A" >/dev/null; echo $?)"
+check "shas_agree: a differing value is named" "grafana arm64: pinned ${A:0:12}…, served ${B:0:12}… do not agree" "$(shas_agree "grafana arm64" "pinned=$A" "served=$B"; true)"
+check "shas_agree: a missing value is named as none" "x: pinned ${A:0:12}…, statement none do not agree" "$(shas_agree x "pinned=$A" "statement="; true)"
+check "shas_agree: a non-digest is not a match" "1" "$(shas_agree x "pinned=$A" "served=oops" >/dev/null; echo $?)"
+stmt='{"packages":[{"os":"linux","arch":"amd64","url":"https://dl.grafana.com/grafana/release/13.1.5/grafana_13.1.5_1_linux_amd64.tar.gz","sha256":"'"$A"'","links":[{"rel":"self"}]},{"arch":"arm64","url":"https://dl.grafana.com/grafana/release/13.1.5/grafana_13.1.5_1_linux_arm64.tar.gz","sha256":"'"$B"'"}]}'
+check "versions_api_sha: the linux amd64 tarball's sha256" "$A" "$(versions_api_sha "$stmt" amd64)"
+check "versions_api_sha: arm64" "$B" "$(versions_api_sha "$stmt" arm64)"
+check "versions_api_sha: no such package yields empty" "" "$(versions_api_sha "$stmt" riscv64)"
+check "versions_api_sha: not JSON yields empty" "" "$(versions_api_sha "<html>" amd64)"
+check "version_statement_url: grafana's known origin" "https://grafana.com/api/grafana/versions/13.1.5" "$(version_statement_url dl.grafana.com 13.1.5)"
+check "version_statement_url: unknown host, no override: empty" "" "$(version_statement_url dl.example.com 1.0)"
+check "version_statement_url: the override serves any host" "file:///tmp/api/1.0" "$(DHC_VERSIONS_API=file:///tmp/api version_statement_url dl.example.com 1.0)"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

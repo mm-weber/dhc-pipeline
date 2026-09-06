@@ -95,3 +95,57 @@ github_verification() {
       console.log(`${v.verified === true} ${v.reason || "unknown"}`);
     });'
 }
+
+# --- the cross-origin checksum, shared by three checkpoints (Req 3.8 to 3.10) --
+# A repackaged tarball's checksum is stated by two origins that do not share a
+# pipeline: the object store's sidecar (dl.grafana.com) and the publisher's
+# version statement (grafana.com's versions API). refresh-grafana.sh compares
+# them before a bump is written (checkpoint 1), verify-arch-pins.sh at PR time
+# with the served bytes as a third value (checkpoint 2), check-authenticity.sh
+# daily (checkpoint 3). One comparison, one reader of the statement.
+
+# version_statement_url <download host> <version> -> the publisher's version
+# statement for that release; empty when no origin is known for the host.
+# DHC_VERSIONS_API overrides the base for any host (the tests serve file:// trees).
+version_statement_url() {
+  case "$1" in
+    dl.grafana.com) printf '%s/%s' "${DHC_VERSIONS_API:-https://grafana.com/api/grafana/versions}" "$2" ;;
+    *) [ -n "${DHC_VERSIONS_API:-}" ] && printf '%s/%s' "$DHC_VERSIONS_API" "$2" ;;
+  esac
+  return 0
+}
+
+# versions_api_sha <statement json> <arch> -> the sha256 the statement gives
+# for the linux <arch> tarball, or empty. Read with node, the one runtime the
+# Renovate container, the runners and the devcontainer all have.
+versions_api_sha() {
+  # shellcheck disable=SC2016  # a JavaScript template, not shell expansion
+  printf '%s' "$1" | node -e '
+    let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      let o; try { o = JSON.parse(s); } catch { return; }
+      const suffix = "_linux_" + process.argv[1] + ".tar.gz";
+      for (const p of o.packages || []) {
+        if (typeof p.url === "string" && p.url.endsWith(suffix)) { process.stdout.write(String(p.sha256 || "")); return; }
+      }
+    });' "$2" 2>/dev/null || true
+}
+
+# shas_agree <what> <label>=<sha>... -> 0 when every value is the same 64-hex
+# digest; otherwise prints one line naming every value and returns 1. Both
+# numbers, always: a mismatch without them is the message that once sent this
+# repository looking in the wrong place for a week.
+shas_agree() {
+  local what="$1"; shift
+  local first="" bad=false line="" kv label val
+  for kv in "$@"; do
+    label="${kv%%=*}"; val="${kv#*=}"
+    [ -n "$line" ] && line="${line}, "
+    if [ "${#val}" -ne 64 ] || [ -n "${val//[0-9a-f]/}" ]; then
+      bad=true; line="${line}${label} ${val:-none}"; continue
+    fi
+    line="${line}${label} ${val:0:12}…"
+    if [ -z "$first" ]; then first="$val"; elif [ "$val" != "$first" ]; then bad=true; fi
+  done
+  if [ "$bad" = true ]; then printf '%s: %s do not agree\n' "$what" "$line"; return 1; fi
+  return 0
+}

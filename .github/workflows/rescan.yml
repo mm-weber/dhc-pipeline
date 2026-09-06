@@ -329,6 +329,43 @@ jobs:
           # manifests the way a consumer reads them, after today's replaces.
           scripts/check-attestation-count.sh "$OUT/enumeration.tsv" "$OUT/attestation-count.json"
 
+      # Task 11.3 (Req 3.10, 4.9): every definition's declared authenticity
+      # signal re-verified against its origin, daily. A mismatch (a tag that
+      # moved, a signature that no longer verifies, two checksum origins that
+      # stopped agreeing) fails the run and files one issue naming it as a
+      # supply-chain signal; the record is the evidence, the issue is where a
+      # human decides. Lapsed compat review-by dates are reported here too.
+      - name: authenticity signals (Req 3.10, 4.9)
+        id: authenticity
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          scripts/check-authenticity.sh . "$OUT/authenticity.jsonl"; rc=$?
+          {
+            echo "verified=$(jq -s '[.[] | select(.class != "compat" and .ok)] | length' "$OUT/authenticity.jsonl")"
+            echo "mismatched=$(jq -s '[.[] | select(.class != "compat" and (.ok | not))] | length' "$OUT/authenticity.jsonl")"
+            echo "lapsed=$(jq -s '[.[] | select(.class == "compat" and (.ok | not))] | length' "$OUT/authenticity.jsonl")"
+          } >> "$GITHUB_OUTPUT"
+          # One open issue per definition with a mismatch, found by its marker
+          # (the cve issues' convention): a signal that persists is one issue
+          # that stays open, not one issue per day.
+          gh label create supply-chain --color B60205 --description "An upstream authenticity signal failed re-verification (Req 3.10)" 2>/dev/null || true
+          existing=$(gh issue list --state open --label supply-chain --limit 200 --json body --jq '.[].body' | grep -oE 'rescan-signal: [^ >]+' | sed 's/^rescan-signal: //' | sort -u || true)
+          while read -r record; do
+            [ -n "$record" ] || continue
+            definition=$(jq -r '.definition' <<<"$record")
+            if grep -qxF "$definition" <<<"$existing"; then
+              echo "supply-chain issue for ${definition} already open"
+              continue
+            fi
+            title="Supply-chain signal: $(jq -r '"\(.definition) (\(.class), \(.ref))"' <<<"$record") failed re-verification"
+            body=$(jq -r '"<!-- rescan-signal: \(.definition) -->\n\nThe daily rescan re-verified this definition'"'"'s declared authenticity signal against its upstream origin and it did not hold (Req 3.10).\n\n| Field | Value |\n|---|---|\n| Definition | `\(.definition)` |\n| Declared class | `\(.class)` |\n| Pinned ref | `\(.ref)` |\n| Finding | \(.detail) |\n\nThis is evidence, not a decision: the pinned content is unchanged and every published image still verifies against its own signature. Someone decides what the mismatch means: an upstream that moved a tag or rotated a key, a compromise, or an origin that changed its publishing. Until then the rescan fails daily and this issue stays open."' <<<"$record")
+            echo "filing supply-chain issue for ${definition}"
+            gh issue create --title "$title" --label supply-chain --body "$body"
+          done < <(jq -c 'select(.class != "compat" and (.ok | not))' "$OUT/authenticity.jsonl")
+          exit "$rc"
+
       # Req 6.10 — an acceptance that lapses unnoticed is the failure mode this
       # whole lane exists to prevent, and Trivy is silent about it: a lapsed
       # entry simply stops suppressing. The daily cron is the right place to say
@@ -527,6 +564,7 @@ jobs:
             fi
             echo "- platform manifests scanned: ${{ steps.scan.outputs.scanned || 0 }} (failed: ${{ steps.scan.outputs.failed || 0 }})"
             echo "- new CVE issues filed: ${{ steps.report.outputs.count || 0 }}"
+            echo "- authenticity signals: ${{ steps.authenticity.outputs.verified || 0 }} verified, ${{ steps.authenticity.outputs.mismatched || 0 }} mismatched, ${{ steps.authenticity.outputs.lapsed || 0 }} lapsed compat review-by date(s)"
             echo "- issues closed on evidence: ${{ steps.lifecycle_apply.outputs.closed || 0 }} of ${{ steps.lifecycle.outputs.close || 0 }} decided, reopened: ${{ steps.lifecycle_apply.outputs.reopened || 0 }} of ${{ steps.lifecycle.outputs.reopen || 0 }}, kept open: ${{ steps.lifecycle.outputs.kept || 0 }}"
             echo "- catalogue status: ${{ steps.status_publish.outputs.url || 'not published' }}, ${{ steps.status.outputs.undecided || 0 }} undecided (${{ steps.status.outputs.over_ceiling || 0 }} over ceiling), ${{ steps.status.outputs.decided || 0 }} decided, ${{ steps.status.outputs.fixed || 0 }} fixed"
             echo
