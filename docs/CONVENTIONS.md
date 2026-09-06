@@ -184,8 +184,14 @@ shape is covered:
   postUpgradeTask that refuses still leaves Renovate free to open the PR
   carrying the manager's partial edit, and grafana 13.1.3 (#36) is what that
   costs when nothing checks.
-- Repackage bumps are **never automerged** — they swap a binary we did not
-  build. From-source patch/digest bumps automerge on green CI (Req 3.5).
+- What automerges, exactly (Req 3.5): patch and digest updates of a
+  compile-from-source upstream, behind green required checks. Repackage bumps
+  **never** (they swap a binary we did not build), tool pins never (their
+  checksum half is human, Req 7.5), the build layer never, minors and majors
+  of anything never. Every third-party release bump waits its minimum release
+  age first, three days, and a release Renovate cannot date waits rather than
+  passes (Req 3.7); only the docker datasource, the catalogue's own digests
+  and the hand-reviewed build layer, is exempt.
 - **Check how the upstream versions its security releases before trusting the
   default versioning.** Grafana ships out-of-band fixes as semver build
   metadata (`v13.0.1+security-01`), and semver *ignores build metadata for
@@ -275,7 +281,9 @@ rewrites the catalogue status issue with every finding's clocks (Req 6.46,
 - One logical change per PR; definition bumps and chart changes do not mix
   unless a bump forces the chart change (say so).
 - PR description references the requirement IDs it serves.
-- Green checks required; digest-only patch bumps automerge (Req 3.5); majors
-  wait behind Dependency Dashboard approval (Req 3.4).
+- Green checks required; patch and digest bumps of a from-source upstream
+  automerge on green required checks, nothing else does (Req 3.5); majors
+  wait behind Dependency Dashboard approval (Req 3.4); every third-party
+  release bump has aged three days before its PR exists (Req 3.7).
 - Review checklist: pins intact, conventions above, README deviations updated,
   test evidence for behavior claims.

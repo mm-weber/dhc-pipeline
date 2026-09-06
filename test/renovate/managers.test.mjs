@@ -279,6 +279,52 @@ check(
   }
 }
 
+// --- quarantine and automerge truth (Req 3.5, 3.7; task 11.1) ---------------
+// The age rule is the whole quarantine: one datasource-scoped packageRule.
+// Its shape is asserted here because a rule that silently loses a datasource
+// or gains matchUpdateTypes stops aging exactly the bumps it should. Whether a
+// datasource can be aged at all is a property of the pinned renovate/dist
+// (releaseTimestampSupport); the offline harness cannot observe network
+// timestamps, so that flag is the strongest local evidence (review 1.7).
+{
+  const ageRules = config.packageRules.filter((r) => r.minimumReleaseAge !== undefined);
+  check("quarantine: exactly one packageRule carries minimumReleaseAge", ageRules.length === 1, `${ageRules.length}`);
+  const age = ageRules[0] ?? {};
+  check('quarantine: minimumReleaseAge is "3 days"', age.minimumReleaseAge === "3 days", `${age.minimumReleaseAge}`);
+  check('quarantine: a release without a timestamp waits (timestamp-required)', age.minimumReleaseAgeBehaviour === "timestamp-required", `${age.minimumReleaseAgeBehaviour}`);
+  const aged = ["github-tags", "github-releases", "npm", "pypi", "helm", "go"];
+  check("quarantine: every third-party version datasource is aged", JSON.stringify([...(age.matchDatasources ?? [])].sort()) === JSON.stringify([...aged].sort()), `${age.matchDatasources}`);
+  check("quarantine: docker is exempt (catalogue digests and the build layer flow same-day)", !(age.matchDatasources ?? []).includes("docker"));
+  check("quarantine: no matchUpdateTypes, so minors and majors age too", age.matchUpdateTypes === undefined, `${age.matchUpdateTypes}`);
+  check("quarantine: the age rule is not the automerge rule", age.automerge === undefined);
+
+  let getDatasources;
+  try {
+    ({ getDatasources } = require("renovate/dist/modules/datasource/index.js"));
+  } catch (e) {
+    check("quarantine: renovate datasource module loadable", false, `${e.message}: path moved on a renovate major?`);
+  }
+  if (getDatasources) {
+    const ds = getDatasources();
+    for (const name of aged) {
+      const d = ds.get(name);
+      check(`quarantine: datasource ${name} exists in the pinned renovate`, !!d);
+      check(`quarantine: datasource ${name} reports release timestamps (releaseTimestampSupport)`, d?.releaseTimestampSupport === true, `${d?.releaseTimestampSupport}`);
+    }
+  }
+
+  // Req 3.5, the decided scope: automerge is patch and digest of the
+  // github-tags datasource, and nothing else in the config says automerge: true.
+  const automerging = config.packageRules.filter((r) => r.automerge === true);
+  check("automerge: exactly one rule enables it", automerging.length === 1, `${automerging.length}`);
+  const am = automerging[0] ?? {};
+  check("automerge: scoped to github-tags (compile-from-source upstreams)", JSON.stringify(am.matchDatasources) === JSON.stringify(["github-tags"]), `${am.matchDatasources}`);
+  check("automerge: patch and digest only", JSON.stringify([...(am.matchUpdateTypes ?? [])].sort()) === JSON.stringify(["digest", "patch"]), `${am.matchUpdateTypes}`);
+  check("automerge: the config's top level does not enable it", config.automerge !== true);
+  const repackage = config.packageRules.find((r) => JSON.stringify(r.matchDepNames) === JSON.stringify(["grafana/grafana"]) && r.automerge === false);
+  check("automerge: the repackage rule says automerge: false explicitly", !!repackage);
+}
+
 // --- scanner pins (Req 7.5, 7.6) --------------------------------------------
 // The gate's own trivy and grype are pinned by version + sha256. If this manager
 // silently stops matching, nothing bumps them, and a stale scanner reports fewer

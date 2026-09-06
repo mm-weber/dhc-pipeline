@@ -280,8 +280,37 @@
       separateMinorPatch: true,
     },
     {
-      // Req 3.5: digest-only and patch updates of an upstream source automerge,
-      // gated on CI success (Renovate withholds merge until checks pass).
+      // Req 3.7 (task 11.1; design decision 8): quarantine. A third-party
+      // release is not offered until it has aged three days, and a release
+      // Renovate cannot date waits rather than passes. Independence from an
+      // upstream compromise comes from three declared things: age (this
+      // rule), signal (the authenticity class each definition declares and
+      // the refresh verifies, Req 1.10, 3.8) and gates (the required checks).
+      // Age answers the fast-burn record: ua-parser-js lived four hours,
+      // chalk/debug two, the tj-actions and trivy tag repointings days; three
+      // days is npm's unpublish window, and renovate itself, the
+      // highest-privilege pin here, ages in the same ecosystem. The commit sha
+      // a from-source bump records is pinned at bump time, so a tag rewritten
+      // after the wait cannot move what was merged (review F2 c). Every
+      // third-party version datasource is listed; no matchUpdateTypes, so
+      // minors and majors age too. docker is deliberately absent: it carries
+      // the catalogue's own published digests, which must reach the charts
+      // the day they are published, and the hand-reviewed build layer.
+      matchDatasources: ["github-tags", "github-releases", "npm", "pypi", "helm", "go"],
+      minimumReleaseAge: "3 days",
+      minimumReleaseAgeBehaviour: "timestamp-required",
+    },
+    {
+      // Req 3.5, the decided scope stated: patch and digest updates of a
+      // compile-from-source upstream (the github-tags datasource: cert-manager,
+      // valkey, hardened-app) automerge behind green required checks. Nothing
+      // else does: a repackage bump (grafana, github-releases) swaps a binary
+      // we did not build and is reviewed even on a patch (its own rule below);
+      // a tool pin (github-releases) needs the human half of its checksum
+      // (Req 7.5); the build layer (docker) changes build behaviour (below);
+      // minors and majors of any upstream are reviewed. Renovate withholds
+      // the merge until the required checks pass, and the quarantine above
+      // has already aged the release.
       matchDatasources: ["github-tags"],
       matchUpdateTypes: ["patch", "digest"],
       automerge: true,
