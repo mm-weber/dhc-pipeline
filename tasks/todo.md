@@ -236,3 +236,29 @@ Every flagged sentence located by grep before editing, every edit anchored on
 the exact old text; lint-pins (reads CONVENTIONS.md), lint-accepted-risk
 (reads grafana.yaml), yamllint and actionlint on build.yml (nine notes, the
 same nine as main), the render drift check, all clean.
+
+## Task 11.1: quarantine and automerge truth in renovate.json5 (2026-09-06)
+
+Branch: `task-11.1-renovate-quarantine`. Goal: a third-party release is not
+offered until it has aged three days, a release without a timestamp waits
+rather than passes, and the automerge wording says exactly what automerges
+(Req 3.5, 3.7). Renovate reads only its own config, so the value is one line.
+
+- [x] 1. renovate.json5: one datasource-scoped rule (github-tags, github-releases, npm, pypi,
+      helm, go; no matchUpdateTypes) with `minimumReleaseAge: "3 days"` and
+      `minimumReleaseAgeBehaviour: "timestamp-required"`; docker deliberately absent; the comment
+      states independence from age, signal and gates, pin-at-bump-time, npm's unpublish window
+- [x] 2. The Req 3.5 rule's comment and CONVENTIONS' automerge rows state the decided scope: patch
+      and digest updates of a from-source upstream automerge behind green required checks;
+      repackage and tool bumps never
+- [x] 3. test/renovate/managers.test.mjs: the age rule's shape, `releaseTimestampSupport === true`
+      on every aged datasource against the pinned renovate/dist, docker exempt, automerge scope
+- [x] 4. `renovate-config-validator --strict` on the pinned version; the manual's Renovate section
+      gains the pending-release sentence and a troubleshooting row; tasks.md tick
+
+### Review
+
+Validated with the pinned renovate 41.173.1 (`renovate-config-validator --strict`),
+which knows `minimumReleaseAgeBehaviour` and its two values; every aged
+datasource reports `releaseTimestampSupport === true` in that dist. The new
+checks fail four ways against the previous config and pass against this one.

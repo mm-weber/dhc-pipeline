@@ -288,7 +288,7 @@
     - _Requirements: Req 6.8, Req 7.1_
 
 - [ ] 11. Production readiness, cluster C: upstream trust (review F2, F10, F8, F13 ii and iii, F12 d; spec amendment landed before any of these)
-  - [ ] 11.1 Quarantine and automerge truth in renovate.json5
+  - [x] 11.1 Quarantine and automerge truth in renovate.json5
     - One datasource-scoped packageRule (matchDatasources: github-tags, github-releases, npm, pypi, helm, go; no matchUpdateTypes, so minors age too) carrying `minimumReleaseAge: "3 days"` and `minimumReleaseAgeBehaviour: "timestamp-required"`, so a release without a timestamp is pending, never a silent pass; docker is deliberately absent: catalogue-published digests and the hand-reviewed build layer flow same-day (Req 3.7; independent review 1.2, 1.3, 1.7). Not the update-type-scoped Req 3.5 automerge rule
     - A comment states independence comes from age, signal and gates, the commit sha is pin-at-bump-time protecting against later tag rewrites (F2 c), and three days is npm's unpublish window
     - The Req 3.5 packageRule comment and CONVENTIONS' automerge rows state the decided scope truthfully: patch and digest updates of a from-source upstream automerge behind green required checks; repackage bumps never (Req 3.5)

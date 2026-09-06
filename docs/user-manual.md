@@ -502,8 +502,11 @@ green, files nothing, and its compile report shows every statement applied.
 ### Handling Renovate PRs
 
 All tracking is custom regex managers — every built-in manager is disabled, so
-nothing opens a surprise PR. Each PR shape comes with different automation and
-a different reviewer job:
+nothing opens a surprise PR. A third-party release younger than three days is
+not offered at all yet (Req 3.7): it waits on the Dependency Dashboard as
+pending, and a release Renovate cannot date waits too; only the catalogue's own
+published digests and the build layer flow the same day. Each PR shape comes
+with different automation and a different reviewer job:
 
 | PR shape | What automation did | Automerge | Your job |
 |----------|---------------------|-----------|----------|
@@ -1070,6 +1073,7 @@ automerge is limited to from-source patch/digest bumps on green CI.
 |---------|--------------|-----|
 | Gate summary: *"Statements exist but suppressed nothing here"* | Inert VEX — wrong product purl, or a statement scoped to a tag this build is not | Copy the product identifier printed in the same summary; check the compile report's drop reasons |
 | `validate` fails on a scanner/tool bump PR: *"no sha256 pinned for …"* | By design — the hash refresh is the human half of the pin | Complete the pin from upstream's checksums file ([Handling Renovate PRs](#handling-renovate-prs)) |
+| A release is out upstream but no Renovate PR appears for days | The three-day minimum release age (Req 3.7); the Dependency Dashboard lists it as pending | Wait; if it never ages, the datasource returned no timestamp, which is the point of `timestamp-required` |
 | `rescan` warns *"cosign attest … failed (attempt 1 of 3)"* | A Sigstore blip. Measured 2026-09-04: Rekor said the upload already existed (cosign's client had retried it), then answered 404 for that entry from a lagging replica | None. The write is tried again with fresh keys, up to three attempts; three failures fail the run and name the digest |
 | VEX product lint fails after a version bump: *"pins version X, which the definition does not publish"* | A tag-scoped statement outlived its release — Req 6.20 firing correctly | Re-decide for the new release: append a superseding statement (keep the old one), or retire the document |
 | Scan gate red on a PR that changed nothing related | An accepted-risk exception expired — the finding decayed back to un-triaged | Make the fresh decision; the rescan had been warning for 14 days |
