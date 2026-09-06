@@ -57,6 +57,7 @@ contents:
           - ca-certificates-bundle
         files:
           - url: https://dl.grafana.com/grafana/release/13.1.5/grafana_13.1.5_33098073184_linux_${target.arch}.tar.gz
+            # authenticity: cross-origin-checksum
             path: ${source.dir}/grafana.tar.gz
             spdx:
               name: grafana

@@ -41,6 +41,7 @@ contents:
           - ca-certificates-bundle
         files:
           - url: git+https://github.com/cert-manager/cert-manager.git#v1.21.1
+            # authenticity: signed-tag
             checksum: 24e33194fb39488eff2bbf10c6dc640f407cad44
             path: /go/src/github.com/cert-manager/cert-manager
             spdx:

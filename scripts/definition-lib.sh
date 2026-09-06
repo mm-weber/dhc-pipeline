@@ -42,3 +42,56 @@ definitions_publishing() { # root, image name
   done
   return 0 # a non-matching last iteration is not a failure
 }
+
+# --- authenticity (Req 1.10, 1.11, 3.8; task 11.2) ---------------------------
+# Each definition declares, beside its source url, how its upstream's
+# authenticity is established:
+#   # authenticity: signed-tag              an annotated tag GitHub verifies
+#   # authenticity: signed-commit           a lightweight tag on a commit GitHub verifies
+#   # authenticity: cross-origin-checksum   two origins state the same checksum
+# A refresh appends what it verified and when, so the diff carries the
+# evidence: "# authenticity: signed-tag, verified v1.21.2 (GitHub verification:
+# valid), 2026-09-06". The class is the first word after the colon.
+# shellcheck disable=SC2034  # read by lint-pins.sh, which sources this file
+AUTHENTICITY_CLASSES="signed-tag signed-commit cross-origin-checksum"
+
+authenticity_class() { # definition path -> the class (empty: no marker)
+  local line
+  line=$(grep -m1 -E '^[[:space:]]*#[[:space:]]*authenticity:' "$1" || true)
+  [ -n "$line" ] || return 0
+  line="${line#*authenticity:}"
+  line="${line#"${line%%[![:space:]]*}"}"
+  printf '%s' "${line%%[, ]*}"
+}
+
+authenticity_stamp() { # definition path, text -> the first marker line becomes "# authenticity: <text>"
+  awk -v text="$2" '
+    !done && /^[[:space:]]*#[[:space:]]*authenticity:/ {
+      match($0, /^[[:space:]]*/); print substr($0, 1, RLENGTH) "# authenticity: " text; done = 1; next
+    }
+    { print }' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
+}
+
+# github_verification <tag|commit> <owner/repo> <sha> -> "true valid" or
+# "false <reason>" on stdout; exit 1 when the statement could not be read.
+# GitHub's verification statement is the signal: it checks the signature
+# against the keys the signer registered. DHC_GITHUB_API overrides the API
+# base (the tests hand it a file:// tree); a token is used when one is set.
+github_verification() {
+  local kind="$1" repo="$2" sha="$3" api="${DHC_GITHUB_API:-https://api.github.com}" url body
+  local auth=() token="${GITHUB_TOKEN:-${RENOVATE_TOKEN:-}}"
+  case "$kind" in
+    tag) url="$api/repos/$repo/git/tags/$sha" ;;
+    commit) url="$api/repos/$repo/commits/$sha" ;;
+    *) return 2 ;;
+  esac
+  [ -n "$token" ] && auth=(-H "Authorization: Bearer ${token}")
+  body=$(curl -fsSL --max-time 60 -H 'Accept: application/vnd.github+json' "${auth[@]}" "$url") || return 1
+  # shellcheck disable=SC2016  # a JavaScript template literal, not shell expansion
+  printf '%s' "$body" | node -e '
+    let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      const o = JSON.parse(s);
+      const v = (o.verification ?? (o.commit && o.commit.verification)) || {};
+      console.log(`${v.verified === true} ${v.reason || "unknown"}`);
+    });'
+}

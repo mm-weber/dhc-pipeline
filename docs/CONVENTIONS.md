@@ -48,6 +48,16 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
 
 - Every base image reference carries `@sha256:<digest>`. No exceptions.
 - Every upstream source is `git+https://...#<ref>` plus a `checksum:` line.
+- Every definition declares, beside its source url, how its upstream's
+  authenticity is established: `# authenticity: signed-tag` (an annotated tag
+  GitHub verifies: cert-manager), `signed-commit` (a lightweight tag on a
+  commit GitHub verifies: valkey, hardened-app) or `cross-origin-checksum`
+  (two origins state the same per-architecture checksum: grafana). `none` or
+  a missing marker fails `lint-pins.sh` (Req 1.10, 1.11); a refresh verifies
+  the declared signal before writing any field of a bump and appends what it
+  verified and when to the marker (Req 3.8). dhi.io package repositories are
+  the `/main` lines only, `dhi.io/apk/<distro>/<release>/main` or
+  `dhi.io/deb/<distro>/main`; the others are entitlement-gated (Req 1.12).
 - Every upstream chart is pinned to an exact version in `chart/<name>/chart.yaml`
   (hand-pinned; nothing tracks chart versions yet). The **image** pins in each
   chart's values are Renovate-tracked with tag + digest (task 8.7), so a

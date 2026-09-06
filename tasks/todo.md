@@ -262,3 +262,37 @@ Validated with the pinned renovate 41.173.1 (`renovate-config-validator --strict
 which knows `minimumReleaseAgeBehaviour` and its two values; every aged
 datasource reports `releaseTimestampSupport === true` in that dist. The new
 checks fail four ways against the previous config and pass against this one.
+
+## Task 11.2: authenticity classes, declared and enforced at bump time (2026-09-06)
+
+Branch: `task-11.2-authenticity`. Goal: every definition says how its upstream's
+authenticity is established, lint refuses a definition that says nothing, and
+a refresh writes no field of a bump whose signal fails verification, naming
+the signal (Req 1.10 to 1.12, 3.8). Measured 2026-09-06: cert-manager v1.21.1
+is an annotated tag GitHub verifies, valkey 9.1.2 a lightweight tag on a
+verified commit, hardened-app v0.1.0 an unsigned commit (the owner's item).
+
+- [x] 1. definition-lib.sh: `authenticity_class`, `authenticity_stamp`, `github_verification`
+      (GitHub's verification statement for a tag object or a commit, JSON read with node, the
+      one runtime every environment here has)
+- [x] 2. lint-pins.sh (+ tests): a marker on every definition, `none` and a missing marker refused
+      by name, the class coherent with the archetype, dhi.io package repositories restricted to
+      apk/<distro>/<release>/main and deb/<distro>/main
+- [x] 3. refresh-definition.sh (+ tests): signed-tag needs an annotated tag whose object GitHub
+      verifies, signed-commit a verified commit; refusal before any write, naming the signal; the
+      dated verification stamp written beside the pin
+- [x] 4. refresh-grafana.sh (+ tests): the versions API's per-architecture sha256 must equal the
+      dl.grafana.com sidecar before anything is written, refusing on disagreement naming both;
+      the stamp
+- [x] 5. The seven definitions carry their marker; tasks.md tick; the owner's item restated
+
+### Review
+
+Rehearsed against the real upstreams on 2026-09-06 with the code that will run:
+cert-manager v1.21.1 (annotated tag, GitHub verification valid) and valkey 9.1.2
+(lightweight tag, verified commit) refreshed and stamped; hardened-app v0.1.0
+refused as unsigned with nothing written; grafana 13.1.5 rebuilt byte for byte
+from the live versions API and dl.grafana.com sidecars, plus the stamp. Four
+suites green (definition-lib, lint-pins, refresh-definition, refresh-grafana),
+shellcheck and yamllint clean, the Renovate manager fixtures still match the
+marked definitions.

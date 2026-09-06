@@ -5,9 +5,26 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 LINT="$HERE/lint-pins.sh"
 FAILURES=0
 
+# Every definition declares an authenticity class (Req 1.10, task 11.2). The
+# fixtures predate that and are line-anchored, so a fixture without a marker
+# gets one appended, fitting its archetype; the cases about the marker itself
+# write their own.
+mark_fixtures() {
+  local f cls
+  [ -e "$SB/.no-mark" ] && return 0
+  for f in "$SB"/image/*/image.yaml; do
+    [ -f "$f" ] || continue
+    grep -q '# authenticity:' "$f" && continue
+    if grep -qE 'url:[[:space:]]*["'\'']?git\+' "$f"; then cls=signed-tag
+    elif grep -qE 'url:[[:space:]]*["'\'']?https?://' "$f"; then cls=cross-origin-checksum
+    else cls=signed-tag; fi
+    printf '# authenticity: %s\n' "$cls" >> "$f"
+  done
+}
 run_case() { # name, expected_exit, expect_substring(optional) — sandbox in $SB
   local name="$1" expected="$2" substr="${3:-}"
   local out rc
+  mark_fixtures
   out=$("$LINT" "$SB" 2>&1); rc=$?
   if [ "$rc" -ne "$expected" ]; then
     echo "FAIL $name: exit $rc, expected $expected"; echo "$out" | sed 's/^/    /'
@@ -524,6 +541,67 @@ fresh
 printf '# syntax=dhi.io/build:2-alpine3.22@sha256:TODO\nbase: ghcr.io/mm-weber/dhc/base@%s\n' \
   "$DIGEST" > "$SB/image/app/image.yaml"
 run_case "placeholder frontend digest fails" 1 "syntax="
+
+# --- authenticity (Req 1.10 to 1.12; task 11.2) -----------------------------
+
+auth_def() { # source-url-line [marker-line] -> a definition around one source
+  cat <<EOF
+$SYNTAX
+vars:
+  VERSION: 1.0.0
+contents:
+  repositories:
+    - https://dhi.io/apk/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/main
+  builds:
+    - name: app
+      contents:
+        files:
+          - $1
+${2:-}
+            checksum: 73f83dfd5f84221455606ad7c3813d4f0ec1330d
+EOF
+}
+
+# 71: a git source under signed-tag or signed-commit passes; a tarball under cross-origin-checksum passes
+fresh; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # authenticity: signed-tag" > "$SB/image/app/image.yaml"
+run_case "authenticity: signed-tag on a git source passes" 0
+fresh; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # authenticity: signed-commit" > "$SB/image/app/image.yaml"
+run_case "authenticity: signed-commit on a git source passes" 0
+fresh; auth_def "url: https://dl.example.com/app_1.0.0_linux_amd64.tar.gz" "            # authenticity: cross-origin-checksum" > "$SB/image/app/image.yaml"
+run_case "authenticity: cross-origin-checksum on a tarball passes" 0
+
+# 72: a missing marker, none, and an unknown class fail naming the definition
+fresh; touch "$SB/.no-mark"; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # a comment that is not the marker" > "$SB/image/app/image.yaml"
+run_case "authenticity: a missing marker fails" 1 "no '# authenticity: <class>' marker"
+fresh; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # authenticity: none" > "$SB/image/app/image.yaml"
+run_case "authenticity: none fails (Req 1.11)" 1 "class 'none' declares that nothing verifies"
+fresh; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # authenticity: pinky-promise" > "$SB/image/app/image.yaml"
+run_case "authenticity: an unknown class fails" 1 "unknown authenticity class 'pinky-promise'"
+
+# 73: the class fits the archetype
+fresh; auth_def "url: https://dl.example.com/app_1.0.0_linux_amd64.tar.gz" "            # authenticity: signed-tag" > "$SB/image/app/image.yaml"
+run_case "authenticity: a git signal on a tarball fails" 1 "names a git signal, but the definition's source is a tarball"
+fresh; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # authenticity: cross-origin-checksum" > "$SB/image/app/image.yaml"
+run_case "authenticity: cross-origin-checksum on a git source fails" 1 "belongs to a repackaged tarball"
+
+# 74: the stamp a refresh writes after the class is still the class
+fresh; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # authenticity: signed-tag, verified v1.0.0 (GitHub verification: valid), 2026-09-06" > "$SB/image/app/image.yaml"
+run_case "authenticity: a dated verification stamp still reads as its class" 0
+
+# 75: dhi.io package repositories are the /main lines (Req 1.12)
+fresh; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # authenticity: signed-tag" > "$SB/image/app/image.yaml"
+sed -i 's|https://dhi.io/apk/alpine/v3.23/main|https://dhi.io/apk/alpine/v3.23/security|' "$SB/image/app/image.yaml"
+run_case "dhi.io: an entitlement-gated line fails, naming it" 1 "dhi.io package repository 'https://dhi.io/apk/alpine/v3.23/security' is not of shape"
+fresh; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # authenticity: signed-tag" > "$SB/image/app/image.yaml"
+sed -i 's|https://dhi.io/apk/alpine/v3.23/main|https://dhi.io/deb/debian/main|' "$SB/image/app/image.yaml"
+run_case "dhi.io: the deb main line passes" 0
+fresh; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # authenticity: signed-tag" > "$SB/image/app/image.yaml"
+sed -i 's|https://dhi.io/apk/alpine/v3.23/main|https://dhi.io/apk/alpine/main|' "$SB/image/app/image.yaml"
+run_case "dhi.io: an apk line without a release fails" 1 "Req 1.12"
+fresh; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # authenticity: signed-tag" > "$SB/image/app/image.yaml"
+sed -i 's|https://dl-cdn.alpinelinux.org/alpine/v3.23/main|https://dhi.io/keyring/x.rsa.pub|' "$SB/image/app/image.yaml"
+run_case "dhi.io: a non-repository dhi.io url outside repositories: is not judged" 1 "Req 1.12"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

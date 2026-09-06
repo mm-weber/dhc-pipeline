@@ -49,6 +49,7 @@ contents:
           - pkgconf
         files:
           - url: git+https://github.com/valkey-io/valkey.git#9.1.2
+            # authenticity: signed-commit
             checksum: 7f1dffedff6de73058b2c2a389422b6ecd56c8fb
             path: ${source.dir}/valkey
             spdx:

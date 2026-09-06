@@ -21,6 +21,7 @@ NEW_ARM64=$(printf '4%.0s' $(seq 64))
 # the version, resolved from the GitHub release assets and stubbed here.
 OLD_BUILD=11111111111
 NEW_BUILD=22222222222
+TODAY="2026-09-06"
 SYNTAX="# syntax=dhi.io/build:2-alpine3.23@sha256:c95f20fcbd7f1dcff9661aa7122d811378aebd436c0927ffb73feca655d3c7bc"
 
 # grafana-shaped definition at a given version/major.minor/major. Mirrors the
@@ -58,6 +59,7 @@ contents:
       contents:
         files:
           - url: https://dl.grafana.com/grafana/release/$1/grafana_${1}_${OLD_BUILD}_linux_\${target.arch}.tar.gz
+            # authenticity: cross-origin-checksum
             path: \${source.dir}/grafana.tar.gz
             spdx:
               name: grafana
@@ -95,6 +97,19 @@ refute() { # label file 'grep-pattern'
     echo "FAIL $1: did NOT expect '$3' in $2"; FAILURES=$((FAILURES+1)); else echo "ok   $1"; fi
 }
 
+api_fixture() { # dir ver id [amd64-sha arm64-sha] -> writes <ver> json, echoes base file:// url
+  # The real endpoint (grafana.com/api/grafana/versions/<ver>) returns a
+  # packages[] list whose per-arch urls carry the build id, the same
+  # grafana_<ver>_<id>_linux_amd64.tar.gz shape dl.grafana.com serves, and,
+  # beside each url, that package's sha256: the second origin of the checksum
+  # (Req 3.8, task 11.2). Nested objects (links) sit in the real shape too.
+  local dir="$1" ver="$2" id="$3" amd="${4:-$NEW_AMD64}" arm="${5:-$NEW_ARM64}"
+  mkdir -p "$dir"
+  printf '{"version":"%s","channels":{"stable":true},"packages":[{"arch":"amd64","os":"linux","url":"https://dl.grafana.com/grafana/release/%s/grafana_%s_%s_linux_amd64.tar.gz","sha256":"%s","links":[{"rel":"self","href":"/x"}]},{"arch":"arm64","os":"linux","url":"https://dl.grafana.com/grafana/release/%s/grafana_%s_%s_linux_arm64.tar.gz","sha256":"%s","links":[]}]}\n' \
+    "$ver" "$ver" "$ver" "$id" "$amd" "$ver" "$ver" "$id" "$arm" > "$dir/$ver"
+  echo "file://$dir"
+}
+
 # run the refresh on a sandbox dir after simulating a Renovate url bump to $newver
 run_bump() { # old_ver new_ver
   SB=$(mktemp -d); mkdir -p "$SB/image/grafana"
@@ -103,7 +118,10 @@ run_bump() { # old_ver new_ver
   # id in the filename still belongs to the old release, and every derived field
   # still holds its old value, when the postUpgradeTask runs.
   sed -i -E "s@(/grafana/release/)[^/]+/@\1${2}/@" "$SB/image/grafana/image.yaml"
-  REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" \
+  # The versions API is the second origin of the checksum (Req 3.8): it
+  # states the same two sha256s the (stubbed) sidecars do.
+  API=$(api_fixture "$SB/api" "$2" "$NEW_BUILD")
+  REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" REFRESH_GRAFANA_API_URL="$API" REFRESH_TODAY="$TODAY" \
   REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" \
     "$SCRIPT" "$SB/image/grafana"
   F="$SB/image/grafana/image.yaml"
@@ -202,7 +220,8 @@ F="$SB/image/grafana/image.yaml"
 # shellcheck disable=SC2016  # ${target.arch} is a DHI template token, not a shell var
 sed -i -E 's@url: https://dl\.grafana\.com/[^[:space:]]*@url: https://dl.grafana.com/oss/release/grafana-13.0.4.linux-${target.arch}.tar.gz@' "$F"
 assert "migrate: fixture starts on the alias" "$F" "/oss/release/grafana-13.0.4.linux-"
-REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" \
+API=$(api_fixture "$SB/api" 13.0.4 "$NEW_BUILD")
+REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" REFRESH_GRAFANA_API_URL="$API" \
 REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" \
   "$SCRIPT" "$SB/image/grafana"
 assert "migrate: now on the per-build url" "$F" "url: https://dl.grafana.com/grafana/release/13.0.4/grafana_13.0.4_${NEW_BUILD}_linux_"
@@ -253,17 +272,6 @@ gh_fixture() { # dir version buildid|"" -> writes releases/tags/v<ver>, echoes b
   echo "file://$dir/tags"
 }
 
-api_fixture() { # dir ver id -> writes <ver> json, echoes base file:// url
-  # The real endpoint (grafana.com/api/grafana/versions/<ver>) returns a
-  # packages[] list whose per-arch urls carry the build id — the same
-  # grafana_<ver>_<id>_linux_amd64.tar.gz shape dl.grafana.com serves.
-  local dir="$1" ver="$2" id="$3"
-  mkdir -p "$dir"
-  printf '{"version":"%s","channels":{"stable":true},"packages":[{"arch":"amd64","os":"linux","url":"https://dl.grafana.com/grafana/release/%s/grafana_%s_%s_linux_amd64.tar.gz"}]}\n' \
-    "$ver" "$ver" "$ver" "$id" > "$dir/$ver"
-  echo "file://$dir"
-}
-
 # resolve a bump with all sources stubbed; no REFRESH_GRAFANA_BUILD_ID, so the
 # resolution path under test actually runs. Echoes nothing; sets F and RC.
 # The api url is ALWAYS stubbed (empty fixture by default): grafana.com is on
@@ -275,7 +283,7 @@ run_resolve() { # old_ver new_ver apt_url gh_url [api_url]
   sed -i -E "s@(/grafana/release/)[^/]+/@\1${2}/@" "$SB/image/grafana/image.yaml"
   RESOLVE_ERR="$SB/err.txt"
   REFRESH_GRAFANA_APT_URL="$3" REFRESH_GRAFANA_GH_URL="$4" \
-  REFRESH_GRAFANA_API_URL="${5:-file://$FX/api-none}" \
+  REFRESH_GRAFANA_API_URL="${5:-file://$FX/api-none}" REFRESH_TODAY="$TODAY" \
   REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" \
     "$SCRIPT" "$SB/image/grafana" >/dev/null 2>"$RESOLVE_ERR"
   RC=$?
@@ -289,7 +297,7 @@ mkdir -p "$FX/api-none"
 # release whose GitHub entry carries no assets at all.
 D=$(mktemp -d); APT=$(apt_fixture "$D" 13.1.2:30777000111)
 GH=$(gh_fixture "$FX/gh-empty" 13.1.2 "")
-run_resolve 13.1.1 13.1.2 "$APT" "$GH"
+run_resolve 13.1.1 13.1.2 "$APT" "$GH" "$(api_fixture "$FX/api-7" 13.1.2 30777000111)"
 assert "resolve: apt covers an asset-less GitHub release" "$F" \
   "url: https://dl.grafana.com/grafana/release/13.1.2/grafana_13.1.2_30777000111_linux_"
 
@@ -297,7 +305,7 @@ assert "resolve: apt covers an asset-less GitHub release" "$F" \
 # published hours before the apt index caught up.
 D=$(mktemp -d); APT=$(apt_fixture "$D" 13.1.1:29761037902)
 GH=$(gh_fixture "$FX/gh-new" 13.0.6 30999888777)
-run_resolve 13.0.5 13.0.6 "$APT" "$GH"
+run_resolve 13.0.5 13.0.6 "$APT" "$GH" "$(api_fixture "$FX/api-8" 13.0.6 30999888777)"
 assert "resolve: github covers a version apt has not indexed" "$F" \
   "url: https://dl.grafana.com/grafana/release/13.0.6/grafana_13.0.6_30999888777_linux_"
 
@@ -317,7 +325,7 @@ assert "resolve: the failure names both sources" "$RESOLVE_ERR" "apt.grafana.com
 # 10: both sources agree — the ordinary case, and the cross-check must pass it.
 D=$(mktemp -d); APT=$(apt_fixture "$D" 13.1.1:29761037902)
 GH=$(gh_fixture "$FX/gh-agree" 13.1.1 29761037902)
-run_resolve 13.0.4 13.1.1 "$APT" "$GH"
+run_resolve 13.0.4 13.1.1 "$APT" "$GH" "$(api_fixture "$FX/api-10" 13.1.1 29761037902)"
 assert "resolve: agreeing sources resolve" "$F" \
   "url: https://dl.grafana.com/grafana/release/13.1.1/grafana_13.1.1_29761037902_linux_"
 
@@ -353,7 +361,7 @@ fi
 # read Filename:, which keeps the upstream version verbatim.
 D=$(mktemp -d); APT=$(apt_fixture "$D" 13.0.4+security-01:31222333444)
 GH=$(gh_fixture "$FX/gh-sec" 13.0.4+security-01 "")
-run_resolve 13.0.4 13.0.4+security-01 "$APT" "$GH"
+run_resolve 13.0.4 13.0.4+security-01 "$APT" "$GH" "$(api_fixture "$FX/api-13" 13.0.4+security-01 31222333444)"
 assert "resolve: security build resolves from the filename" "$F" \
   "url: https://dl.grafana.com/grafana/release/13.0.4+security-01/grafana_13.0.4+security-01_31222333444_linux_"
 
@@ -477,6 +485,42 @@ if "$SCRIPT" "$(mktemp -d)/nope" >/dev/null 2>&1; then
 else
   echo "ok   guard: missing image.yaml exits non-zero"
 fi
+
+# --- Req 3.8 (task 11.2): the two origins of the checksum must agree --------
+
+# 17: the stamp beside the pin names both origins, both architectures, and the day
+run_bump 13.0.4 13.1.1
+assert "stamp: dated evidence beside the pin" "$F" "# authenticity: cross-origin-checksum, verified 13.1.1 (grafana.com versions API and dl.grafana.com sidecars agree, amd64 ${NEW_AMD64:0:12}…, arm64 ${NEW_ARM64:0:12}…), $TODAY"
+
+# 18: the API states another sha256 for one architecture: refused naming both, nothing written
+SB=$(mktemp -d); mkdir -p "$SB/image/grafana"
+grafana_def 13.0.4 13.0 13 > "$SB/image/grafana/image.yaml"
+sed -i -E "s@(/grafana/release/)[^/]+/@\113.1.1/@" "$SB/image/grafana/image.yaml"
+OTHER=$(printf '9%.0s' $(seq 64))
+API=$(api_fixture "$SB/api" 13.1.1 "$NEW_BUILD" "$NEW_AMD64" "$OTHER")
+out=$(REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" REFRESH_GRAFANA_API_URL="$API" REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" "$SCRIPT" "$SB/image/grafana" 2>&1); rc=$?
+if [ "$rc" -ne 0 ] && grep -q "for the arm64 tarball of v13.1.1 the grafana.com versions API states ${OTHER:0:12}… while the dl.grafana.com sidecar states ${NEW_ARM64:0:12}…" <<<"$out"; then
+  echo "ok   disagreeing origins: refused, naming both"
+else
+  echo "FAIL disagreeing origins: rc=$rc"; echo "$out" | sed 's/^/    /'; FAILURES=$((FAILURES+1))
+fi
+assert "disagreeing origins: nothing written" "$SB/image/grafana/image.yaml" "VERSION: 13.0.4"
+refute "disagreeing origins: no new checksum"  "$SB/image/grafana/image.yaml" "$NEW_AMD64"
+
+# 19: the API has no entry for the version: no second origin, refused
+SB=$(mktemp -d); mkdir -p "$SB/image/grafana" "$SB/api-empty"
+grafana_def 13.0.4 13.0 13 > "$SB/image/grafana/image.yaml"
+sed -i -E "s@(/grafana/release/)[^/]+/@\113.1.1/@" "$SB/image/grafana/image.yaml"
+out=$(REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" REFRESH_GRAFANA_API_URL="file://$SB/api-empty" REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" "$SCRIPT" "$SB/image/grafana" 2>&1); rc=$?
+[ "$rc" -ne 0 ] && grep -q "states no sha256 for the amd64 tarball" <<<"$out" && echo "ok   no API entry: no second origin, refused" || { echo "FAIL no API entry: rc=$rc"; echo "$out" | sed 's/^/    /'; FAILURES=$((FAILURES+1)); }
+
+# 20: a definition without the marker, or with a git class, is refused
+SB=$(mktemp -d); mkdir -p "$SB/image/grafana"
+grafana_def 13.0.4 13.0 13 | sed 's/# authenticity: cross-origin-checksum/# authenticity: signed-tag/' > "$SB/image/grafana/image.yaml"
+sed -i -E "s@(/grafana/release/)[^/]+/@\113.1.1/@" "$SB/image/grafana/image.yaml"
+API=$(api_fixture "$SB/api" 13.1.1 "$NEW_BUILD")
+out=$(REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" REFRESH_GRAFANA_API_URL="$API" REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" "$SCRIPT" "$SB/image/grafana" 2>&1); rc=$?
+[ "$rc" -ne 0 ] && grep -q "class 'signed-tag' is not cross-origin-checksum" <<<"$out" && echo "ok   a git class on the tarball archetype is refused" || { echo "FAIL wrong class: rc=$rc"; echo "$out" | sed 's/^/    /'; FAILURES=$((FAILURES+1)); }
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all refresh-grafana tests passed"
