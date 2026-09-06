@@ -39,18 +39,26 @@ the claim that there was never any risk here to treat.
 > attested to the image, no expiry, and a service to whoever runs it.
 >
 > **`accepted-risk/` answers "what are we doing about it?"** — a decision about our
-> exposure. Internal, **never attested** (Req 6.8), and it **expires**.
+> exposure. Published in the same attested document as **`affected`**, never as
+> `not_affected` or `fixed` (Req 6.8), it **suppresses nothing**, and it **expires**.
 
-Publishing the first is useful. Publishing the second would tell every downstream
-consumer that a vulnerability does not apply to them because *we* decided to live
-with it. Transfer gets no separate file: while waiting on upstream we are still
-carrying the risk, so it is an acceptance with an external owner.
+Publishing the first excuses a finding. Publishing the second as `not_affected`
+would tell every downstream consumer that a vulnerability does not apply to them
+because *we* decided to live with it; published as `affected`, it tells them the
+truth: it applies, here is the treatment, the upstream issue, the binaries and
+the date it expires (Req 6.38). Transfer gets no separate file: while waiting on
+upstream we are still carrying the risk, so it is an acceptance with an external
+owner. Issues and clocks run over the **supported set**, the digests each
+definition's current `tags:` reference; a superseded digest keeps its daily
+scans and its attested document and holds no issues.
 
 ### Why the expiry is load-bearing
 
 An acceptance without one is indistinguishable from an unfixed bug. Trivy stops
-honouring an entry the moment `expired_at` passes — silently, with nothing logged
-— so the finding reappears, the gate goes red, and somebody has to decide again.
+honouring an entry the moment `expired_at` passes, silently, with nothing logged,
+so the finding reappears, the gate goes red, the compiled document carries it
+as `under_investigation` naming the lapse with its original first-seen time
+(Req 6.41), and somebody has to decide again.
 **Risk acceptance decays back to un-triaged on its own.** That is why the ceiling
 is the policy file's largest ceiling from `decided_at` (`scripts/lint-accepted-risk.sh`, reading `catalogue-policy.yaml` `triage.ceilings`: 90 days for HIGH, 30 for CRITICAL, 14 for anything CISA lists as exploited, enforced per finding by `scripts/check-exceptions.sh` in the gate and the rescan) and why the daily rescan reports
 anything within the policy's warning window of lapsing (Req 6.10).
@@ -115,30 +123,59 @@ Four ways, in order of strength — the gate's error message names all four:
 Reaching for the last one before ruling out the first two is the failure mode
 this lane is designed to make visible, which is what `blocked:` is for.
 
-## The daily rescan (Req 6.2, 6.3)
+## The daily rescan (Req 6.2, 6.3, 6.42 to 6.57)
 
 The scan gate only sees a CVE at PR time; new advisories land against already-
 published images every day. `.github/workflows/rescan.yml` runs on a daily cron
 (and on demand) and closes that gap:
 
-1. **Trivy** re-scans every published `ghcr.io/mm-weber/dhc` image for
-   `HIGH,CRITICAL`, honouring `triage/vex/` and `triage/accepted-risk/` — so
-   already-triaged CVEs stay quiet. Without the second one the cron would refile
-   an accepted finding every day and drown the acceptance in noise; the expiry,
-   not the silence, is what ends it.
-2. Findings **not already tracked** by an open `cve` issue are enriched with
-   **EPSS** (FIRST.org) and **CISA KEV** status.
-3. One **GitHub issue per CVE** is filed (Req 6.3) — severity, EPSS, KEV, and
-   affected images — carrying a `<!-- rescan-cve: CVE-… -->` marker so the next
-   run recognises it and doesn't duplicate.
-4. A **Grype** second opinion runs on each CRITICAL being filed (Req 6.6).
+1. **Enumerate and scan.** Every tag-referenced digest of every catalogue
+   repository, every platform manifest by its own digest (Req 2.22), with the
+   aperture the policy file declares, honouring `triage/vex/` and
+   `triage/accepted-risk/` and keeping what they suppressed in the report
+   (`--show-suppressed`, Req 6.55). Without the ignorefile the cron would
+   refile an accepted finding every day; the expiry, not the silence, ends it.
+2. **Attest and re-attest.** Today's report replaces yesterday's on each
+   platform manifest (`cosign attest --type vuln --replace`, Req 6.42). The
+   document is compiled again from source, exceptions, today's reports, the
+   previously attested document and the open-issue map (Req 6.37); when its
+   statement set differs, or a digest carries a number of OpenVEX attestations
+   other than one, it is re-attested with `--replace` on the digest and every
+   platform manifest (Req 6.43, 6.44; ADR 0004). `scripts/reattest.sh`.
+3. **The issue lifecycle over the supported set** (Req 6.52 to 6.57;
+   `cmd/rescan-lifecycle`). An open `cve` issue closes when its finding is
+   absent, reported or suppressed, from every supported digest's report, with
+   the label the attested CycloneDX SBOMs justify (`resolved:fixed` only when
+   every occurrence of the recorded package moved to a fixed version,
+   `resolved:removed`, else `resolved:absent` naming the scanner and database
+   versions), or when it is covered wherever listed (`resolved:accepted`,
+   `resolved:not_affected`, `resolved:fixed`, the weakest grade first, naming
+   the covering artifact). A closed issue reopens, history intact, when its
+   finding is reported again on a supported digest. A digest with a platform
+   manifest unscanned, or scanned without its VEX, blocks every close. The
+   comment states evidence, never a decision (Req 6.54).
+4. **New issues.** Findings not tracked by an open `cve` issue are enriched
+   with **EPSS** (FIRST.org) and **CISA KEV** status and filed one **issue per
+   CVE** (Req 6.3; `cmd/rescan-report`), carrying a `<!-- rescan-cve: CVE-… -->`
+   marker, the durable identity the lifecycle reads back. A **Grype** second
+   opinion runs on each CRITICAL being filed (Req 6.6).
+5. **The clocks.** For every finding on a supported digest, first seen and
+   decided from the attested statements and fixed as the first day absent from
+   every supported digest of its repository, carried forward from the
+   previously published data (Req 6.46; `cmd/rescan-status`), rewritten into
+   the one "Catalogue status" issue and uploaded as the `catalogue-status`
+   artifact (Req 6.47).
+6. **Invariants** (Req 2.21, 2.24, 6.44, 6.45, 6.51): visibility, the admission
+   proof, exactly one OpenVEX attestation everywhere, exceptions against
+   current severity and KEV. Any failure fails the run.
 
-The join / dedup / enrichment / templating is a small, unit-tested Go tool,
-**`triage/rescan/`** (`cmd/rescan-report`): a pure `BuildIssues(inputs) → issues`
-so the correctness of an unattended, issue-opening cron is covered by tests, not
-trust. The workflow is the I/O around it (scan, fetch feeds, list/create issues).
-Scan and feed failures soft-fail (skip + warn) so a transient outage never turns
-the cron permanently red.
+The decisions are pure, unit-tested Go in **`triage/rescan/`**: `BuildIssues`,
+`Lifecycle`, `BuildStatus`, data in and data out, so the correctness of an
+unattended cron that opens, closes and reopens issues is covered by tests, not
+trust. The workflow is the I/O around them (scan, fetch feeds, verify
+attestations, list and edit issues). Scan and feed failures soft-fail (skip +
+warn) so a transient outage never turns the cron permanently red; a Sigstore
+blip on a write is tried again, three failures are a failure.
 
 The cron also **reports every accepted-risk exception that has expired or expires
 within the policy's warning window** (Req 6.10; 14 days as declared), reusing `scripts/lint-accepted-risk.sh` so there is
@@ -149,7 +186,8 @@ change.
 
 Each filed issue is a triage decision waiting to happen — resolved exactly as a
 red gate is: avoid, fix, an OpenVEX statement under `vex/` (+ a `LOG.md` entry),
-or a time-boxed entry in `accepted-risk/`.
+or a time-boxed entry in `accepted-risk/`. Nobody closes it by hand: the next
+rescan closes it on the evidence the decision produced, and names that evidence.
 
 ## `LOG.md`
 
@@ -253,8 +291,10 @@ vexctl create \
   here, not inferred from documentation.
 
 Statements are attached to the images they name as `openvex` attestations by
-`build.yml` on the main branch (Req 6.4), so a decision travels with the
-artifact and a consumer can verify it against the digest they actually run.
+`build.yml` on the main branch (Req 6.4) and re-attested by the rescan when the
+compiled document changes, replacing, so a digest carries exactly one at all
+times (Req 6.43, 6.44): a decision travels with the artifact and a consumer can
+verify it against the digest they actually run with one `verify-attestation`.
 Matching is anchored on the purl name, so a statement about `grafana` is never
 attached to some future `grafana-agent`. A PR touching `vex/` builds and
 rescans exactly the images its statements name, which is how a statement is

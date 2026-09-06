@@ -439,8 +439,10 @@ jobs:
           #                 execute here. Evidence-backed, published with the
           #                 image, no expiry.
           #   --ignorefile  risk decisions — it is real and we ship anyway, for a
-          #                 bounded time. Internal, never attested (Req 6.8), and
-          #                 it expires (Req 6.9).
+          #                 bounded time. Published as `affected` in the compiled
+          #                 document, never as not_affected or fixed (Req 6.8,
+          #                 6.38); suppresses nothing beyond this scan, and it
+          #                 expires (Req 6.9).
           #
           # They compose in one scan and the report's Source field tells them
           # apart, which is what lets the summary below keep them apart too.

@@ -248,21 +248,24 @@ Per-chart notes worth knowing before you deploy:
 
 ### What VEX means for you
 
-The catalogue splits vulnerability handling into two lanes, and only one of
-them is published:
+The catalogue splits vulnerability handling into two lanes, and both are
+published in the one OpenVEX document attested to every digest, under
+different statuses (the third verb, `affected`, arrived with task 10.2):
 
 | Lane              | Claim                                                                                   | You see it as                                          | Expires? |
 |-------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------|----------|
-| **VEX**           | "This CVE does not apply here" (`not_affected`) or "this release carries the remedy" (`fixed`) — a claim about the artifact, evidence-backed | An `openvex` attestation on the image, consumable by your scanner | No |
-| **Accepted risk** | "It applies, and the maintainer ships anyway for a bounded time" — a decision about *their* exposure | You don't. It is internal and never attested (Req 6.8) | Yes, ≤ 90 days |
+| **VEX**           | "This CVE does not apply here" (`not_affected`) or "this release carries the remedy" (`fixed`): a claim about the artifact, evidence-backed | A `not_affected` or `fixed` statement in the `openvex` attestation; your scanner suppresses the finding | No |
+| **Accepted risk** | "It applies, and the maintainer ships anyway for a bounded time": a decision about *their* exposure | An `affected` statement in the same attestation, its action statement naming the treatment, the upstream issue, the binaries and the expiry (Req 6.38); your scanner suppresses nothing | Yes, within the policy ceiling for its tier: 30 days for a CRITICAL, 90 for a HIGH, 14 when CISA lists it as exploited |
+| **Not yet decided** | "Reported, no decision recorded" | An `under_investigation` statement with its first-seen time (Req 2.12), and its age against the ceiling in the catalogue status issue | Until decided |
 
 The consequence for a consumer: a HIGH finding your scanner reports against a
-catalogue image, which the VEX attestation does not excuse, may still be a
-*known and tracked* risk on the maintainer side — check the repo's open
-`cve`-labeled issues and `triage/accepted-risk/`. What you will never get is a
-published claim that a vulnerability doesn't apply merely because someone
-decided to live with it: writing a risk acceptance as VEX is prohibited by
-requirement, precisely because every downstream consumer would inherit it.
+catalogue image, which the VEX attestation does not excuse, is either
+`affected` (known, tracked, with an expiry you can read) or
+`under_investigation` (its clock is running in the status issue). What you
+will never get is a published claim that a vulnerability doesn't apply merely
+because someone decided to live with it: an acceptance is published as
+`affected` and never as `not_affected` or `fixed` (Req 6.8), precisely because
+every downstream consumer would inherit the excuse.
 
 ## Part II: The pipeline
 
@@ -275,7 +278,7 @@ requirement, precisely because every downstream consumer would inherit it.
 | `chart.yml`    | every PR + main            | Render *every* chart, evaluate with the Kyverno policies; `ct lint` on owned charts |
 | `e2e.yml`      | PR + dispatch              | Per affected component: kind cluster, install the hardened chart, run the Ginkgo suite |
 | `renovate.yml` | cron every 4h + dispatch   | Self-hosted Renovate over the custom managers; postUpgradeTasks recompute derived fields |
-| `rescan.yml`   | daily 06:17 UTC + dispatch | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set; the clocks over the supported set to the catalogue status issue; expiry warnings |
+| `rescan.yml`   | daily 06:17 UTC + dispatch | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set, close them on evidence with graded labels and reopen them on recurrence; the clocks over the supported set to the catalogue status issue; expiry warnings |
 
 Every GitHub Action is pinned to a full commit SHA, and every third-party
 executable a workflow installs is exact-version-pinned and checksum-verified
@@ -490,7 +493,7 @@ branch protection.
 |---------------------------|--------------------------|---------------------------------------------------|-------------|
 | Renovate (`renovate.yml`) | every 4h (Req 3.1)       | Bump PRs; the Dependency Dashboard issue          | Actions tab · issue #5 |
 | Rebuild (`build.yml`)     | daily 04:47 UTC (Req 2.14)| Fresh digests for every definition whose package set changed; a discard line for the rest | Actions tab · the run summary per image |
-| Rescan (`rescan.yml`)     | daily 06:17 UTC (Req 6.2, 2.22)| Enumeration of every catalogue tag; the visibility invariant and the admission proof (Req 2.21, 2.24); every platform manifest scanned by digest; new-CVE issues for the supported set; expiry warnings; VEX compile report | Actions tab · `cve`-labeled issues |
+| Rescan (`rescan.yml`)     | daily 06:17 UTC (Req 6.2, 2.22)| Enumeration of every catalogue tag; the visibility invariant and the admission proof (Req 2.21, 2.24); every platform manifest scanned by digest; today's reports attested and the OpenVEX document re-attested on change, replacing (Req 6.42, 6.43); the cve issue lifecycle over the supported set, closing on evidence with graded labels and reopening on recurrence (Req 6.52 to 6.57); the clocks to the catalogue status issue (Req 6.46, 6.47); expiry warnings; VEX compile report | Actions tab · `cve`-labeled issues · the "Catalogue status" issue |
 
 Both are dispatchable on demand (Renovate with dry-run and debug knobs). A
 healthy quiet day is: Renovate runs green and opens nothing; rescan runs
@@ -603,15 +606,19 @@ HIGH/CRITICAL survives suppression — the gate is red
        │
        └─ "it applies; we ship anyway" ─► ACCEPT / TRANSFER    [risk lane]
              triage/accepted-risk/<image>.yaml + LOG.md
-             internal · never attested · expires within its tier's ceiling
-             └─ expiry lapses ──► finding re-reds the gate  ↻
+             published as `affected` · suppresses nothing · expires within its tier's ceiling
+             └─ expiry lapses ──► finding re-reds the gate, published as
+                                  under_investigation naming the lapse  ↻
 ```
 
 The two lanes answer different questions. **VEX** answers "does this apply?"
 — a claim about the artifact, published forever. **Accepted risk** answers
-"what are we doing about it?" — a decision about exposure, internal, and it
+"what are we doing about it?", a decision about exposure, published as
+`affected` with its expiry (never as `not_affected`, Req 6.8), and it
 *decays back to un-triaged on its own*: Trivy silently stops honouring a
-lapsed entry, the finding reappears, and someone must decide again.
+lapsed entry, the finding reappears as `under_investigation` naming the lapse
+(Req 6.41), and someone must decide again. The decision clock starts at the
+entry's `decided_at`; the ceilings live in `catalogue-policy.yaml`.
 
 Ground rules that hold across all four:
 
@@ -1053,7 +1060,7 @@ automerge is limited to from-source patch/digest bumps on green CI.
 | **Req 3** — Upstream tracking | renovate.yml (4h cron) · renovate.json5 managers · refresh tasks · manager fixtures · Dependency Dashboard |
 | **Req 4** — Chart adaptation | `chart/*/` overlays + READMEs · chart.yml render + Kyverno gate · compat decision protocol |
 | **Req 5** — Integration tests | `test/` Ginkgo suite · e2e.yml kind matrix · upgrade path on both bump shapes · diagnostics artifacts |
-| **Req 6** — CVE triage | Scan gate + rescan cron · `triage/` two-lane model · compile-vex + both lints · govulncheck evidence · issue filing tool |
+| **Req 6** — CVE triage | Scan gate + rescan cron · `triage/` two lanes, three published verbs · compile-vex (affected from exceptions, carry-forward) + both lints · govulncheck evidence · re-attestation replacing, exactly one OpenVEX per digest · issue filing, closing and reopening on evidence · the catalogue status issue |
 | **Req 7** — Conventions & enforcement | `docs/CONVENTIONS.md` · validate.yml battery · PR template · pinned + verified tool installs with managers over the pins |
 | **Req 8** — Operating environment | All heavy operations on Actions; devcontainer delegates (operating convention) |
 
@@ -1091,13 +1098,26 @@ automerge is limited to from-source patch/digest bumps on green CI.
   HIGH/CRITICAL not excused by VEX or an unexpired exception (Req 6.1).
 - **VEX / OpenVEX** — machine-readable statements about whether a
   vulnerability applies to a product. Here: hand-authored source in
-  `triage/vex/`, compiled per build, attested to images.
+  `triage/vex/` (`not_affected`, `fixed`), compiled per digest together with
+  `affected` from unexpired exceptions and `under_investigation` from the
+  attested scan report, attested to images, exactly one attestation per
+  digest, re-attested by the rescan when the decisions change.
 - **Product / subcomponent purl** — the two halves of a VEX match: the image
   (`pkg:oci/…`, matched via RepoDigest) and the vulnerable package inside it
   (`pkg:golang/…`, versionless).
 - **Accepted-risk exception** — a time-boxed, owner-carrying, per-image +
   per-binary entry recording that a real finding ships anyway (`accept`) or
-  waits on upstream (`transfer`). Internal; expires within its tier's ceiling.
+  waits on upstream (`transfer`). Published as `affected`, never as
+  `not_affected`; expires within its tier's ceiling from `decided_at`.
+- **Supported set**: the digests each definition's current `tags:`
+  reference. Issues and clocks run over it; a superseded digest keeps its
+  daily scans and attestations and holds no issues.
+- **Catalogue status issue**: the one issue the rescan rewrites daily with
+  every finding's clocks (first seen, decided, fixed) and a fenced JSON block,
+  the same data as the `catalogue-status` artifact.
+- **Resolved labels**: `resolved:fixed`, `removed`, `not_affected`,
+  `accepted`, `absent`: the evidence grade the rescan closed a cve issue on,
+  declared in `catalogue-policy.yaml`.
 - **Treatment** — one of the four responses to real risk: avoid, mitigate
   (fix), transfer, accept. `not_affected` is deliberately not a treatment —
   it claims there was never a risk to treat.

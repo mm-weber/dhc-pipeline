@@ -2,8 +2,10 @@
 #
 # A native Trivy ignorefile, handed to the same scan as --ignorefile. It answers
 # "what are we doing about it?", never "does this apply?" — that second question
-# is VEX, and it lives in triage/vex/ and is published with the image. Nothing
-# here is ever attested (Req 6.8).
+# is VEX, and it lives in triage/vex/. Every unexpired entry here is published in
+# the image's OpenVEX document as an `affected` statement, never as not_affected
+# or fixed (Req 6.8, 6.38); it suppresses nothing beyond this scan, and it
+# expires.
 #
 # The filename is the image scope; `paths:` is the binary scope. Both matter:
 # one file per image stops grafana covering cert-manager, and one entry per
