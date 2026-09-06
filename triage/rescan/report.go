@@ -16,7 +16,11 @@ import (
 type TrivyReport struct {
 	CreatedAt    string        `json:"CreatedAt"`
 	ArtifactName string        `json:"ArtifactName"`
+	Trivy        TrivyVersion  `json:"Trivy"` // the scanner's own version block (Req 6.55)
 	Results      []TrivyResult `json:"Results"`
+}
+type TrivyVersion struct {
+	Version string `json:"Version"`
 }
 type TrivyResult struct {
 	Target          string      `json:"Target"`

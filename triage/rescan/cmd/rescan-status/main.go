@@ -21,34 +21,33 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mm-weber/dhc-pipeline/triage/rescan"
+	"github.com/mm-weber/dhc-pipeline/triage/rescan/cmd/internal/inputs"
 )
 
 func main() {
-	enumeration := flag.String("enumeration", "", "the rescan's enumeration.tsv — required")
-	reattestDir := flag.String("reattest", "", "re-attest work directory (rescan-out/reattest) — required")
-	reportsDir := flag.String("reports", "", "supported-set scan reports (rescan-out/trivy) — required")
-	kevFile := flag.String("kev", "", "CISA KEV catalog JSON — optional")
-	apertureFlag := flag.String("aperture", "", "decision aperture, comma-separated severities in rank order — required")
-	ceilingsFlag := flag.String("ceilings", "", "exception ceilings in days per severity, SEV=days comma-separated — required")
-	kevCeiling := flag.Int("kev-ceiling", 0, "ceiling in days for a KEV-listed finding — required")
-	previousFile := flag.String("previous", "", "previously published metrics.json — optional")
-	previousBody := flag.String("previous-body", "", "the status issue's body, the fenced JSON block is read — optional")
+	enumeration := flag.String("enumeration", "", "the rescan's enumeration.tsv (required)")
+	reattestDir := flag.String("reattest", "", "re-attest work directory (rescan-out/reattest) (required)")
+	reportsDir := flag.String("reports", "", "supported-set scan reports (rescan-out/trivy) (required)")
+	vexReports := flag.String("vex-reports", "", "the scan step's compile reports (rescan-out/vex); a digest whose VEX did not resolve counts as unscanned (optional)")
+	kevFile := flag.String("kev", "", "CISA KEV catalog JSON (optional)")
+	apertureFlag := flag.String("aperture", "", "decision aperture, comma-separated severities in rank order (required)")
+	ceilingsFlag := flag.String("ceilings", "", "exception ceilings in days per severity, SEV=days comma-separated (required)")
+	kevCeiling := flag.Int("kev-ceiling", 0, "ceiling in days for a KEV-listed finding (required)")
+	previousFile := flag.String("previous", "", "previously published metrics.json (optional)")
+	previousBody := flag.String("previous-body", "", "the status issue's body, the fenced JSON block is read (optional)")
 	todayFlag := flag.String("today", "", "YYYY-MM-DD; default: the latest report's date, else now (UTC)")
-	runURL := flag.String("run", "", "the run's URL, recorded in the data — optional")
-	outJSON := flag.String("out-json", "", "where to write metrics.json — required")
-	outBody := flag.String("out-body", "", "where to write the issue body — required")
+	runURL := flag.String("run", "", "the run's URL, recorded in the data (optional)")
+	outJSON := flag.String("out-json", "", "where to write metrics.json (required)")
+	outBody := flag.String("out-body", "", "where to write the issue body (required)")
 	flag.Parse()
 
 	for name, v := range map[string]string{"--enumeration": *enumeration, "--reattest": *reattestDir, "--reports": *reportsDir,
@@ -73,7 +72,7 @@ func main() {
 		ceilings[strings.ToUpper(strings.TrimSpace(parts[0]))] = n
 	}
 
-	digests, err := loadSupported(*enumeration, *reattestDir, *reportsDir)
+	digests, err := inputs.LoadSupported(*enumeration, *reattestDir, *reportsDir, *vexReports)
 	if err != nil {
 		fatal(err.Error())
 	}
@@ -142,73 +141,6 @@ func main() {
 		ag.Findings, len(digests), ag.Undecided, ag.OverCeiling, ag.Decided, ag.Fixed)
 }
 
-// loadSupported reads the enumeration and, for every supported digest, the
-// document and reports the rescan wrote under its <name>__<12 hex> naming.
-func loadSupported(enumeration, reattestDir, reportsDir string) ([]rescan.SupportedDigest, error) {
-	f, err := os.Open(enumeration)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	type key struct{ repo, digest string }
-	byKey := map[key]*rescan.SupportedDigest{}
-	order := []key{}
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 1024*1024), 1024*1024)
-	for sc.Scan() {
-		cols := strings.Split(sc.Text(), "\t")
-		if len(cols) < 6 || cols[5] != "supported" {
-			continue
-		}
-		k := key{cols[0], cols[2]}
-		d := byKey[k]
-		if d == nil {
-			d = &rescan.SupportedDigest{Repository: cols[0], Digest: cols[2]}
-			byKey[k] = d
-			order = append(order, k)
-		}
-		if !contains(d.Tags, cols[1]) {
-			d.Tags = append(d.Tags, cols[1])
-		}
-	}
-	if err := sc.Err(); err != nil {
-		return nil, err
-	}
-	out := make([]rescan.SupportedDigest, 0, len(order))
-	for _, k := range order {
-		d := byKey[k]
-		work := rescan.StatusWorkDirName(d.Repository, d.Digest)
-		docs, _ := filepath.Glob(filepath.Join(reattestDir, work, "out", "*.openvex.json"))
-		if len(docs) > 0 {
-			sort.Strings(docs)
-			data, err := os.ReadFile(docs[0])
-			if err != nil {
-				return nil, err
-			}
-			doc, err := rescan.ParseVEX(data)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", docs[0], err)
-			}
-			d.Document = &doc
-		}
-		reports, _ := filepath.Glob(filepath.Join(reportsDir, work+"__*.json"))
-		sort.Strings(reports)
-		for _, r := range reports {
-			data, err := os.ReadFile(r)
-			if err != nil {
-				return nil, err
-			}
-			rep, err := rescan.ParseTrivy(data)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", r, err)
-			}
-			d.Reports = append(d.Reports, rep)
-		}
-		out = append(out, *d)
-	}
-	return out, nil
-}
-
 // latestReportDay is the UTC date of the newest report, the day the
 // evidence was taken; without reports, today.
 func latestReportDay(digests []rescan.SupportedDigest) string {
@@ -227,15 +159,6 @@ func latestReportDay(digests []rescan.SupportedDigest) string {
 		latest = time.Now()
 	}
 	return latest.UTC().Format("2006-01-02")
-}
-
-func contains(xs []string, s string) bool {
-	for _, x := range xs {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
 
 func warn(format string, a ...any) { fmt.Fprintf(os.Stderr, "rescan-status: "+format+"\n", a...) }

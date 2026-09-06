@@ -78,6 +78,26 @@ fresh
 out=$(q nonsense); rc=$?
 [ "$rc" -eq 2 ] && pass "an unknown query is a usage refusal" || fail "an unknown query is a usage refusal" "rc=$rc"
 
+# The closing labels (task 10.6, Req 6.56) are declared per evidence grade; a
+# missing grade is a hole, named.
+fresh
+out=$(q resolved-labels); rc=$?
+[ "$rc" -eq 2 ] && grep -q "resolved_labels.fixed has no name" <<<"$out" && pass "no resolved labels declared: refused, naming the first missing grade" || fail "missing labels" "rc=$rc" "$out"
+cat >> "$SB/catalogue-policy.yaml" <<'EOF'
+  resolved_labels:
+    fixed: {name: "resolved:fixed", color: "0E8A16", description: "bumped"}
+    removed: {name: "resolved:removed", color: "0E8A16", description: "gone"}
+    not_affected: {name: "resolved:not_affected", color: "1D76DB", description: "statement"}
+    accepted: {name: "resolved:accepted", color: "FBCA04", description: "exception"}
+    absent: {name: "resolved:absent", color: "C5DEF5", description: "absent"}
+EOF
+out=$(q resolved-labels); rc=$?
+[ "$rc" -eq 0 ] && [ "$(jq -r '.accepted.name' <<<"$out")" = "resolved:accepted" ] && [ "$(jq 'length' <<<"$out")" = "5" ] \
+  && pass "resolved-labels is the declared map as JSON, name, colour and description per grade" || fail "resolved-labels" "rc=$rc" "$out"
+sed -i '/^    absent:/d' "$SB/catalogue-policy.yaml"
+out=$(q resolved-labels); rc=$?
+[ "$rc" -eq 2 ] && grep -q "resolved_labels.absent has no name" <<<"$out" && pass "one grade missing: refused by name" || fail "one grade missing" "rc=$rc" "$out"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all triage-policy tests passed"

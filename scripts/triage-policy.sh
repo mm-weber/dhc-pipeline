@@ -14,6 +14,8 @@
 #   kev-ceiling        the ceiling for a finding listed in CISA KEV, in days
 #   expiry-warning     the window the rescan reports lapsing exceptions in
 #   kev-feed           the KEV catalogue URL both arms fetch
+#   resolved-labels    the closing labels per evidence grade, as JSON
+#                      {grade: {name, color, description}} (task 10.6, Req 6.56)
 #
 # Durations are whole days written as `<n>d`: the exception schema carries
 # dates, so a sub-day ceiling would be unenforceable; a fork wanting one
@@ -26,7 +28,7 @@ set -euo pipefail
 
 err() { printf '::error::triage-policy: %s\n' "$1" >&2; }
 if [ "$#" -lt 2 ]; then
-  err "usage: triage-policy.sh <root> <aperture|ceiling <SEV>|largest-ceiling|kev-ceiling|expiry-warning|kev-feed>"
+  err "usage: triage-policy.sh <root> <aperture|ceiling <SEV>|largest-ceiling|kev-ceiling|expiry-warning|kev-feed|resolved-labels>"
   exit 2
 fi
 ROOT="$1"; QUERY="$2"; ARG="${3:-}"
@@ -71,6 +73,15 @@ elif query == "expiry-warning":
 elif query == "kev-feed":
     if not t.get("kev_feed"): refuse("kev_feed is missing")
     print(t["kev_feed"])
+elif query == "resolved-labels":
+    import json
+    labels = t.get("resolved_labels") or {}
+    for grade in ("fixed", "removed", "not_affected", "accepted", "absent"):
+        entry = labels.get(grade)
+        if not isinstance(entry, dict) or not entry.get("name"):
+            refuse(f"resolved_labels.{grade} has no name")
+    print(json.dumps({g: {"name": str(e["name"]), "color": str(e.get("color", "")), "description": str(e.get("description", ""))}
+                      for g, e in labels.items()}, sort_keys=True))
 else:
     print(f"::error::triage-policy: unknown query '{query}'", file=sys.stderr); sys.exit(2)
 PY

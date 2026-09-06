@@ -147,3 +147,60 @@ stays in a thin command and the workflow, like `rescan-report`.
 - [x] 4. tasks.md tick; user manual: the rescan row and a short "Catalogue status" paragraph
       (rehearsed 2026-09-05 on the real supported set with a stub gh: 13 findings over 7 digests,
       create then edit, carry-forward identical across two passes)
+
+## Task 10.6: evidence-based issue lifecycle over the supported set (2026-09-05)
+
+Branch: `task-10.6-issue-lifecycle`. Goal: a cve issue closes when the evidence
+says so and reopens when the finding returns, and the label says which evidence
+(Req 6.52 to 6.57); the tool records no decision (Req 6.54). Pure decision in
+the tested `rescan` package, I/O in a thin command, a verified SBOM read, and
+three workflow steps placed before the dedup so a reopened issue is open when
+the filer runs.
+
+- [x] 1. `lifecycle.go` (+ tests, TDD): parse our own issue template (marker, images, packages);
+      per finding over the supported set: reported, covered (exception, not_affected, fixed, with
+      the covering artifact) or absent; an open issue closes on "absent everywhere" (label from
+      the attested SBOMs: fixed when every occurrence of the package bumped, removed when it left
+      every SBOM, absent otherwise with scanner and database versions) or on "covered wherever
+      listed" (accepted over not_affected over fixed, the weakest grade wins); a supported digest
+      without a report today blocks every close; a closed issue reopens when its finding is
+      reported on a supported digest, resolved labels removed, the latest closed issue per finding
+- [x] 2. `scripts/fetch-sboms.sh` (+ test with a cosign stub): the CycloneDX SBOM of every supported
+      platform manifest through `cosign verify-attestation --type cyclonedx` against the roles that
+      attest it (Req 6.58); a manifest without one is named and skipped
+- [x] 3. `cmd/rescan-lifecycle`: reads issues.json (gh), the enumeration, reports, SBOMs, scanner
+      version, triage/vex sources; writes actions.json; shared input loading with rescan-status
+- [x] 4. rescan.yml: evidence, decision, apply (labels created idempotently) before the dedup step;
+      summary line; SC2154 sweep, actionlint, yamllint, lint-workflow-policy; rehearsal with a stub gh
+- [x] 5. Rehearsal on the real supported set: what today's evidence would do to the open issues
+- [x] 6. tasks.md tick; user manual: the lifecycle paragraph replaces "it never closes them"
+- [x] 7. Review round: see below
+      (rehearsed 2026-09-05: 25 issues, 7 digests, 14 SBOMs; 16 closes, 6 fixed on SBOM proof and 10
+      accepted on the grafana exceptions, 0 reopened, 0 kept; the rehearsal caught the loop's stdin
+      being the enumeration, fixed with a regression case)
+
+### Review (2026-09-05, /code-review of #148, 23 correctness and 14 cleanup candidates)
+
+Confirmed and fixed in the same PR, each with a test: the OpenVEX source
+directory was a relative path under `go -C` (never found; now absolute, and
+the command warns when it finds nothing); a digest with one platform
+manifest unscanned counted as examined (now every manifest needs a report,
+in the status tool too); a reopen of a hand-closed issue serialised
+`remove_labels` as null and would have broken the apply loop on the first
+reopen (lists are lists, and jq guards); "bumped" was any different version
+(now at or above the fix on the installed version's release line); a
+statement without components read as an empty SBOM and graded `removed`
+(no components is no evidence, in the script and the tool); an empty
+installed version dropped the package line; the "absent from" list was
+keyed by repository, not digest; the reopen picked the newest closed issue,
+not the original; an open issue could keep a stale resolved label (a
+relabel pass, and close-then-label order); a digest scanned without its VEX
+was evidence (now it blocks closes and reopens); a suppressed finding
+outside the aperture read as absent; the issue list's page limit was
+silent; the summary counted decided, not applied; the labels were
+hard-coded in two places (now `triage.resolved_labels` in the policy
+file, read through triage-policy.sh); the lifecycle ran after the
+compiler's issue map (now right after the scan). Left as designed, noted
+in the manual: no "keep closed" switch. Left for later: one policy reader
+for the verification section, a machine-readable block in the cve issue
+template.

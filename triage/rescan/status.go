@@ -74,11 +74,13 @@ func ParseVEX(data []byte) (VEXDocument, error) {
 // digest was skipped) and the scan reports of its platform manifests (none
 // when it was not scanned).
 type SupportedDigest struct {
-	Repository string
-	Digest     string
-	Tags       []string
-	Document   *VEXDocument
-	Reports    []TrivyReport
+	Repository    string
+	Digest        string
+	Tags          []string
+	Manifests     []string // its platform manifest digests, from the enumeration
+	Document      *VEXDocument
+	Reports       []TrivyReport
+	VEXUnresolved bool // the VEX compile for it failed today: scanned without --vex, so over-reporting
 }
 
 type StatusInputs struct {
@@ -301,10 +303,17 @@ func BuildStatus(in StatusInputs) StatusData {
 			repos[d.Repository] = &RepoStatus{Repository: d.Repository}
 			repoOrder = append(repoOrder, d.Repository)
 		}
+		complete, _ := d.scanState()
 		repos[d.Repository].Digests = append(repos[d.Repository].Digests, DigestStatus{
-			Digest: d.Digest, Tags: d.Tags, Scanned: len(d.Reports) > 0, Document: d.Document != nil})
-		if len(d.Reports) > 0 {
+			Digest: d.Digest, Tags: d.Tags, Scanned: complete, Document: d.Document != nil})
+		// A repository counts as looked at only when every platform manifest
+		// of every supported digest has a report: absence read from half a
+		// scan would be a fix date invented.
+		if _, seen := repoScanned[d.Repository]; !seen {
 			repoScanned[d.Repository] = true
+		}
+		if !complete {
+			repoScanned[d.Repository] = false
 		}
 		// present today: reported or suppressed alike, within the aperture
 		presentSev := map[string]string{}
@@ -314,26 +323,16 @@ func BuildStatus(in StatusInputs) StatusData {
 			if stamp == "" || earlier(stamp, r.CreatedAt) == r.CreatedAt {
 				stamp = r.CreatedAt
 			}
-			note := func(v TrivyVuln) {
-				rank := sevRank(v.Severity, in.Aperture)
-				if rank == 0 || v.VulnerabilityID == "" {
+			eachFinding(r, func(f reportFinding) {
+				rank := sevRank(f.Severity, in.Aperture)
+				if rank == 0 {
 					return
 				}
-				if rank > presentRank[v.VulnerabilityID] {
-					presentRank[v.VulnerabilityID] = rank
-					presentSev[v.VulnerabilityID] = strings.ToUpper(v.Severity)
+				if rank > presentRank[f.ID] {
+					presentRank[f.ID] = rank
+					presentSev[f.ID] = f.Severity
 				}
-			}
-			for _, res := range r.Results {
-				for _, v := range res.Vulnerabilities {
-					note(v)
-				}
-				for _, m := range res.ExperimentalModifiedFindings {
-					if m.Type == "" || m.Type == "vulnerability" {
-						note(m.Finding)
-					}
-				}
-			}
+			})
 		}
 		cves := make([]string, 0, len(presentSev))
 		for cve := range presentSev {

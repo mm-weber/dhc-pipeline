@@ -79,6 +79,16 @@ triage:
   # The KEV catalogue both arms fetch; an outage fails the pull request and
   # the rescan by name rather than evaluating without it (Req 6.59, 6.60).
   kev_feed: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+  # The labels the rescan closes cve issues with, one per evidence grade
+  # (task 10.6, Req 6.56): fixed and removed on the attested SBOMs,
+  # not_affected and accepted on a covering statement or exception, absent
+  # when nothing proves more. Design decision 7 lists them as a fork switch.
+  resolved_labels:
+    fixed: {name: "resolved:fixed", color: "0E8A16", description: "the attested SBOMs prove the package version bumped, or a fixed statement covers it"}
+    removed: {name: "resolved:removed", color: "0E8A16", description: "the package left every supported digest's SBOM"}
+    not_affected: {name: "resolved:not_affected", color: "1D76DB", description: "a not_affected statement covers it on every supported digest listing it"}
+    accepted: {name: "resolved:accepted", color: "FBCA04", description: "an unexpired accepted-risk exception covers it on every supported digest listing it"}
+    absent: {name: "resolved:absent", color: "C5DEF5", description: "absent from every supported digest's report, no SBOM proof of a bump"}
   # The support statement (requirements.md, Terms): the supported set is the
   # digests each definition's current `tags:` reference. A superseded
   # tag-referenced digest keeps its daily scans and attestations and holds no

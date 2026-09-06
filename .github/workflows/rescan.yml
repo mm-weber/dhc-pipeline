@@ -167,6 +167,98 @@ jobs:
             | grep -E '^CVE-' | sort -u > "$OUT/cves.txt" || true
           echo "distinct HIGH/CRITICAL CVEs (supported set): $(grep -c . "$OUT/cves.txt" || echo 0)"
 
+      # Task 10.6 (Req 6.52 to 6.57): the evidence-based issue lifecycle over
+      # the supported set. Every cve issue, open and closed, meets today's
+      # attested scan reports, the SBOMs attested to the supported platform
+      # manifests (read through verification, Req 6.58) and the merged
+      # triage artifacts; the tested Go package decides what closes, with
+      # which evidence-graded label, and what reopens; gh applies it. Right
+      # after the scan, so the issue map the compiler stamps into today's
+      # documents and the dedup the filer relies on both see the closes and
+      # reopens of the same run, and nothing is filed twice (Req 6.57).
+      - name: issue lifecycle, the evidence (Req 6.52 to 6.57)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT/lifecycle"
+          # Every cve issue ever filed: closed ones are the reopen candidates.
+          gh issue list --state all --label cve --limit 2000 --json number,state,body,labels > "$OUT/lifecycle/issues.json"
+          n=$(jq 'length' "$OUT/lifecycle/issues.json")
+          echo "cve issues, open and closed: ${n}"
+          [ "$n" -lt 2000 ] || echo "::warning::issue lifecycle: the issue list is at its page limit (${n}); the oldest closed issues may be missing from the reopen candidates, raise --limit"
+          # The scanner and database the scans above ran with (Req 6.55), read
+          # right after them.
+          trivy version --format json > "$OUT/lifecycle/scanner.json"
+          scripts/triage-policy.sh . resolved-labels > "$OUT/lifecycle/labels.json"
+          scripts/fetch-sboms.sh . "$OUT/enumeration.tsv" "$OUT/lifecycle/sbom"
+
+      - name: issue lifecycle, decided on evidence (tested)
+        id: lifecycle
+        run: |
+          set -euo pipefail
+          go -C triage/rescan run ./cmd/rescan-lifecycle \
+            --enumeration "$OUT/enumeration.tsv" --reports "$OUT/trivy" --sboms "$OUT/lifecycle/sbom" \
+            --issues "$OUT/lifecycle/issues.json" --scanner "$OUT/lifecycle/scanner.json" \
+            --vex-dir "${GITHUB_WORKSPACE}/triage/vex" --vex-reports "$OUT/vex" --labels "$OUT/lifecycle/labels.json" \
+            --aperture "$(scripts/triage-policy.sh . aperture)" --out "$OUT/lifecycle/actions.json"
+          for k in close reopen relabel kept; do
+            echo "${k}=$(jq ".${k} | length" "$OUT/lifecycle/actions.json")" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: issue lifecycle, applied (Req 6.52, 6.53, 6.56, 6.57)
+        id: lifecycle_apply
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The graded labels exist before use, idempotently, as the policy
+          # file declares them (Req 6.56).
+          jq -r 'to_entries[] | "\(.value.name)\t\(.value.color)\t\(.value.description)"' "$OUT/lifecycle/labels.json" \
+            | while IFS=$'\t' read -r name color desc; do
+                gh label create "$name" --color "$color" --description "$desc" 2>/dev/null || true
+              done
+          closed=0; reopened=0; relabelled=0
+          # Order: the state change first, the label second, so a failure in
+          # between never leaves an open issue wearing a resolved label; a
+          # closed issue without its label is repaired by the comment's
+          # "Label:" line and by the next run's relabel pass.
+          while read -r action; do
+            [ -n "$action" ] || continue
+            number=$(jq -r '.number' <<<"$action"); label=$(jq -r '.label' <<<"$action")
+            jq -r '.comment' <<<"$action" > "$OUT/lifecycle/comment-${number}.md"
+            echo "closing #${number} as ${label}"
+            gh issue close "$number" --comment "$(cat "$OUT/lifecycle/comment-${number}.md")" > /dev/null
+            remove=$(jq -r '(.remove_labels // []) | join(",")' <<<"$action")
+            [ -z "$remove" ] || gh issue edit "$number" --remove-label "$remove" > /dev/null
+            gh issue edit "$number" --add-label "$label" > /dev/null
+            closed=$((closed + 1))
+          done < <(jq -c '.close[]' "$OUT/lifecycle/actions.json")
+          while read -r action; do
+            [ -n "$action" ] || continue
+            number=$(jq -r '.number' <<<"$action")
+            jq -r '.comment' <<<"$action" > "$OUT/lifecycle/comment-${number}.md"
+            echo "reopening #${number}"
+            remove=$(jq -r '(.remove_labels // []) | join(",")' <<<"$action")
+            [ -z "$remove" ] || gh issue edit "$number" --remove-label "$remove" > /dev/null
+            gh issue reopen "$number" --comment "$(cat "$OUT/lifecycle/comment-${number}.md")" > /dev/null
+            reopened=$((reopened + 1))
+          done < <(jq -c '.reopen[]' "$OUT/lifecycle/actions.json")
+          while read -r action; do
+            [ -n "$action" ] || continue
+            number=$(jq -r '.number' <<<"$action")
+            remove=$(jq -r '(.remove_labels // []) | join(",")' <<<"$action")
+            echo "open #${number} sheds ${remove}: $(jq -r '.reason' <<<"$action")"
+            [ -z "$remove" ] || gh issue edit "$number" --remove-label "$remove" > /dev/null
+            relabelled=$((relabelled + 1))
+          done < <(jq -c '.relabel[]' "$OUT/lifecycle/actions.json")
+          jq -r '.kept[] | "kept open #\(.number) \(.id): \(.reason)"' "$OUT/lifecycle/actions.json"
+          {
+            echo "closed=${closed}"
+            echo "reopened=${reopened}"
+            echo "relabelled=${relabelled}"
+          } >> "$GITHUB_OUTPUT"
+
       # Task 10.3: the open `cve` issues, finding -> URL, read before the
       # compile so a statement the compiler writes can name where the finding
       # is being worked (task 9.1's promise, Req 6.40). The dedup step below
@@ -435,6 +527,7 @@ jobs:
             fi
             echo "- platform manifests scanned: ${{ steps.scan.outputs.scanned || 0 }} (failed: ${{ steps.scan.outputs.failed || 0 }})"
             echo "- new CVE issues filed: ${{ steps.report.outputs.count || 0 }}"
+            echo "- issues closed on evidence: ${{ steps.lifecycle_apply.outputs.closed || 0 }} of ${{ steps.lifecycle.outputs.close || 0 }} decided, reopened: ${{ steps.lifecycle_apply.outputs.reopened || 0 }} of ${{ steps.lifecycle.outputs.reopen || 0 }}, kept open: ${{ steps.lifecycle.outputs.kept || 0 }}"
             echo "- catalogue status: ${{ steps.status_publish.outputs.url || 'not published' }}, ${{ steps.status.outputs.undecided || 0 }} undecided (${{ steps.status.outputs.over_ceiling || 0 }} over ceiling), ${{ steps.status.outputs.decided || 0 }} decided, ${{ steps.status.outputs.fixed || 0 }} fixed"
             echo
             # Req 6.33. Without this the run is green whether every statement
