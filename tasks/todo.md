@@ -418,3 +418,35 @@ rows in the three Req 9.15 classes with the framing addendum's seams. The
 labels dropped from four intros; the attribution and non-affiliation
 sentences sit in the README, the design overview and NOTICE. No em dashes in
 added lines; the README's rendered verification block is untouched.
+
+## Task 13.2: governance as code (2026-09-07)
+
+Branch: `task-13.2-governance-as-code`. Goal: the intended ruleset is a
+committed export compared daily against the live one through anonymous reads
+(Req 9.8, 9.9), the reporting channel's enabled state is asserted daily
+(Req 9.3), CODEOWNERS names the maintainer per lane (Req 9.10), and the
+admin view with bypass actors lands in data/.
+
+- [x] 1. Test first: scripts/check-governance_test.sh over a localhost fixture API
+      (identical modulo server fields, bypass actors and order; a differing rule; a
+      missing check; committed without live; live-only active branch ruleset; disabled
+      or tag-target live-only ignored; reporting disabled; endpoint unreadable)
+- [x] 2. scripts/check-governance.sh: anonymous reads, canonical comparison by name over
+      name, target, enforcement, conditions, rules; both directions; JSON record
+- [x] 3. .github/rulesets/main_sec.json (export shape, bypass_actors carried), its README
+      (the second-maintainer switch), CODEOWNERS, data/ admin view
+- [x] 4. rescan.yml step "governance invariants (Req 9.3, 9.9)" with outputs and the
+      summary line; rehearsed locally against the live API
+- [x] 5. SECURITY.md present tense; manual's branch-protection section; CONVENTIONS PR
+      section; tasks.md tick; em-dash sweep; shellcheck, actionlint, lint-workflow-policy
+
+**Review (2026-09-07).** Test first: ten cases over a localhost http.server
+(the list endpoint as `index.html`, details as files) failed against the
+missing script, then passed; shellcheck clean. The live rehearsal reproduced
+the expected state exactly: the export equals the live `main_sec` after
+canonicalisation (rule and check order differ live, no difference reported),
+and the two failures are the owner items the task lists. The step runs last
+in the rescan so those failures fail the run without skipping the issue
+lifecycle and the status publish; the step block was extracted verbatim,
+shellchecked and executed locally with the outputs file inspected. actionlint,
+yamllint and lint-workflow-policy pass.

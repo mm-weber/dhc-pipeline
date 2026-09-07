@@ -493,6 +493,17 @@ succeeded, because a failed detection that skips everything gated nothing.
 Require the fan-in jobs plus `validate`'s two jobs and `chart`'s gate in
 branch protection.
 
+The ruleset that does so is committed as `.github/rulesets/main_sec.json`,
+GitHub's export format, importable as is (Req 9.8). The daily rescan
+compares it against the live rulesets API through anonymous reads
+(`scripts/check-governance.sh`, Req 9.9): by name, over name, target,
+enforcement, conditions and rules, in both directions, with bypass actors
+outside the set because anonymous reads withhold them (the export carries
+them; `SECURITY.md` states the posture). The same step asserts that private
+vulnerability reporting is on (Req 9.3); either failing fails the run by
+name. `CODEOWNERS` names the maintainer per lane (Req 9.10), and
+`require_code_owner_review` in the export is the second-maintainer switch.
+
 ## Part III: Operating the catalogue
 
 ### Crons and cadence

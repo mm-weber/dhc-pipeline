@@ -101,8 +101,10 @@ release environment with required reviewers would put a human approval point
 on nightly rebuilds, which a catalogue must not have. The required checks are
 the gate. A second maintainer flips `require_code_owner_review` in the
 committed ruleset, and the bypass becomes an exception instead of the rule.
-The intended ruleset is committed under `.github/rulesets/` and compared daily
-against the live one (task 13.2 of the spec).
+The intended ruleset is committed as `.github/rulesets/main_sec.json` in
+GitHub's export format and compared daily against the live one through
+anonymous reads, both directions, so a retired ruleset that returns is caught;
+`CODEOWNERS` names the maintainer per lane.
 
 ## Reporting a vulnerability
 
@@ -110,7 +112,7 @@ Report vulnerabilities in the catalogue's machinery, its definitions or its
 published images through GitHub private vulnerability reporting on this
 repository (Security tab, "Report a vulnerability"). Do not open a public
 issue for an undisclosed vulnerability. The daily rescan asserts that the
-channel stays enabled (task 13.2 of the spec); if the Security tab shows no
+channel stays enabled and fails by name when it is not; if the Security tab shows no
 "Report a vulnerability" button, the channel is off and this policy is not
 being kept.
 

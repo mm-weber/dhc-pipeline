@@ -328,3 +328,8 @@ rewrites the catalogue status issue with every finding's clocks (Req 6.46,
   release bump has aged three days before its PR exists (Req 3.7).
 - Review checklist: pins intact, conventions above, README deviations updated,
   test evidence for behavior claims.
+- The ruleset that enforces the gates is code: `.github/rulesets/main_sec.json`
+  (GitHub's export format) is compared daily against the live ruleset
+  through anonymous reads, both directions (Req 9.8, 9.9); `CODEOWNERS` names
+  the maintainer per lane (Req 9.10), and `require_code_owner_review` in the
+  export is the switch a second maintainer flips.

@@ -553,6 +553,28 @@ jobs:
           name: catalogue-status
           path: rescan-out/status/metrics.json
 
+      # Task 13.2 (Req 9.3, 9.9): governance as code, asserted daily through
+      # anonymous reads. The committed ruleset export under .github/rulesets/
+      # must match the live rulesets API by name over name, target,
+      # enforcement, conditions and rules, in both directions, and private
+      # vulnerability reporting must be on. bypass_actors is outside the
+      # compared set (anonymous reads withhold it): the export carries it and
+      # SECURITY.md states it. A difference fails the run by name. It runs
+      # last so a governance failure never starves the day's scans, issues
+      # and status of their run; the summary still prints.
+      - name: governance invariants (Req 9.3, 9.9)
+        id: governance
+        run: |
+          set -uo pipefail
+          scripts/check-governance.sh .github/rulesets "$GITHUB_REPOSITORY" "$OUT/governance.json"; rc=$?
+          {
+            echo "reporting=$(jq -r 'if .reporting.enabled == null then "unreadable" elif .reporting.enabled then "enabled" else "DISABLED" end' "$OUT/governance.json")"
+            echo "compared=$(jq '.rulesets | length' "$OUT/governance.json")"
+            echo "differences=$(jq '[.rulesets[].differences | length] | add // 0' "$OUT/governance.json")"
+            echo "live_only=$(jq '.live_only | length' "$OUT/governance.json")"
+          } >> "$GITHUB_OUTPUT"
+          exit "$rc"
+
       - name: summary
         if: always()
         run: |
@@ -565,6 +587,7 @@ jobs:
             echo "- platform manifests scanned: ${{ steps.scan.outputs.scanned || 0 }} (failed: ${{ steps.scan.outputs.failed || 0 }})"
             echo "- new CVE issues filed: ${{ steps.report.outputs.count || 0 }}"
             echo "- authenticity signals: ${{ steps.authenticity.outputs.verified || 0 }} verified, ${{ steps.authenticity.outputs.mismatched || 0 }} mismatched, ${{ steps.authenticity.outputs.lapsed || 0 }} lapsed compat review-by date(s)"
+            echo "- governance: private vulnerability reporting ${{ steps.governance.outputs.reporting || 'not checked' }}, ${{ steps.governance.outputs.compared || 0 }} committed ruleset(s) compared, ${{ steps.governance.outputs.differences || 0 }} difference(s), ${{ steps.governance.outputs.live_only || 0 }} live-only ruleset(s)"
             echo "- issues closed on evidence: ${{ steps.lifecycle_apply.outputs.closed || 0 }} of ${{ steps.lifecycle.outputs.close || 0 }} decided, reopened: ${{ steps.lifecycle_apply.outputs.reopened || 0 }} of ${{ steps.lifecycle.outputs.reopen || 0 }}, kept open: ${{ steps.lifecycle.outputs.kept || 0 }}"
             echo "- catalogue status: ${{ steps.status_publish.outputs.url || 'not published' }}, ${{ steps.status.outputs.undecided || 0 }} undecided (${{ steps.status.outputs.over_ceiling || 0 }} over ceiling), ${{ steps.status.outputs.decided || 0 }} decided, ${{ steps.status.outputs.fixed || 0 }} fixed"
             echo

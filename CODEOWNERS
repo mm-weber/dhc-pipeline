@@ -1,0 +1,10 @@
+# CODEOWNERS (Req 9.10): the maintainer per lane. With one maintainer this
+# file changes nothing by itself; it is the switch a second maintainer flips:
+# add them to a lane here and set require_code_owner_review to true in
+# .github/rulesets/main_sec.json, and the one-review rule stops being a
+# recorded bypass (SECURITY.md, "Governance").
+/triage/    @mm-weber
+/image/     @mm-weber
+/chart/     @mm-weber
+/policies/  @mm-weber
+/.github/   @mm-weber
