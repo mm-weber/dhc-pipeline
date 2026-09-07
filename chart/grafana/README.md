@@ -21,6 +21,13 @@ Renovate's chart-pin manager). Grafana's `grafana.ini` and `grafana server` CLI
 are stable across 12→13, so the templates deploy 13.x unchanged; the phase-6
 e2e HTTP-health probe validates the running deployment.
 
+**Upstream authenticity:** the image comes from `image/grafana/`, whose source
+is declared `cross-origin-checksum`. Grafana publishes no signature for its
+tarballs, so "verified" here means that the grafana.com versions API and the
+`dl.grafana.com` sidecars state the same per-architecture checksum, checked
+before any bump is written, at PR time and daily (Req 3.8 to 3.10). That is
+agreement of independent origins, not a signature.
+
 ## Deviations from upstream defaults
 
 | Change | Why | Requirement |

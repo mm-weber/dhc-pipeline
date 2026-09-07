@@ -347,7 +347,7 @@ graph TB
      2026-09-05 against the real supported set: 25 issues, 7 digests, 14 verified SBOMs,
      16 closes (6 `fixed` on SBOM proof, 10 `accepted`), no reopen.
 
-8. **Upstream trust: quarantine, declared authenticity, tracked charts (Req 1.3, 1.10 to 1.12, 3.5, 3.7 to 3.12, 4.5, 4.8, 4.9; review F2, F10, F8, F13 ii and iii, F12 d; ADR 0002 amendment; 2026-08-25)**
+8. **Upstream trust: quarantine, declared authenticity, tracked charts (Req 1.3, 1.10 to 1.12, 3.5, 3.7 to 3.12, 4.5, 4.8, 4.9; review F2, F10, F8, F13 ii and iii, F12 d; ADR 0002 amendment; 2026-08-25; as built 2026-09-07, tasks 11.1 to 11.5)**
    - **Context**: from-source patch bumps automerged while their checksum was recomputed
      from whatever upstream served at that instant, so an adversary publishing a
      malicious release also chose whether a human read the diff (F2); grafana's
@@ -412,6 +412,23 @@ graph TB
      watcher (the datasource exists). Fork switches: the age value, the automerge
      update types, the per-definition class, whether compat is allowed at all, an
      entitled fork's extra dhi.io paths.
+   - **As built** (tasks 11.1 to 11.5, 2026-09-04 to 2026-09-07): as decided, with these
+     measured departures. A release Renovate cannot date waits rather than passes
+     (`minimumReleaseAgeBehaviour: timestamp-required`, 11.1). hardened-app entered the
+     `signed-commit` class through a signed v0.1.1 the owner cut on 2026-09-06 and bumped
+     through Req 3.8, so the daily check asserted every definition from its first run and
+     no grandfather state was built (11.2, 11.3). The daily re-verification is a rescan
+     step over `scripts/check-authenticity.sh`, which files one `supply-chain` issue per
+     mismatched definition under a marker and reports lapsed compat review-by dates in the
+     same pass (Req 4.9). The compat block is checked twice, yamale for shape and
+     `scripts/lint-compat.sh` for the clock; the ask was cut to the problem and the ask,
+     reviewed twice (prior art; an adversarial pass that found no design reason for the
+     init container to share the main image, its separation being secret isolation) and
+     filed by the owner as valkey-io/valkey-helm#247 on 2026-09-07. The chart manager
+     reads the chart repository from the `upstream:` block as `registryUrl`; the
+     digest-only automerge rule is scoped to `ghcr.io/mm-weber/dhc/**` and ordered before
+     the build-layer rule (11.4). The grafana legacy alias handler, dead since every
+     definition migrated, went with the truth pass, refusal replacing migration (11.5).
 
 9. **Greenfield successor: the catalogue restarts as a new repository, and this one is archived intact (review F9 re-decision, revised on PR #102's independent review; F13, cluster D retention; 2026-08-25)**
    - **Context**: clusters A to C were specified against a registry carrying ten

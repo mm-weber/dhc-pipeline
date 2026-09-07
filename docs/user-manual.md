@@ -505,15 +505,21 @@ All tracking is custom regex managers — every built-in manager is disabled, so
 nothing opens a surprise PR. A third-party release younger than three days is
 not offered at all yet (Req 3.7): it waits on the Dependency Dashboard as
 pending, and a release Renovate cannot date waits too; only the catalogue's own
-published digests and the build layer flow the same day. Each PR shape comes
-with different automation and a different reviewer job:
+published digests and the build layer flow the same day. Age is one half of
+the defence; the declared signal is the other: a refresh verifies the
+definition's `# authenticity:` class before it writes a field and refuses by
+name otherwise (Req 3.8), a repackage checksum change is re-verified at PR
+time (Req 3.9), and the daily rescan re-verifies every definition and files a
+`supply-chain` issue on a mismatch (Req 3.10). Each PR shape comes with
+different automation and a different reviewer job:
 
 | PR shape | What automation did | Automerge | Your job |
 |----------|---------------------|-----------|----------|
 | **From-source bump** (cert-manager ×3 grouped, hardened-app, valkey+compat grouped) | `refresh-definition.sh` recomputed checksum, `COMMIT_SHA`, VERSION/SEMVER vars, all three tags, ldflags stamps — from the one ref Renovate moved (Req 3.2) | patch + digest, on green CI (Req 3.5); majors staged behind Dependency Dashboard approval (Req 3.4) | For minors/majors: review the diff coherence, let the gates argue the rest |
 | **grafana repackage bump** | `refresh-grafana.sh` resolved the opaque build id from three sources (versions API, apt index, GitHub assets — all answering sources must agree), confirmed both arch tarballs are actually served, re-pinned both per-arch SHA-256s from the `dl.grafana.com` sidecars (ADR 0002) | **Never** — it swaps a binary we did not build | Review version sanity + chart implications; expect the VEX product lint to demand re-scoped statements on a version bump |
 | **Build-layer bump** (`syntax=` frontend, `dhi.io/golang` builder) | Tag + digest moved in every definition; source checksums untouched by design | No | Review; expect scan-gate deltas — a newer Go toolchain moves stdlib CVEs in every compiled image |
-| **Chart pin bump** | Tag and/or digest moved in chart values (same-tag rebuilds reach charts too); triggers the e2e *upgrade* path (Req 5.6) | No | Review the upgrade e2e result |
+| **Chart pin bump** | Tag and/or digest moved in chart values (same-tag rebuilds reach charts too); triggers the e2e *upgrade* path (Req 5.6) | Digest-only moves: yes, on green required checks (Req 3.12); tag moves: no | Review the upgrade e2e result |
+| **Chart version bump** (cert-manager, grafana, valkey) | `upstream.version` in `chart/<name>/chart.yaml` moved by the helm-datasource manager against the chart repository; triggers the e2e *upgrade* path | **Never** (Req 3.11): a chart release can change what its values mean | Read the chart's changelog against the overlay's keys, then the upgrade e2e result |
 | **Tool pin bump** (trivy/grype/kind/kyverno/helm/ct) | Bumped the `_VERSION` in the install script — **and left the recorded sha256 stale on purpose** | No | Complete the pin by hand — below |
 
 **Operator action — completing a tool-pin bump.** A scanner/tool bump PR
@@ -879,9 +885,11 @@ repository; the variant is a tag suffix. Rules that follow, all enforced:
 ### Adapt a chart
 
 1. **Pin the upstream chart** in `chart/<name>/chart.yaml` (upstream name,
-   repo URL, exact version — hand-pinned; chart *versions* are deliberately
-   untracked, image pins are not). Upstream templates are never edited,
-   forked, or patched (Req 4.1).
+   repo URL, exact version). Renovate tracks that version against the chart
+   repository and opens a never-automerged bump PR that runs the e2e upgrade
+   path (Req 3.11); the image pins in the overlay are tracked separately
+   (Req 3.12). Upstream templates are never edited, forked, or patched
+   (Req 4.1).
 2. **Write the overlay**, `config/values-hardened.yaml`: digest-pinned
    catalogue image (Req 4.2), the canonical restricted block (Req 4.3) — pod
    level unless the chart only exposes container level, and note
@@ -1045,14 +1053,17 @@ pin surface; every one is fixture-tested in both directions:
 | From-source definitions | `url: git+https://…#vX.Y.Z` | github-tags | `refresh-definition.sh` |
 | grafana repackage | versioned tarball URL (custom `versioningTemplate` — semver build metadata ordered as a 4th component, so `+security-NN` releases rank) | github-releases | `refresh-grafana.sh` |
 | Build layer | `syntax=` / `uses:` / `GOLANG_REFERENCE` tag@digest | docker (dhi.io, authenticated) | none — reviewed by hand |
-| Chart image pins | digest-keyed values (cert-manager ×3, hardened-app) and tag@digest values (grafana, valkey) — capturing tag *and* digest so same-tag rebuilds propagate | docker (ghcr.io) | none |
+| Chart image pins | digest-keyed values (cert-manager ×3, hardened-app) and tag@digest values (grafana, valkey), capturing tag *and* digest so same-tag rebuilds propagate | docker (ghcr.io) | none; digest-only bumps automerge (Req 3.12) |
+| Chart versions | `upstream:` block in `chart/<name>/chart.yaml` (name, repository, version) | helm (the chart repository) | none; never automerged (Req 3.11) |
 | Tool pins | `*_VERSION=` blocks in the two install scripts | github-releases | none — sha256 refresh is human |
 | Workflow env pins | `# renovate:`-marked `*_VERSION:` (govulncheck, renovate, json5) | go / npm | none |
 | Python CI deps | `.github/requirements-ci.txt` | pypi | none — hash refresh is human |
 
 Grouping: cert-manager's three definitions move as one PR; valkey runtime +
 compat move as one PR. Majors wait behind Dependency Dashboard approval;
-automerge is limited to from-source patch/digest bumps on green CI.
+automerge is limited to from-source patch/digest bumps and digest-only chart
+image pin bumps, both on green CI; every third-party version bump waits its
+three-day minimum release age first.
 
 ### Requirements map
 
@@ -1060,7 +1071,7 @@ automerge is limited to from-source patch/digest bumps on green CI.
 |-------------|---------------------------|
 | **Req 1** — Image definition catalogue | `image/*/image.yaml` · `lint-pins.sh` · frontend compile in build.yml · `verify-arch-pins.sh` · ADR 0001 |
 | **Req 2** — Build & release | build.yml release arm: push + cosign + Syft SBOM + provenance; tags from definitions; fail publishes nothing |
-| **Req 3** — Upstream tracking | renovate.yml (4h cron) · renovate.json5 managers · refresh tasks · manager fixtures · Dependency Dashboard |
+| **Req 3** — Upstream tracking | renovate.yml (4h cron) · renovate.json5 managers · refresh tasks · manager fixtures · Dependency Dashboard · three-day quarantine · declared authenticity signals (bump, PR, daily) · chart-version manager |
 | **Req 4** — Chart adaptation | `chart/*/` overlays + READMEs · chart.yml render + Kyverno gate · compat decision protocol |
 | **Req 5** — Integration tests | `test/` Ginkgo suite · e2e.yml kind matrix · upgrade path on both bump shapes · diagnostics artifacts |
 | **Req 6** — CVE triage | Scan gate + rescan cron · `triage/` two lanes, three published verbs · compile-vex (affected from exceptions, carry-forward) + both lints · govulncheck evidence · re-attestation replacing, exactly one OpenVEX per digest · issue filing, closing and reopening on evidence · the catalogue status issue |

@@ -350,3 +350,41 @@ re-runnable measurement.
       checks/valkey-helm-init-container.sh re-running the render measurement; the owner files
       it and records the number in the compat block and LOG.md
 - [x] 4. tasks.md tick; suites, validator, yamllint
+
+## Task 11.5: truth pass for cluster C (2026-09-07)
+
+Branch: `task-11.5-cluster-c-truth-pass`. Goal: every document that describes
+upstream tracking says what 11.1 to 11.4 built (quarantine, declared
+authenticity, tracked chart versions, digest-only chart automerge), the
+cert-manager pin's "still-open gap" comment goes, the chart READMEs state
+each image's authenticity class, the legacy grafana alias handler goes as
+dead code, and design.md Decision 8 is marked as-built.
+
+- [x] 1. Alias removal, test first: refresh-grafana_test.sh case 5b becomes "a definition on
+      the legacy alias is refused, not migrated"; then the renovate.json5 matchString and the
+      refresh script's alias parse go; suites, validator and fixtures green
+- [x] 2. docs/CONVENTIONS.md: chart bullet (tracked, never automerged), the managers intro and
+      table (chart-version row, chart image pins row), the automerge bullet states Req 3.12,
+      the signal sentence (Req 3.8, 3.9, 3.10), the PR section's automerge sentence
+- [x] 3. chart/cert-manager/chart.yaml comment; chart/valkey/chart.yaml and README version
+      note (the image may run a patch ahead of the chart's appVersion); valkey README image
+      row and the deployer-side features paragraph; every chart README states its images'
+      authenticity class
+- [x] 4. docs/user-manual.md: Renovate PR table (chart version row, chart pin automerge
+      scope, the signal sentence), the managers reference, "Adapt a chart" step 1, the
+      requirements map's Req 3 row
+- [x] 5. design.md Decision 8 as-built; tasks.md tick; em-dash sweep of added lines
+
+**Review (2026-09-07).** Test first on the only code change: case 5b of
+`refresh-grafana_test.sh` now expects a definition on the legacy alias to be
+refused by its url line and left untouched; it failed against the migrating
+script, passed once the alias parse and the renovate matchString were gone.
+The suite, shellcheck (pre-existing style notes only), the Renovate validator
+and the manager fixtures are green; yamllint, yamale, lint-compat, lint-pins
+and both chart renders pass on the edited pin files. Docs say what cluster C
+built: chart versions tracked and never automerged, digest-only chart pin
+bumps automerged, the three-day quarantine, and the signal verified at bump
+time, PR time and daily. Each chart README states its images' authenticity
+class in the reader's words (grafana's says plainly that it is agreement of
+origins, not a signature). Cluster parents 10 and 11 are ticked, every child
+being done. Only pre-existing table labels carry em dashes.

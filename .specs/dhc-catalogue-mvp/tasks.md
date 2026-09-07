@@ -251,7 +251,7 @@
     - `validate.yml` lints the `schedule:` cron of `build.yml` and `rescan.yml` and each job's `permissions:` block against the policy file, since GitHub reads those only as literal workflow YAML (Req 7.10)
     - _Requirements: Req 7.7, Req 7.8, Req 7.9, Req 7.10_
 
-- [ ] 10. Production readiness, cluster B: statuses and clocks (review F5, F4, F13 i; ADR 0003, ADR 0004; spec amendment landed before any of these)
+- [x] 10. Production readiness, cluster B: statuses and clocks (review F5, F4, F13 i; ADR 0003, ADR 0004; spec amendment landed before any of these)
   - [x] 10.1 Policy triage section and the exception schema [done 2026-09-02]
     - `catalogue-policy.yaml` `triage` section: `aperture: [CRITICAL, HIGH]`, `ceilings: {CRITICAL: 30d, HIGH: 90d}`, `kev_ceiling: 14d`, `expiry_warning: 14d`, and the support statement: the supported set is each definition's current `tags:`; superseded tag-referenced digests keep scans and attestations and hold no issues (Req 6.49); every value a variable, a fork widens the aperture, tightens the clocks or widens the supported set
     - `triage/accepted-risk/<image>.yaml` entries gain `decided_at` (ISO date); `lint-accepted-risk.sh` requires it and checks `expired_at` minus `decided_at` against the largest ceiling, replacing the "more than 90 days from today" rule (Req 6.7, 6.11); the thirteen standing entries gain `decided_at` as re-decisions dated when this task lands, no historical backfill; the successor starts with `decided_at` native (Decision 9)
@@ -287,7 +287,7 @@
     - `docs/user-manual.md` and README: the consumer recipe becomes one `verify-attestation` per predicate type (exactly one OpenVEX attestation per digest), the two-lane table gains the third verb, the rescan section describes replace-not-append, the status issue and the issue lifecycle with its evidence-graded labels and reopening (the manual's "the cron opens issues, it never closes them" sentence goes); `docs/CONVENTIONS.md`'s "must never be written as a VEX" and 90-day sentences; the header comment of `triage/accepted-risk/grafana.yaml` and the same "never attested" sentence in `build.yml`'s attest step comment (flagged for task 9.1's rewrite of that step); `triage/README.md` and `triage/accepted-risk/README.md`: `decided_at`, the policy file's ceilings, the supported set, `affected` as the published form of an exception; design.md Decision 7 marked as-built
     - _Requirements: Req 6.8, Req 7.1_
 
-- [ ] 11. Production readiness, cluster C: upstream trust (review F2, F10, F8, F13 ii and iii, F12 d; spec amendment landed before any of these)
+- [x] 11. Production readiness, cluster C: upstream trust (review F2, F10, F8, F13 ii and iii, F12 d; spec amendment landed before any of these)
   - [x] 11.1 Quarantine and automerge truth in renovate.json5
     - One datasource-scoped packageRule (matchDatasources: github-tags, github-releases, npm, pypi, helm, go; no matchUpdateTypes, so minors age too) carrying `minimumReleaseAge: "3 days"` and `minimumReleaseAgeBehaviour: "timestamp-required"`, so a release without a timestamp is pending, never a silent pass; docker is deliberately absent: catalogue-published digests and the hand-reviewed build layer flow same-day (Req 3.7; independent review 1.2, 1.3, 1.7). Not the update-type-scoped Req 3.5 automerge rule
     - A comment states independence comes from age, signal and gates, the commit sha is pin-at-bump-time protecting against later tag rewrites (F2 c), and three days is npm's unpublish window
@@ -310,12 +310,13 @@
     - `chart/valkey/chart.yaml` gains `compat:` (reason, upstream issue reference, review-by date); a yamale schema validates its shape in validate.yml (yamale is already pinned in requirements-ci.txt), and a date test in a validate lint fails a past review-by date, reusing lint-accepted-risk.sh's expired_at pattern, since yamale day() constraints are static literals with no dynamic today (measured; independent review 1.5) (Req 4.5, 4.8); the chart README keeps the prose, now citing the block
     - `triage/upstream/2026-08-25-valkey-helm-init-container-image.md`: the measured evidence (unconditional init container, same image helper as the main container, metrics-exporter image value as upstream's own precedent) with a checks/ script re-running the render measurement; asks for an init-container image value defaulting to the main image, and an enable switch second. [OPERATOR: file against valkey-io/valkey-helm; record the issue number in the compat block and triage/LOG.md]
     - _Requirements: Req 3.11, Req 3.12, Req 4.5, Req 4.8_
-  - [ ] 11.5 Truth pass
+  - [x] 11.5 Truth pass
     - docs/CONVENTIONS.md: the pinning contract gains the authenticity-class row and the dhi.io /main rule; "hand-pinned; nothing tracks chart versions yet" goes; the upstream-tracking table gains the chart-version manager row and the quarantine and signal sentences; the automerge rows state the 3.5 scope
     - `chart/cert-manager/chart.yaml`'s "still-open gap" comment goes; chart READMEs state each image's authenticity class (F10 consumer half; SECURITY.md's copy arrives with cluster D)
     - `docs/user-manual.md`: the upstream-tracking section gains quarantine, signal and chart-version tracking
     - The `/oss/release/` legacy alias handling goes as dead code with the honest reason, every definition migrated long since: the renovate.json5 matchString, refresh-grafana.sh's alias branch and its test case 5b (epoch review 2.7)
     - design.md Decision 8 marked as-built when implemented
+    - As built 2026-09-07: the alias handler's test became a refusal test (a definition on the alias is refused by its url line, not migrated); the chart READMEs also record what stays with the deployer (auth, TLS, replication, persistence, metrics) and the valkey version note no longer claims exact appVersion agreement
     - _Requirements: Req 7.1_
 
 - [ ] 12. Greenfield successor (owner decided 2026-08-25, F9 re-decision revised on PR #102's independent review; executes after every implementation task in this repository completes)

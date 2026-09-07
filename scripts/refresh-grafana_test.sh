@@ -211,21 +211,31 @@ else
   echo "ok   supersede: no tag line contains '+'"
 fi
 
-# 5b: a definition still pinned to the legacy /oss/release/ version alias is
-# MIGRATED to the per-build url, not merely refreshed in place. The alias is the
-# path whose contents were observed drifting from its own published checksum.
+# 5b: a definition on the legacy /oss/release/ version alias is REFUSED, not
+# migrated. The alias handler (parse the alias, rewrite it onto the per-build
+# url) was removed on 2026-09-07 as dead code: every definition migrated long
+# before, and a reader for a shape nothing carries is a shape nobody tests.
+# The alias is the path whose contents were observed drifting from its own
+# published checksum (triage/LOG.md 2026-07-26), so refusing by name is the
+# honest answer for a definition that somehow lands on it again.
 SB=$(mktemp -d); mkdir -p "$SB/image/grafana"
 grafana_def 13.0.4 13.0 13 > "$SB/image/grafana/image.yaml"
 F="$SB/image/grafana/image.yaml"
 # shellcheck disable=SC2016  # ${target.arch} is a DHI template token, not a shell var
 sed -i -E 's@url: https://dl\.grafana\.com/[^[:space:]]*@url: https://dl.grafana.com/oss/release/grafana-13.0.4.linux-${target.arch}.tar.gz@' "$F"
-assert "migrate: fixture starts on the alias" "$F" "/oss/release/grafana-13.0.4.linux-"
+assert "alias: fixture starts on the alias" "$F" "/oss/release/grafana-13.0.4.linux-"
 API=$(api_fixture "$SB/api" 13.0.4 "$NEW_BUILD")
-REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" REFRESH_GRAFANA_API_URL="$API" \
-REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" \
-  "$SCRIPT" "$SB/image/grafana"
-assert "migrate: now on the per-build url" "$F" "url: https://dl.grafana.com/grafana/release/13.0.4/grafana_13.0.4_${NEW_BUILD}_linux_"
-refute "migrate: alias url gone"           "$F" "url: https://dl.grafana.com/oss/release/"
+if REFRESH_GRAFANA_BUILD_ID="$NEW_BUILD" REFRESH_GRAFANA_API_URL="$API" \
+   REFRESH_GRAFANA_SHA256_AMD64="$NEW_AMD64" REFRESH_GRAFANA_SHA256_ARM64="$NEW_ARM64" \
+   "$SCRIPT" "$SB/image/grafana" >/dev/null 2>"$SB/err"; then
+  echo "FAIL alias: a definition on the legacy alias was refreshed instead of refused"; FAILURES=$((FAILURES+1))
+else
+  echo "ok   alias: a definition on the legacy alias is refused"
+fi
+assert "alias: the refusal names the reason"   "$SB/err" "could not read a version from:"
+assert "alias: the refusal names the url"      "$SB/err" "oss/release/grafana-13.0.4"
+assert "alias: the definition is untouched"    "$F" "url: https://dl.grafana.com/oss/release/grafana-13.0.4.linux-"
+refute "alias: no per-build url was written"   "$F" "url: https://dl.grafana.com/grafana/release/"
 
 # ---------------------------------------------------------------------------
 # Build-id resolution (measured 2026-08-07). The id is an opaque CI run id in

@@ -13,6 +13,9 @@ Hardening is baked into the defaults (no overlay needed — we own it):
   drop-ALL caps, `allowPrivilegeEscalation: false`, seccomp RuntimeDefault.
 - `/healthz` readiness + liveness probes on `:8080`. No writable paths — the
   service is stateless and logs to stdout, so RO rootfs needs no `emptyDir`.
+- Upstream authenticity: `image/hardened-app/` declares `signed-commit` (a
+  lightweight tag on a commit GitHub verifies, since v0.1.1), checked before
+  any bump is written and daily by the rescan (Req 3.8, 3.10).
 
 ```bash
 helm template hardened-app chart/hardened-app        # render

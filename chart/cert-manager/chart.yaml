@@ -1,9 +1,11 @@
 # Pinned upstream chart (Req 4.1). Templates are NEVER edited, forked, or
-# patched — the chart is rendered live from this exact version with
-# config/values-hardened.yaml as the only overlay. Hand-pinned: no Renovate
-# manager reads chart.yaml (the chart-pin managers of task 8.7 track the IMAGE
-# pins in the values overlay, which may run a patch ahead of these templates —
-# chart-version tracking is a separate, still-open gap).
+# patched: the chart is rendered live from this exact version with
+# config/values-hardened.yaml as the only overlay. Renovate's helm-datasource
+# manager tracks `version` against the chart repository and opens a
+# never-automerged bump PR that runs the e2e upgrade path (Req 3.11); the
+# chart-pin managers track the IMAGE pins in the values overlay, which may run
+# a patch ahead of these templates between a definition bump and the chart's
+# next release (Req 3.12).
 upstream:
   name: cert-manager
   repository: https://charts.jetstack.io
