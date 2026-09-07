@@ -1,0 +1,173 @@
+{
+  "read": "2026-09-07, GET /repos/mm-weber/dhc-pipeline/rulesets/<id> with a token holding write access to the rulesets, so bypass_actors is present (anonymous reads withhold it); RepositoryRole 5 is the repository administrator",
+  "rulesets": [
+    {
+      "id": 20716271,
+      "name": "main_sec",
+      "target": "branch",
+      "source_type": "Repository",
+      "source": "mm-weber/dhc-pipeline",
+      "enforcement": "active",
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "~DEFAULT_BRANCH"
+          ]
+        }
+      },
+      "rules": [
+        {
+          "type": "non_fast_forward"
+        },
+        {
+          "type": "pull_request",
+          "parameters": {
+            "required_approving_review_count": 1,
+            "dismiss_stale_reviews_on_push": false,
+            "required_reviewers": [],
+            "require_code_owner_review": false,
+            "require_last_push_approval": false,
+            "required_review_thread_resolution": true,
+            "require_extra_approval_for_unattributed_changes": true,
+            "allowed_merge_methods": [
+              "squash"
+            ]
+          }
+        },
+        {
+          "type": "required_linear_history"
+        },
+        {
+          "type": "required_status_checks",
+          "parameters": {
+            "strict_required_status_checks_policy": true,
+            "do_not_enforce_on_create": false,
+            "required_status_checks": [
+              {
+                "context": "yamllint, pin lint, policy tests",
+                "integration_id": 15368
+              },
+              {
+                "context": "go modules (e2e + rescan tool)",
+                "integration_id": 15368
+              },
+              {
+                "context": "render + policy gate",
+                "integration_id": 15368
+              },
+              {
+                "context": "e2e gate",
+                "integration_id": 15368
+              },
+              {
+                "context": "build gate",
+                "integration_id": 15368
+              }
+            ]
+          }
+        },
+        {
+          "type": "required_signatures"
+        },
+        {
+          "type": "deletion"
+        },
+        {
+          "type": "code_scanning",
+          "parameters": {
+            "code_scanning_tools": [
+              {
+                "tool": "CodeQL",
+                "security_alerts_threshold": "all",
+                "alerts_threshold": "errors"
+              }
+            ]
+          }
+        }
+      ],
+      "node_id": "RRS_lACqUmVwb3NpdG9yec5NyVn8zgE8Gu8",
+      "created_at": "2026-08-11T13:05:06.876-07:00",
+      "updated_at": "2026-08-21T07:13:40.970-07:00",
+      "bypass_actors": [
+        {
+          "actor_id": 5,
+          "actor_type": "RepositoryRole",
+          "bypass_mode": "always"
+        }
+      ],
+      "current_user_can_bypass": "always",
+      "_links": {
+        "self": {
+          "href": "https://api.github.com/repos/mm-weber/dhc-pipeline/rulesets/20716271"
+        },
+        "html": {
+          "href": "https://github.com/mm-weber/dhc-pipeline/rules/20716271"
+        }
+      }
+    },
+    {
+      "id": 19534405,
+      "name": "branch",
+      "target": "branch",
+      "source_type": "Repository",
+      "source": "mm-weber/dhc-pipeline",
+      "enforcement": "active",
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "~DEFAULT_BRANCH"
+          ]
+        }
+      },
+      "rules": [
+        {
+          "type": "deletion"
+        },
+        {
+          "type": "non_fast_forward"
+        },
+        {
+          "type": "pull_request",
+          "parameters": {
+            "required_approving_review_count": 0,
+            "dismiss_stale_reviews_on_push": false,
+            "required_reviewers": [],
+            "require_code_owner_review": false,
+            "require_last_push_approval": false,
+            "required_review_thread_resolution": false,
+            "require_extra_approval_for_unattributed_changes": true,
+            "allowed_merge_methods": [
+              "merge",
+              "squash",
+              "rebase"
+            ]
+          }
+        },
+        {
+          "type": "required_linear_history"
+        }
+      ],
+      "node_id": "RRS_lACqUmVwb3NpdG9yec5NyVn8zgEqEkU",
+      "created_at": "2026-07-22T00:34:00.821-07:00",
+      "updated_at": "2026-07-22T00:34:00.865-07:00",
+      "bypass_actors": [
+        {
+          "actor_id": 5,
+          "actor_type": "RepositoryRole",
+          "bypass_mode": "always"
+        }
+      ],
+      "current_user_can_bypass": "always",
+      "_links": {
+        "self": {
+          "href": "https://api.github.com/repos/mm-weber/dhc-pipeline/rulesets/19534405"
+        },
+        "html": {
+          "href": "https://github.com/mm-weber/dhc-pipeline/rules/19534405"
+        }
+      }
+    }
+  ]
+}

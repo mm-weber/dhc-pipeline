@@ -137,6 +137,8 @@ jobs:
         run: scripts/fetch-sboms_test.sh
       - name: check-authenticity unit tests (Req 3.10, 4.9)
         run: scripts/check-authenticity_test.sh
+      - name: check-governance unit tests (Req 9.3, 9.9)
+        run: scripts/check-governance_test.sh
       - name: lint-compat unit tests (Req 4.8)
         run: scripts/lint-compat_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)
