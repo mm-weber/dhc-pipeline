@@ -1,12 +1,12 @@
 # Let the init container run from its own image (`initContainer.image`, defaulting to the main image)
 
-Target: `valkey-io/valkey-helm` · Status: not filed · Drafted 2026-08-25, re-checked 2026-09-06
+Target: `valkey-io/valkey-helm` · Status: **filed** as [#247](https://github.com/valkey-io/valkey-helm/issues/247) on 2026-09-07 · Drafted 2026-08-25, re-checked 2026-09-06
 
 The issue body is this file from `## Summary` down, unmodified. The facts
 reproduce with
 [`checks/valkey-helm-init-container.sh 0.11.0 chart/valkey/config/values-hardened.yaml`](checks/valkey-helm-init-container.sh).
-When filed, the issue number goes into `chart/valkey/chart.yaml`
-(`compat.issue`) and `../LOG.md`.
+The number is recorded in `chart/valkey/chart.yaml` (`compat.issue`) and
+`../LOG.md`.
 
 ---
 

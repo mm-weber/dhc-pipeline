@@ -1389,3 +1389,26 @@ Req 3.11) and automerges digest-only bumps of the catalogue's own image pins
 under `chart/` behind the required checks (Req 3.12). The valkey index
 already lists 0.12.0, so the manager's first run offers a real chart bump
 through the e2e upgrade path.
+
+## 2026-09-07: the valkey-helm ask is filed (#247)
+
+The transfer recorded on 2026-09-06 now has its tracker: the owner filed
+[valkey-io/valkey-helm#247](https://github.com/valkey-io/valkey-helm/issues/247), open, body the draft from `## Summary`
+down. `chart/valkey/chart.yaml` (`compat.issue`) points at it, and the draft
+and the `triage/upstream/README.md` table say filed.
+
+Before filing, the draft was cut to the problem and the ask (#157) and put
+through two reviews, one for prior art and one briefed to argue against
+filing. The ask held (right repo, active, no existing knob, no design reason
+for the init container to share the main image: it appeared on the chart's
+second day as a refactor of an inline `sh -c` wrapper, and the one stated
+reason for a separate container, secret isolation in upstream PR #14, is
+kept by a different image). Two claims were corrected: the exporter's value
+is `metrics.exporter.image`, and the init script also calls chmod, touch,
+sha256sum and cut on the ACL path, so the 2026-09-06 entry's list of five
+utilities was incomplete; `compat.reason` now says "standard utilities".
+`initResources`, an init-container-only value present since 0.11.0, went
+into the ask as precedent.
+
+Next check: an answer on #247, or the `review_by` date 2026-11-24, whichever
+comes first.
