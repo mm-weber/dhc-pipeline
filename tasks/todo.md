@@ -388,3 +388,33 @@ time, PR time and daily. Each chart README states its images' authenticity
 class in the reader's words (grafana's says plainly that it is agreement of
 origins, not a signature). Cluster parents 10 and 11 are ticked, every child
 being done. Only pre-existing table labels carry em dashes.
+
+## Task 13.1: SECURITY.md, notice, attribution, trust-boundary table (2026-09-07)
+
+Branch: `task-13.1-security-policy`. Goal: the catalogue's posture is stated
+where a consumer looks (Req 9.1), the substrate's copyright and licence are
+carried with the SBOM licence statement (Req 9.16), the README states
+non-affiliation (Req 9.17), and every component's owner class and seam
+alternative are tabled (Req 9.15).
+
+- [x] 1. Measure what the policy states: reporting channel, advisories, live ruleset
+      (bypass, required checks), in-image licence copies, the substrate licence text
+- [x] 2. LICENSES/Apache-2.0.txt (the substrate's own copy) and NOTICE
+- [x] 3. SECURITY.md with every Req 9.1 item, dated snapshots, homes named
+- [x] 4. docs/concepts.md trust-boundary table (owner class, authenticity or pin, seam)
+- [x] 5. README, CLAUDE.md, requirements and design intros: labels, attribution,
+      non-affiliation; CONVENTIONS modification-notice rule; manual links
+- [x] 6. tasks.md tick; em-dash sweep; table column counts
+
+**Review (2026-09-07).** Measured first, then written: the reporting channel
+is still disabled (the policy names it and says what its absence means; the
+switch is the owner's, the daily assertion 13.2's), no advisory exists, the
+live ruleset requires five checks and one review with an always-on
+administrator bypass, the substrate's licence text equals SPDX's apart from
+its filled-in appendix copyright, and the runtime images carry no licence
+text of their own. SECURITY.md carries every Req 9.1 item in that order,
+each number dated and its home named. The trust-boundary table has sixteen
+rows in the three Req 9.15 classes with the framing addendum's seams. The
+labels dropped from four intros; the attribution and non-affiliation
+sentences sit in the README, the design overview and NOTICE. No em dashes in
+added lines; the README's rendered verification block is untouched.

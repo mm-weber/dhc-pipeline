@@ -11,8 +11,9 @@
 > statements will follow here. Do not build anything on this catalogue that
 > expects continuity; wait for the successor.
 
-A miniature [Docker Hardened Images](https://docs.docker.com/dhi/)-style
-catalogue, built as a skill-building project and then **operated**: image
+A miniature hardened-image catalogue built with
+[Docker Hardened Images](https://docs.docker.com/dhi/) tooling and packages,
+made as a skill-building project and then **operated**: image
 definitions in native `dhi.io/build` syntax, upstream Helm charts adapted to
 hardened non-root images, Renovate tracking upstream releases, Go integration
 tests on real Kubernetes, and CVE triage recorded as portable OpenVEX. It grew
@@ -20,6 +21,13 @@ out of a one-image supply-chain lab (a hardened Go service plus Kyverno
 admission policies — both carried over) into the full maintainer loop, and the
 automation has been running unattended since 2026-07: real bump PRs, real scan
 findings, real triage decisions, all in this repo's history.
+
+The hardening substrate is Docker Hardened Images': the build frontend, the
+builder images, the apk repositories and their signing key. This catalogue
+contributes the operating model: the definitions, the triage lanes, the chart
+adaptations, the tests, the published promise and its invariants. It is not
+affiliated with, sponsored by or endorsed by Docker, Inc.; the names are used
+to describe where the substrate comes from.
 
 ## Layout
 
@@ -75,7 +83,20 @@ CI rebuilds, re-scans, and e2e-tests them; a daily rescan of published images
 opens issues with severity/EPSS/KEV. See
 [`docs/operating-loop.md`](docs/operating-loop.md) for a live trace.
 
+## Security and trust
+
+[`SECURITY.md`](SECURITY.md) states the promise, what a signature attests and
+does not, the governance (one maintainer, the bypass kept in force), the
+reporting and advisory channels, the revocation record, each definition's
+upstream authenticity class, the transparency-log disclosure and the
+substrate terms. The trust-boundary table in
+[`docs/concepts.md`](docs/concepts.md#trust-boundary-who-owns-what-and-where-the-seams-are)
+lists every component with its owner class and declared seam alternative.
+
 ## License
 
-[MIT](LICENSE). Images repackage upstream software under upstream licenses
-(noted per definition).
+[MIT](LICENSE) for this repository. The images are built with Docker Hardened
+Images tooling and packages, Copyright 2025 Docker Inc., Apache-2.0
+([`NOTICE`](NOTICE), [`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt)),
+and repackage upstream software under upstream licenses (noted per
+definition, enumerated per package in the attested SBOMs).

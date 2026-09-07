@@ -2,9 +2,14 @@
 
 ## Overview
 
-**Purpose**: A miniature DHI-style hardened-image catalogue ("dhc") that exercises, with real
-industry tooling, every responsibility of a Docker Hardened Images engineering role: definition
-authoring, chart adaptation, upstream tracking, Go-based integration testing, and CVE triage.
+**Purpose**: A miniature hardened-image catalogue ("dhc") built with Docker Hardened Images
+tooling and packages, exercising, with real industry tooling, every responsibility of a Docker
+Hardened Images engineering role: definition authoring, chart adaptation, upstream tracking,
+Go-based integration testing, and CVE triage. The hardening substrate is Docker Hardened
+Images' (the build frontend, the builder images, the apk repositories and their signing key);
+this catalogue contributes the operating model (definitions, triage lanes, chart adaptations,
+tests, the published promise and its invariants). It is not affiliated with, sponsored by or
+endorsed by Docker, Inc. (Req 9.17).
 
 **Users**: The project owner (as catalogue maintainer and job candidate); later, reviewers of the
 repository evaluating maintainer craft.
