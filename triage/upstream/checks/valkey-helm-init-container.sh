@@ -41,7 +41,7 @@ awk '/define "valkey.image"/{f=1} f{print NR": "$0} f&&/end/{exit}' "$chart/temp
 echo
 echo "== init.sh: interpreter and the utilities it calls (templates/init_config.yaml) =="
 grep -n '#!/bin/sh' "$chart/templates/init_config.yaml" | head -1
-for u in date tee cat rm mkdir; do printf '%-6s on %s line(s)\n' "$u" "$(grep -cw "$u" "$chart/templates/init_config.yaml" || true)"; done
+for u in date tee cat rm mkdir chmod touch sha256sum cut valkey-cli valkey-server; do printf '%-13s on %s line(s)\n' "$u" "$(grep -cw -- "$u" "$chart/templates/init_config.yaml" || true)"; done
 echo
 echo "== values that carry an image, values.yaml (the exporter's own image is the precedent) =="
 grep -nE '^(image|metrics):|^\s+image:|repository:|^\s+tag:' "$chart/values.yaml" | head -12

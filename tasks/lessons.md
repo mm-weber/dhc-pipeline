@@ -101,3 +101,21 @@ commit (verified byte-identical) resolved it.
 unmerged work, either wait for the merge, or branch from it and, the moment
 the base squash-merges, reset the branch to main and cherry-pick only the
 new commits before anyone merges the dependent PR.
+
+## 2026-09-07: an outward-facing draft carried two claims a grep had invented
+
+**What happened.** The valkey-helm draft said the exporter's image value was
+`metrics.image` and that the init script needed "tee, cat, rm, mkdir and
+date". Both came from a grep for the names I expected rather than from
+reading the files: the value is `metrics.exporter.image`, and the script also
+calls chmod, touch, sha256sum and cut on the ACL path. An adversarial second
+review, prompted by the owner asking whether the ask was naive, found both.
+The ask itself held up (no design reason for image parity, no existing knob,
+active maintainers), but either slip alone would have read as uninformed on
+the upstream tracker.
+
+**Rule.** Before a draft leaves the repo, read every upstream file it cites
+end to end and quote value paths verbatim from `values.yaml`; count binaries
+over the whole script, including every conditional branch, and make the
+check script print the full list so the count is measured, not remembered.
+Then have a second reviewer argue against filing before the owner does.
