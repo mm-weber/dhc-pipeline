@@ -20,11 +20,12 @@ compat:
   variant: valkey-compat
   reason: >-
     The chart renders an unconditional init container from the same image as
-    the main container, running /scripts/init.sh under /bin/sh with date, tee,
-    cat, rm and mkdir; the runtime image ships no shell, so the pod never
-    starts. No value disables or replaces that container (measured on 0.11.0
-    and 0.12.0, triage/upstream/checks/valkey-helm-init-container.sh).
-  issue: triage/upstream/2026-08-25-valkey-helm-init-container-image.md
+    the main container, running /scripts/init.sh under /bin/sh with standard
+    utilities such as cat, tee, mkdir and sha256sum; the runtime image ships
+    no shell, so the pod never starts. No value disables or replaces that
+    container (measured on 0.11.0 and 0.12.0,
+    triage/upstream/checks/valkey-helm-init-container.sh).
+  issue: https://github.com/valkey-io/valkey-helm/issues/247
   decided_at: 2026-08-25
   review_by: 2026-11-24
 #

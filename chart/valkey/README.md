@@ -98,10 +98,11 @@ The decision itself is recorded as structured metadata in
 [`chart.yaml`](chart.yaml) under `compat:` (task 11.4, Req 4.5): the variant,
 the reason above in one paragraph, the upstream ask it waits on, `decided_at`
 and `review_by`. It is a transfer: the ask, an init-container image value
-defaulting to the main image, is drafted in
-[`triage/upstream/2026-08-25-valkey-helm-init-container-image.md`](../../triage/upstream/2026-08-25-valkey-helm-init-container-image.md)
+defaulting to the main image, is filed as [valkey-io/valkey-helm#247](https://github.com/valkey-io/valkey-helm/issues/247)
+(drafted in
+[`triage/upstream/2026-08-25-valkey-helm-init-container-image.md`](../../triage/upstream/2026-08-25-valkey-helm-init-container-image.md),
 with the measurement re-runnable by
-[`checks/valkey-helm-init-container.sh`](../../triage/upstream/checks/valkey-helm-init-container.sh);
+[`checks/valkey-helm-init-container.sh`](../../triage/upstream/checks/valkey-helm-init-container.sh));
 once upstream ships it, the runtime image can carry this chart and the variant
 retires. `scripts/lint-compat.sh` fails validate the day after `review_by`
 until a dated re-decision lands (Req 4.8), and the daily rescan reports the
