@@ -22,6 +22,13 @@ jobs:
           pip install --quiet --require-hashes -r .github/requirements-ci.txt
           yamllint .
 
+      # Req 4.5, 4.8 (task 11.4): the pinned upstream charts and the compat
+      # decision have a shape (yamale) and a clock (lint-compat.sh).
+      - name: chart pins and compat decisions (Req 4.5, 4.8)
+        run: |
+          yamale -s chart/chart.schema.yaml chart/cert-manager/chart.yaml chart/grafana/chart.yaml chart/valkey/chart.yaml
+          scripts/lint-compat.sh
+
       # Fast deterministic gate; the authoritative definition validator is
       # the dhi.io/build frontend compiling each changed definition (build.yml)
       - name: pin + definition lint against docs/CONVENTIONS.md (Req 1.5, 1.6, 7.4)
@@ -130,6 +137,8 @@ jobs:
         run: scripts/fetch-sboms_test.sh
       - name: check-authenticity unit tests (Req 3.10, 4.9)
         run: scripts/check-authenticity_test.sh
+      - name: lint-compat unit tests (Req 4.8)
+        run: scripts/lint-compat_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)
         run: scripts/check-attestation-count_test.sh
 

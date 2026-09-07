@@ -328,3 +328,25 @@ filed nothing on real data and one correctly formed supply-chain issue on a
 fabricated moved tag. Five suites green (definition-lib, refresh-grafana,
 verify-arch-pins, check-authenticity, plus the lint battery), shellcheck,
 yamllint, actionlint, lint-workflow-policy and the SC2154 sweep clean.
+
+## Task 11.4: chart versions tracked, same-tag chart automerge, valkey compat as transfer (2026-09-06)
+
+Branch: `task-11.4-charts-compat`. Goal: Renovate tracks the three upstream
+chart versions (Req 3.11, never automerged), digest-only bumps of the
+catalogue's own image pins under chart/ automerge on green (Req 3.12), and the
+valkey compat decision is structured metadata with a review-by date that
+validate fails once past (Req 4.5, 4.8), with the upstream ask drafted from a
+re-runnable measurement.
+
+- [x] 1. renovate.json5: a helm-datasource manager over chart/<name>/chart.yaml capturing
+      upstream.repository as registryUrl; a helm automerge:false rule; a docker digest-only
+      automerge rule for ghcr.io/mm-weber/dhc/** ordered before the build-layer rule; fixtures
+      in managers.test.mjs for the three captures, the non-capture and the registryUrl;
+      renovate-config-validator --strict
+- [x] 2. chart/valkey/chart.yaml `compat:` block; chart/chart.schema.yaml (yamale) validated in
+      validate.yml; scripts/lint-compat.sh (+ tests) failing a past review_by (Req 4.8); the
+      README cites the block
+- [x] 3. triage/upstream/2026-08-25-valkey-helm-init-container-image.md with
+      checks/valkey-helm-init-container.sh re-running the render measurement; the owner files
+      it and records the number in the compat block and LOG.md
+- [x] 4. tasks.md tick; suites, validator, yamllint

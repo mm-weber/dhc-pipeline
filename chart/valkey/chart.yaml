@@ -8,6 +8,25 @@ upstream:
 # NOTE: this is the valkey project's own chart, and 0.11.0 ships appVersion
 # 9.1.1 — the exact version image/valkey/ builds. No version-skew note is
 # needed here, unlike chart/grafana/.
+
+# Req 4.5 (task 11.4): the compat-variant decision as structured metadata.
+# Shape validated by chart/chart.schema.yaml (yamale, validate.yml); the
+# clock by scripts/lint-compat.sh, which fails validate once review_by has
+# passed (Req 4.8), and the rescan reports a lapse daily (Req 4.9). The
+# README below carries the reasoning; this block carries the decision. A
+# transfer: the ask sits with upstream (issue), and the date is when we
+# re-decide whether to keep shipping a shell.
+compat:
+  variant: valkey-compat
+  reason: >-
+    The chart renders an unconditional init container from the same image as
+    the main container, running /scripts/init.sh under /bin/sh with date, tee,
+    cat, rm and mkdir; the runtime image ships no shell, so the pod never
+    starts. No value disables or replaces that container (measured on 0.11.0
+    and 0.12.0, triage/upstream/checks/valkey-helm-init-container.sh).
+  issue: triage/upstream/2026-08-25-valkey-helm-init-container-image.md
+  decided_at: 2026-08-25
+  review_by: 2026-11-24
 #
 # Render (chart CI gate, task 5.5) and install (e2e, phase 6):
 #   helm template dhc-valkey valkey \

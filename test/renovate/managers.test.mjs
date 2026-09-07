@@ -54,7 +54,7 @@ function extract(manager, content) {
 }
 
 const read = (rel) => readFileSync(join(root, rel), "utf8");
-const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr, workflowMgr, chartDigestMgr, chartTagMgr, pipMgr, goBumpMgr] =
+const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr, workflowMgr, chartDigestMgr, chartTagMgr, pipMgr, goBumpMgr, helmMgr] =
   config.customManagers;
 
 // managerFilePatterns is the half extract() cannot exercise: a pattern that
@@ -313,16 +313,49 @@ check(
     }
   }
 
-  // Req 3.5, the decided scope: automerge is patch and digest of the
-  // github-tags datasource, and nothing else in the config says automerge: true.
+  // Req 3.5 and 3.12, the decided scope: automerge is patch and digest of
+  // the github-tags datasource, and digest-only bumps of the catalogue's own
+  // image pins under chart/; nothing else in the config says automerge: true.
   const automerging = config.packageRules.filter((r) => r.automerge === true);
-  check("automerge: exactly one rule enables it", automerging.length === 1, `${automerging.length}`);
-  const am = automerging[0] ?? {};
-  check("automerge: scoped to github-tags (compile-from-source upstreams)", JSON.stringify(am.matchDatasources) === JSON.stringify(["github-tags"]), `${am.matchDatasources}`);
+  check("automerge: exactly two rules enable it", automerging.length === 2, `${automerging.length}`);
+  const am = automerging.find((r) => JSON.stringify(r.matchDatasources) === JSON.stringify(["github-tags"])) ?? {};
+  check("automerge: one is scoped to github-tags (compile-from-source upstreams)", !!am.matchDatasources, JSON.stringify(automerging));
   check("automerge: patch and digest only", JSON.stringify([...(am.matchUpdateTypes ?? [])].sort()) === JSON.stringify(["digest", "patch"]), `${am.matchUpdateTypes}`);
+  const chartDigests = automerging.find((r) => JSON.stringify(r.matchDatasources) === JSON.stringify(["docker"])) ?? {};
+  check("automerge: the other is docker digest-only", JSON.stringify(chartDigests.matchUpdateTypes) === JSON.stringify(["digest"]), `${chartDigests.matchUpdateTypes}`);
+  check("automerge: scoped to the catalogue's own images", JSON.stringify(chartDigests.matchPackageNames) === JSON.stringify(["ghcr.io/mm-weber/dhc/**"]), `${chartDigests.matchPackageNames}`);
+  const buildLayer = config.packageRules.findIndex((r) => r.groupName === "dhi.io build layer");
+  check("automerge: the build-layer rule (automerge: false) is ordered after the digest rule, so it wins", buildLayer > config.packageRules.indexOf(chartDigests) && config.packageRules[buildLayer].automerge === false, `${buildLayer}`);
   check("automerge: the config's top level does not enable it", config.automerge !== true);
   const repackage = config.packageRules.find((r) => JSON.stringify(r.matchDepNames) === JSON.stringify(["grafana/grafana"]) && r.automerge === false);
   check("automerge: the repackage rule says automerge: false explicitly", !!repackage);
+  const helmRule = config.packageRules.find((r) => JSON.stringify(r.matchDatasources) === JSON.stringify(["helm"]) && r.automerge === false);
+  check("automerge: a chart release is never automerged, stated (Req 3.11)", !!helmRule);
+}
+
+// --- upstream chart versions (Req 3.11; task 11.4) ---------------------------
+// The three upstream charts are pinned in chart/<name>/chart.yaml. The manager
+// must capture the chart name, the pinned version and, as the registryUrl, the
+// chart repository: the helm datasource's default registry is a frozen decoy
+// (independent review 1.8), so a lost registryUrl reports every chart up to
+// date forever. hardened-app's own Chart.yaml is not an upstream pin.
+{
+  check("charts: a tenth custom manager tracks the upstream chart versions", !!helmMgr && helmMgr.datasourceTemplate === "helm", JSON.stringify(helmMgr));
+  for (const [file, name, version, registry] of [
+    ["chart/cert-manager/chart.yaml", "cert-manager", "v1.21.0", "https://charts.jetstack.io"],
+    ["chart/grafana/chart.yaml", "grafana", "10.5.15", "https://grafana.github.io/helm-charts"],
+    ["chart/valkey/chart.yaml", "valkey", "0.11.0", "https://valkey-io.github.io/valkey-helm"],
+  ]) {
+    check(`charts: manager file pattern matches ${file}`, !!helmMgr && filePatternMatches(helmMgr, file));
+    const deps = helmMgr ? extract(helmMgr, read(file)) : [];
+    check(`charts: ${name} yields exactly one dep`, deps.length === 1, `${deps.length}`);
+    const d = deps[0] ?? {};
+    check(`charts: ${name} tracked by chart name`, d.depName === name, `${d.depName}`);
+    check(`charts: ${name} pinned version captured (${version})`, d.currentValue === version, `${d.currentValue}`);
+    check(`charts: ${name} repository captured as the registryUrl`, d.registryUrl === registry, `${d.registryUrl}`);
+  }
+  check("charts: hardened-app's own Chart.yaml is not captured (case differs, it is ours)", !!helmMgr && !filePatternMatches(helmMgr, "chart/hardened-app/Chart.yaml"));
+  check("charts: a values file is not a chart pin", !!helmMgr && !filePatternMatches(helmMgr, "chart/grafana/config/values-hardened.yaml"));
 }
 
 // --- scanner pins (Req 7.5, 7.6) --------------------------------------------
