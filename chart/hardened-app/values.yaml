@@ -4,8 +4,8 @@
 # the pinned digest sat a rebuild behind the registry (issue #64).
 image:
   repository: ghcr.io/mm-weber/dhc/hardened-app
-  tag: 0.1.0-alpine3.23
-  digest: sha256:8eee13295b6434030d9b6b5295be748bb4b5017977fca6a4ffa9e867c7926bf3
+  tag: 0.1.1-alpine3.23
+  digest: sha256:8f1f7f76f3d5c208dfd7c0fd75a8b32394c843a402e9fa0adef2976137023403
 
 replicaCount: 1
 port: 8080
