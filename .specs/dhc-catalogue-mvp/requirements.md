@@ -2,7 +2,8 @@
 
 ## Introduction
 
-dhc-pipeline is a miniature DHI-style hardened-image catalogue that mirrors the day-to-day
+dhc-pipeline is a miniature hardened-image catalogue built with Docker Hardened Images tooling
+and packages; it mirrors the day-to-day
 responsibilities of a Docker Hardened Images engineering role: authoring declarative image
 definitions, adapting upstream Helm charts to hardened non-root images, tracking upstream
 releases automatically, validating behavior with Go-based integration tests on real Kubernetes,

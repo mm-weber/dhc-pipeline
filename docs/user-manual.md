@@ -42,6 +42,12 @@ anything carrying an unexcused finding, and the only ways to excuse one are
 recorded, reviewable decisions — an OpenVEX statement or a time-boxed risk
 exception.
 
+What the catalogue promises, what a signature attests and does not, and where
+to report a vulnerability are stated in [`SECURITY.md`](../SECURITY.md); the
+trust-boundary table in [`concepts.md`](concepts.md#trust-boundary-who-owns-what-and-where-the-seams-are)
+says which components are the substrate's, which are upstream's and which
+are this repository's own.
+
 ### Who this is for
 
 | You are…            | You want to…                                              | Start at |
@@ -65,6 +71,8 @@ exception.
 | `.specs/dhc-catalogue-mvp/`   | EARS requirements, design, task ledger |
 | `docs/`                       | This manual, conventions, concepts, ADRs, operating-loop evidence |
 | `renovate.json5`              | All upstream tracking: custom regex managers only |
+| `SECURITY.md`                 | The promise, what a signature attests, governance, reporting and advisory channels, revocation record, authenticity classes, transparency-log disclosure, substrate terms |
+| `NOTICE`, `LICENSES/`         | The substrate's copyright and licence (Docker Hardened Images, Apache-2.0) and the SBOM licence statement |
 
 ### The two loops
 

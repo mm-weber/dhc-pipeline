@@ -1,0 +1,40 @@
+dhc-pipeline
+Copyright (c) 2026 Manuel Weber. Licensed under the MIT License (LICENSE).
+
+Hardening substrate: Docker Hardened Images
+Copyright 2025 Docker Inc.
+Licensed under the Apache License, Version 2.0. A copy of the licence is in
+LICENSES/Apache-2.0.txt, taken from the substrate's own licence file,
+https://github.com/docker-hardened-images/catalog/blob/main/LICENSE.txt
+(read 2026-09-07; it is the SPDX Apache-2.0 text with the appendix's
+copyright line filled in as "Copyright 2025 Docker Inc.").
+
+Every image this catalogue publishes is built with Docker Hardened Images
+tooling and packages and contains DHI-origin content: the dhi.io/build
+frontend produces it, dhi.io builder images compile it, and its base layers
+come from the dhi.io apk package repositories (the public "main" lines only)
+and their signing keyring. No definition in this repository is a copy of a
+catalog definition; each was authored here. A definition copied or adapted
+from the catalog carries a modification notice (docs/CONVENTIONS.md,
+Definitions).
+
+Third-party packages and binaries inside every published image remain under
+their own upstream licences, enumerated per package in the SPDX and
+CycloneDX SBOMs attested to each platform manifest:
+
+  cosign verify-attestation --type spdxjson  <image>@sha256:<digest>
+  cosign verify-attestation --type cyclonedx <image>@sha256:<digest>
+
+with the identities README.md ("Verify an image") names. Each definition's
+license: field names the licence of the upstream software it repackages.
+
+Measured 2026-09-07 with crane export: the published runtime images carry no
+licence text in their filesystem (hardened-app 0.1.1: 68 files, valkey 9.1.2:
+101 files, none named LICENSE or NOTICE; grafana 13.1.5 ships its upstream's
+own LICENSE and NOTICE.md). This repository, which owns the registry
+namespace ghcr.io/mm-weber/dhc, is the copy of the licence that Apache-2.0
+section 4(a) requires to accompany the redistributed work.
+
+"Docker", "Docker Hardened Images" and "DHI" are Docker, Inc.'s names, used
+here only to describe the origin of the substrate. This catalogue is not
+affiliated with, sponsored by or endorsed by Docker, Inc.

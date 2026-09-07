@@ -162,6 +162,18 @@ One file per component at `image/<name>/image.yaml`. Rules, all enforced by
 - The linter is the fast gate; the **frontend itself is the authoritative
   validator** — it compiles every definition on each PR build (Req 1.5).
 
+- **A definition copied or adapted from the DHI catalog carries a
+  modification notice.** No definition here is one: each was authored in
+  this repository against the frontend's documented syntax (the cert-manager
+  definitions cross-checked one pin against the catalog, which is reading,
+  not copying). A definition that starts from a file in
+  `github.com/docker-hardened-images/catalog` opens with a prominent comment
+  naming the source file and commit and stating that it was changed here
+  (Apache-2.0 section 4(b)), and keeps every copyright and attribution
+  notice the source carried (section 4(c)). `NOTICE` names the substrate's
+  copyright and licence; `LICENSES/Apache-2.0.txt` is the licence text
+  (Req 9.16).
+
 ## Runtime accounts (Req 1.4)
 
 - Runtime images run as UID/GID **65532** (`nonroot`), declared in the definition's

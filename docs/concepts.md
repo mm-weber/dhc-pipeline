@@ -161,3 +161,30 @@ hatch for *computation*, never for *acquisition*. (See `triage/LOG.md`,
 Verification, when images are in a registry: `docker buildx imagetools
 inspect <ref>` (see the attestation manifests), `cosign verify-attestation
 --type slsaprovenance <ref>`, `docker scout attest list <ref>`.
+
+## Trust boundary: who owns what, and where the seams are
+
+Every component the catalogue depends on, with its owner class (Req 9.15):
+**substrate-inherited** (Docker Hardened Images), **upstream-inherited** with
+the authenticity class or pin that stands behind it, or **own**. The last
+column is the seam the framing addendum declared and deliberately did not
+build (design Decision 11): a fork changes the row, the operating model
+stays. `SECURITY.md` links here; the per-definition classes are also stated
+there.
+
+| Component | Owner class | Authenticity or pin | Declared seam alternative |
+|---|---|---|---|
+| Build frontend `dhi.io/build` | substrate-inherited | digest-pinned `# syntax=` line; docker datasource, bumps reviewed by hand | apko plus Wolfi, the documented backend a fork targets; the builder contract per archetype (Req 1.17: definition directory in, image by digest plus SBOM material out) is the seam |
+| Builder images `dhi.io/golang:*-dev` | substrate-inherited | digest-pinned `uses:`; reviewed by hand | Wolfi toolchain images through the same contract |
+| Package repositories `dhi.io/apk/<distro>/<release>/main` and their keyring | substrate-inherited | `/main` lines only, enforced by `lint-pins.sh`; packages float by design (Req 1.9), the resolved set is recorded per digest in the attested SBOMs | Wolfi apk repositories; the `dhi.io` login the build step needs is an adoption constraint, stated, not hidden |
+| Runtime base layers (baselayout, certificates, libc) | substrate-inherited | from the repositories above; rebuilt daily, published on change (Req 2.14 to 2.16) | comes with the backend |
+| cert-manager sources (controller, webhook, cainjector) | upstream-inherited, `signed-tag` | GitHub's verification statement for the annotated tag, at bump time and daily | none needed; the class is per definition |
+| valkey sources (runtime and compat) | upstream-inherited, `signed-commit` | GitHub's verification statement for the commit the tag points at, at bump time and daily | none needed |
+| hardened-app source (the owner's own upstream) | upstream-inherited, `signed-commit` | the same, since v0.1.1 | none needed |
+| grafana tarball | upstream-inherited, `cross-origin-checksum` | grafana.com versions API and dl.grafana.com sidecars agree per architecture, at bump time, PR time and daily; no upstream signature exists | the `.deb` route for a cryptographic anchor (ADR 0002); the definition ships as a reference behind the active-set switch |
+| Upstream charts (jetstack cert-manager, grafana community, valkey project) | upstream-inherited, none declared | exact version pinned in `chart.yaml`, tracked by the helm datasource, never automerged; templates never edited | a fork's chart source; the overlay is the only delta |
+| Definitions, overlays, Kyverno policies, triage records (VEX, exceptions, LOG), scripts, workflows, the rescan tool, tests | own | git history under the committed ruleset; every change a pull request | the operating model is the product; forks change declared values in `catalogue-policy.yaml` |
+| Trivy (authoritative scanner and VEX consumer) | upstream-inherited, exact version plus recorded sha256 (Req 7.5) | the PR gate and the rescan | Grype as the measured second consumer and the daily consumer smoke test as migration insurance (task 13.4); a fork flips the authoritative consumer in the policy file |
+| Grype, syft, govulncheck, kind, kyverno, helm, ct, crane, cosign, renovate | upstream-inherited, exact version plus recorded sha256, Go sumdb or npm integrity (Req 7.5, 7.6) | tool pins with Renovate managers; the checksum half is human | each is a rendering of a declared value: cosign to notation and Kyverno to policy-controller are declared renderings, not built |
+| Sigstore public-good instance (Fulcio, Rekor) | upstream-inherited, service | identities pinned in the verification policy; keyless signing | a private Sigstore or a key with notation; the transparency-log disclosure fact changes with it |
+| GitHub: Actions (builds, OIDC identities), GHCR (registry), Issues (lifecycle, status), rulesets (governance) | upstream-inherited, platform coupling accepted deliberately | owner, repository and registry names are declared values (Req 1.13 to 1.19); the OIDC issuer is pinned | another forge with OIDC, a registry and an issue tracker; the coupling is listed, not abstracted |

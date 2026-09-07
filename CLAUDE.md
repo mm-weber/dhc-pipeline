@@ -1,7 +1,8 @@
 # CLAUDE.md — dhc-pipeline
 
-Mini DHI-style hardened-image catalogue: a skill-building repo mirroring the
-responsibilities of a DHI-flavored role (image definitions, chart adaptation,
+Mini hardened-image catalogue built with Docker Hardened Images tooling and
+packages: a skill-building repo mirroring the responsibilities of a DHI
+engineering role (image definitions, chart adaptation,
 upstream tracking, Go integration tests, CVE triage). Research inputs live in
 `data/`; formal spec artifacts in `.specs/` (spec-driven-workflow); design docs
 in `docs/`.
