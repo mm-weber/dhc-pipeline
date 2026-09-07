@@ -129,12 +129,14 @@ this repository. None has been published as of 2026-09-07.
 
 ## Revocation
 
-The record is `triage/revocations.yaml`: one entry per revoked digest with
-the digest, the reason, the replacement digest or a recorded absence of one,
-the advisory link and the date, schema-checked in CI. The runbook is
-`docs/revocation-runbook.md`. A daily invariant reports any catalogue tag that
-still references a revoked digest. Both land with task 13.3 of the spec; the
-record starts empty, and no digest has been revoked.
+The record is [`triage/revocations.yaml`](triage/revocations.yaml): one entry
+per revoked digest with the digest, the reason, the replacement digest or a
+recorded absence of one (and then the move taken, version deletion or a
+tombstone), the advisory link and the date, schema-checked in CI. The runbook
+is [`docs/revocation-runbook.md`](docs/revocation-runbook.md); it names the
+moves GHCR actually has. The daily rescan fails by name while any catalogue
+tag still references a recorded digest, and the status issue lists every
+entry. No digest has been revoked.
 
 ## Upstream authenticity, per definition
 

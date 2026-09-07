@@ -101,6 +101,21 @@ const StatusSchemaVersion = 1
 // StatusMarker is the hidden marker the workflow finds the status issue by.
 const StatusMarker = "<!-- catalogue-status -->"
 
+// Revocation is one entry of triage/revocations.yaml (Req 9.5), read from the
+// JSON scripts/check-revocations.sh derives from it. The status issue lists
+// every entry (task 13.3) so whoever reads the status sees what was
+// withdrawn, why, and what replaced it.
+type Revocation struct {
+	Image       string `json:"image"`
+	Digest      string `json:"digest"`
+	Reason      string `json:"reason"`
+	Replacement string `json:"replacement"`
+	Withdrawal  string `json:"withdrawal,omitempty"`
+	Tombstone   string `json:"tombstone,omitempty"`
+	Advisory    string `json:"advisory"`
+	Date        string `json:"date"`
+}
+
 type StatusData struct {
 	SchemaVersion int              `json:"schema_version"`
 	GeneratedAt   string           `json:"generated_at"`
@@ -109,6 +124,7 @@ type StatusData struct {
 	Repositories  []RepoStatus     `json:"repositories"`
 	Findings      []FindingClock   `json:"findings"`
 	Aggregates    StatusAggregates `json:"aggregates"`
+	Revocations   []Revocation     `json:"revocations"`
 }
 type StatusPolicy struct {
 	Aperture   []string       `json:"aperture"`
@@ -513,6 +529,15 @@ func median(xs []float64) *float64 {
 // RenderStatusIssue is the issue body: the marker, the numbers, the open
 // findings against their ceilings, the fixed ones folded away, and the
 // metrics JSON in a fenced block the next run reads back (ExtractFencedJSON).
+// shortDigest renders sha256:<64 hex> as sha256:<12 hex>, the table's width.
+func shortDigest(d string) string {
+	const prefix = "sha256:"
+	if strings.HasPrefix(d, prefix) && len(d) > len(prefix)+12 {
+		return d[:len(prefix)+12]
+	}
+	return d
+}
+
 func RenderStatusIssue(s StatusData) string {
 	var b strings.Builder
 	b.WriteString(StatusMarker + "\n")
@@ -532,7 +557,29 @@ func RenderStatusIssue(s StatusData) string {
 		oldest = fmt.Sprintf(", oldest: %d days", *ag.OldestUndecidedDays)
 	}
 	fmt.Fprintf(&b, "- findings: %d; undecided: %d (over ceiling: %d%s); decided: %d; fixed: %d\n", ag.Findings, ag.Undecided, ag.OverCeiling, oldest, ag.Decided, ag.Fixed)
-	fmt.Fprintf(&b, "- median days to decision: %s; median days to fix: %s\n\n", num(ag.MedianDaysToDecision), num(ag.MedianDaysToFix))
+	fmt.Fprintf(&b, "- median days to decision: %s; median days to fix: %s\n", num(ag.MedianDaysToDecision), num(ag.MedianDaysToFix))
+	if len(s.Revocations) == 0 {
+		b.WriteString("- revocations: none\n\n")
+	} else {
+		fmt.Fprintf(&b, "- revocations: %d (Req 9.5), listed below\n\n", len(s.Revocations))
+		b.WriteString("| Repository | Digest | Date | Reason | Outcome | Advisory |\n")
+		b.WriteString("|---|---|---|---|---|---|\n")
+		for _, r := range s.Revocations {
+			outcome := "withdrawn (" + orNA(r.Withdrawal) + ")"
+			if r.Replacement != "" && r.Replacement != "none" {
+				outcome = "replaced by `" + shortDigest(r.Replacement) + "`"
+			} else if r.Tombstone != "" {
+				outcome += ", tombstone `" + shortDigest(r.Tombstone) + "`"
+			}
+			advisory := r.Advisory
+			if i := strings.LastIndex(r.Advisory, "/"); i >= 0 && i+1 < len(r.Advisory) {
+				advisory = fmt.Sprintf("[%s](%s)", r.Advisory[i+1:], r.Advisory)
+			}
+			fmt.Fprintf(&b, "| %s | `%s` | %s | %s | %s | %s |\n",
+				shortName(r.Image), shortDigest(r.Digest), r.Date, r.Reason, outcome, advisory)
+		}
+		b.WriteString("\n")
+	}
 
 	open := []FindingClock{}
 	fixed := []FindingClock{}

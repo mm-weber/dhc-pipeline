@@ -1,0 +1,21 @@
+# yamale schema for triage/revocations.yaml (Req 9.6; task 13.3). validate.yml
+# runs `yamale -s triage/revocations.schema.yaml triage/revocations.yaml`;
+# a violation fails validation naming the entry and the field.
+revocations: list(any(include('replaced'), include('withdrawn')), required=True)
+---
+replaced:
+  image: regex('^[a-z0-9.-]+(/[a-z0-9._-]+)+$')
+  digest: regex('^sha256:[0-9a-f]{64}$')
+  reason: str(min=1)
+  replacement: regex('^sha256:[0-9a-f]{64}$')
+  advisory: regex('^https://github\.com/[^/]+/[^/]+/security/advisories/GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}$')
+  date: day()
+withdrawn:
+  image: regex('^[a-z0-9.-]+(/[a-z0-9._-]+)+$')
+  digest: regex('^sha256:[0-9a-f]{64}$')
+  reason: str(min=1)
+  replacement: enum('none')
+  withdrawal: enum('delete-version', 'tombstone')
+  tombstone: regex('^sha256:[0-9a-f]{64}$', required=False)
+  advisory: regex('^https://github\.com/[^/]+/[^/]+/security/advisories/GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}$')
+  date: day()

@@ -450,3 +450,37 @@ in the rescan so those failures fail the run without skipping the issue
 lifecycle and the status publish; the step block was extracted verbatim,
 shellchecked and executed locally with the outputs file inspected. actionlint,
 yamllint and lint-workflow-policy pass.
+
+## Task 13.3: revocation record (2026-09-07)
+
+Branch: `task-13.3-revocation-record`. Goal: every revoked digest is a
+schema-checked entry in `triage/revocations.yaml` (Req 9.5, 9.6), the daily
+rescan fails by name when a catalogue tag still references one (Req 9.7),
+the status issue lists the record, and a short runbook names the moves GHCR
+actually has.
+
+- [x] 1. Test first: scripts/check-revocations_test.sh (empty record; a revoked index digest
+      and a revoked platform manifest referenced by a tag; a frozen revoked digest; an
+      unreadable file; schema fixtures through yamale) and a Go test for the status section
+- [x] 2. triage/revocations.yaml (empty), triage/revocations.schema.yaml (replaced or
+      withdrawn entry shapes), scripts/check-revocations.sh, the status tool's --revocations
+- [x] 3. docs/revocation-runbook.md: replacement through the release path; withdrawal by
+      version deletion or a tombstone, with what each costs and what the rescan then reports
+- [x] 4. rescan.yml: the record read by the status step, the assertion in the posture step at
+      the end; validate.yml: yamale on the record and the new suite
+- [x] 5. SECURITY.md present tense; triage/README.md section; tasks.md tick; em-dash sweep;
+      shellcheck, actionlint, lint-workflow-policy, go test, local rehearsal
+
+**Review (2026-09-07).** Test first on both halves: the bash suite (six
+behaviour cases plus five schema cases through yamale with the real schema)
+failed on the missing script and passed once written; the Go test for the
+status section failed to compile before the type existed and passes now, with
+the JSON round trip. Rehearsed against the real enumeration (73 rows): the
+empty record passes, and a real index digest recorded as revoked names all
+three tags that reference it, one line each. The status tool rendered the
+rehearsal entry in its table. The posture step block was extracted verbatim,
+shellchecked and executed; actionlint, yamllint, lint-workflow-policy, go vet
+and gofmt are clean. Deviation from the design's placement, recorded: the
+verdict is asserted in the posture step at the end (the invariants step only
+produces the record for the status issue), for the same reason 13.2 runs
+last, so a failure never starves the day's issues and status.

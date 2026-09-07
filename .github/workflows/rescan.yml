@@ -328,6 +328,12 @@ jobs:
           # tag-referenced digest and platform manifest, read from the .att
           # manifests the way a consumer reads them, after today's replaces.
           scripts/check-attestation-count.sh "$OUT/enumeration.tsv" "$OUT/attestation-count.json"
+          # Req 9.5 (task 13.3): the revocation record, read once here into the
+          # JSON the status step lists; its verdict (no catalogue tag on a
+          # revoked digest, Req 9.7) is asserted by the posture step at the
+          # end, so a half-executed revocation fails the run after the day's
+          # issues and status are published, not instead of them.
+          scripts/check-revocations.sh triage/revocations.yaml "$OUT/enumeration.tsv" "$OUT/revocations.json" || true
 
       # Task 11.3 (Req 3.10, 4.9): every definition's declared authenticity
       # signal re-verified against its origin, daily. A mismatch (a tag that
@@ -523,7 +529,7 @@ jobs:
             --enumeration "$OUT/enumeration.tsv" --reattest "$OUT/reattest" --reports "$OUT/trivy" \
             --kev "$OUT/kev.json" --aperture "$aperture" --ceilings "$ceilings" \
             --kev-ceiling "$(scripts/triage-policy.sh . kev-ceiling)" \
-            --previous-body "$OUT/status/previous.md" \
+            --previous-body "$OUT/status/previous.md" --revocations "$OUT/revocations.json" \
             --run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             --out-json "$OUT/status/metrics.json" --out-body "$OUT/status/issue.md"
           for k in findings undecided over_ceiling decided fixed; do
@@ -553,20 +559,27 @@ jobs:
           name: catalogue-status
           path: rescan-out/status/metrics.json
 
-      # Task 13.2 (Req 9.3, 9.9): governance as code, asserted daily through
-      # anonymous reads. The committed ruleset export under .github/rulesets/
-      # must match the live rulesets API by name over name, target,
-      # enforcement, conditions and rules, in both directions, and private
-      # vulnerability reporting must be on. bypass_actors is outside the
-      # compared set (anonymous reads withhold it): the export carries it and
-      # SECURITY.md states it. A difference fails the run by name. It runs
-      # last so a governance failure never starves the day's scans, issues
-      # and status of their run; the summary still prints.
-      - name: governance invariants (Req 9.3, 9.9)
+      # Tasks 13.2 and 13.3 (Req 9.3, 9.7, 9.9): the posture invariants,
+      # asserted daily. Governance through anonymous reads: the committed
+      # ruleset export under .github/rulesets/ must match the live rulesets
+      # API by name over name, target, enforcement, conditions and rules, in
+      # both directions, and private vulnerability reporting must be on
+      # (bypass_actors is outside the compared set, anonymous reads withhold
+      # it: the export carries it and SECURITY.md states it). And no catalogue
+      # tag may still reference a digest the revocation record names. Each
+      # failure fails the run by name. The step runs last so a posture failure
+      # never starves the day's scans, issues and status of their run; the
+      # summary still prints.
+      - name: posture invariants (Req 9.3, 9.7, 9.9)
         id: governance
         run: |
           set -uo pipefail
           scripts/check-governance.sh .github/rulesets "$GITHUB_REPOSITORY" "$OUT/governance.json"; rc=$?
+          scripts/check-revocations.sh triage/revocations.yaml "$OUT/enumeration.tsv" "$OUT/revocations.json" || rc=1
+          {
+            echo "revoked=$(jq '.revocations | length' "$OUT/revocations.json")"
+            echo "revoked_referenced=$(jq '.referenced | length' "$OUT/revocations.json")"
+          } >> "$GITHUB_OUTPUT"
           {
             echo "reporting=$(jq -r 'if .reporting.enabled == null then "unreadable" elif .reporting.enabled then "enabled" else "DISABLED" end' "$OUT/governance.json")"
             echo "compared=$(jq '.rulesets | length' "$OUT/governance.json")"
@@ -588,6 +601,7 @@ jobs:
             echo "- new CVE issues filed: ${{ steps.report.outputs.count || 0 }}"
             echo "- authenticity signals: ${{ steps.authenticity.outputs.verified || 0 }} verified, ${{ steps.authenticity.outputs.mismatched || 0 }} mismatched, ${{ steps.authenticity.outputs.lapsed || 0 }} lapsed compat review-by date(s)"
             echo "- governance: private vulnerability reporting ${{ steps.governance.outputs.reporting || 'not checked' }}, ${{ steps.governance.outputs.compared || 0 }} committed ruleset(s) compared, ${{ steps.governance.outputs.differences || 0 }} difference(s), ${{ steps.governance.outputs.live_only || 0 }} live-only ruleset(s)"
+            echo "- revocations: ${{ steps.governance.outputs.revoked || 0 }} recorded, ${{ steps.governance.outputs.revoked_referenced || 0 }} still referenced by a catalogue tag"
             echo "- issues closed on evidence: ${{ steps.lifecycle_apply.outputs.closed || 0 }} of ${{ steps.lifecycle.outputs.close || 0 }} decided, reopened: ${{ steps.lifecycle_apply.outputs.reopened || 0 }} of ${{ steps.lifecycle.outputs.reopen || 0 }}, kept open: ${{ steps.lifecycle.outputs.kept || 0 }}"
             echo "- catalogue status: ${{ steps.status_publish.outputs.url || 'not published' }}, ${{ steps.status.outputs.undecided || 0 }} undecided (${{ steps.status.outputs.over_ceiling || 0 }} over ceiling), ${{ steps.status.outputs.decided || 0 }} decided, ${{ steps.status.outputs.fixed || 0 }} fixed"
             echo

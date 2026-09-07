@@ -29,6 +29,11 @@ jobs:
           yamale -s chart/chart.schema.yaml chart/cert-manager/chart.yaml chart/grafana/chart.yaml chart/valkey/chart.yaml
           scripts/lint-compat.sh
 
+      # Req 9.6 (task 13.3): every entry of the revocation record fits its
+      # schema; a violation names the entry and the field.
+      - name: revocation record (Req 9.6)
+        run: yamale -s triage/revocations.schema.yaml triage/revocations.yaml
+
       # Fast deterministic gate; the authoritative definition validator is
       # the dhi.io/build frontend compiling each changed definition (build.yml)
       - name: pin + definition lint against docs/CONVENTIONS.md (Req 1.5, 1.6, 7.4)
@@ -139,6 +144,8 @@ jobs:
         run: scripts/check-authenticity_test.sh
       - name: check-governance unit tests (Req 9.3, 9.9)
         run: scripts/check-governance_test.sh
+      - name: check-revocations unit tests (Req 9.5 to 9.7)
+        run: scripts/check-revocations_test.sh
       - name: lint-compat unit tests (Req 4.8)
         run: scripts/lint-compat_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)
