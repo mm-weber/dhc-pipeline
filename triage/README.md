@@ -189,6 +189,18 @@ red gate is: avoid, fix, an OpenVEX statement under `vex/` (+ a `LOG.md` entry),
 or a time-boxed entry in `accepted-risk/`. Nobody closes it by hand: the next
 rescan closes it on the evidence the decision produced, and names that evidence.
 
+## `revocations.yaml`: the revocation record (Req 9.5 to 9.7)
+
+One entry per revoked digest: image, digest, reason, the replacement digest
+or `none` with the move taken (`delete-version` or `tombstone`), the GHSA
+advisory link and the date. Its shape is `revocations.schema.yaml`, checked
+in validate (Req 9.6); nothing is ever removed from the list. The record
+drives the mechanics: the daily rescan fails by name while any catalogue tag
+still references a recorded digest (`scripts/check-revocations.sh`,
+Req 9.7), and the status issue lists every entry. How an entry gets here,
+and what GHCR can and cannot do about a tag, is
+[`docs/revocation-runbook.md`](../docs/revocation-runbook.md).
+
 ## `LOG.md`
 
 Dated, human-readable decisions: *finding → evidence → outcome → link*.

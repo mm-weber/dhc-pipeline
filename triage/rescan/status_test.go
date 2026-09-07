@@ -445,3 +445,42 @@ func TestBuildStatus_PartialScanInventsNoAbsence(t *testing.T) {
 		t.Errorf("a partially scanned digest is not listed as scanned")
 	}
 }
+
+func TestRenderStatusIssue_ListsRevocations(t *testing.T) {
+	s := StatusData{SchemaVersion: 1, GeneratedAt: "2026-09-07T06:17:00Z"}
+	body := RenderStatusIssue(s)
+	if !strings.Contains(body, "- revocations: none") {
+		t.Fatalf("an empty record must read as none:\n%s", body)
+	}
+	s.Revocations = []Revocation{{
+		Image: "ghcr.io/acme/dhc/solo", Digest: "sha256:" + strings.Repeat("a", 64),
+		Reason:      "the 1.0.0 build shipped a compromised upstream tarball",
+		Replacement: "sha256:" + strings.Repeat("b", 64),
+		Advisory:    "https://github.com/acme/dhc/security/advisories/GHSA-abcd-ef12-3456", Date: "2026-09-07",
+	}, {
+		Image: "ghcr.io/acme/dhc/valkey", Digest: "sha256:" + strings.Repeat("c", 64),
+		Reason: "withdrawn, no fixed upstream release exists", Replacement: "none", Withdrawal: "delete-version",
+		Advisory: "https://github.com/acme/dhc/security/advisories/GHSA-1111-2222-3333", Date: "2026-09-07",
+	}}
+	body = RenderStatusIssue(s)
+	for _, want := range []string{
+		"- revocations: 2 (Req 9.5), listed below",
+		"| solo | `sha256:aaaaaaaaaaaa` | 2026-09-07 | the 1.0.0 build shipped a compromised upstream tarball | replaced by `sha256:bbbbbbbbbbbb` | [GHSA-abcd-ef12-3456](https://github.com/acme/dhc/security/advisories/GHSA-abcd-ef12-3456) |",
+		"| valkey | `sha256:cccccccccccc` | 2026-09-07 | withdrawn, no fixed upstream release exists | withdrawn (delete-version) | [GHSA-1111-2222-3333](https://github.com/acme/dhc/security/advisories/GHSA-1111-2222-3333) |",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q in:\n%s", want, body)
+		}
+	}
+	raw, ok := ExtractFencedJSON(body)
+	if !ok {
+		t.Fatal("no fenced JSON")
+	}
+	var back StatusData
+	if err := json.Unmarshal([]byte(raw), &back); err != nil {
+		t.Fatal(err)
+	}
+	if len(back.Revocations) != 2 || back.Revocations[1].Withdrawal != "delete-version" {
+		t.Fatalf("revocations did not round-trip: %+v", back.Revocations)
+	}
+}

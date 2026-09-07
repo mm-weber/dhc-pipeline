@@ -72,6 +72,7 @@ are this repository's own.
 | `docs/`                       | This manual, conventions, concepts, ADRs, operating-loop evidence |
 | `renovate.json5`              | All upstream tracking: custom regex managers only |
 | `SECURITY.md`                 | The promise, what a signature attests, governance, reporting and advisory channels, revocation record, authenticity classes, transparency-log disclosure, substrate terms |
+| `triage/revocations.yaml`     | The revocation record, schema-checked; `docs/revocation-runbook.md` says how an entry gets there |
 | `NOTICE`, `LICENSES/`         | The substrate's copyright and licence (Docker Hardened Images, Apache-2.0) and the SBOM licence statement |
 
 ### The two loops

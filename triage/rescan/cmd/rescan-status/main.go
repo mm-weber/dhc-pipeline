@@ -46,6 +46,7 @@ func main() {
 	previousBody := flag.String("previous-body", "", "the status issue's body, the fenced JSON block is read (optional)")
 	todayFlag := flag.String("today", "", "YYYY-MM-DD; default: the latest report's date, else now (UTC)")
 	runURL := flag.String("run", "", "the run's URL, recorded in the data (optional)")
+	revocationsFile := flag.String("revocations", "", "the revocation record as JSON, scripts/check-revocations.sh's output; its revocations list is carried into the status (optional)")
 	outJSON := flag.String("out-json", "", "where to write metrics.json (required)")
 	outBody := flag.String("out-body", "", "where to write the issue body (required)")
 	flag.Parse()
@@ -126,6 +127,19 @@ func main() {
 	}
 
 	status := rescan.BuildStatus(in)
+	if *revocationsFile != "" {
+		data, err := os.ReadFile(*revocationsFile)
+		if err != nil {
+			fatal(fmt.Sprintf("read %s: %v", *revocationsFile, err))
+		}
+		var record struct {
+			Revocations []rescan.Revocation `json:"revocations"`
+		}
+		if err := json.Unmarshal(data, &record); err != nil {
+			fatal(fmt.Sprintf("parse %s: %v", *revocationsFile, err))
+		}
+		status.Revocations = record.Revocations
+	}
 	data, err := json.MarshalIndent(status, "", "  ")
 	if err != nil {
 		fatal(err.Error())

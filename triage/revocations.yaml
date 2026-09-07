@@ -1,0 +1,17 @@
+# triage/revocations.yaml: the revocation record (Req 9.5 to 9.7; task 13.3).
+#
+# One entry per revoked digest, and it drives the mechanics: the daily rescan
+# fails by name while any catalogue tag still references a recorded digest,
+# the status issue lists every entry, and validate checks each entry's shape
+# against triage/revocations.schema.yaml. docs/revocation-runbook.md says how
+# an entry gets here. Two shapes:
+#
+#   replaced   the fix was published through the release path; the tags moved
+#              to `replacement` and the revoked digest is frozen
+#   withdrawn  nothing replaces it (`replacement: none`); `withdrawal` records
+#              the move taken, delete-version or tombstone (then `tombstone`
+#              names the manifest the tags were parked on)
+#
+# Every entry carries image, digest, reason, advisory (the GHSA on this
+# repository) and date. Nothing is ever removed from this list.
+revocations: []
