@@ -1358,3 +1358,34 @@ for six of seven components and failed cert-manager-cainjector in the base
 package install, a definition identical to its two siblings that built in
 the same minute; tonight's run retries. The Renovate tool-bump PRs failing
 `validate` are by design: the checksum half of a pin is manual.
+
+## 2026-09-06: the valkey compat variant, recorded as a transfer (task 11.4, Req 4.5)
+
+The decision that `chart/valkey/` deploys the `-compat` image (busybox beside
+the server, a shell for the chart's init script) was made on 2026-08-25 and
+lived in the chart README's prose. It is now structured metadata in
+`chart/valkey/chart.yaml` (`compat:`), validated by `chart/chart.schema.yaml`
+and clocked by `scripts/lint-compat.sh`: decided 2026-08-25, review by
+2026-11-24, after which validate fails until a dated re-decision lands
+(Req 4.8), and the rescan reports the lapse daily (Req 4.9).
+
+It is a transfer. The ask is drafted in
+`triage/upstream/2026-08-25-valkey-helm-init-container-image.md`: an
+`initContainer.image` value defaulting to the main image, the shape the chart's
+exporter already has. Measured again on 2026-09-06 with
+`triage/upstream/checks/valkey-helm-init-container.sh`: on chart 0.11.0 and
+0.12.0 alike, in the standalone Deployment and the replica StatefulSet, the
+init container renders whenever the workload does (no block of its own, only
+the mode switch that renders the workload), from the main image helper,
+running a `/bin/sh` script that calls tee, cat, rm, mkdir and date; no value
+replaces or disables it. Owner item: file it against
+valkey-io/valkey-helm and record the number in `compat.issue` and here. When
+upstream ships the value, the runtime image can carry this chart and the
+variant retires.
+
+Same day, mechanism: Renovate now tracks the three upstream chart versions
+(a helm-datasource manager over `chart/<name>/chart.yaml`, never automerged,
+Req 3.11) and automerges digest-only bumps of the catalogue's own image pins
+under `chart/` behind the required checks (Req 3.12). The valkey index
+already lists 0.12.0, so the manager's first run offers a real chart bump
+through the e2e upgrade path.

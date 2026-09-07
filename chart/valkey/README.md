@@ -94,6 +94,19 @@ rejected because Req 4.1 is the stronger constraint: consuming upstream
 unmodified is the property this repo is demonstrating, and a fork trades a
 recurring merge burden for a one-package image.
 
+The decision itself is recorded as structured metadata in
+[`chart.yaml`](chart.yaml) under `compat:` (task 11.4, Req 4.5): the variant,
+the reason above in one paragraph, the upstream ask it waits on, `decided_at`
+and `review_by`. It is a transfer: the ask, an init-container image value
+defaulting to the main image, is drafted in
+[`triage/upstream/2026-08-25-valkey-helm-init-container-image.md`](../../triage/upstream/2026-08-25-valkey-helm-init-container-image.md)
+with the measurement re-runnable by
+[`checks/valkey-helm-init-container.sh`](../../triage/upstream/checks/valkey-helm-init-container.sh);
+once upstream ships it, the runtime image can carry this chart and the variant
+retires. `scripts/lint-compat.sh` fails validate the day after `review_by`
+until a dated re-decision lands (Req 4.8), and the daily rescan reports the
+lapse (Req 4.9), so the shell is never simply forgotten.
+
 ## e2e probe (Req 5.5)
 
 `probeValkey` (`test/e2e/probes_test.go`) runs a Job that writes a key and

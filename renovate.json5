@@ -228,6 +228,28 @@
         "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*-\\s*\\S+@(?<currentValue>v[^\\s\"']+)",
       ],
     },
+    {
+      // Chart versions tracked (Req 3.11; task 11.4). The three upstream
+      // charts are pinned by hand in chart/<name>/chart.yaml, and until this
+      // manager nothing read them, so the templates could trail the image
+      // pins by releases (chart/cert-manager's own comment recorded the gap).
+      // upstream.repository is captured as the registryUrl: the helm
+      // datasource's default registry is charts.helm.sh/stable, a frozen
+      // decoy that would report every chart up to date forever (independent
+      // review 1.8). valkey's index url 301-redirects and the datasource
+      // follows it (measured). hardened-app's own Chart.yaml differs by case
+      // and is not captured: it is ours, not an upstream pin. A chart bump
+      // is never automerged (the rule below): its values change runs the e2e
+      // upgrade path (Req 5.6) and a human reads that verdict, since a chart
+      // release can change what the values mean; grafana's version-skew note
+      // in its chart.yaml governs that review.
+      customType: "regex",
+      managerFilePatterns: ["/^chart/.+/chart\\.yaml$/"],
+      matchStrings: [
+        "upstream:\\s*\\n\\s*name:\\s*(?<depName>[^\\s\"']+)\\s*\\n\\s*repository:\\s*(?<registryUrl>https?://[^\\s\"']+)\\s*\\n\\s*version:\\s*\"?(?<currentValue>[^\\s\"'#]+)",
+      ],
+      datasourceTemplate: "helm",
+    },
   ],
 
   packageRules: [
@@ -348,6 +370,27 @@
       // a repackage bump swaps a binary artifact we did not build and re-pins
       // its checksum, so it is always reviewed even on a patch.
       automerge: false,
+    },
+    {
+      // Req 3.11: a chart release reaching a chart is reviewed, never
+      // automerged. Explicit, though no automerge rule reaches the helm
+      // datasource: the scope is a requirement, and a default that happens
+      // to satisfy it today is not a record of that.
+      matchDatasources: ["helm"],
+      automerge: false,
+    },
+    {
+      // Req 3.12: a same-tag rebuild moves the digest under a chart's image
+      // pin (task 9.2's publish-on-change), and that bump is the catalogue's
+      // own published image reaching its chart. It automerges behind the
+      // required checks, the e2e gate among them since 2026-08-21. A tag
+      // bump of the same pin (a new release reaching the chart) stays
+      // reviewed. The build-layer rule below is ordered after this one so
+      // its automerge: false wins for the build layer, which is docker too.
+      matchDatasources: ["docker"],
+      matchPackageNames: ["ghcr.io/mm-weber/dhc/**"],
+      matchUpdateTypes: ["digest"],
+      automerge: true,
     },
     {
       // The build layer is our own stricter pin surface — a frontend/builder
