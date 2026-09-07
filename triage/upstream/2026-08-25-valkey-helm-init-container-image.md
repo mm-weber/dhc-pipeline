@@ -30,7 +30,8 @@ chart.
 ## Ask
 
 An `initContainer.image` value, the shape `metrics.exporter.image` already
-has, used by the init container in place of `include "valkey.image"` and
+has (and the init container already has its own `initResources`), used by
+the init container in place of `include "valkey.image"` and
 **defaulting to the main image**, so existing installs are unchanged. Users
 of a shell-less image can then point it at any small image with a shell. The
 separation #14 introduced stays as it is (the server container never sees
