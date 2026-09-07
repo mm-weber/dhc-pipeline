@@ -13,6 +13,11 @@ helm template dhc-cert-manager cert-manager \
   -f chart/cert-manager/config/values-hardened.yaml
 ```
 
+**Upstream authenticity:** the three images come from
+`image/cert-manager-{controller,webhook,cainjector}/`, whose source is
+declared `signed-tag` (an annotated tag GitHub verifies), checked before any
+bump is written and daily by the rescan (Req 3.8, 3.10).
+
 ## Deviations from upstream defaults
 
 | Change | Why | Requirement |

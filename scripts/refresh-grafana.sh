@@ -69,10 +69,11 @@ tagver() { printf '%s' "${1//+/_}"; }
 # REQUIRED: it exits non-zero rather than falling back to a version-only url.
 url_line=$(grep -E '^[[:space:]]*-?[[:space:]]*url:[[:space:]]*https://dl\.grafana\.com/' "$f" | head -1)
 [ -n "$url_line" ] || { echo "refresh-grafana: no dl.grafana.com tarball url in $f" >&2; exit 1; }
-# Per-build shape (what we pin) first, then the legacy /oss/release/ alias so a
-# definition that has not been migrated yet is still refreshable.
+# The per-build shape is the only one read. The legacy /oss/release/ alias
+# handler (parse it, migrate the definition) was removed on 2026-09-07 as dead
+# code, every definition long since migrated; a definition on the alias is
+# refused below by the url line it carries.
 new_ver=$(sed -nE 's#.*/grafana/release/([^/[:space:]]+)/.*#\1#p' <<<"$url_line")
-[ -n "$new_ver" ] || new_ver=$(sed -nE 's#.*/oss/release/grafana-([^[:space:]]+)\.linux-.*#\1#p' <<<"$url_line")
 [ -n "$new_ver" ] || { echo "refresh-grafana: could not read a version from: ${url_line}" >&2; exit 1; }
 
 # Build id for this version, from three independent sources.
@@ -218,7 +219,7 @@ stamp="cross-origin-checksum, verified ${new_ver} (grafana.com versions API and 
 
 # 0) the url. Renovate only changed the version in the path segment; the build
 #    id in the filename still belongs to the old release, so rebuild the whole
-#    line. Also migrates a definition still on the /oss/release/ alias.
+#    line.
 new_url="https://dl.grafana.com/grafana/release/${new_ver}/grafana_${new_ver}_${build_id}_linux_\${target.arch}.tar.gz"
 sed -i -E "s@^([[:space:]]*-?[[:space:]]*url:[[:space:]]*)https://dl\.grafana\.com/[^[:space:]]*@\1${new_url}@" "$f"
 

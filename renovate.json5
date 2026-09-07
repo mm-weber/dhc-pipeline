@@ -74,12 +74,10 @@
         // assets and no apt entry while the API carried the id (ADR 0002,
         // amendments 2026-08-07 and 2026-08-11).
         "url:\\s*https://dl\\.grafana\\.com/grafana/release/(?<currentValue>[0-9][^\\s\"'/]*)/",
-        // The legacy /oss/release/ version alias, matched only so a definition
-        // not yet migrated stays tracked; its next bump moves it onto the
-        // per-build url. We deliberately do NOT pin this path — its objects are
-        // rewritten roughly a day after release, so a digest taken at release
-        // time stops matching with no version change (triage/LOG.md 2026-07-26).
-        "url:\\s*https://dl\\.grafana\\.com/oss/release/grafana-(?<currentValue>[0-9][^\\s\"'/]*?)\\.linux-",
+        // Only the per-build shape. The legacy /oss/release/ alias matchString
+        // was removed on 2026-09-07 as dead code (every definition migrated;
+        // the alias is never pinned, its objects are rewritten after release,
+        // triage/LOG.md 2026-07-26).
       ],
       depNameTemplate: "grafana/grafana",
       datasourceTemplate: "github-releases",

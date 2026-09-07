@@ -5,9 +5,11 @@ upstream:
   repository: https://valkey-io.github.io/valkey-helm
   version: 0.11.0   # chart appVersion 9.1.1
 
-# NOTE: this is the valkey project's own chart, and 0.11.0 ships appVersion
-# 9.1.1 — the exact version image/valkey/ builds. No version-skew note is
-# needed here, unlike chart/grafana/.
+# NOTE: this is the valkey project's own chart, so its appVersion follows the
+# server release (0.11.0 ships 9.1.1, 0.12.0 ships 9.1.2). The image pin in
+# config/values-hardened.yaml may run a patch ahead of it between a definition
+# bump and the chart bump that follows through Req 3.11; no structural skew,
+# unlike chart/grafana/.
 
 # Req 4.5 (task 11.4): the compat-variant decision as structured metadata.
 # Shape validated by chart/chart.schema.yaml (yamale, validate.yml); the

@@ -58,11 +58,15 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
   verified and when to the marker (Req 3.8). dhi.io package repositories are
   the `/main` lines only, `dhi.io/apk/<distro>/<release>/main` or
   `dhi.io/deb/<distro>/main`; the others are entitlement-gated (Req 1.12).
-- Every upstream chart is pinned to an exact version in `chart/<name>/chart.yaml`
-  (hand-pinned; nothing tracks chart versions yet). The **image** pins in each
-  chart's values are Renovate-tracked with tag + digest (task 8.7), so a
-  definition bump reaches the deployed chart and a same-tag rebuild moves the
-  digest; a chart-pin bump PR runs the e2e upgrade path (Req 5.6).
+- Every upstream chart is pinned to an exact version in `chart/<name>/chart.yaml`,
+  and Renovate tracks that version against the chart repository through the
+  native helm datasource: a new chart release opens a PR that is never
+  automerged and runs the e2e upgrade path, because a chart release can
+  change what its values mean (Req 3.11, 5.6). The **image** pins in each
+  chart's values are tracked with tag + digest (task 8.7), so a definition
+  bump reaches the deployed chart and a same-tag rebuild moves the digest; a
+  bump that moves only the digest automerges behind green required checks,
+  a tag move waits for a human (Req 3.12).
 - Floating tags (`latest`, bare majors like `:1`, digestless tags) fail CI.
 - A digest is 64 lowercase hex characters, and both gates read them:
   `scripts/lint-pins.sh` over the sources and `policies/require-image-digest.yaml`
@@ -165,16 +169,19 @@ One file per component at `image/<name>/image.yaml`. Rules, all enforced by
 
 ## Upstream tracking (Req 3, ADR 0002)
 
-Renovate is driven entirely by custom regex managers over `image/*/image.yaml`
-— every built-in manager is disabled, so nothing opens a surprise PR. There is
+Renovate is driven entirely by custom regex managers, every built-in manager
+disabled, so nothing opens a surprise PR. Over `image/*/image.yaml` there is
 **one manager per archetype**, and adding an image means checking its source
-shape is covered:
+shape is covered; the other pin surfaces (chart versions and chart image pins,
+tool pins, workflow and CI dependency pins) carry one manager each:
 
 | Archetype | Source shape | Datasource | postUpgradeTask |
 |---|---|---|---|
 | compile-from-source | `url: git+https://…#vX.Y.Z` | `github-tags` | `refresh-definition.sh` |
 | tarball-repackage | `url: https://<vendor>/…-X.Y.Z.linux-…` | `github-releases` | `refresh-grafana.sh` |
 | build layer | `syntax=` / `uses:` / `GOLANG_REFERENCE:` | `docker` | none (reviewed by hand) |
+| upstream chart version | `upstream:` block in `chart/<name>/chart.yaml` | `helm` (the chart repository) | none (never automerged; a bump runs the e2e upgrade path, Req 3.11) |
+| chart image pins | tag@digest or digest values in `chart/<name>/config/values-hardened.yaml` | `docker` (ghcr.io) | none (digest-only bumps automerge, Req 3.12) |
 
 - **The download host and the version datasource are separate concerns.** A
   vendor that ships prebuilt tarballs off its own CDN can still be tracked
@@ -194,14 +201,25 @@ shape is covered:
   postUpgradeTask that refuses still leaves Renovate free to open the PR
   carrying the manager's partial edit, and grafana 13.1.3 (#36) is what that
   costs when nothing checks.
-- What automerges, exactly (Req 3.5): patch and digest updates of a
-  compile-from-source upstream, behind green required checks. Repackage bumps
-  **never** (they swap a binary we did not build), tool pins never (their
+- What automerges, exactly (Req 3.5, 3.12): patch and digest updates of a
+  compile-from-source upstream, and digest-only updates of the catalogue's own
+  image pins under `chart/`, both behind green required checks. Repackage bumps
+  **never** (they swap a binary we did not build), chart versions never (a
+  chart release can change what its values mean), tool pins never (their
   checksum half is human, Req 7.5), the build layer never, minors and majors
   of anything never. Every third-party release bump waits its minimum release
   age first, three days, and a release Renovate cannot date waits rather than
   passes (Req 3.7); only the docker datasource, the catalogue's own digests
   and the hand-reviewed build layer, is exempt.
+- Age is one half of independence from a compromised release; the declared
+  signal is the other. A refresh verifies the definition's `# authenticity:`
+  class before it writes any field of a bump and refuses by name otherwise
+  (Req 3.8); a repackage checksum change is re-verified at PR time against
+  the bytes served and the upstream's version statement
+  (`scripts/verify-arch-pins.sh`, Req 3.9); and the daily rescan re-verifies
+  every active definition's signal, failing the run and filing a
+  `supply-chain` issue on a mismatch (`scripts/check-authenticity.sh`,
+  Req 3.10).
 - **Check how the upstream versions its security releases before trusting the
   default versioning.** Grafana ships out-of-band fixes as semver build
   metadata (`v13.0.1+security-01`), and semver *ignores build metadata for
@@ -291,8 +309,9 @@ rewrites the catalogue status issue with every finding's clocks (Req 6.46,
 - One logical change per PR; definition bumps and chart changes do not mix
   unless a bump forces the chart change (say so).
 - PR description references the requirement IDs it serves.
-- Green checks required; patch and digest bumps of a from-source upstream
-  automerge on green required checks, nothing else does (Req 3.5); majors
+- Green checks required; patch and digest bumps of a from-source upstream and
+  digest-only bumps of catalogue image pins under `chart/` automerge on green
+  required checks, nothing else does (Req 3.5, 3.12); majors
   wait behind Dependency Dashboard approval (Req 3.4); every third-party
   release bump has aged three days before its PR exists (Req 3.7).
 - Review checklist: pins intact, conventions above, README deviations updated,

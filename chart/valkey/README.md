@@ -13,15 +13,28 @@ helm template dhc-valkey valkey \
   -f chart/valkey/config/values-hardened.yaml
 ```
 
-**Version note:** this is the valkey project's own chart and 0.11.0 ships
-appVersion `9.1.1` — the exact version `image/valkey/` builds. No version skew
-to reason about, unlike [`chart/grafana`](../grafana/README.md).
+**Version note:** this is the valkey project's own chart, so its appVersion
+follows the server release (0.11.0 ships `9.1.1`, 0.12.0 ships `9.1.2`). The
+image pin may run a patch ahead of it between a definition bump and the chart
+bump that follows (Req 3.11); no structural skew, unlike
+[`chart/grafana`](../grafana/README.md).
+
+**Upstream authenticity:** the image comes from `image/valkey-compat/`, whose
+source is declared `signed-commit` (a lightweight tag on a commit GitHub
+verifies), checked before any bump is written and daily by the rescan
+(Req 3.8, 3.10).
+
+**Left to the deployer, on purpose:** ACL authentication (`auth.enabled` with
+users or an existing secret), TLS (`tls.existingSecret`), replication mode,
+persistence and the metrics exporter. Each needs a secret, a certificate, a
+volume or a third-party image the catalogue cannot supply; the chart's install
+notes say plainly when auth and persistence are off.
 
 ## Deviations from upstream defaults
 
 | Change | Why | Requirement |
 |---|---|---|
-| `image` → digest-pinned `ghcr.io/mm-weber/dhc/valkey:9.1.1-alpine3.23-compat@sha256:…` | Deploy the hardened catalogue build, not upstream `docker.io/valkey/valkey`; digest-pinned. The chart composes `registry/repository:tag` and strips a trailing `@sha` for its version label, so the digest rides on `tag` | Req 4.2 |
+| `image` → digest-pinned `ghcr.io/mm-weber/dhc/valkey:9.1.x-alpine3.23-compat@sha256:…` | Deploy the hardened catalogue build, not upstream `docker.io/valkey/valkey`; digest-pinned. The chart composes `registry/repository:tag` and strips a trailing `@sha` for its version label, so the digest rides on `tag` | Req 4.2 |
 | `podSecurityContext.runAsUser/runAsGroup/fsGroup: 65532` | The chart defaults to **1000**, an account no catalogue image has | Req 4.3 |
 | `podSecurityContext.runAsNonRoot: true` | Not a chart default at pod level, and `policies/require-nonroot.yaml` reads it exactly there. The container context already sets it; the policy gate does not look at the container | Req 4.3, Req 4.6 |
 | `securityContext.runAsUser/runAsGroup: 65532` | Same UID move for the containers. The rest of the container-level restricted set (drop-ALL caps, `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, `runAsNonRoot: true`) is already upstream default and merges in — this chart arrives harder-by-default than grafana's. `seccompProfile: RuntimeDefault` is upstream default too, but at **pod** level only, and covers both containers from there | Req 4.3 |
