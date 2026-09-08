@@ -391,7 +391,8 @@ doubt, read `build.yml` — it is deliberately over-commented.
 shapes — owned `Chart.yaml` charts via `helm template <dir>`, adapted charts
 via `--repo/--version` + overlay) and the manifests are evaluated by all three
 Kyverno policies: `require-image-digest` (a real 64-hex digest — placeholders
-fail), `restrict-registries` (only `ghcr.io/mm-weber/dhc`), and
+fail), `restrict-registries` (only the declared registry namespace,
+rendered from `catalogue-policy.yaml`), and
 `require-nonroot` (Req 4.6). Owned charts additionally get `ct lint`.
 Install-level verification is deliberately *not* here — that is the e2e
 suite's job.
@@ -925,7 +926,12 @@ The walkthrough:
    `refresh-definition.sh` / `refresh-grafana.sh`).
 4. **Wire e2e** if the image deploys via a chart: register the component in
    `test/harness`, add its probe (next sections).
-5. **Open the PR** — one logical change. The gates do the rest: lints,
+5. **Activate it**: add the directory name to `active_set:` in
+   `catalogue-policy.yaml` (Req 1.13). The active set is the declared source
+   of candidates for the build and test matrices and the tracking scope
+   (the matrices read it from task 14.2 on); an unlisted definition is
+   inactive, and an entry naming no directory is refused by name.
+6. **Open the PR** — one logical change. The gates do the rest: lints,
    frontend compile, scan gate (expect to triage real findings on a new
    image), chart render, e2e.
 
@@ -996,7 +1002,10 @@ Three Kyverno policies gate every rendered chart: `require-image-digest`
 (foreach + regex over containers, initContainers, *and* ephemeralContainers —
 a full 64-hex digest, so `@sha256:PENDING` fails), `restrict-registries`,
 `require-nonroot`. Fixtures live in `policies/tests/` and run via
-`kyverno test` in validate.
+`kyverno test` in validate. `restrict-registries` is rendered, not edited:
+its allowed-image glob is `verification.registry` from
+`catalogue-policy.yaml`, and validate fails on a hand edit (Req 7.9); change
+the namespace there and re-run `scripts/render-verification.sh`.
 
 Fixture discipline: when you change a policy, the load-bearing fixture is the
 one that must *fail* — and for Deployment-shaped workloads that means a

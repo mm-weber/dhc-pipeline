@@ -560,6 +560,12 @@ graph TB
      mechanical half of re-scoping version-scoped statements on a grafana bump), review
      dates as a column (cosign v2 re-measured by 2026-10-22, the terms memo by 2026-11-21,
      the valkey compat by 2026-11-24), and the manual's operator paragraphs cite rows by id.
+     F13's mechanical link (13.6) is one resolver, `scripts/lint-log-anchors.sh`, called for
+     the `ref:` half from `lint-accepted-risk.sh` and for the statement half by validate;
+     it accepts the two citation forms the records already used (a heading's GitHub
+     slug, or a day heading by date) rather than rewriting attested statements, and it
+     names the nearest heading on a miss. Measured on day one: 12 refs and 6 citations,
+     all resolving.
 
 11. **The base-repo contract: a declared active set, parameterized instance values, a documented builder contract (Req 1.1, 1.13 to 1.17, 2.2, 2.7, 2.21, 2.23, 4.1, 5.5, 7.7; the 5.1 framing addendum encoded; 2026-08-25)**
    - **Context**: the criteria hardcoded one instance, `ghcr.io/mm-weber/dhc` in
@@ -606,6 +612,24 @@ graph TB
      repository (a fork deletes; the reference demonstrates the switch). Fork
      switches: the active set itself, the registry namespace, the reference
      set.
+   - **As built** (task 14.1, 2026-09-08): as decided. The namespace was already
+     read from `verification.registry` by build.yml's meta step and the visibility
+     check when this task landed; what remained was the second Kyverno policy,
+     `restrict-registries`, hand-written with the namespace in three places, now
+     rendered by `render-verification.sh` and drift-checked by the same validate
+     step, plus a dead `REGISTRY` literal in rescan.yml and the PR gate's local
+     registry path, both retired. The active set is a top-level `active_set:` list
+     (all seven, in build order), with one reader, `active_definitions` in
+     `definition-lib.sh` (python3 and PyYAML, the visibility check's precedent):
+     it refuses by name a missing or empty or scalar section, a duplicate, and an
+     entry with no `image/<name>/image.yaml` (Req 1.19 at the reader, so 14.2's
+     validate lint calls it and adds 1.18), and it treats an unlisted directory as
+     inactive rather than an error, because that is the switch. No plane reads the
+     set yet: 14.2 moves the matrices and the tracking scope onto it, 14.3 the
+     probe lint; the manual's add-a-definition walkthrough already carries the
+     activation step. One fixture literal remains by design: `policies/tests/
+     resources.yaml` names the reference namespace, the one file a fork edits
+     with the value.
 
 ## System Flows
 

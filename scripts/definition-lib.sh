@@ -43,6 +43,49 @@ definitions_publishing() { # root, image name
   return 0 # a non-matching last iteration is not a failure
 }
 
+# --- the active set (Req 1.13, 1.14, 1.19; task 14.1) -------------------------
+# catalogue-policy.yaml's `active_set:` names each definition directory the
+# catalogue builds, tracks, tests and publishes. This is its one reader: the
+# names, one per line, in declared order. Malformed input is a refusal (exit 2,
+# a ::error naming the problem) rather than an empty answer, because Req 1.14
+# makes the set the SOLE source of matrix candidates, and an empty matrix is
+# indistinguishable from a catalogue with nothing to do (the schedule branch
+# that diffed HEAD~1 and rebuilt nothing, review 1.10, is the failure shape).
+# Refused: no policy file, no or empty or non-list active_set, a non-string
+# entry, a duplicate, and an entry with no image/<name>/image.yaml (Req 1.19).
+# A directory the list does not name is inactive, not an error: that is the
+# switch. python3 + PyYAML, not yq: the runner and the devcontainer ship
+# different yq dialects (check-visibility.sh precedent).
+active_definitions() { # root -> the active definition names, one per line
+  local root="${1%/}"
+  if [ ! -f "$root/catalogue-policy.yaml" ]; then
+    printf '::error::active_definitions: no catalogue-policy.yaml under %s (Req 1.13)\n' "$root" >&2
+    return 2
+  fi
+  python3 - "$root" <<'PY'
+import os, sys, yaml
+root = sys.argv[1]
+doc = yaml.safe_load(open(os.path.join(root, "catalogue-policy.yaml"))) or {}
+names = doc.get("active_set") if isinstance(doc, dict) else None
+def refuse(msg):
+    print(f"::error file=catalogue-policy.yaml::active_definitions: {msg} (Req 1.13)", file=sys.stderr)
+    sys.exit(2)
+if not isinstance(names, list) or not names:
+    refuse("active_set must be a non-empty list of definition directory names; a catalogue that builds nothing says so by an empty image/ tree, not by an empty set")
+seen = set()
+for n in names:
+    if not isinstance(n, str) or not n or "/" in n:
+        refuse(f"active_set entry {n!r} is not a definition directory name")
+    if n in seen:
+        refuse(f"active_set names {n} twice")
+    seen.add(n)
+    if not os.path.isfile(os.path.join(root, "image", n, "image.yaml")):
+        refuse(f"active_set entry '{n}' has no definition: image/{n}/image.yaml does not exist (Req 1.19)")
+for n in names:
+    print(n)
+PY
+}
+
 # --- authenticity (Req 1.10, 1.11, 3.8; task 11.2) ---------------------------
 # Each definition declares, beside its source url, how its upstream's
 # authenticity is established:

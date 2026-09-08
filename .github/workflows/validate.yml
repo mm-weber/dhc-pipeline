@@ -106,6 +106,11 @@ jobs:
 
       - name: VEX product identity lint (Req 6.17-6.21)
         run: scripts/lint-vex-product.sh
+      # Req 9.18 (task 13.6): every source statement's log citation resolves
+      # to a heading in triage/LOG.md (the exception half runs inside
+      # lint-accepted-risk.sh above).
+      - name: VEX statement LOG citations (Req 9.18)
+        run: scripts/lint-log-anchors.sh statements
 
       - name: VEX product identity lint unit tests
         run: scripts/lint-vex-product_test.sh
@@ -152,6 +157,8 @@ jobs:
         run: scripts/vex-portability_test.sh
       - name: consumer-smoke unit tests (Req 9.13)
         run: scripts/consumer-smoke_test.sh
+      - name: lint-log-anchors unit tests (Req 9.18)
+        run: scripts/lint-log-anchors_test.sh
       - name: lint-compat unit tests (Req 4.8)
         run: scripts/lint-compat_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)

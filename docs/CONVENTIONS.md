@@ -276,9 +276,15 @@ tool pins, workflow and CI dependency pins) carry one manager each:
 ## Policy gate (Req 4.6)
 
 Rendered manifests of every chart are evaluated by the Kyverno policies in
-`policies/`: images referenced by digest, only from `ghcr.io/mm-weber/dhc`,
-workloads non-root. Policy fixtures live in `policies/tests/` and run via
-`kyverno test` in CI (no kyverno binary in the devcontainer — Req 8.2).
+`policies/`: images referenced by digest, only from the declared registry
+namespace (`catalogue-policy.yaml` `verification.registry`), workloads
+non-root. The registry policy is rendered from that value by
+`scripts/render-verification.sh` and drift-checked like the verification
+policy (Req 7.8, 7.9; task 14.1), so a fork's gate admits the fork's
+namespace by editing one line; `policies/tests/resources.yaml` names the
+reference namespace literally and is the one fixture that edit touches.
+Policy fixtures live in `policies/tests/` and run via `kyverno test` in CI
+(no kyverno binary in the devcontainer — Req 8.2).
 
 ## Scanning & triage (Req 6)
 
@@ -330,6 +336,12 @@ rewrites the catalogue status issue with every finding's clocks (Req 6.46,
   a recipe step in `render-verification.sh`, a pinned install (Req 7.5).
 - Reading a divergence and deciding whether it matters is register row M19
   below.
+- **Every decision cites the LOG, and the citation resolves** (Req 9.18):
+  an exception's `ref:` and a statement's `status_notes` name a
+  `triage/LOG.md` heading as `LOG.md#<slug>` (the heading's GitHub anchor)
+  or `LOG.md <date>` (a day heading); `scripts/lint-log-anchors.sh` fails
+  validate on a citation that names no heading and on a decision without
+  one, so renaming a heading is caught by the records that rest on it.
 
 ## Manual controls (Req 9.14)
 
