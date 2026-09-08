@@ -54,12 +54,12 @@ PINS_FILE="${INSTALL_TOOL_PINS:-}"
 ARCH="${INSTALL_TOOL_ARCH:-$(uname -m)}"
 
 # renovate: datasource=github-releases depName=kubernetes-sigs/kind
-KIND_VERSION="0.32.0"
-KIND_SHA256="50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54"
+KIND_VERSION="0.33.0"
+KIND_SHA256="aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d"
 
 # renovate: datasource=github-releases depName=kyverno/kyverno
-KYVERNO_VERSION="1.18.2"
-KYVERNO_SHA256="cb2feb8356149fd2fe774c894ccf0969f4a60a83867dd913af724f74ffbbc18b"
+KYVERNO_VERSION="1.19.0"
+KYVERNO_SHA256="f5b4dc73c8e2f3f66e8e0034dc370e6eb6c4617eff7d5ae3838d2200034eb421"
 
 # renovate: datasource=github-releases depName=helm/helm
 HELM_VERSION="4.2.4"
@@ -74,8 +74,8 @@ SYFT_VERSION="1.51.1"
 SYFT_SHA256="8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3"
 
 # renovate: datasource=github-releases depName=google/go-containerregistry
-CRANE_VERSION="0.22.0"
-CRANE_SHA256="edb74d53fad9a596860f59d1c5d04a43dfb5f441dc71f57060dd0bf39483c833"
+CRANE_VERSION="0.22.1"
+CRANE_SHA256="0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0"
 
 # renovate: datasource=github-releases depName=openvex/vexctl
 VEXCTL_VERSION="0.4.4"
