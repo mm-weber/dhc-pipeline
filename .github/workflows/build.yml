@@ -6,7 +6,8 @@ name: build
 # CVE scan gate: Trivy over HIGH/CRITICAL, failing on anything not excused by an
 # OpenVEX statement in triage/vex/ (Req 6.1), with a Grype second opinion
 # whenever a CRITICAL is present (Req 6.6).
-# main: same build, then push to ghcr.io/mm-weber/dhc with a cosign
+# main: same build, then push to the declared registry namespace
+# (catalogue-policy.yaml verification.registry, task 14.1) with a cosign
 # keyless signature, an SPDX SBOM (Syft), and BuildKit provenance attached
 # (Req 2.2), tags derived from the definition (Req 2.3). Any failure publishes
 # nothing (Req 2.5). Req 2.4's private-package guard was removed at the
@@ -140,7 +141,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write   # push to ghcr.io/mm-weber/dhc
+      packages: write   # push to the declared registry namespace
       id-token: write    # cosign keyless (GitHub OIDC)
     strategy:
       fail-fast: false
@@ -423,6 +424,7 @@ jobs:
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           NAME: ${{ matrix.name }}
+          REGISTRY: ${{ steps.meta.outputs.registry }}
         run: |
           set -euo pipefail
           docker run -d --rm -p 5000:5000 --name dhc-localreg \
@@ -432,7 +434,10 @@ jobs:
             sleep 1
           done
           src=$(printf '%s\n' "$TAGS" | head -n1)
-          ref="localhost:5000/mm-weber/dhc/${NAME}:scan"
+          # The path under the throwaway registry mirrors the declared
+          # namespace; nothing matches on it (compile-vex.sh drops the
+          # qualifiers), it just keeps the instance literal out of the step.
+          ref="localhost:5000/${REGISTRY#*/}/${NAME}:scan"
           docker tag "$src" "$ref"
           docker push -q "$ref"
           # The digest this push minted is what Trivy puts in its product purl,
