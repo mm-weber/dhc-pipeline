@@ -9,7 +9,7 @@
 upstream:
   name: cert-manager
   repository: https://charts.jetstack.io
-  version: v1.21.0
+  version: v1.21.1
 
 # Render (chart CI gate, task 5.5) and install (e2e, phase 6):
 #   helm template dhc-cert-manager cert-manager \
