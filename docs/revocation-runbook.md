@@ -1,6 +1,6 @@
 # Revocation runbook (Req 9.5 to 9.7)
 
-A revocation is the decision that a published digest must not be pulled any
+A revocation (manual-controls register row M14) is the decision that a published digest must not be pulled any
 more: a compromised input, a build that shipped what it should not have, a
 published status that was wrong in a way a replacement cannot express. The
 record, `triage/revocations.yaml`, drives the mechanics, which is why this

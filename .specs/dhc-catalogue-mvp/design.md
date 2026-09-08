@@ -555,6 +555,11 @@ graph TB
      fails the run; more is reported. Grype's real matching is first measured by the
      first rescan after the merge (its database is unreachable from the devcontainer);
      the rehearsal used a stub that honours the statements.
+     The register (13.5) has twenty deliberate rows and two pending automation (the cosign
+     pin's Renovate tracking, found missing on 2026-09-08 though ADR 0003 promised it; the
+     mechanical half of re-scoping version-scoped statements on a grafana bump), review
+     dates as a column (cosign v2 re-measured by 2026-10-22, the terms memo by 2026-11-21,
+     the valkey compat by 2026-11-24), and the manual's operator paragraphs cite rows by id.
 
 11. **The base-repo contract: a declared active set, parameterized instance values, a documented builder contract (Req 1.1, 1.13 to 1.17, 2.2, 2.7, 2.21, 2.23, 4.1, 5.5, 7.7; the 5.1 framing addendum encoded; 2026-08-25)**
    - **Context**: the criteria hardcoded one instance, `ghcr.io/mm-weber/dhc` in

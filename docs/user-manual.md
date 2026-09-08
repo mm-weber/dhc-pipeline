@@ -554,6 +554,11 @@ green, files nothing, and its compile report shows every statement applied.
 
 ### Handling Renovate PRs
 
+Every human step in this part is a row of the manual-controls register in
+[`CONVENTIONS.md`](CONVENTIONS.md#manual-controls-req-914) (Req 9.14),
+cited by id where it applies; a step you find yourself taking that has no
+row is either automation missing or a row missing, and both are findings.
+
 All tracking is custom regex managers — every built-in manager is disabled, so
 nothing opens a surprise PR. A third-party release younger than three days is
 not offered at all yet (Req 3.7): it waits on the Dependency Dashboard as
@@ -569,13 +574,13 @@ different automation and a different reviewer job:
 | PR shape | What automation did | Automerge | Your job |
 |----------|---------------------|-----------|----------|
 | **From-source bump** (cert-manager ×3 grouped, hardened-app, valkey+compat grouped) | `refresh-definition.sh` recomputed checksum, `COMMIT_SHA`, VERSION/SEMVER vars, all three tags, ldflags stamps — from the one ref Renovate moved (Req 3.2) | patch + digest, on green CI (Req 3.5); majors staged behind Dependency Dashboard approval (Req 3.4) | For minors/majors: review the diff coherence, let the gates argue the rest |
-| **grafana repackage bump** | `refresh-grafana.sh` resolved the opaque build id from three sources (versions API, apt index, GitHub assets — all answering sources must agree), confirmed both arch tarballs are actually served, re-pinned both per-arch SHA-256s from the `dl.grafana.com` sidecars (ADR 0002) | **Never** — it swaps a binary we did not build | Review version sanity + chart implications; expect the VEX product lint to demand re-scoped statements on a version bump |
-| **Build-layer bump** (`syntax=` frontend, `dhi.io/golang` builder) | Tag + digest moved in every definition; source checksums untouched by design | No | Review; expect scan-gate deltas — a newer Go toolchain moves stdlib CVEs in every compiled image |
-| **Chart pin bump** | Tag and/or digest moved in chart values (same-tag rebuilds reach charts too); triggers the e2e *upgrade* path (Req 5.6) | Digest-only moves: yes, on green required checks (Req 3.12); tag moves: no | Review the upgrade e2e result |
-| **Chart version bump** (cert-manager, grafana, valkey) | `upstream.version` in `chart/<name>/chart.yaml` moved by the helm-datasource manager against the chart repository; triggers the e2e *upgrade* path | **Never** (Req 3.11): a chart release can change what its values mean | Read the chart's changelog against the overlay's keys, then the upgrade e2e result |
-| **Tool pin bump** (trivy/grype/kind/kyverno/helm/ct) | Bumped the `_VERSION` in the install script — **and left the recorded sha256 stale on purpose** | No | Complete the pin by hand — below |
+| **grafana repackage bump** | `refresh-grafana.sh` resolved the opaque build id from three sources (versions API, apt index, GitHub assets — all answering sources must agree), confirmed both arch tarballs are actually served, re-pinned both per-arch SHA-256s from the `dl.grafana.com` sidecars (ADR 0002) | **Never** — it swaps a binary we did not build | Review version sanity + chart implications; expect the VEX product lint to demand re-scoped statements on a version bump (register M8) |
+| **Build-layer bump** (`syntax=` frontend, `dhi.io/golang` builder) | Tag + digest moved in every definition; source checksums untouched by design | No | Review; expect scan-gate deltas — a newer Go toolchain moves stdlib CVEs in every compiled image (register M2) |
+| **Chart pin bump** | Tag and/or digest moved in chart values (same-tag rebuilds reach charts too); triggers the e2e *upgrade* path (Req 5.6) | Digest-only moves: yes, on green required checks (Req 3.12); tag moves: no | Review the upgrade e2e result (register M20) |
+| **Chart version bump** (cert-manager, grafana, valkey) | `upstream.version` in `chart/<name>/chart.yaml` moved by the helm-datasource manager against the chart repository; triggers the e2e *upgrade* path | **Never** (Req 3.11): a chart release can change what its values mean | Read the chart's changelog against the overlay's keys, then the upgrade e2e result (register M7) |
+| **Tool pin bump** (trivy/grype/kind/kyverno/helm/ct) | Bumped the `_VERSION` in the install script — **and left the recorded sha256 stale on purpose** | No | Complete the pin by hand — below (register M1) |
 
-**Operator action — completing a tool-pin bump.** A scanner/tool bump PR
+**Operator action, completing a tool-pin bump (register M1).** A scanner/tool bump PR
 fails `validate` with, e.g., *"trivy: no sha256 pinned for
 trivy_0.74.0_Linux-64bit.tar.gz"*. That failure is the design: the hash
 refresh is deliberately human (Req 7.5), because a checksum that updates
@@ -590,7 +595,7 @@ already-adopted versions). To complete it:
    `scripts/install-tool.sh` on the PR branch, push, and let the unit tests
    re-verify the install shape.
 
-Grafana corner case: when no public index carries a new release's build id
+Grafana corner case (register M11): when no public index carries a new release's build id
 yet (it has happened for several 13.x releases), the refresh *refuses by
 name* rather than guessing. Wait, or feed the id via
 `REFRESH_GRAFANA_BUILD_ID` once you've confirmed it — the pin is still the
@@ -688,6 +693,8 @@ Ground rules that hold across all four:
   The only sanctioned suppression inputs are `triage/vex/` and
   `triage/accepted-risk/`; a `.trivyignore` anywhere else fails validation
   (Req 6.12).
+- A transfer's upstream issue is filed by the owner from a draft under
+  `triage/upstream/` (register row M12).
 - Reaching for accept/transfer before ruling out avoid and fix is the failure
   mode the lane is designed to expose — the `blocked:` field must say why the
   stronger treatments were unavailable, and its content is judged at review.
@@ -699,7 +706,8 @@ Ground rules that hold across all four:
 
 ### Writing a VEX statement
 
-Author with `vexctl` into `triage/vex/CVE-….openvex.json`:
+The decision itself is register row M3, deliberately human; everything
+around it is not. Author with `vexctl` into `triage/vex/CVE-….openvex.json`:
 
 ```sh
 vexctl create \
@@ -750,6 +758,9 @@ statement, add the `LOG.md` entry, open the PR. The PR will automatically
 claims — that is the affected-detection rule, not a coincidence.
 
 ### Writing an accepted-risk exception
+
+The decision is register row M3; a transfer's upstream filing is M12; the
+fix-forward hand-bump is M10.
 
 `triage/accepted-risk/<image>.yaml` is a native Trivy ignorefile plus the
 fields that make an entry reviewable. Real shape (abbreviated from the live
@@ -842,7 +853,8 @@ and KEV order the queue; they never justify a status.
 
 Expiry happens with time, not with a commit — so the daily rescan is what
 raises it, listing every exception already lapsed or lapsing within the policy's warning window
-(Req 6.10). Each one needs a fresh decision: fix (has a remedy shipped
+(Req 6.10). Each one needs a fresh decision (register row M3; a compat
+variant's review date is M13): fix (has a remedy shipped
 since?), avoid, prove it does not apply, or re-accept with a new expiry *and
 a reason it is still the right call*. Doing nothing is also a decision — the
 lapsed entry stops suppressing and the next affected PR goes red, blaming a
@@ -1113,7 +1125,7 @@ pin surface; every one is fixture-tested in both directions:
 | Python CI deps | `.github/requirements-ci.txt` | pypi | none — hash refresh is human |
 
 Grouping: cert-manager's three definitions move as one PR; valkey runtime +
-compat move as one PR. Majors wait behind Dependency Dashboard approval;
+compat move as one PR. Majors wait behind Dependency Dashboard approval (register M9);
 automerge is limited to from-source patch/digest bumps and digest-only chart
 image pin bumps, both on green CI; every third-party version bump waits its
 three-day minimum release age first.

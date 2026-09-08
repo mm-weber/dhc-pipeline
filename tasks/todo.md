@@ -526,3 +526,31 @@ manifests), the real enumeration and a compiled grafana document, with the
 network-facing tools stubbed; the whole validate chain passes locally. Not
 measured here: grype's real matching (its database is unreachable), which
 the first rescan after the merge measures; the owner dispatches one.
+
+## Task 13.5: manual-controls register (2026-09-08)
+
+Branch: `task-13.5-manual-controls-register`. Goal: every human step in the
+catalogue's operation is a row of one register in docs/CONVENTIONS.md
+(step, class, reason, fork switch; class binary: deliberate or pending
+automation; a review date is a column, not a class), and the manual's
+operator steps cite their rows (Req 9.14).
+
+- [x] 1. Inventory every human step across the manual, CONVENTIONS, SECURITY.md, the
+      runbooks, the workflows and the reviews; decide each class and fork switch
+- [x] 2. The register section in CONVENTIONS.md with stable row ids (M1..), review-date
+      column, and the retired rows (the three automations F13 named) as history
+- [x] 3. The manual's operator steps cite their rows; the revocation runbook and
+      SECURITY.md governance cite theirs; the design Decision 10 as-built note; tasks tick
+- [x] 4. Em-dash sweep; a lint-free rendering (yamllint untouched); no gate depends on prose
+
+**Review (2026-09-08).** The inventory came from the manual's Part III, the
+Renovate PR table, CONVENTIONS, SECURITY.md, the revocation runbook, the
+workflows' dispatch paths, ADR 0002 and 0003, and the two reviews: twenty
+deliberate rows, two pending automation, every row with a reason and a fork
+switch or a stated "none". The class stays binary (review 3.13); review
+dates are a column. Two dates are the spec's (terms 2026-11-21, valkey compat
+2026-11-24); the cosign one (2026-10-22) is proposed with its reason and is
+the owner's to adjust. The manual cites nine rows by id, the runbook one,
+SECURITY.md one. Prose only: the drift check and the whole validate chain
+pass locally; no em dashes in new text (four pre-existing table rows kept
+theirs where only an id was appended).
