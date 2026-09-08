@@ -554,3 +554,29 @@ the owner's to adjust. The manual cites nine rows by id, the runbook one,
 SECURITY.md one. Prose only: the drift check and the whole validate chain
 pass locally; no em dashes in new text (four pre-existing table rows kept
 theirs where only an id was appended).
+
+## Task 13.6: LOG-anchor lint, F13's mechanical link (2026-09-08)
+
+Branch: `task-13.6-log-anchor-lint`. Goal: every exception's `ref:` and every
+VEX source statement's log citation resolves to a heading in
+`triage/LOG.md`, both directions (a decision without a citation fails too),
+one reader of the headings, unit-tested, in validate (Req 9.18).
+
+- [x] 1. Tests first: scripts/lint-log-anchors_test.sh (slug refs, dated citations, a
+      missing heading, a decision without a citation, both halves, the refs half alone)
+- [x] 2. scripts/lint-log-anchors.sh [refs|statements|all] [root]: the resolver (GitHub's
+      heading slug; a day heading for `LOG.md <date>`); lint-accepted-risk.sh calls the
+      refs half; validate runs the statements half; every-suite check
+- [x] 3. triage/README.md and CONVENTIONS state the two citation forms; design Decision 10
+      as-built; tasks tick; em-dash sweep
+
+**Review (2026-09-08).** Measured first: twelve exception refs, all
+`LOG.md#<slug>` against colon-form headings, and six statement citations,
+all `see triage/LOG.md <date>`, so the lint accepts both forms rather than
+rewriting attested statements (a notes rewrite would re-attest every grafana
+digest for no decision). GitHub's slug rule was checked against the manual's
+own example (`transfer--stdlib`, double dash from a dash between spaces);
+the markdown API strips anchors, so the rule is the documented one. Eight
+fixture cases plus one in the accepted-risk suite, written before the
+script; the two lints, shellcheck, actionlint and the every-suite check
+pass; day one resolves 12 and 6. Cluster D's parent is ticked with 13.6.
