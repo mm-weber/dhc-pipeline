@@ -32,9 +32,14 @@
 #                        missing CycloneDX attestation or mismatched platform
 #                        sets all publish (Req 2.16), with the reason named.
 #
-# Exit 0 for either verdict. Exit 2 refuses: bad usage, or a local SBOM that
-# does not parse, because that means our own build output is broken and no
-# comparison against it can be trusted.
+# Exit 0 for either verdict. Exit 2 refuses: bad usage, a local SBOM that
+# does not parse, or a tool this script needs (docker, cosign, jq) missing
+# from PATH, because each of those means our own build or environment is
+# broken and no comparison can be trusted. A missing tool is NOT an
+# unreadable attestation: measured 2026-09-08, build.yml installed cosign
+# only in the release part, after this comparator, so "cosign: command not
+# found" read as attestation-unreadable and every nightly rebuild published
+# every definition from 2026-09-02 on.
 set -euo pipefail
 
 err() { printf '::error::package-set-diff: %s\n' "$1" >&2; }
@@ -44,6 +49,16 @@ if [ "$#" -lt 5 ]; then
   exit 2
 fi
 NAME="$1"; REF="$2"; LOCAL_DIGEST="$3"; OUT="$4"; shift 4
+
+# The environment is checked before anything is read: a tool that is not
+# there is a refusal, never a verdict, so a broken runner can neither publish
+# nor discard.
+for tool in docker cosign jq; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    err "$tool is not on PATH; the comparator cannot read the published side, and a tool that is missing is our environment broken, not a difference (install it before this step)"
+    exit 2
+  fi
+done
 
 declare -A local_cdx=()
 for pair in "$@"; do
