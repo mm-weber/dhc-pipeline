@@ -40,7 +40,19 @@ END = "<!-- render-verification:end -->"
 KYVERNO_REL = "policies/verify-catalogue-images.yaml"
 DOC_RELS = ["README.md", "docs/user-manual.md"]
 
-pol = yaml.safe_load(open(policy_path))["verification"]
+whole = yaml.safe_load(open(policy_path))
+pol = whole["verification"]
+# task 13.4 (Req 9.11, 9.13): the consumer scan steps are rendered from the
+# declared list and the declared aperture, so the recipe the smoke test runs
+# verbatim and the list it asserts against cannot drift.
+consumers = (whole.get("consumers") or {}).get("list") or []
+if not consumers or sum(1 for c in consumers if c.get("authoritative")) != 1:
+    print("::error::render-verification: catalogue-policy.yaml consumers.list needs exactly one authoritative consumer (Req 9.11)", file=sys.stderr)
+    sys.exit(2)
+aperture = ",".join((whole.get("triage") or {}).get("aperture") or [])
+if not aperture:
+    print("::error::render-verification: catalogue-policy.yaml triage.aperture is missing (Req 6.49)", file=sys.stderr)
+    sys.exit(2)
 registry, issuer = pol["registry"], pol["issuer"]
 roles, required = pol["roles"], pol["required"]
 
@@ -131,16 +143,35 @@ snip += [
     "  | jq -r '.payload | @base64d | fromjson | .predicate'      # SBOM",
 ]
 if len(vex_roles) > 1:
+    # Braces, deliberately: `a || b | jq` groups as `a || (b | jq)`, so the
+    # first role's success would print the raw envelope and write nothing.
+    # Measured 2026-09-08 by the consumer smoke test on its first run.
     snip += [
-        'cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" 2>/dev/null \\',
-        '  || cosign verify-attestation $ISSUER $RESCAN --type openvex "$REF" \\',
-        "  | jq -r '.payload | @base64d | fromjson | .predicate'      # VEX: releaser or re-attester",
+        '{ cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" 2>/dev/null \\',
+        '  || cosign verify-attestation $ISSUER $RESCAN --type openvex "$REF"; } \\',
+        "  | jq -r '.payload | @base64d | fromjson | .predicate' > openvex.json   # VEX: releaser or re-attester",
     ]
 else:
     snip += [
         'cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" \\',
-        "  | jq -r '.payload | @base64d | fromjson | .predicate'      # VEX, compiled per digest",
+        "  | jq -r '.payload | @base64d | fromjson | .predicate' > openvex.json   # VEX, compiled per digest",
     ]
+# One scan step per declared consumer, the authoritative one first (Req 9.11).
+# The scanners suppress a not_affected or fixed statement and show it as such;
+# an affected statement (an accepted risk) suppresses nothing, by design.
+scan_step = {
+    "trivy": 'trivy image --vex openvex.json --show-suppressed --severity {ap} "$REF"',
+    "grype": 'grype "$REF" --vex openvex.json',
+}
+ordered = [c for c in consumers if c.get("authoritative")] + [c for c in consumers if not c.get("authoritative")]
+for c in ordered:
+    name = str(c.get("name"))
+    if name not in scan_step:
+        print(f"::error::render-verification: no recipe step for consumer {name}; add one beside its adapter (Req 9.11)", file=sys.stderr)
+        sys.exit(2)
+    cmd = scan_step[name].format(ap=aperture)
+    tag = "# authoritative consumer" if c.get("authoritative") else "# declared consumer, informational"
+    snip.append(f"{cmd:<83}{tag}")
 snip += [
     "# BuildKit provenance is attached at build time and is not verified by the",
     "# policy above (Req 2.25); inspect it with the buildx CLI plugin:",

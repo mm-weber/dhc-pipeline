@@ -98,6 +98,47 @@ sed -i '/^    absent:/d' "$SB/catalogue-policy.yaml"
 out=$(q resolved-labels); rc=$?
 [ "$rc" -eq 2 ] && grep -q "resolved_labels.absent has no name" <<<"$out" && pass "one grade missing: refused by name" || fail "one grade missing" "rc=$rc" "$out"
 
+# The VEX consumers (task 13.4, Req 9.11): a declared list with exactly one
+# authoritative, read by both scan arms, the portability block and the daily
+# smoke test. A list without exactly one authoritative is a hole, refused.
+consumers_policy() { # <yaml body under consumers:>
+  fresh
+  { cat "$SB/catalogue-policy.yaml"; printf 'consumers:\n%s\n' "$1"; } > "$SB/p2" && mv "$SB/p2" "$SB/catalogue-policy.yaml"
+}
+consumers_policy '  list:
+    - name: trivy
+      authoritative: true
+    - name: grype
+      authoritative: false
+  gating: false'
+[ "$(q consumers)" = $'trivy\ttrue\ngrype\tfalse' ] && pass "consumers: name and authoritative flag per line, declared order" || fail "consumers list" "$(q consumers)"
+[ "$(q authoritative-consumer)" = "trivy" ] && pass "the authoritative consumer by name" || fail "authoritative consumer" "$(q authoritative-consumer)"
+[ "$(q other-consumers)" = "grype" ] && pass "the other consumers, one per line" || fail "other consumers" "$(q other-consumers)"
+[ "$(q consumer-gating)" = "false" ] && pass "the divergence gating switch reads false" || fail "gating" "$(q consumer-gating)"
+consumers_policy '  list:
+    - name: trivy
+      authoritative: true
+    - name: grype
+      authoritative: true
+  gating: false'
+out=$(q authoritative-consumer); rc=$?
+[ "$rc" -eq 2 ] && grep -q "exactly one consumer must be authoritative" <<<"$out" && pass "two authoritative consumers: refused" || fail "two authoritative" "rc=$rc" "$out"
+consumers_policy '  list:
+    - name: trivy
+      authoritative: false
+  gating: false'
+out=$(q consumers); rc=$?
+[ "$rc" -eq 2 ] && grep -q "exactly one consumer must be authoritative" <<<"$out" && pass "no authoritative consumer: refused" || fail "no authoritative" "rc=$rc" "$out"
+fresh
+out=$(q consumers); rc=$?
+[ "$rc" -eq 2 ] && grep -q "consumers.list is missing" <<<"$out" && pass "no consumers section: refused by name" || fail "no consumers section" "rc=$rc" "$out"
+consumers_policy '  list:
+    - name: trivy
+      authoritative: true
+  gating: maybe'
+out=$(q consumer-gating); rc=$?
+[ "$rc" -eq 2 ] && grep -q "consumers.gating must be true or false" <<<"$out" && pass "a non-boolean gating switch: refused" || fail "gating non-boolean" "rc=$rc" "$out"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all triage-policy tests passed"

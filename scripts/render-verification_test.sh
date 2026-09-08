@@ -40,6 +40,15 @@ verification:
     attestations:
       spdxjson: [releaser]
       openvex: [releaser, re-attester]
+triage:
+  aperture: [CRITICAL, HIGH]
+consumers:
+  list:
+    - name: trivy
+      authoritative: true
+    - name: grype
+      authoritative: false
+  gating: false
 EOF
   printf 'intro\n%s\nstale snippet\n%s\noutro\n' "$BEGIN" "$END" > "$SB/README.md"
   printf 'manual\n%s\nstale snippet\n%s\ntail\n' "$BEGIN" "$END" > "$SB/docs/user-manual.md"
@@ -94,6 +103,19 @@ for doc in "$SB/README.md" "$SB/docs/user-manual.md"; do
     "--type openvex"; do
     grep -qF -- "$want" <<<"$body" && pass "$(basename "$doc") snippet carries $want" || fail "$(basename "$doc") snippet carries $want"
   done
+  # 3a (task 13.4, Req 9.11, 9.13): one scan step per declared consumer, the
+  # authoritative one first and marked, the aperture from the policy, the
+  # extracted document written to a file both steps read; no vexctl merge
+  # (ADR 0003 retired it). This is the recipe the daily smoke test runs verbatim.
+  for want in \
+    "> openvex.json" \
+    'trivy image --vex openvex.json --show-suppressed --severity CRITICAL,HIGH "$REF"   # authoritative consumer' \
+    'grype "$REF" --vex openvex.json                                                    # declared consumer, informational'; do
+    grep -qF -- "$want" <<<"$body" && pass "$(basename "$doc") snippet carries $want" || fail "$(basename "$doc") snippet carries $want" "$body"
+  done
+  grep -q 'vexctl' <<<"$body" && fail "$(basename "$doc") snippet has no vexctl merge step" || pass "$(basename "$doc") snippet has no vexctl merge step"
+  authline=$(grep -n 'authoritative consumer' <<<"$body" | cut -d: -f1); otherline=$(grep -n 'declared consumer, informational' <<<"$body" | cut -d: -f1)
+  [ -n "$authline" ] && [ -n "$otherline" ] && [ "$authline" -lt "$otherline" ] && pass "$(basename "$doc") authoritative consumer step comes first" || fail "$(basename "$doc") step order"
   grep -qF "intro" "$doc" >/dev/null 2>&1 || true
 done
 grep -qF "intro" "$SB/README.md" && pass "text outside markers untouched" || fail "text outside markers untouched"

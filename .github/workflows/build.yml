@@ -668,6 +668,39 @@ jobs:
           # already produced. The log is readable, so send it to both.
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # ---- PR-only: VEX portability (task 13.4, Req 9.12) ----
+      # The statements are written for the authoritative scanner's matcher;
+      # whether they land in every other declared consumer is measured here,
+      # never gated (catalogue-policy.yaml consumers.gating is the switch).
+      # The authoritative side is the scan above, normalised from its report
+      # (no second trivy run); each other consumer scans the same image with
+      # the same compiled documents. continue-on-error for the same reason as
+      # govulncheck below: a second scanner that can break CI is a second
+      # gate nobody designed.
+      - name: VEX portability (Req 9.12)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          REF: ${{ steps.localreg.outputs.ref }}
+          NAME: ${{ matrix.name }}
+          VEXDIR: .vexscan
+        run: |
+          set -uo pipefail
+          mkdir -p .portability
+          scripts/vex-consumer.sh "$(scripts/triage-policy.sh . authoritative-consumer)" .portability/authoritative.jsonl --root . --report trivy.json
+          records=(.portability/authoritative.jsonl)
+          while read -r consumer; do
+            [ -n "$consumer" ] || continue
+            if scripts/vex-consumer.sh "$consumer" ".portability/${consumer}.jsonl" --root . --scan "$REF" --vex-dir "$VEXDIR"; then
+              records+=(".portability/${consumer}.jsonl")
+            else
+              echo "::warning::VEX portability: ${consumer} did not produce a record for ${REF}; reported as not measured"
+              records+=(".portability/${consumer}.missing.jsonl")
+            fi
+          done < <(scripts/triage-policy.sh . other-consumers)
+          scripts/vex-portability.sh --root . --label "${NAME} (${REF})" --out .portability/block.md --json .portability/block.json "${records[@]}"
+          cat .portability/block.md >> "$GITHUB_STEP_SUMMARY"
+
       # ---- PR-only: reachability evidence (Req 6.13) ----
       # Trivy and Grype answer "is this module linked". govulncheck -mode=binary
       # reads the binary's symbol table and answers "is the vulnerable code
