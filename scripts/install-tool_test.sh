@@ -25,14 +25,14 @@ FAILURES=0
 
 # The pins the script must ship with, verified against the digests upstream
 # publishes beside each release (kind-linux-amd64.sha256sum, checksums.txt).
-KIND_VER=0.32.0
-KYVERNO_VER=1.18.2
+KIND_VER=0.33.0
+KYVERNO_VER=1.19.0
 KIND_ASSET="kind-linux-amd64"
 KYVERNO_ASSET="kyverno-cli_v${KYVERNO_VER}_linux_x86_64.tar.gz"
 KIND_URLDIR="kubernetes-sigs/kind/releases/download/v${KIND_VER}"
 KYVERNO_URLDIR="kyverno/kyverno/releases/download/v${KYVERNO_VER}"
-KIND_PIN=50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54
-KYVERNO_PIN=cb2feb8356149fd2fe774c894ccf0969f4a60a83867dd913af724f74ffbbc18b
+KIND_PIN=aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d
+KYVERNO_PIN=f5b4dc73c8e2f3f66e8e0034dc370e6eb6c4617eff7d5ae3838d2200034eb421
 KIND_DEP=kubernetes-sigs/kind
 KYVERNO_DEP=kyverno/kyverno
 
@@ -60,10 +60,10 @@ SYFT_DEP=anchore/syft
 # crane lists registry tags for the rescan enumeration (Req 2.22, task 9.3);
 # a github tarball with the binary at the root, and the one asset here whose
 # filename carries NO version — only the URL path does.
-CRANE_VER=0.22.0
+CRANE_VER=0.22.1
 CRANE_ASSET="go-containerregistry_Linux_x86_64.tar.gz"
 CRANE_URLDIR="google/go-containerregistry/releases/download/v${CRANE_VER}"
-CRANE_PIN=edb74d53fad9a596860f59d1c5d04a43dfb5f441dc71f57060dd0bf39483c833
+CRANE_PIN=0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0
 CRANE_DEP=google/go-containerregistry
 
 # vexctl merges several OpenVEX documents into one for the rescan's

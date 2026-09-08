@@ -81,14 +81,14 @@ FAILURES=0
 
 # The pins the script must ship with, verified by hand against the real
 # releases. Group 5 requires these exact strings to come back out of it.
-TRIVY_VER=0.73.0
-GRYPE_VER=0.117.0
+TRIVY_VER=0.74.0
+GRYPE_VER=0.118.0
 TRIVY_ASSET="trivy_${TRIVY_VER}_Linux-64bit.tar.gz"
 GRYPE_ASSET="grype_${GRYPE_VER}_linux_amd64.tar.gz"
 TRIVY_URLDIR="aquasecurity/trivy/releases/download/v${TRIVY_VER}"
 GRYPE_URLDIR="anchore/grype/releases/download/v${GRYPE_VER}"
-TRIVY_PIN=2edd39da482bb4e9831962487b68f68e3928ec3137794757f54d00383d79547b
-GRYPE_PIN=38525dab1e06f162ebaa02f94d82d1f807076b011a44180cf2777edf1a7b9c26
+TRIVY_PIN=2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
+GRYPE_PIN=1d444c5e7360471815f7158f71935fcecc68a3c417d85c7344f770854300bba2
 TRIVY_DEP=aquasecurity/trivy
 GRYPE_DEP=anchore/grype
 
