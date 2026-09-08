@@ -259,6 +259,18 @@ graph TB
      reporting enabled and no tag on a revoked digest from cluster D (F1, F11). One step, one
      report shape, one place a fork adds an invariant.
 
+   - **As built, corrected 2026-09-08 (task 9.2)**: from 2026-09-02 to 2026-09-08 every
+     nightly rebuild published every definition. Not a package-set change: build.yml
+     installed cosign only in the release part, after the comparator, the runner image
+     ships none, and the comparator read "cosign: command not found" as
+     `attestation-unreadable`, which by design publishes (equality must be proven).
+     Measured on grafana: the digest of 2026-09-08 and the one it replaced project to the
+     same 654 entries. Two changes: cosign is installed before the comparator, and a tool
+     missing from PATH is a refusal (exit 2, the run fails naming the tool), never a
+     verdict, the same class as a local SBOM that does not parse. The 28 digests published
+     in that window are real releases (scanned, signed, attested, tagged in order) and
+     stay, superseded, under Decision 9's no-deletion rule; the cost was daily rescans of
+     their platform manifests and one digest-only chart-pin PR per definition per night.
 7. **Statuses and clocks: every known finding carries a published status, and the clocks are read from attestations (Req 6.38 to 6.54; review F5, F4, F13 i; ADR 0003, ADR 0004; 2026-08-23; as built 2026-09-06, tasks 10.1 to 10.7)**
    - **Context**: the two-lane model published only `not_affected` and `fixed`; an accepted
      or transferred finding was invisible to anyone pulling the image, which review A had
@@ -1056,6 +1068,7 @@ ports: [3000/tcp]
 | Release-time scan yields no report for a platform manifest, or leaves one unscanned | release arm signs nothing, attests nothing, tags nothing; red run naming the scan | 2.26 |
 | Uncovered finding at release time | default: stated as `under_investigation` in the attested VEX, release completes; fail-closed setting on: nothing signed, attested or tagged, red run naming the finding | 2.12, 2.13 |
 | Scheduled rebuild with an unchanged package set | discarded before any push under the `on-change` publish policy; digest equality logged as the reproducibility measurement | 2.15 |
+| A tool the publish-on-change comparator needs (docker, cosign, jq) is missing from PATH | the comparator refuses (exit 2) naming the tool, the rebuild leg fails, nothing is published or discarded; a missing tool never reads as a package-set difference | 2.15, 2.16 |
 | Repository or catalogue tag refuses an anonymous pull | daily invariants step fails the rescan run naming it | 2.21 |
 | Tag-referenced digest rejected by the verification policy, or the control digest admitted | daily invariants step fails the rescan run | 2.24 |
 | Rendered verification artifact, workflow cron or job permissions drift from `catalogue-policy.yaml` | validate.yml fails naming the artifact or value | 7.9, 7.10 |

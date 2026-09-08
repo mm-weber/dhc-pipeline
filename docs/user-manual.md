@@ -447,7 +447,11 @@ the run stops before the push, publishes nothing, stays green, and logs
 whether the digests happened to match (a free reproducibility measurement).
 Different, or nothing published yet, or the `always` policy: the release
 arm above runs and the summary shows the difference (Req 2.15 to 2.17). A
-manual dispatch never compares: a human asking for a release gets one.
+manual dispatch never compares: a human asking for a release gets one. A
+tool the comparator needs that is not on PATH fails the run by name and
+publishes nothing: a broken runner is neither a change nor a no-change
+(measured 2026-09-08, when a late cosign install had published every
+definition every night for a week).
 
 ### Reading job summaries
 
@@ -1105,6 +1109,7 @@ three-day minimum release age first.
 | Gate summary: *"Statements exist but suppressed nothing here"* | Inert VEX — wrong product purl, or a statement scoped to a tag this build is not | Copy the product identifier printed in the same summary; check the compile report's drop reasons |
 | `validate` fails on a scanner/tool bump PR: *"no sha256 pinned for …"* | By design — the hash refresh is the human half of the pin | Complete the pin from upstream's checksums file ([Handling Renovate PRs](#handling-renovate-prs)) |
 | A release is out upstream but no Renovate PR appears for days | The three-day minimum release age (Req 3.7); the Dependency Dashboard lists it as pending | Wait; if it never ages, the datasource returned no timestamp, which is the point of `timestamp-required` |
+| The nightly publishes every definition every night, and the chart-pin PRs carry digests whose package sets are identical | A tool the comparator reads the published SBOM with is missing at comparator time (measured 2026-09-08: cosign installed later in the job), so every attestation read as unreadable, which publishes by design | Fixed by installing the tool before the comparator; the comparator now refuses on a missing tool. If it recurs, the run is red and names the tool |
 | `rescan` warns *"cosign attest … failed (attempt 1 of 3)"* | A Sigstore blip. Measured 2026-09-04: Rekor said the upload already existed (cosign's client had retried it), then answered 404 for that entry from a lagging replica | None. The write is tried again with fresh keys, up to three attempts; three failures fail the run and name the digest |
 | VEX product lint fails after a version bump: *"pins version X, which the definition does not publish"* | A tag-scoped statement outlived its release — Req 6.20 firing correctly | Re-decide for the new release: append a superseding statement (keep the old one), or retire the document |
 | Scan gate red on a PR that changed nothing related | An accepted-risk exception expired — the finding decayed back to un-triaged | Make the fresh decision; the rescan had been warning for 14 days |

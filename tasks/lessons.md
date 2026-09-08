@@ -137,3 +137,21 @@ the captured value and that it equals what the file pins now, never the
 literal, unless a human is meant to touch the test on every bump and the
 test says so. Before merging a new manager, simulate its own bump PR
 against the fixture (edit the pin, run the suite, revert).
+
+## 2026-09-08: a step ran before the tool it needs was installed, and the script read the missing tool as data
+
+**What happened.** The publish-on-change comparator calls cosign; build.yml
+installed cosign in the release part, after the comparator; the runner image
+has none. "cosign: command not found" was caught by the comparator's
+"unreadable attestation" branch, which publishes by design, so every nightly
+rebuild published every definition for a week. The unit suite could not see
+it (cosign was stubbed on PATH), the local rehearsal could not see it (cosign
+is installed here), and the daily summary said "different" in a place the API
+does not expose. The LOG even recorded the symptom without asking why.
+
+**Rule.** For every workflow step, list the tools its script calls and check
+each is installed EARLIER in the same job (grep the step order, not the
+file). A script that shells out guards its tools up front and refuses when
+one is missing; a missing tool is an environment failure, never a data
+verdict. And when a nightly publishes without a reason you can name, that is
+a finding, not a line in the log.

@@ -11,8 +11,10 @@
 #
 # The one rule under test: equality is the only thing that suppresses a
 # publish, so equality must be PROVEN. Anything unprovable (no tag, no
-# attestation, mismatched platforms) is `different`, and only a broken LOCAL
-# SBOM refuses outright, because that means our own build is lying to us.
+# attestation, mismatched platforms) is `different`; a broken LOCAL SBOM or
+# a tool missing from PATH refuses outright, because that means our own
+# build or environment is broken, and a broken environment must neither
+# publish nor discard (case 9b, measured 2026-09-08).
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PSD="$HERE/package-set-diff.sh"
@@ -206,6 +208,29 @@ out=$(run - "linux/amd64=$SB/loc.cdx.json"); rc=$?
 [ "$rc" -eq 2 ] && pass "malformed local sbom refuses with exit 2" || fail "malformed local sbom refuses with exit 2" "rc=$rc" "$out"
 [ ! -s "$SB/verdict" ] || ! grep -q "^verdict=" "$SB/verdict" \
   && pass "and writes no verdict" || fail "and writes no verdict" "$(cat "$SB/verdict")"
+
+# 9b: a tool the comparator needs that is not on PATH is OUR environment
+# broken, not an unreadable attestation: hard refusal, no verdict. Measured
+# 2026-09-08: build.yml installed cosign only in the release part, after the
+# comparator, and the runner image ships none, so every nightly rebuild from
+# 2026-09-02 read its own missing binary as `attestation-unreadable` and
+# published every definition every night (28 needless digests by 09-08).
+for tool in cosign docker; do
+  fresh
+  rm "$SB/bin/$tool"
+  # A PATH holding only the sandbox stubs plus the coreutils and jq the script
+  # itself needs, linked into a second directory, so the real tool installed
+  # on this machine cannot answer for the one the sandbox lacks.
+  mkdir -p "$SB/essentials"
+  for e in bash env jq sort sed awk cut grep cat mktemp rm mkdir sha256sum paste cmp tr head comm diff basename dirname printf; do
+    src=$(command -v "$e" 2>/dev/null) && ln -sf "$src" "$SB/essentials/$e"
+  done
+  out=$(PATH="$SB/bin:$SB/essentials" "$PSD" hardened-app "$REF" - "$SB/verdict" "linux/amd64=$SB/loc.cdx.json" 2>&1); rc=$?
+  [ "$rc" -eq 2 ] && pass "missing $tool refuses with exit 2" || fail "missing $tool refuses with exit 2" "rc=$rc" "$out"
+  grep -q "package-set-diff: $tool is not on PATH" <<<"$out" && pass "missing $tool is named" || fail "missing $tool is named" "$out"
+  [ ! -s "$SB/verdict" ] || ! grep -q "^verdict=" "$SB/verdict" \
+    && pass "missing $tool writes no verdict" || fail "missing $tool writes no verdict" "$(cat "$SB/verdict")"
+done
 
 # 10: the invocations are the ones the design names: the raw index by tag
 #     ref, the attestation bundle by repo@manifest-digest.
