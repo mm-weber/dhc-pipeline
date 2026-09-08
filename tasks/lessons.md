@@ -119,3 +119,21 @@ end to end and quote value paths verbatim from `values.yaml`; count binaries
 over the whole script, including every conditional branch, and make the
 check script print the full list so the count is measured, not remembered.
 Then have a second reviewer argue against filing before the owner does.
+
+## 2026-09-08: a fixture that hardcodes the value a bump PR moves turns every bump red
+
+**What happened.** The helm chart-version manager fixture (task 11.4)
+asserted the three pinned chart versions as literals while reading the real
+`chart/<name>/chart.yaml` files. The first two chart bumps Renovate opened
+(#167 cert-manager v1.21.1, #168 valkey 0.12.0) failed the lint battery on
+that fixture alone, and the CI annotations named nothing, so the cause was
+found only by running the whole validate chain locally on the PR branch.
+The tool-pin suites hardcode versions on purpose (the test is the second
+record of a human-verified pin); a chart version has no human half, so the
+literal only made the tracking self-defeating.
+
+**Rule.** A fixture over a file that Renovate rewrites asserts the shape of
+the captured value and that it equals what the file pins now, never the
+literal, unless a human is meant to touch the test on every bump and the
+test says so. Before merging a new manager, simulate its own bump PR
+against the fixture (edit the pin, run the suite, revert).
