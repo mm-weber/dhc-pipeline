@@ -74,7 +74,7 @@ SYFT_VERSION="1.51.1"
 SYFT_SHA256="8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3"
 
 # renovate: datasource=github-releases depName=google/go-containerregistry
-CRANE_VERSION="0.22.0"
+CRANE_VERSION="0.22.1"
 CRANE_SHA256="edb74d53fad9a596860f59d1c5d04a43dfb5f441dc71f57060dd0bf39483c833"
 
 # renovate: datasource=github-releases depName=openvex/vexctl
