@@ -129,5 +129,72 @@ check "version_statement_url: grafana's known origin" "https://grafana.com/api/g
 check "version_statement_url: unknown host, no override: empty" "" "$(version_statement_url dl.example.com 1.0)"
 check "version_statement_url: the override serves any host" "file:///tmp/api/1.0" "$(DHC_VERSIONS_API=file:///tmp/api version_statement_url dl.example.com 1.0)"
 
+# --- the active set (Req 1.13, 1.19; task 14.1) ------------------------------
+# catalogue-policy.yaml's `active_set:` names each definition the catalogue
+# builds, tracks, tests and publishes; this is its one reader. Malformed input
+# is a refusal by name rather than an empty answer, because an empty matrix
+# looks exactly like a catalogue with nothing to do.
+policy() { printf '%s\n' "$@" > "$SB/catalogue-policy.yaml"; }
+
+# 13: the declared list, in declared order, one per line
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+def db 'image: ghcr.io/acme/imgs/db'
+def db-compat 'image: ghcr.io/acme/imgs/db'
+policy 'release:' '  public: true' 'active_set:' '  - db' '  - app' '  - db-compat'
+check "active_definitions: the declared names in declared order" "$(printf 'db\napp\ndb-compat')" "$(active_definitions "$SB")"
+check "active_definitions: exit 0 on a well-formed set" "0" "$(active_definitions "$SB" >/dev/null 2>&1; echo $?)"
+
+# 14: a definition directory the set does not name is simply not active;
+#     the reader neither adds it nor complains (deactivation is the switch)
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+def old 'image: ghcr.io/acme/imgs/old'
+policy 'active_set:' '  - app'
+check "active_definitions: an unlisted directory is inactive, not an error" "app" "$(active_definitions "$SB" 2>/dev/null)"
+
+# 15: an entry with no image/<name>/image.yaml is refused naming the entry
+#     (Req 1.19), not passed on as a matrix row that fails somewhere else
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set:' '  - app' '  - typo'
+out=$(active_definitions "$SB" 2>&1); rc=$?
+check "active_definitions: a name with no definition directory is refused (exit 2)" "2" "$rc"
+case "$out" in *"typo"*"image/typo/image.yaml"*) check "active_definitions: the refusal names the entry and the missing file" "ok" "ok" ;;
+  *) check "active_definitions: the refusal names the entry and the missing file" "names typo and image/typo/image.yaml" "$out" ;; esac
+
+# 16: a duplicate entry is refused, so a matrix never builds one twice
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set:' '  - app' '  - app'
+out=$(active_definitions "$SB" 2>&1); rc=$?
+check "active_definitions: a duplicate entry is refused (exit 2)" "2" "$rc"
+case "$out" in *"app"*"twice"*|*"app"*"duplicate"*) check "active_definitions: the refusal names the duplicate" "ok" "ok" ;;
+  *) check "active_definitions: the refusal names the duplicate" "names app as duplicate" "$out" ;; esac
+
+# 17: no active_set, or an empty one, is a refusal: Req 1.14 makes the set the
+#     SOLE source of candidates, so "nothing declared" must not read as
+#     "nothing to build" (the schedule branch would silently rebuild nothing,
+#     the review 1.10 failure shape again)
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'release:' '  public: true'
+out=$(active_definitions "$SB" 2>&1); rc=$?
+check "active_definitions: a policy file without active_set is refused (exit 2)" "2" "$rc"
+case "$out" in *active_set*) check "active_definitions: the refusal names active_set" "ok" "ok" ;;
+  *) check "active_definitions: the refusal names active_set" "names active_set" "$out" ;; esac
+policy 'active_set: []'
+check "active_definitions: an empty active_set is refused (exit 2)" "2" "$(active_definitions "$SB" >/dev/null 2>&1; echo $?)"
+policy 'active_set: grafana'
+check "active_definitions: a scalar active_set is refused (exit 2)" "2" "$(active_definitions "$SB" >/dev/null 2>&1; echo $?)"
+
+# 18: no policy file at all is a refusal too, by path
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+out=$(active_definitions "$SB" 2>&1); rc=$?
+check "active_definitions: no catalogue-policy.yaml is refused (exit 2)" "2" "$rc"
+case "$out" in *catalogue-policy.yaml*) check "active_definitions: the refusal names the policy file" "ok" "ok" ;;
+  *) check "active_definitions: the refusal names the policy file" "names catalogue-policy.yaml" "$out" ;; esac
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

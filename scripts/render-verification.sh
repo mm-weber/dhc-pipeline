@@ -6,6 +6,9 @@
 #
 # Renders:
 #   - policies/verify-catalogue-images.yaml   (Kyverno verifyImages, Req 2.23)
+#   - policies/restrict-registries.yaml       (Kyverno registry gate, Req 4.2;
+#     its allowed-image glob is `registry:`, so a fork's chart gate admits
+#     the fork's namespace; task 14.1)
 #   - the fenced consumer snippet between
 #       <!-- render-verification:begin --> / <!-- render-verification:end -->
 #     in README.md and docs/user-manual.md   (Req 2.25)
@@ -38,6 +41,7 @@ mode, root, policy_path = sys.argv[1], sys.argv[2], sys.argv[3]
 BEGIN = "<!-- render-verification:begin -->"
 END = "<!-- render-verification:end -->"
 KYVERNO_REL = "policies/verify-catalogue-images.yaml"
+REGISTRY_REL = "policies/restrict-registries.yaml"
 DOC_RELS = ["README.md", "docs/user-manual.md"]
 
 whole = yaml.safe_load(open(policy_path))
@@ -199,6 +203,47 @@ def emit(rel_path, text):
 
 emit(KYVERNO_REL, kyverno_text)
 
+# The registry gate (Req 4.2): workloads run only images under the declared
+# namespace. Rendered so the glob and the namespace can never disagree; the
+# rule's shape (pattern over containers and initContainers, Pod-matched, with
+# kyverno's autogen covering Deployment templates) is unchanged from the
+# hand-written policy it replaces, and policies/tests/ keeps proving it.
+registry_text = f"""# Rendered by scripts/render-verification.sh from catalogue-policy.yaml's
+# verification section (Req 7.8); do not edit: edit the policy file and
+# re-render. validate.yml fails on any drift (Req 7.9).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-registries
+  annotations:
+    policies.kyverno.io/title: Restrict Registries
+    policies.kyverno.io/category: dhc-supply-chain
+    policies.kyverno.io/description: >-
+      Workloads run only images from this catalogue's declared registry
+      namespace {registry} (Req 4.2). Anything else (upstream defaults,
+      docker.io, unqualified references) is rejected at the gate.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: check-registry
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: >-
+          Only images from {registry} are allowed (Req 4.2).
+        pattern:
+          spec:
+            =(initContainers):
+              - image: "{registry}/*"
+            containers:
+              - image: "{registry}/*"
+"""
+emit(REGISTRY_REL, registry_text)
+
 for rel_path in DOC_RELS:
     path = os.path.join(root, rel_path)
     if not os.path.isfile(path):
@@ -216,6 +261,6 @@ for rel_path in DOC_RELS:
 if failures:
     sys.exit(1)
 if mode != "check":
-    print(f"render-verification: rendered {KYVERNO_REL} and {len(DOC_RELS)} snippet(s) "
-          f"from catalogue-policy.yaml")
+    print(f"render-verification: rendered {KYVERNO_REL}, {REGISTRY_REL} and "
+          f"{len(DOC_RELS)} snippet(s) from catalogue-policy.yaml")
 PY

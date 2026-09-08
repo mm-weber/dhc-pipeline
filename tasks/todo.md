@@ -580,3 +580,44 @@ the markdown API strips anchors, so the rule is the documented one. Eight
 fixture cases plus one in the accepted-risk suite, written before the
 script; the two lints, shellcheck, actionlint and the every-suite check
 pass; day one resolves 12 and 6. Cluster D's parent is ticked with 13.6.
+
+## Task 14.1: the policy file declares the registry namespace and the active set (2026-09-08)
+
+Branch: `task-14.1-active-set`. Goal: the two instance values a fork changes
+first, the registry namespace and the set of definitions it activates, are
+declared in `catalogue-policy.yaml` and read from there by every consumer
+(Req 1.13, 2.2, 2.7, 2.21, 2.23, 7.7); the registry gate policy joins the
+rendered, drift-checked artifacts.
+
+- [x] 1. Tests first: definition-lib_test.sh cases for `active_definitions` (the list,
+      a missing entry directory refused by name, a duplicate, an empty or missing
+      section); render-verification_test.sh cases for policies/restrict-registries.yaml
+      (rendered from `registry:`, no hardcode, drift named by --check)
+- [x] 2. catalogue-policy.yaml: `active_set:` (all seven; comment: what it drives, what
+      deactivation means, fork switch); the registry comment records the placement
+- [x] 3. definition-lib.sh: `active_definitions <root>`, the one reader (python3 + PyYAML,
+      the check-visibility precedent), refusing malformed input by name
+- [x] 4. render-verification.sh renders policies/restrict-registries.yaml from `registry:`
+      (second Kyverno artifact; validate's --check step covers it unchanged)
+- [x] 5. Literals out of the workflows: rescan.yml's dead REGISTRY env and header comment;
+      build.yml's local-registry path derives from the declared namespace; comments
+- [x] 6. Docs: CONVENTIONS policy gate paragraph, manual (chart gate, Policies, the
+      add-a-definition walkthrough gains "activate it"); design Decision 11 as-built;
+      tasks tick; every-suite check, shellcheck, actionlint, yamllint, kyverno test,
+      em-dash sweep
+
+**Review (2026-09-08).** Measured before writing: the namespace was already
+read from the policy file by build.yml's meta step and check-visibility.sh,
+so the registry half of the task was the hand-written registry policy
+(namespace in three places), rescan.yml's unused `REGISTRY` env, and the PR
+gate's local-registry path. The active set went in as a top-level list with
+one reader that refuses rather than returns empty (an empty matrix is
+indistinguishable from nothing to do, the review 1.10 shape), with the
+missing-directory check at the reader so 14.2's lint just calls it.
+Thirteen new reader cases and eight render cases were red before the code
+and green after; the reader returns all seven on the real tree; the rendered
+policy differs from the hand-written one only in its header and description
+(the em dash went); kyverno's 13 fixture results, every validate step in
+CI's order, shellcheck and actionlint (findings identical to main's) pass
+locally. Nothing reads the set until 14.2, said so in the policy comment,
+the manual and the design as-built note.
