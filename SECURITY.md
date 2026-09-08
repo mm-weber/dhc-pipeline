@@ -99,7 +99,7 @@ recorded bypass of the one-review rule. The bypass is kept deliberately: with
 one person, a review nobody else can give would be theatre, and a protected
 release environment with required reviewers would put a human approval point
 on nightly rebuilds, which a catalogue must not have. The required checks are
-the gate. A second maintainer flips `require_code_owner_review` in the
+the gate (manual-controls register row M16 in `docs/CONVENTIONS.md`). A second maintainer flips `require_code_owner_review` in the
 committed ruleset, and the bypass becomes an exception instead of the rule.
 The intended ruleset is committed as `.github/rulesets/main_sec.json` in
 GitHub's export format and compared daily against the live one through

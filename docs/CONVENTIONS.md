@@ -328,6 +328,53 @@ rewrites the catalogue status issue with every finding's clocks (Req 6.46,
   (Req 9.13): a step that fails or a suppression the authoritative consumer
   misses fails the run. Adding a consumer means: the list, an adapter case,
   a recipe step in `render-verification.sh`, a pinned install (Req 7.5).
+- Reading a divergence and deciding whether it matters is register row M19
+  below.
+
+## Manual controls (Req 9.14)
+
+Every step a human takes in operating this catalogue, in one place, so that
+no human-per-item control is unlabelled toil (review F13). Two classes only:
+**deliberate**, kept on purpose with the reason stated, or **pending
+automation**, a gap with its intended mechanism named. A review date is a
+column, not a class. The manual's operator paragraphs cite these rows by id;
+a row that names no fork switch is one a fork keeps or changes by removing
+the step altogether.
+
+| Id | Step | Class | Reason | Fork switch | Review by |
+|---|---|---|---|---|---|
+| M1 | Complete a tool-pin bump: record the new sha256 in `scripts/install-scanners.sh` or `scripts/install-tool.sh` (and the hash in `.github/requirements-ci.txt`) after comparing the release's checksums with a second source (Req 7.5) | deliberate | A checksum that updates itself verifies nothing: CVE-2026-33634 republished bytes under already-adopted versions. The second source is a Sigstore bundle, SLSA provenance, or the binary's embedded source commit (measured 2026-09-08: trivy, grype, kyverno and crane sign or attest, kind does not) | A verifier over the published signature where one exists, leaving the unsigned tools human | none |
+| M2 | Review and merge build-layer bumps (`dhi.io/build` frontend, `dhi.io/golang` builders) | deliberate | A toolchain change moves stdlib findings in every compiled image at once; the scan-gate delta is what the reviewer reads | `automerge: true` on the build-layer rule in `renovate.json5` | none |
+| M3 | Decide a finding: write a VEX statement (`vexctl`, `triage/vex/`), an accepted-risk exception (`triage/accepted-risk/`), a fix bump, or a drop, and the LOG entry that argues it (Req 6.4, 6.5) | deliberate | Judgement is the human's; everything mechanical around it (compile, lint, ceilings, the issue lifecycle, expiries, the status clocks) is automated | none: a fork automates evidence, never the decision | per entry: the exception's `expired_at`, the statement's LOG citation |
+| M4 | Sign hardened-app's release tags in its own repository (the `signed-commit` class needs a verified commit) | deliberate | The authenticity signal rests on a key only a person holds; the refresh refuses an unverified bump (Req 3.8) | The definition's class, or an upstream whose release workflow signs with a Sigstore identity | none |
+| M5 | Bump cosign by hand and keep it on the v2 line (`cosign-release` in `build.yml` and `rescan.yml`, ADR 0003) | deliberate | cosign v3 writes a bundle layout Kyverno 1.18.2 and Trivy 0.72.0 could not find (measured 2026-08-22); a move happens only when both consumers are measured to read v3 bundles, and the daily smoke test is the control that would catch an unmeasured one | The pinned version | 2026-10-22: re-measure with kyverno 1.19.0 and trivy 0.74.0, both newer than the ADR's measurement and both pinned since 2026-09-08 |
+| M6 | Re-verify the sources of the DHI redistribution memo (`data/dhi-terms-2026-08-21.md`) and re-decide the terms statement in `SECURITY.md` (F12 e) | deliberate | Docker revises the cited pages often; the memo says it holds for a few months, and the DSSA-versus-Apache tension is unresolved by any Docker document | A fork under different terms replaces the memo and the statement | 2026-11-21 |
+| M7 | Review and merge upstream chart version bumps (`chart/<name>/chart.yaml`, the helm-datasource manager, Req 3.11) | deliberate | A chart release can change what the overlay's values mean; the upgrade e2e argues the rest | `automerge: true` on the helm rule | none |
+| M8 | Review and merge grafana repackage bumps (the tarball, `refresh-grafana.sh`, ADR 0002) | deliberate | A repackage bump swaps a binary we did not build; the cross-origin checksum is agreement of origins, not a signature | Convert the definition to from-source, or automerge patch bumps of the repackage archetype | none |
+| M9 | Approve Renovate majors on the Dependency Dashboard (Req 3.4) | deliberate | A major of anything is a review, not a bump | `dependencyDashboardApproval` off for a datasource | none |
+| M10 | Fix-forward hand-bumps between upstream releases: a `go/bump@v2` step in a definition's fetch phase with a `# renovate:` marker and a LOG entry naming the version at which it is dropped (Req 6.5) | deliberate | The fix lane cannot wait for the next upstream release when a finding is KEV-listed or over its ceiling; the floor stays tracked | none: it is the fix treatment | per entry: the LOG names the drop version |
+| M11 | Feed a grafana build id (`REFRESH_GRAFANA_BUILD_ID`) when no public index carries it yet | deliberate | The refresh refuses by name rather than guessing; the pin is still the sidecar checksum, so a wrong id can only refuse or verify | The `.deb` route (ADR 0002) makes the id unnecessary | none |
+| M12 | File an upstream issue from a draft under `triage/upstream/` and record its number (a transfer's tracker, Req 6.5) | deliberate | An outward-facing report carries the owner's name and measurements; it is reviewed like code before it is sent | none | none |
+| M13 | Re-decide a compat variant at its `review_by` date (`chart/<name>/chart.yaml` `compat:`, Req 4.8) | deliberate | A shell shipped for a chart's sake is a cost with an owner and an expiry; validate fails the day after the date until a dated re-decision lands | Whether compat is allowed at all | valkey: 2026-11-24 |
+| M14 | Revoke a digest: the entry in `triage/revocations.yaml`, the advisory, the replacement release or the version deletion (`docs/revocation-runbook.md`, Req 9.5) | deliberate | The record drives the mechanics; the decision that a digest must not be pulled is not one a rescan makes | none | none |
+| M15 | Repository settings only the administrator holds: private vulnerability reporting on, the ruleset kept equal to its committed export, the weaker ruleset retired, packages public on first publish (Req 9.2, 9.8, 2.21) | deliberate | GitHub exposes these as settings, not as files; the daily rescan asserts each and fails by name when one drifts (Req 9.3, 9.9, 2.21) | none: the GitHub coupling is accepted (design Decision 10) | none |
+| M16 | Merge a pull request over the one-review rule, the recorded bypass (SECURITY.md, Governance) | deliberate | With one maintainer a review nobody else can give is theatre; the required checks are the gate | A second maintainer in `CODEOWNERS` and `require_code_owner_review: true` in the committed ruleset | none |
+| M17 | Dispatch a build (a release) or a rescan by hand | deliberate | A human asking for a release gets one: the dispatch path never runs the publish-on-change comparator | none | none |
+| M18 | Decide what a supply-chain signal means (the rescan's `supply-chain` issue: a tag that moved, a rotated key, a compromise, a changed origin; Req 3.10) | deliberate | The rescan can measure a mismatch, not its cause; it fails daily and keeps the issue open until someone decides | none | none |
+| M19 | Read the VEX portability block and decide whether a divergence matters (Req 9.12) | deliberate | Matcher semantics differ across scanners; a divergence is information about portability, not a defect in the statement, until someone says otherwise | `consumers.gating: true` in `catalogue-policy.yaml` fails a run on a divergence | none |
+| M20 | Review chart image-pin tag bumps (a new image release reaching a chart; digest-only bumps automerge, Req 3.12) | deliberate | A tag move is a release reaching the deployed chart; the upgrade e2e runs, a human reads its result | `matchUpdateTypes` on the digest automerge rule | none |
+| P1 | Track the cosign pin with Renovate: no manager matches a `cosign-release:` line, so M5's bumps are not offered (found 2026-09-08 while moving the install step; ADR 0003 promised the manager) | pending automation | A pin nothing bumps is a stale scanner's failure mode with a signing tool in its place | none: the intended mechanism is a `matchStrings` entry on the workflow manager plus a fixture, and M5 stays the completion step | none |
+| P2 | Re-scope version-scoped VEX statements on a grafana bump: the product lint demands re-scoped statements (Req 6.20), and today a person re-stamps each one in a triage session (2026-09-03 for 13.1.5) | pending automation | The mechanical half is scriptable: a statement whose module version is unchanged by the bump is carried forward under the new product; only a changed module version needs a person | none: the intended mechanism is a postUpgradeTask beside `refresh-grafana.sh` | none |
+
+**Automated since the register was decided** (F13's three automations and
+the ones cluster C added), kept here so the list of human steps reads
+against what it used to be: closing and reopening `cve` issues on evidence
+(task 10.6, Req 6.52 to 6.57); tracking upstream chart versions (task 11.4,
+Req 3.11); automerging digest-only chart image pins (task 11.4, Req 3.12);
+re-verifying every definition's authenticity signal daily (task 11.3,
+Req 3.10); discarding an unchanged nightly rebuild (task 9.2, Req 2.15);
+asserting the repository's governance and its revocation record daily
+(tasks 13.2, 13.3, Req 9.3, 9.7, 9.9).
 
 ## Pull requests (Req 7)
 
