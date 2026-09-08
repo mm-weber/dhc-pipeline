@@ -3,7 +3,7 @@
 upstream:
   name: valkey
   repository: https://valkey-io.github.io/valkey-helm
-  version: 0.11.0   # chart appVersion 9.1.1
+  version: 0.12.0   # chart appVersion 9.1.1
 
 # NOTE: this is the valkey project's own chart, so its appVersion follows the
 # server release (0.11.0 ships 9.1.1, 0.12.0 ships 9.1.2). The image pin in

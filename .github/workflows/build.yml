@@ -252,6 +252,29 @@ jobs:
           scripts/install-tool.sh syft "${RUNNER_TEMP}/bin"
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
+      # cosign serves two steps on main: the publish-on-change comparator
+      # below reads the published SBOM through `cosign download attestation`,
+      # and the release part signs and attests with it. It is installed here,
+      # before both. Until 2026-09-08 it was installed in the release part
+      # only, after the comparator; the runner image ships no cosign, so the
+      # comparator read "cosign: command not found" as an unreadable
+      # attestation, which by design publishes, and every nightly rebuild
+      # from 2026-09-02 published every definition (measured: 28 needless
+      # digests). The comparator now refuses outright when a tool is missing.
+      - name: install cosign
+        if: github.ref == 'refs/heads/main'
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        with:
+          # Pinned to the v2 line deliberately (ADR 0003, measured): cosign v3
+          # writes a bundle layout Kyverno 1.18.2 and Trivy 0.72.0 cannot find,
+          # so a v3 signature is invisible to both consumers this catalogue
+          # makes promises to. CI was on v2 only by the installer's default,
+          # which is not a pin. Not yet Renovate-tracked: no manager matches
+          # a `cosign-release:` line (found 2026-09-08 while moving this
+          # step; the tracking is a follow-up, Req 7.6).
+          # renovate: datasource=github-releases depName=sigstore/cosign
+          cosign-release: v2.6.0
+
       # ---- Daily rebuild, publish-on-change (task 9.2, Req 2.14-2.17) ----
       # The scheduled path builds LOCALLY first: same definition, same pins,
       # same provenance mode, exported to an OCI archive instead of pushed.
@@ -645,6 +668,39 @@ jobs:
           # already produced. The log is readable, so send it to both.
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # ---- PR-only: VEX portability (task 13.4, Req 9.12) ----
+      # The statements are written for the authoritative scanner's matcher;
+      # whether they land in every other declared consumer is measured here,
+      # never gated (catalogue-policy.yaml consumers.gating is the switch).
+      # The authoritative side is the scan above, normalised from its report
+      # (no second trivy run); each other consumer scans the same image with
+      # the same compiled documents. continue-on-error for the same reason as
+      # govulncheck below: a second scanner that can break CI is a second
+      # gate nobody designed.
+      - name: VEX portability (Req 9.12)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          REF: ${{ steps.localreg.outputs.ref }}
+          NAME: ${{ matrix.name }}
+          VEXDIR: .vexscan
+        run: |
+          set -uo pipefail
+          mkdir -p .portability
+          scripts/vex-consumer.sh "$(scripts/triage-policy.sh . authoritative-consumer)" .portability/authoritative.jsonl --root . --report trivy.json
+          records=(.portability/authoritative.jsonl)
+          while read -r consumer; do
+            [ -n "$consumer" ] || continue
+            if scripts/vex-consumer.sh "$consumer" ".portability/${consumer}.jsonl" --root . --scan "$REF" --vex-dir "$VEXDIR"; then
+              records+=(".portability/${consumer}.jsonl")
+            else
+              echo "::warning::VEX portability: ${consumer} did not produce a record for ${REF}; reported as not measured"
+              records+=(".portability/${consumer}.missing.jsonl")
+            fi
+          done < <(scripts/triage-policy.sh . other-consumers)
+          scripts/vex-portability.sh --root . --label "${NAME} (${REF})" --out .portability/block.md --json .portability/block.json "${records[@]}"
+          cat .portability/block.md >> "$GITHUB_STEP_SUMMARY"
+
       # ---- PR-only: reachability evidence (Req 6.13) ----
       # Trivy and Grype answer "is this module linked". govulncheck -mode=binary
       # reads the binary's symbol table and answers "is the vulnerable code
@@ -795,18 +851,6 @@ jobs:
       # signature and attestations exist, and the tag is applied last. Until
       # task 9.1 the build pushed tags itself and the only scan ever run was the
       # pull request's, against a different artifact than the one signed.
-      - name: install cosign
-        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true')
-        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
-        with:
-          # Pinned to the v2 line deliberately (ADR 0003, measured): cosign v3
-          # writes a bundle layout Kyverno 1.18.2 and Trivy 0.72.0 cannot find,
-          # so a v3 signature is invisible to both consumers this catalogue
-          # makes promises to. CI was on v2 only by the installer's default,
-          # which is not a pin. Renovate tracks it (Req 7.5, 7.6).
-          # renovate: datasource=github-releases depName=sigstore/cosign
-          cosign-release: v2.6.0
-
       # Every platform manifest of the pushed index, by its own digest. The
       # index also carries BuildKit's attestation manifests, which sit under
       # unknown/unknown and are NOT platform manifests (Req 2 terms): scanning
