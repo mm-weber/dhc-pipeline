@@ -503,7 +503,9 @@ bottom:
 
 The daily rescan's summary adds the **consumer smoke test** (Req 9.13: the
 README's verify recipe run verbatim against one supported digest, every
-step's exit code, the suppressions the authoritative consumer landed, and
+step's exit code, each suppressing statement counted as suppressed a
+reported finding, nothing to suppress (the finding is not reported at
+all) or missing, and
 the `--vex oci` reading compared with the extracted document) and the **VEX
 portability block** (Req 9.12: per statement the authoritative scanner
 suppressed on a supported platform manifest, each other consumer's result);

@@ -52,6 +52,7 @@ EOF
 VEXDOC='{"@context":"https://openvex.dev/ns/v0.2.0","@id":"x","statements":[
  {"vulnerability":{"name":"CVE-2026-2001"},"status":"not_affected","products":[{"@id":"pkg:oci/grafana@sha256:aaaa","subcomponents":[{"@id":"pkg:golang/github.com/grafana/tempo@v1.5.1"}]}]},
  {"vulnerability":{"name":"CVE-2026-2002"},"status":"fixed","products":[{"@id":"pkg:oci/grafana@sha256:aaaa","subcomponents":[{"@id":"pkg:apk/alpine/libssl3@3.5.7-r1"}]}]},
+ {"vulnerability":{"name":"CVE-2026-7001"},"status":"fixed","products":[{"@id":"pkg:oci/grafana@sha256:aaaa","subcomponents":[{"@id":"pkg:golang/stdlib@v1.26.4"}]}]},
  {"vulnerability":{"name":"CVE-2026-5001"},"status":"affected","products":[{"@id":"pkg:oci/grafana@sha256:aaaa","subcomponents":[{"@id":"pkg:golang/x@1"}]}]}]}'
 printf '%s' "$VEXDOC" > "$SB/vexdoc.json"
 cat > "$SB/bin/cosign" <<'STUB'
@@ -122,11 +123,11 @@ grep -q "grype $REF --vex openvex.json" "$STUB_ARGV" && pass "the grype recipe s
 grep -q "docker buildx imagetools inspect $REF" "$STUB_ARGV" && pass "the provenance step ran" || fail "provenance step" "$(cat "$STUB_ARGV")"
 grep -q -- "trivy image --vex oci" "$STUB_ARGV" && pass "the --vex oci reading was taken for the regression comparison" || fail "vex oci" "$(cat "$STUB_ARGV")"
 grep -q "recipe: 6 step(s) ran, 0 failed" "$SB/smoke.md" && pass "the block counts the recipe steps" || fail "steps counted" "$(cat "$SB/smoke.md")"
-grep -q "statements in the attested document: 2 suppressing (not_affected or fixed), 1 affected" "$SB/smoke.md" && pass "the block counts the document's statements" || fail "statement counts" "$(cat "$SB/smoke.md")"
-grep -q "trivy (authoritative): 2 of 2 suppressing statement(s) landed, 0 missing" "$SB/smoke.md" && pass "the authoritative assertion is reported" || fail "authoritative line" "$(cat "$SB/smoke.md")"
+grep -q "statements in the attested document: 3 suppressing (not_affected or fixed), 1 affected" "$SB/smoke.md" && pass "the block counts the document's statements" || fail "statement counts" "$(cat "$SB/smoke.md")"
+grep -q "trivy (authoritative): 3 suppressing statement(s): 2 suppressed a reported finding, 1 had nothing to suppress (finding not reported), 0 missing" "$SB/smoke.md" && pass "the authoritative assertion tells suppressed from nothing-to-suppress" || fail "authoritative line" "$(cat "$SB/smoke.md")"
 grep -q -- "--vex oci: same 2 suppression(s) as the extracted document" "$SB/smoke.md" && pass "the oci reading agrees" || fail "oci line" "$(cat "$SB/smoke.md")"
 grep -q '#### VEX portability' "$SB/smoke.md" && grep -q 'grype: 1 agree, 1 DIVERGENCE, 0 absent' "$SB/smoke.md" && pass "the other consumer went into the portability block" || fail "portability" "$(cat "$SB/smoke.md")"
-jq -e '.ref == "'"$REF"'" and .recipe.failed == 0 and .authoritative.missing == 0 and .oci.agrees == true' "$SB/smoke.json" >/dev/null && pass "the JSON record" || fail "json" "$(cat "$SB/smoke.json")"
+jq -e '.ref == "'"$REF"'" and .recipe.failed == 0 and .authoritative.suppressed == 2 and .authoritative.unneeded == 1 and .authoritative.missing == 0 and .oci.agrees == true' "$SB/smoke.json" >/dev/null && pass "the JSON record carries the three buckets" || fail "json" "$(cat "$SB/smoke.json")"
 
 # 2: a recipe step fails: the run fails naming the step
 export STUB_COSIGN_FAIL=verify
@@ -139,7 +140,7 @@ export STUB_TRIVY_JSON="$SB/trivy-missing.json"
 out=$(run "$REF"); rc=$?
 export STUB_TRIVY_JSON="$SB/trivy-good.json"
 [ "$rc" -eq 1 ] && grep -q '::error::consumer-smoke: CVE-2026-2002 (pkg:apk/alpine/libssl3@3.5.7-r1, fixed) is still reported by trivy: the published statement did not land in the authoritative consumer (Req 9.13)' <<<"$out" && pass "a missing authoritative suppression fails by name" || fail "missing suppression" "rc=$rc" "$out"
-grep -q "trivy (authoritative): 1 of 2 suppressing statement(s) landed, 1 missing" "$SB/smoke.md" && pass "and the block says so" || fail "block on missing" "$(cat "$SB/smoke.md")"
+grep -q "trivy (authoritative): 3 suppressing statement(s): 1 suppressed a reported finding, 1 had nothing to suppress (finding not reported), 1 missing" "$SB/smoke.md" && pass "and the block says so" || fail "block on missing" "$(cat "$SB/smoke.md")"
 
 # 4: the --vex oci reading suppresses less than the extracted document: the authoritative consumer
 #    is missing a suppression for anyone who follows that reading (ADR 0004's regression check)
