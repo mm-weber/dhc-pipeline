@@ -1412,3 +1412,26 @@ into the ask as precedent.
 
 Next check: an answer on #247, or the `review_by` date 2026-11-24, whichever
 comes first.
+
+## 2026-09-08: a week of nightly publishes that changed nothing (task 9.2, Req 2.15)
+
+Found while explaining a digest-only chart-pin PR (#163): the grafana digest
+published by the 09:08 rebuild and the one it replaced project to the same
+654 package entries under the comparator's own projection, and the last four
+nightly runs had published all seven definitions each. Cause: build.yml
+installed cosign in the release part, after the publish-on-change comparator,
+and the runner image ships no cosign, so `cosign download attestation` failed
+with "command not found", which the comparator read as an unreadable
+attestation, which by design publishes. Every night from 2026-09-02 (the
+first scheduled run after task 9.2) published every definition: 28 needless
+digests through 2026-09-08, each scanned, signed, attested and tagged in
+order, each then rescanned daily as a superseded digest, each opening a
+digest-only chart-pin PR. The 09-04 entry above recorded "published new
+digests for six of seven" without asking why.
+
+Fix: cosign installs before the comparator, and the comparator refuses (exit
+2, the run fails naming the tool) when docker, cosign or jq is missing,
+instead of returning a verdict; the suite gained the case. The 28 digests
+stay, superseded, under the no-deletion rule; nothing about them is wrong
+except that they were unnecessary. First proof: the next nightly should
+discard all seven and log the reproducibility measurement instead.
