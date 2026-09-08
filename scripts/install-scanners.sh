@@ -54,7 +54,7 @@ ARCH="${INSTALL_SCANNERS_ARCH:-$(uname -m)}"
 
 # renovate: datasource=github-releases depName=aquasecurity/trivy
 TRIVY_VERSION="0.74.0"
-TRIVY_SHA256="2edd39da482bb4e9831962487b68f68e3928ec3137794757f54d00383d79547b"
+TRIVY_SHA256="2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a"
 
 # renovate: datasource=github-releases depName=anchore/grype
 GRYPE_VERSION="0.117.0"
