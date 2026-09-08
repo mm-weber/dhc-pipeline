@@ -26,13 +26,13 @@ FAILURES=0
 # The pins the script must ship with, verified against the digests upstream
 # publishes beside each release (kind-linux-amd64.sha256sum, checksums.txt).
 KIND_VER=0.33.0
-KYVERNO_VER=1.18.2
+KYVERNO_VER=1.19.0
 KIND_ASSET="kind-linux-amd64"
 KYVERNO_ASSET="kyverno-cli_v${KYVERNO_VER}_linux_x86_64.tar.gz"
 KIND_URLDIR="kubernetes-sigs/kind/releases/download/v${KIND_VER}"
 KYVERNO_URLDIR="kyverno/kyverno/releases/download/v${KYVERNO_VER}"
 KIND_PIN=aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d
-KYVERNO_PIN=cb2feb8356149fd2fe774c894ccf0969f4a60a83867dd913af724f74ffbbc18b
+KYVERNO_PIN=f5b4dc73c8e2f3f66e8e0034dc370e6eb6c4617eff7d5ae3838d2200034eb421
 KIND_DEP=kubernetes-sigs/kind
 KYVERNO_DEP=kyverno/kyverno
 
