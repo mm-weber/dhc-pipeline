@@ -13,11 +13,15 @@
 #      variables. A step that exits non-zero fails the run naming the step.
 #   2. The authoritative consumer's suppressions, from the same extracted
 #      document (openvex.json, which the recipe wrote). Every not_affected or
-#      fixed statement whose finding the authoritative consumer still REPORTS
-#      is a suppression missing in the authoritative consumer: the run fails
-#      naming the statement. A finding it does not report at all is neither
-#      (nothing to suppress); an affected statement suppresses nothing by
-#      design.
+#      fixed statement is counted into one of three buckets: it SUPPRESSED a
+#      finding the consumer reported and hid; it had NOTHING TO SUPPRESS,
+#      because the consumer does not report that finding at all (a toolchain
+#      bump removed it, or the database never had it); or it is MISSING, the
+#      finding still reported. Only missing fails the run, naming the
+#      statement. The first real run (2026-09-08, cert-manager-cainjector)
+#      counted the middle bucket as "landed" beside "0 suppressions" and read
+#      as a contradiction; the buckets are told apart since. An affected
+#      statement suppresses nothing by design.
 #   3. ADR 0004's regression check: trivy reading `--vex oci` (the attestation
 #      itself, exactly one per digest, Req 6.44) must suppress what the
 #      extracted document suppresses; suppressing less is the authoritative
@@ -99,7 +103,7 @@ done
 
 # 2. the authoritative consumer's suppressions, from the document the recipe extracted
 doc="$WORK/run/openvex.json"
-suppressing=0; affected=0; landed=0; missing=0; missing_names=(); measured=""
+suppressing=0; affected=0; landed=0; unneeded=0; missing=0; missing_names=(); measured=""
 oci_note="not measured"; oci_agrees=null; oci_missing=()
 mkdir -p "$WORK/vex"; cp "$doc" "$WORK/vex/openvex.json" 2>/dev/null || true
 if [ -s "$doc" ] && "$HERE/vex-consumer.sh" "$AUTH" "$WORK/auth.jsonl" --root "$ROOT" --scan "$REF" --vex-dir "$WORK/vex" --remote >/dev/null 2>"$WORK/auth.err"; then
@@ -128,13 +132,14 @@ for s in d.get("statements") or []:
         affected += 1
 rows = [json.loads(l) for l in open(rec) if l.strip()]
 reported = {(r["vulnerability"], r["key"]) for r in rows if not r["suppressed"]}
-landed = [s for s in statements if (s[0], s[1]) not in reported]
+suppressed_set = {(r["vulnerability"], r["key"]) for r in rows if r["suppressed"] and r["by"] == "vex"}
 missing = [s for s in statements if (s[0], s[1]) in reported]
-suppressed_keys = sorted({(r["vulnerability"], r["key"]) for r in rows if r["suppressed"] and r["by"] == "vex"})
-json.dump({"suppressing": len(statements), "affected": affected, "landed": len(landed), "missing": missing,
-           "suppressed": suppressed_keys}, open(out, "w"))
+suppressed = [s for s in statements if (s[0], s[1]) in suppressed_set and (s[0], s[1]) not in reported]
+unneeded = [s for s in statements if (s[0], s[1]) not in reported and (s[0], s[1]) not in suppressed_set]
+json.dump({"suppressing": len(statements), "affected": affected, "suppressed_count": len(suppressed),
+           "unneeded": len(unneeded), "missing": missing, "suppressed": sorted(suppressed_set)}, open(out, "w"))
 PY
-  suppressing=$(jq '.suppressing' "$WORK/verdict"); affected=$(jq '.affected' "$WORK/verdict"); landed=$(jq '.landed' "$WORK/verdict"); missing=$(jq '.missing | length' "$WORK/verdict")
+  suppressing=$(jq '.suppressing' "$WORK/verdict"); affected=$(jq '.affected' "$WORK/verdict"); landed=$(jq '.suppressed_count' "$WORK/verdict"); unneeded=$(jq '.unneeded' "$WORK/verdict"); missing=$(jq '.missing | length' "$WORK/verdict")
   mapfile -t missing_names < <(jq -r '.missing[] | "\(.[0]) (\(.[1]), \(.[2]))"' "$WORK/verdict")
   for m in "${missing_names[@]}"; do
     err "${m} is still reported by ${AUTH}: the published statement did not land in the authoritative consumer (Req 9.13)"
@@ -158,6 +163,7 @@ PY
       oci_agrees=false; oci_note="--vex oci suppresses ${o} statement(s), the extracted document ${f}: more in the attestation than the extracted document reads (reported, not gated)"
     else
       oci_agrees=true; oci_note="--vex oci: same ${f} suppression(s) as the extracted document"
+      [ "$f" -eq 0 ] && oci_note="--vex oci: no suppression either way (nothing reported to suppress), the two readings agree"
     fi
   else
     oci_note="--vex oci: not measured ($(tr -d '\n' < "$WORK/oci.err" 2>/dev/null | cut -c1-160))"
@@ -174,7 +180,7 @@ fi
   echo "- recipe: ${ran} step(s) ran, ${failed} failed${failed_names:+ (${failed_names[*]})}"
   if [ -n "$measured" ]; then
     echo "- statements in the attested document: ${suppressing} suppressing (not_affected or fixed), ${affected} affected"
-    echo "- ${AUTH} (authoritative): ${landed} of ${suppressing} suppressing statement(s) landed, ${missing} missing${missing_names:+: ${missing_names[*]}}"
+    echo "- ${AUTH} (authoritative): ${suppressing} suppressing statement(s): ${landed} suppressed a reported finding, ${unneeded} had nothing to suppress (finding not reported), ${missing} missing${missing_names:+: ${missing_names[*]}}"
     echo "- ${oci_note}"
   else
     echo "- ${AUTH} (authoritative): not measured"
@@ -193,14 +199,14 @@ if [ -n "$measured" ]; then
   "$HERE/vex-portability.sh" --root "$ROOT" --label "smoke ${REF}" --out "$OUT" --append --json "$WORK/portability.json" "${records[@]}" >/dev/null || true
 fi
 
-python3 - "$JSON" "$REF" "$ran" "$failed" "$suppressing" "$affected" "$landed" "$missing" "$oci_agrees" "$oci_note" "$WORK/portability.json" <<'PY'
+python3 - "$JSON" "$REF" "$ran" "$failed" "$suppressing" "$affected" "$landed" "$unneeded" "$missing" "$oci_agrees" "$oci_note" "$WORK/portability.json" <<'PY'
 import json, os, sys
-out, ref, ran, failed, supp, aff, landed, missing, oci_agrees, oci_note, port = sys.argv[1:12]
+out, ref, ran, failed, supp, aff, landed, unneeded, missing, oci_agrees, oci_note, port = sys.argv[1:13]
 p = json.load(open(port)) if os.path.exists(port) else None
 json.dump({"ref": ref, "recipe": {"ran": int(ran), "failed": int(failed)},
-           "authoritative": {"suppressing": int(supp), "affected": int(aff), "landed": int(landed), "missing": int(missing)},
+           "authoritative": {"suppressing": int(supp), "affected": int(aff), "suppressed": int(landed), "unneeded": int(unneeded), "missing": int(missing)},
            "oci": {"agrees": None if oci_agrees == "null" else oci_agrees == "true", "note": oci_note},
            "portability": p}, open(out, "w"), indent=1)
 PY
-echo "consumer-smoke: ${REF}: recipe ${ran} step(s) (${failed} failed), ${AUTH}: ${landed}/${suppressing} suppressions landed (${missing} missing), ${oci_note}"
+echo "consumer-smoke: ${REF}: recipe ${ran} step(s) (${failed} failed), ${AUTH}: ${suppressing} suppressing statement(s), ${landed} suppressed, ${unneeded} nothing to suppress, ${missing} missing; ${oci_note}"
 [ "$failed" -eq 0 ] && [ "$missing" -eq 0 ] && [ -n "$measured" ] && [ "${#oci_missing[@]}" -eq 0 ] || exit 1

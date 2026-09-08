@@ -440,7 +440,8 @@ jobs:
             echo "ref=${ref}"
             echo "failed_steps=$(jq '.recipe.failed' "$OUT/smoke/smoke.json" 2>/dev/null || echo 0)"
             echo "missing=$(jq '.authoritative.missing' "$OUT/smoke/smoke.json" 2>/dev/null || echo 0)"
-            echo "landed=$(jq '.authoritative.landed' "$OUT/smoke/smoke.json" 2>/dev/null || echo 0)"
+            echo "suppressed=$(jq '.authoritative.suppressed' "$OUT/smoke/smoke.json" 2>/dev/null || echo 0)"
+            echo "unneeded=$(jq '.authoritative.unneeded' "$OUT/smoke/smoke.json" 2>/dev/null || echo 0)"
           } >> "$GITHUB_OUTPUT"
           exit "$rc"
 
@@ -674,7 +675,7 @@ jobs:
             echo "- authenticity signals: ${{ steps.authenticity.outputs.verified || 0 }} verified, ${{ steps.authenticity.outputs.mismatched || 0 }} mismatched, ${{ steps.authenticity.outputs.lapsed || 0 }} lapsed compat review-by date(s)"
             echo "- governance: private vulnerability reporting ${{ steps.governance.outputs.reporting || 'not checked' }}, ${{ steps.governance.outputs.compared || 0 }} committed ruleset(s) compared, ${{ steps.governance.outputs.differences || 0 }} difference(s), ${{ steps.governance.outputs.live_only || 0 }} live-only ruleset(s)"
             echo "- revocations: ${{ steps.governance.outputs.revoked || 0 }} recorded, ${{ steps.governance.outputs.revoked_referenced || 0 }} still referenced by a catalogue tag"
-            echo "- consumer smoke test: ${{ steps.smoke.outputs.ref || 'not run' }}, ${{ steps.smoke.outputs.failed_steps || 0 }} failed step(s), ${{ steps.smoke.outputs.landed || 0 }} suppression(s) landed, ${{ steps.smoke.outputs.missing || 0 }} missing in the authoritative consumer"
+            echo "- consumer smoke test: ${{ steps.smoke.outputs.ref || 'not run' }}, ${{ steps.smoke.outputs.failed_steps || 0 }} failed step(s); statements: ${{ steps.smoke.outputs.suppressed || 0 }} suppressed a reported finding, ${{ steps.smoke.outputs.unneeded || 0 }} had nothing to suppress, ${{ steps.smoke.outputs.missing || 0 }} missing in the authoritative consumer"
             echo "- VEX portability: ${{ steps.portability.outputs.blocks || 0 }} supported platform manifest(s) compared, ${{ steps.portability.outputs.divergences || 0 }} divergence(s), ${{ steps.portability.outputs.unmeasured || 0 }} consumer scan(s) not measured"
             echo "- issues closed on evidence: ${{ steps.lifecycle_apply.outputs.closed || 0 }} of ${{ steps.lifecycle.outputs.close || 0 }} decided, reopened: ${{ steps.lifecycle_apply.outputs.reopened || 0 }} of ${{ steps.lifecycle.outputs.reopen || 0 }}, kept open: ${{ steps.lifecycle.outputs.kept || 0 }}"
             echo "- catalogue status: ${{ steps.status_publish.outputs.url || 'not published' }}, ${{ steps.status.outputs.undecided || 0 }} undecided (${{ steps.status.outputs.over_ceiling || 0 }} over ceiling), ${{ steps.status.outputs.decided || 0 }} decided, ${{ steps.status.outputs.fixed || 0 }} fixed"
