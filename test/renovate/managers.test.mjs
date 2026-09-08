@@ -339,19 +339,30 @@ check(
 // chart repository: the helm datasource's default registry is a frozen decoy
 // (independent review 1.8), so a lost registryUrl reports every chart up to
 // date forever. hardened-app's own Chart.yaml is not an upstream pin.
+//
+// The pinned version is read out of the file rather than written here: the
+// bump PR this manager opens changes that line, and a fixture carrying the
+// old literal turned every chart bump red (#167, #168, 2026-09-08). What the
+// fixture proves is that the manager captures exactly what the file pins and
+// that the value has a version's shape, not which version it is today.
 {
   check("charts: a tenth custom manager tracks the upstream chart versions", !!helmMgr && helmMgr.datasourceTemplate === "helm", JSON.stringify(helmMgr));
-  for (const [file, name, version, registry] of [
-    ["chart/cert-manager/chart.yaml", "cert-manager", "v1.21.0", "https://charts.jetstack.io"],
-    ["chart/grafana/chart.yaml", "grafana", "10.5.15", "https://grafana.github.io/helm-charts"],
-    ["chart/valkey/chart.yaml", "valkey", "0.11.0", "https://valkey-io.github.io/valkey-helm"],
+  const pinnedVersion = (text) => (text.match(/^\s*version:\s*"?([^\s"'#]+)/m) ?? [])[1];
+  const isChartVersion = (v) => /^v?[0-9]+\.[0-9]+\.[0-9]+$/.test(v ?? "");
+  for (const [file, name, registry] of [
+    ["chart/cert-manager/chart.yaml", "cert-manager", "https://charts.jetstack.io"],
+    ["chart/grafana/chart.yaml", "grafana", "https://grafana.github.io/helm-charts"],
+    ["chart/valkey/chart.yaml", "valkey", "https://valkey-io.github.io/valkey-helm"],
   ]) {
     check(`charts: manager file pattern matches ${file}`, !!helmMgr && filePatternMatches(helmMgr, file));
-    const deps = helmMgr ? extract(helmMgr, read(file)) : [];
+    const text = read(file);
+    const version = pinnedVersion(text);
+    check(`charts: ${file} pins a semver chart version`, isChartVersion(version), `${version}`);
+    const deps = helmMgr ? extract(helmMgr, text) : [];
     check(`charts: ${name} yields exactly one dep`, deps.length === 1, `${deps.length}`);
     const d = deps[0] ?? {};
     check(`charts: ${name} tracked by chart name`, d.depName === name, `${d.depName}`);
-    check(`charts: ${name} pinned version captured (${version})`, d.currentValue === version, `${d.currentValue}`);
+    check(`charts: ${name} pinned version captured as the file pins it (${version})`, d.currentValue === version, `${d.currentValue}`);
     check(`charts: ${name} repository captured as the registryUrl`, d.registryUrl === registry, `${d.registryUrl}`);
   }
   check("charts: hardened-app's own Chart.yaml is not captured (case differs, it is ours)", !!helmMgr && !filePatternMatches(helmMgr, "chart/hardened-app/Chart.yaml"));
