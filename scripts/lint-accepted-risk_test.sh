@@ -44,6 +44,8 @@ fresh() {
   SB=$(mktemp -d)
   mkdir -p "$SB/image/grafana" "$SB/triage/accepted-risk"
   printf 'image: ghcr.io/mm-weber/dhc/grafana\n' > "$SB/image/grafana/image.yaml"
+  # Req 9.18: the reasoning the valid entry cites must exist as a LOG heading
+  printf '# log\n\n## 2026-07-27 grpc\n\nreasoning\n' > "$SB/triage/LOG.md"
   # The clocks come from the policy file (Req 6.49), read through
   # scripts/triage-policy.sh: the largest ceiling bounds every entry from its
   # decided_at, and the warning window is what the rescan reports in.
@@ -92,6 +94,11 @@ YAML
 fresh
 { echo "vulnerabilities:"; valid_body "$OK_DATE"; } > "$SB/triage/accepted-risk/grafana.yaml"
 run_case "complete entry passes" 0
+
+# 1b (Req 9.18, task 13.6): a ref that names no LOG heading fails by name
+fresh
+{ echo "vulnerabilities:"; valid_body "$OK_DATE" | sed 's|triage/LOG.md#2026-07-27-grpc|triage/LOG.md#2026-07-27-grpc-typo|'; } > "$SB/triage/accepted-risk/grafana.yaml"
+run_case "a ref that resolves to no LOG heading fails" 1 "resolves to no heading in triage/LOG.md"
 
 # 2: no accepted-risk files at all is fine — nothing is being suppressed
 fresh

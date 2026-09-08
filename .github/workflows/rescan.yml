@@ -1,6 +1,7 @@
 name: rescan
 
-# Daily CVE rescan of the PUBLISHED ghcr.io/mm-weber/dhc images (Req 6.2).
+# Daily CVE rescan of the PUBLISHED images under the declared registry
+# namespace (catalogue-policy.yaml verification.registry; Req 6.2).
 # Trivy re-scans each catalogue image for HIGH/CRITICAL honouring our OpenVEX
 # statements in triage/vex/. Findings that are new — not already tracked by an
 # open `cve` issue — are enriched with EPSS (FIRST.org) and CISA KEV status and
@@ -44,7 +45,6 @@ jobs:
         # makes those lines the whole truth.
         shell: bash {0}
     env:
-      REGISTRY: ghcr.io/mm-weber/dhc
       OUT: ${{ github.workspace }}/rescan-out
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

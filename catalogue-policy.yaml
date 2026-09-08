@@ -28,10 +28,39 @@ release:
     - linux/amd64
     - linux/arm64
 
+# Req 1.13 (task 14.1): the active set, each definition directory under
+# image/ this catalogue builds, tracks, tests and publishes. It is the sole
+# source of candidates for the build and test matrices and the tracking
+# scope (Req 1.14; the matrices read it from task 14.2 on, the probe lint
+# from 14.3), and scripts/definition-lib.sh's active_definitions is the one
+# reader: an entry naming no image/<name>/image.yaml, a duplicate, or an
+# empty list is refused by name rather than read as "nothing to do".
+# Deactivating a definition means removing its line, and only that: no new
+# digest is pushed and no new tag applied for it (Req 1.15), a bump PR
+# touching it fails validation (Req 1.16), while its already-published tags
+# keep every tag-driven plane (enumeration, daily scans, attestations,
+# issues over its current tags) until retention retires them; the directory
+# stays, the reference demonstrates the switch. The reference instance
+# activates everything, grafana's repackaged tarball included (design
+# Decision 11). A fork lists what it stands behind.
+active_set:
+  - hardened-app
+  - cert-manager-controller
+  - cert-manager-webhook
+  - cert-manager-cainjector
+  - grafana
+  - valkey
+  - valkey-compat
+
 verification:
-  # The registry namespace the criteria bind through (Req 2.2, 2.7, 2.21,
-  # 2.23). Inside this section because the rendering needs it for the
-  # imageReferences glob (review 4.7); task 14.1 records the placement.
+  # The registry namespace the four registry criteria bind through (Req 2.2,
+  # 2.7, 2.21, 2.23): build.yml refuses a definition publishing outside it,
+  # check-visibility.sh probes under it, and the two Kyverno policies
+  # (verify-catalogue-images, restrict-registries) render their image globs
+  # from it. Placed inside this section because the rendering needs it for
+  # the imageReferences glob (review 4.7; task 14.1 records the placement).
+  # policies/tests/resources.yaml names the reference namespace literally,
+  # the one fixture a fork edits together with this value.
   registry: ghcr.io/mm-weber/dhc
   issuer: https://token.actions.githubusercontent.com
   # Roles are attestor lists a fork extends; no role is widened (Req 2.23).

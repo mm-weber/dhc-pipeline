@@ -75,6 +75,22 @@ for want in \
 done
 grep -qF "mm-weber" "$POL" && fail "policy artifact has no out-of-band hardcode" || pass "policy artifact has no out-of-band hardcode"
 
+# 1b (task 14.1, Req 2.2, 7.8, 7.9): the registry gate policy is the second
+#    rendered Kyverno artifact. Its allowed-image glob comes from `registry:`,
+#    so a fork's chart gate admits the fork's namespace rather than this
+#    instance's; both container lists carry the glob, and no hardcode survives.
+RR="$SB/policies/restrict-registries.yaml"
+if [ ! -f "$RR" ]; then fail "renders policies/restrict-registries.yaml"
+else
+  pass "renders policies/restrict-registries.yaml"
+  for want in "name: restrict-registries" "name: check-registry" "ghcr.io/acme/imgs/*" "=(initContainers):"; do
+    grep -qF -- "$want" "$RR" && pass "registry policy carries $want" || fail "registry policy carries $want"
+  done
+  [ "$(grep -cF 'image: "ghcr.io/acme/imgs/*"' "$RR")" = "2" ] && pass "registry policy globs containers and initContainers" || fail "registry policy globs containers and initContainers" "$(cat "$RR")"
+  grep -qF "mm-weber" "$RR" && fail "registry policy has no out-of-band hardcode" || pass "registry policy has no out-of-band hardcode"
+  grep -q "render-verification" "$RR" && pass "registry policy says it is rendered" || fail "registry policy says it is rendered"
+fi
+
 # 2: role separation in the artifact: the SPDX attestation block admits only
 #    the releaser; the rescan identity appears only for openvex
 spdx_block=$(awk '/spdx.dev\/Document/{f=1} f{print} f&&/openvex.dev\/ns/{exit}' "$POL")
@@ -123,7 +139,7 @@ grep -qF "intro" "$SB/README.md" && pass "text outside markers untouched" || fai
 # 3b: every rendered file ends with a newline. yamllint's
 # new-line-at-end-of-file rule is an error in this repo, so an artifact
 # without one fails the validate gate (measured on PR #106, run 33110774290).
-for f in "$POL" "$SB/README.md" "$SB/docs/user-manual.md"; do
+for f in "$POL" "$SB/policies/restrict-registries.yaml" "$SB/README.md" "$SB/docs/user-manual.md"; do
   if [ -n "$(tail -c 1 "$f")" ]; then
     fail "$(basename "$f") ends with a newline"
   else
@@ -152,6 +168,16 @@ if [ "$rc" -eq 1 ] && grep -qF "policies/verify-catalogue-images.yaml" <<<"$out"
   pass "--check fails naming the drifted policy artifact"
 else
   fail "--check fails naming the drifted policy artifact" "exit=$rc" "$out"
+fi
+"$RENDER" "$SB" >/dev/null 2>&1 # restore
+
+# 6b: and a tampered registry policy, by its own name (Req 7.9)
+sed -i 's#ghcr.io/acme/imgs/\*#docker.io/*#' "$SB/policies/restrict-registries.yaml"
+out=$("$RENDER" --check "$SB" 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "policies/restrict-registries.yaml" <<<"$out"; then
+  pass "--check fails naming the drifted registry policy"
+else
+  fail "--check fails naming the drifted registry policy" "exit=$rc" "$out"
 fi
 "$RENDER" "$SB" >/dev/null 2>&1 # restore
 
