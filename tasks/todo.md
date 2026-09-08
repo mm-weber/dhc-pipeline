@@ -621,3 +621,46 @@ policy differs from the hand-written one only in its header and description
 CI's order, shellcheck and actionlint (findings identical to main's) pass
 locally. Nothing reads the set until 14.2, said so in the policy comment,
 the manual and the design as-built note.
+
+## Task 14.2: every matrix and the tracking scope derive from the active set (2026-09-08)
+
+Branch: `task-14.2-active-set-matrices`. Goal: the active set declared in 14.1
+is the sole source of candidates for the build matrix, the e2e matrix and the
+tracking scope (Req 1.14 to 1.16, 1.18, 1.19, 2.1, 2.14, 3.2, 3.10, 3.11);
+the chart gate keeps looping every chart directory (review 4.4).
+
+- [x] 1. Tests first: definition-lib_test.sh (`source_repository`, `chart_deploys`,
+      `active_components`); lint-active-set_test.sh (1.18 split group, 1.19 via the
+      reader, deploys coherence, 1.16 changed inactive definition and chart);
+      render-tracking_test.sh (block rendered, empty when all active, drift named);
+      check-authenticity_test.sh (an inactive definition is not re-verified);
+      managers.test.mjs (the rendered block, an inactive fixture)
+- [x] 2. `deploys:` in every chart's chart.yaml (hardened-app gains one; schema: deploys
+      required, upstream optional for the owned chart); validate's yamale covers all four
+- [x] 3. definition-lib.sh readers; scripts/lint-active-set.sh; scripts/render-tracking.sh
+      rendering renovate.json5's delimited ignorePaths block; validate steps (lint with
+      the PR diff, render --check, both suites in the every-suite check)
+- [x] 4. build.yml changes job: every branch filters through active_definitions (schedule,
+      dispatch refusal, PR, push, canary); e2e.yml affected job: components through
+      deploys; check-authenticity.sh scoped to active definitions
+- [x] 5. Rehearse the two workflow scripts locally (schedule, dispatch, PR, push shapes);
+      renovate-config-validator --strict on the rendered file; every-suite check
+- [x] 6. Docs (CONVENTIONS tracking scope + PR rule, manual renovate/e2e/build passages);
+      design Decision 11 as-built; tasks tick; em-dash sweep; actionlint, shellcheck
+
+**Review (2026-09-08).** Tests first in five suites (three new reader cases,
+twelve lint cases, sixteen render cases, five authenticity cases, nine
+Renovate cases), red before the code and green after. Measured rather than
+assumed: Renovate 41.173.1's own file filter drops every file under the
+rendered globs and its strict validator accepts both block shapes, so
+`ignorePaths` alone carries the scope. The Req 1.18 groups are derived from
+the definitions (published repository, source repository), never listed by
+hand. Both matrix scripts were rehearsed locally in every event shape,
+including a deactivated definition, an inactive canary and a malformed set
+(the reader's refusal fails the job by name). One trap caught by the lints
+before commit: a colon in a validate step name made the whole workflow
+unparseable, the exact failure the workflow-policy lint exists for. The
+deploys list on the valkey chart names both valkey definitions on purpose;
+14.3's probe lint will lean on that. Every validate step in CI's order,
+kyverno, actionlint (findings identical to main's), shellcheck pass; no em
+dashes in added lines.

@@ -63,19 +63,30 @@ jobs:
           DISPATCH_IMAGE: ${{ github.event.inputs.image }}
         run: |
           set -euo pipefail
-          all_defs() { find image -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/image.yaml' ';' -print | cut -d/ -f2; }
+          . scripts/definition-lib.sh
+          # Req 1.14 (task 14.2): catalogue-policy.yaml's active set is the
+          # sole source of candidates for this matrix, every branch below
+          # filters through it, and an inactive definition gets no new digest
+          # or tag whatever changed (Req 1.15). A malformed set is the
+          # reader's refusal: this job fails, the build gate with it, so
+          # nothing merges on a set that names nothing buildable.
+          active=$(active_definitions .)
+          is_active() { printf '%s\n' "$active" | grep -qxF -- "$1"; }
 
           if [ "$EVENT" = "workflow_dispatch" ]; then
-            if [ -n "$DISPATCH_IMAGE" ]; then names=$(printf '%s\n' "$DISPATCH_IMAGE")
-            else names=$(all_defs); fi
+            if [ -n "$DISPATCH_IMAGE" ]; then
+              if ! is_active "$DISPATCH_IMAGE"; then
+                echo "::error::dispatch names '${DISPATCH_IMAGE}', which is not in catalogue-policy.yaml's active set; an inactive definition gets no new digest or tag (Req 1.15)"
+                exit 1
+              fi
+              names=$DISPATCH_IMAGE
+            else names=$active; fi
           elif [ "$EVENT" = "schedule" ]; then
             # Req 2.14: the daily rebuild covers every active definition.
             # `github.event.before` is empty on a schedule, so the push-diff
             # fallback below would diff HEAD~1 and rebuild nothing (independent
-            # review 1.10). Until task 14.2 re-sources every matrix from the
-            # policy file's active set, the definition directories ARE the
-            # active set — the same source the dispatch-all branch reads.
-            names=$(all_defs)
+            # review 1.10); the declared set is what a schedule reads.
+            names=$active
           elif [ "$EVENT" = "pull_request" ]; then
             git fetch --no-tags --depth=1 origin "$BASE_REF"
             changed=$(git diff --name-only "origin/${BASE_REF}...HEAD")
@@ -114,9 +125,10 @@ jobs:
               done
             fi
             # Canary: a change to the gate itself touches no definition — build
-            # the simplest image so the gate is exercised on the PR changing it.
+            # the simplest image so the gate is exercised on the PR changing it:
+            # hardened-app while it is active, else the first active definition.
             if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/build\.yml$'; then
-              names="$names hardened-app"
+              if is_active hardened-app; then names="$names hardened-app"; else names="$names $(printf '%s\n' "$active" | head -n1)"; fi
             fi
             # An accepted-risk file names its image in its own filename, so a
             # change to one rebuilds exactly that image. Without this the gate
@@ -128,6 +140,16 @@ jobs:
             if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then range="HEAD~1...HEAD"; else range="${BEFORE}...${GITHUB_SHA}"; fi
             names=$(git diff --name-only $range -- image/ | awk -F/ 'NF>=3 && $3=="image.yaml"{print $2}' | sort -u)
           fi
+
+          # The one filter point (Req 1.14, 1.15): whatever a branch above
+          # collected, an inactive definition leaves the matrix here, by name
+          # in the log. On a pull request validate fails it separately
+          # (Req 1.16, scripts/lint-active-set.sh); here it is simply not built.
+          kept=""
+          for n in $names; do
+            if is_active "$n"; then kept="$kept $n"; else echo "inactive, not built: ${n} (catalogue-policy.yaml active_set, Req 1.15)"; fi
+          done
+          names=$kept
 
           json=$(printf '%s\n' $names | jq -R . | jq -s -c 'map(select(length>0)) | unique')
           echo "names=$json" >> "$GITHUB_OUTPUT"

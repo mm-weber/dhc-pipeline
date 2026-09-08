@@ -345,7 +345,12 @@ The heart of the PR path. For each affected definition (matrix), the job:
    image's input cannot change);
    a changed `triage/accepted-risk/<image>.yaml` rebuilds exactly that image,
    so "the exception suppresses what it claims" is re-proved (Req 6.9); and a
-   change to `build.yml` itself builds hardened-app as a canary.
+   change to `build.yml` itself builds hardened-app as a canary (the first
+   active definition if hardened-app is not). Whatever a branch collects, the
+   active set (`catalogue-policy.yaml` `active_set`, Req 1.14) is the one
+   filter: an inactive definition leaves the matrix by name in the log and
+   gets no new digest or tag (Req 1.15), the nightly rebuilds every active
+   definition, and a dispatch naming an inactive one is refused.
 2. **Verifies per-arch pins.** `verify-arch-pins.sh` fetches every per-arch
    pinned artifact and checks the recorded checksums against the bytes
    upstream actually serves, so a pin the PR gate never builds (arm64: the
@@ -399,9 +404,15 @@ suite's job.
 
 ### e2e — the kind suite
 
-For each component a PR touches (chart *or* any of its image definitions; a
-change to the harness itself smoke-tests on hardened-app), the workflow
-provisions an ephemeral kind cluster and runs the Ginkgo suite (Req 5.2):
+For each component a PR touches (chart *or* any active definition it
+deploys; a change to the harness itself smoke-tests on hardened-app, or the
+first component if that is inactive), the workflow provisions an ephemeral
+kind cluster and runs the Ginkgo suite (Req 5.2). A component is a chart
+directory whose `deploys:` list in `chart/<c>/chart.yaml` names an active
+definition (Req 1.14; task 14.2): that list, not a name prefix, is how a
+changed definition finds its chart, which is what lets three definitions
+share cert-manager's chart and the valkey chart stand in for both valkey
+definitions.
 
 - **Image access:** kubelet on each kind node gets a ghcr `config.json`,
   because charts pin the multi-arch *index* digest and a `kind load`-ed image
@@ -1133,7 +1144,13 @@ pin surface; every one is fixture-tested in both directions:
 | Workflow env pins | `# renovate:`-marked `*_VERSION:` (govulncheck, renovate, json5) | go / npm | none |
 | Python CI deps | `.github/requirements-ci.txt` | pypi | none — hash refresh is human |
 
-Grouping: cert-manager's three definitions move as one PR; valkey runtime +
+Scope: the active set (`catalogue-policy.yaml` `active_set`, Req 1.14) is
+rendered into the delimited `ignorePaths` block of `renovate.json5` by
+`scripts/render-tracking.sh`, one glob per inactive definition directory and
+per chart deploying no active definition, so no bump opens for a frozen
+definition; validate fails on drift, and a bump that reaches a frozen
+definition anyway fails validation by name (Req 1.16). Grouping:
+cert-manager's three definitions move as one PR; valkey runtime +
 compat move as one PR. Majors wait behind Dependency Dashboard approval (register M9);
 automerge is limited to from-source patch/digest bumps and digest-only chart
 image pin bumps, both on green CI; every third-party version bump waits its

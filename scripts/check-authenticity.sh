@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # check-authenticity.sh <root> <out.jsonl>
 #
-# Checkpoint 3 (task 11.3; Req 3.10): every definition's declared authenticity
-# signal, re-verified against its upstream origin once a day:
+# Checkpoint 3 (task 11.3; Req 3.10): every ACTIVE definition's declared
+# authenticity signal, re-verified against its upstream origin once a day
+# (task 14.2 scoped it to catalogue-policy.yaml's active set: an inactive
+# definition is outside the tracking scope, so a tag that moves under it is
+# nobody's signal; the count of definitions skipped for that reason is in the
+# summary line):
 #
 #   signed-tag       the pinned tag still points at the pinned commit, is an
 #                    annotated tag, and GitHub's verification statement for
@@ -34,7 +38,8 @@ ROOT="${1:?usage: check-authenticity.sh <root> <out.jsonl>}"
 OUT="${2:?usage: check-authenticity.sh <root> <out.jsonl>}"
 today="${DHC_TODAY:-$(date -u +%F)}"
 : > "$OUT"
-failures=0; verified=0; lapsed=0
+failures=0; verified=0; lapsed=0; inactive=0
+active=$(active_definitions "$ROOT") || exit $? # the reader's refusal, with its own message
 
 record() { # definition class ref ok detail
   jq -cn --arg d "$1" --arg class "$2" --arg ref "$3" --argjson ok "$4" --arg detail "$5" \
@@ -54,6 +59,7 @@ pass() { # definition class ref detail
 for f in "$ROOT"/image/*/image.yaml; do
   [ -f "$f" ] || continue
   name=$(basename "$(dirname "$f")")
+  if ! printf '%s\n' "$active" | grep -qxF -- "$name"; then inactive=$((inactive + 1)); continue; fi
   class=$(authenticity_class "$f")
   case "$class" in
     signed-tag|signed-commit)
@@ -125,5 +131,5 @@ print(v if v else "")' "$c")
   fi
 done
 
-echo "check-authenticity: ${verified} signal(s) verified, ${failures} mismatch(es), ${lapsed} lapsed compat review-by date(s)"
+echo "check-authenticity: ${verified} signal(s) verified, ${failures} mismatch(es), ${lapsed} lapsed compat review-by date(s), ${inactive} inactive definition(s) not re-verified"
 [ "$failures" -eq 0 ] || exit 1

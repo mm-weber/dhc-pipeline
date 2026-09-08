@@ -1,0 +1,7 @@
+# The catalogue's own chart (Chart.yaml beside this file is Helm's), so
+# there is no upstream pin here; this file exists for the one declaration
+# every chart directory makes (task 14.2, Req 1.14, 5.2): the definitions it
+# deploys. scripts/render-chart.sh renders an owned chart from Chart.yaml
+# and never reads this file.
+deploys:
+  - hardened-app
