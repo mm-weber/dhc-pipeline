@@ -60,10 +60,10 @@ SYFT_DEP=anchore/syft
 # crane lists registry tags for the rescan enumeration (Req 2.22, task 9.3);
 # a github tarball with the binary at the root, and the one asset here whose
 # filename carries NO version — only the URL path does.
-CRANE_VER=0.22.0
+CRANE_VER=0.22.1
 CRANE_ASSET="go-containerregistry_Linux_x86_64.tar.gz"
 CRANE_URLDIR="google/go-containerregistry/releases/download/v${CRANE_VER}"
-CRANE_PIN=edb74d53fad9a596860f59d1c5d04a43dfb5f441dc71f57060dd0bf39483c833
+CRANE_PIN=0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0
 CRANE_DEP=google/go-containerregistry
 
 # vexctl merges several OpenVEX documents into one for the rescan's
