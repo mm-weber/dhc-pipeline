@@ -205,6 +205,15 @@ and what GHCR can and cannot do about a tag, is
 
 Dated, human-readable decisions: *finding → evidence → outcome → link*.
 
+**The link is mechanical (Req 9.18).** `scripts/lint-log-anchors.sh` holds
+that every exception's `ref:` and every source statement's citation in its
+`status_notes` resolves to a heading here, and that every decision carries
+one; validate fails naming the record otherwise. Two citation forms:
+`LOG.md#<slug>`, the heading's GitHub anchor (lowercased, punctuation
+dropped, spaces to dashes, so an em dash between spaces becomes a double
+dash), and `LOG.md <YYYY-MM-DD>`, a day heading of that date. Rename a
+heading and the lint names every record that pointed at it.
+
 It records **every** outcome, not just the excused ones — because the three
 things people conflate have to stay apart:
 

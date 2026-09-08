@@ -330,6 +330,12 @@ rewrites the catalogue status issue with every finding's clocks (Req 6.46,
   a recipe step in `render-verification.sh`, a pinned install (Req 7.5).
 - Reading a divergence and deciding whether it matters is register row M19
   below.
+- **Every decision cites the LOG, and the citation resolves** (Req 9.18):
+  an exception's `ref:` and a statement's `status_notes` name a
+  `triage/LOG.md` heading as `LOG.md#<slug>` (the heading's GitHub anchor)
+  or `LOG.md <date>` (a day heading); `scripts/lint-log-anchors.sh` fails
+  validate on a citation that names no heading and on a decision without
+  one, so renaming a heading is caught by the records that rest on it.
 
 ## Manual controls (Req 9.14)
 

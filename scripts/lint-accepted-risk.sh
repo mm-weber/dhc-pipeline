@@ -215,6 +215,15 @@ if [ -d "$ROOT/$LANE" ]; then
   done < <(find "$ROOT/$LANE" -type f \( -name '*.yaml' -o -name '*.yml' \) -print0)
 fi
 
+# Req 9.18 (task 13.6): every entry's `ref:` resolves to a real heading in
+# triage/LOG.md, F13's mechanical link between the reasoning (prose) and the
+# record the gate reads. One resolver for both halves: lint-log-anchors.sh.
+if [ -d "$ROOT/$LANE" ] && [ -n "$(find "$ROOT/$LANE" -type f \( -name '*.yaml' -o -name '*.yml' \) -print -quit)" ]; then
+  if ! "$(cd "$(dirname "$0")" && pwd)/lint-log-anchors.sh" refs "$ROOT"; then
+    violations=$((violations + 1))
+  fi
+fi
+
 if [ "$violations" -gt 0 ]; then
   echo "lint-accepted-risk: ${violations} violation(s) — see triage/README.md (risk treatment)"
   exit 1
