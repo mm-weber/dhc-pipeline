@@ -535,6 +535,26 @@ graph TB
      (informational first, like govulncheck; a fork flips it). Fork switches:
      `require_code_owner_review` in the committed ruleset, the consumer list,
      divergence gating, the register's rows.
+   - **As built** (tasks 13.1 to 13.4, 2026-09-07 to 2026-09-08): as decided, with these
+     measured departures. The revocation verdict and the governance checks run in a
+     posture step at the end of the rescan rather than in the invariants step, so a
+     failure never starves the day's issues and status (13.2, 13.3). The consumers are a
+     `consumers` section of the policy file (`list` with one `authoritative`, a `gating`
+     switch, false); the adapter is one script with a case per consumer, the trivy side
+     normalised from the report both arms already write so the block costs one scan per
+     other consumer per supported platform manifest; the join is a canonical package key
+     (qualifiers dropped, a leading v on the version dropped) because the scanners spell
+     one package two ways (trivy `stdlib@v1.26.4`, syft `stdlib@1.26.4`), so a spelling
+     difference reads as agree or absent, never as a divergence. The smoke test extracts
+     the README's rendered recipe and runs it step by step in a scratch directory; its
+     first run found the recipe itself wrong (`a || b | jq > file` grouped as
+     `a || (b | jq > file)`, so a releaser-signed attestation printed a raw envelope and
+     wrote nothing), fixed in the renderer with braces. ADR 0004's `--vex oci` check
+     rides inside the smoke test: fewer suppressions through the attestation than through
+     the extracted document is a missing suppression in the authoritative consumer and
+     fails the run; more is reported. Grype's real matching is first measured by the
+     first rescan after the merge (its database is unreachable from the devcontainer);
+     the rehearsal used a stub that honours the statements.
 
 11. **The base-repo contract: a declared active set, parameterized instance values, a documented builder contract (Req 1.1, 1.13 to 1.17, 2.2, 2.7, 2.21, 2.23, 4.1, 5.5, 7.7; the 5.1 framing addendum encoded; 2026-08-25)**
    - **Context**: the criteria hardcoded one instance, `ghcr.io/mm-weber/dhc` in

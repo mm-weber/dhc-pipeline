@@ -484,3 +484,45 @@ and gofmt are clean. Deviation from the design's placement, recorded: the
 verdict is asserted in the posture step at the end (the invariants step only
 produces the record for the status issue), for the same reason 13.2 runs
 last, so a failure never starves the day's issues and status.
+
+## Task 13.4: consumers, declared list, portability block, daily smoke test (2026-09-08)
+
+Branch: `task-13.4-vex-consumers`. Goal: the VEX consumers are a declared
+list in the policy file with one authoritative (Req 9.11); every PR scan and
+rescan reports a portability block naming each other consumer's suppression
+result per statement the authoritative one suppressed, informational
+(Req 9.12); the rescan runs the published recipe verbatim daily against one
+published digest, failing only on a broken step or a suppression missing in
+the authoritative consumer (Req 9.13); the recipe gains one scan step per
+declared consumer, rendered from the list so the two cannot drift.
+
+- [x] 1. catalogue-policy.yaml `consumers:`; triage-policy.sh `consumers` and
+      `authoritative-consumer` queries, refusing a list without exactly one authoritative;
+      tests first
+- [x] 2. scripts/vex-consumer.sh: the adapter contract (trivy from a report or a scan, grype
+      from a scan), one normalised JSONL shape; stubs in tests; canonical join key documented
+- [x] 3. scripts/vex-portability.sh: the block (markdown + JSON) over an authoritative record
+      and each other consumer's; agree / DIVERGENCE (reported) / absent; tests first
+- [x] 4. scripts/consumer-smoke.sh: the README snippet extracted and run verbatim against one
+      digest, the authoritative assertion, the --vex oci regression comparison, the other
+      consumers into the block; tests with stubbed cosign/trivy/grype/jq
+- [x] 5. render-verification.sh: the consumer scan steps rendered from the list; README and
+      manual re-rendered; drift check
+- [x] 6. build.yml (PR gate) and rescan.yml (supported set, daily smoke) steps; rehearsed
+      verbatim locally where the registry allows; actionlint, lint-workflow-policy
+- [x] 7. Docs: manual's consumer section and Reading job summaries; CONVENTIONS scanning
+      section; design Decision 10 as-built; tasks tick; em-dash sweep
+
+**Review (2026-09-08).** Four scripts, each with its suite written first
+(policy reader queries; adapter; block; smoke test) and shellcheck clean.
+Measured before writing: grype 0.118.0 builds product identifiers of exactly
+the compiler's shape (`pkg:oci/<name>@sha256:<manifest>`, qualifier-free
+first) and its JSON carries `ignoredMatches[].appliedIgnoreRules[].vex-status`;
+trivy and syft spell one package two ways, hence the canonical key. The smoke
+test's first run found the published recipe wrong (`a || b | jq > file`
+grouping), fixed in the renderer. Both rescan step blocks were extracted
+verbatim, shellchecked and run against the real reports (14 supported
+manifests), the real enumeration and a compiled grafana document, with the
+network-facing tools stubbed; the whole validate chain passes locally. Not
+measured here: grype's real matching (its database is unreachable), which
+the first rescan after the merge measures; the owner dispatches one.

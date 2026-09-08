@@ -98,6 +98,26 @@ triage:
     supported_set: "the digests each definition's current tags: reference"
     superseded: "scanned and attested daily; outside issue scope"
 
+# Req 9.11 (task 13.4): the VEX consumers, a declared list with exactly one
+# authoritative. The authoritative consumer is the one both scan arms gate
+# on and the one the daily smoke test asserts suppressions in; every other
+# listed consumer feeds the VEX portability block (Req 9.12), informational:
+# for each statement the authoritative scanner suppressed, whether the
+# equivalent finding was suppressed there, divergences named. Each consumer
+# is an adapter in scripts/vex-consumer.sh emitting one normalised shape
+# (vulnerability, purl, suppressed). scripts/triage-policy.sh reads this.
+# A fork adds a consumer here and an adapter case there (Docker Scout is
+# the example the review named: credentials, a third pinned CLI); the
+# `gating` switch, off here, is what a fork flips to fail a run on a
+# divergence (design Decision 10's rejected-for-now option).
+consumers:
+  list:
+    - name: trivy
+      authoritative: true
+    - name: grype
+      authoritative: false
+  gating: false
+
 # Req 7.10's declared map: schedule cron and permissions per workflow, plus
 # explicit per-job permissions blocks. Jobs without an entry inherit the
 # workflow default and need none.

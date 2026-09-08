@@ -172,9 +172,11 @@ RESCAN='--certificate-identity https://github.com/mm-weber/dhc-pipeline/.github/
 cosign verify $ISSUER $BUILD "$REF"                          # signature: the release workflow on main
 cosign verify-attestation $ISSUER $BUILD --type spdxjson "$REF" \
   | jq -r '.payload | @base64d | fromjson | .predicate'      # SBOM
-cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" 2>/dev/null \
-  || cosign verify-attestation $ISSUER $RESCAN --type openvex "$REF" \
-  | jq -r '.payload | @base64d | fromjson | .predicate'      # VEX: releaser or re-attester
+{ cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" 2>/dev/null \
+  || cosign verify-attestation $ISSUER $RESCAN --type openvex "$REF"; } \
+  | jq -r '.payload | @base64d | fromjson | .predicate' > openvex.json   # VEX: releaser or re-attester
+trivy image --vex openvex.json --show-suppressed --severity CRITICAL,HIGH "$REF"   # authoritative consumer
+grype "$REF" --vex openvex.json                                                    # declared consumer, informational
 # BuildKit provenance is attached at build time and is not verified by the
 # policy above (Req 2.25); inspect it with the buildx CLI plugin:
 docker buildx imagetools inspect "$REF" --format '{{ json .Provenance }}'
@@ -276,6 +278,24 @@ because someone decided to live with it: an acceptance is published as
 `affected` and never as `not_affected` or `fixed` (Req 6.8), precisely because
 every downstream consumer would inherit the excuse.
 
+**Which scanners the statements are written for.** The catalogue declares its
+VEX consumers in `catalogue-policy.yaml` (`consumers.list`, Req 9.11): Trivy
+is authoritative, the one both scan arms gate on and the one the daily smoke
+test asserts suppressions in; Grype is a declared second consumer. The
+verify recipe above runs one scan step per declared consumer, rendered from
+that list. Whether a statement written for Trivy's matcher also lands in
+Grype is measured, not promised: every PR scan and every rescan publishes a
+**VEX portability** block (Req 9.12) that names, per statement Trivy
+suppressed, each other consumer's result: agree, DIVERGENCE (still reported
+there) or absent (that consumer's database does not carry the advisory). It
+is informational; a fork that wants a divergence to fail the run flips
+`consumers.gating`. Expect the first divergences on Go standard-library
+statements, where the two scanners spell the package differently; the block
+joins on a canonical package key so a spelling difference reads as agree or
+absent, never as a false divergence. If your scanner is neither, the block
+tells you how portable the statements have proven to be so far, and
+`scripts/vex-consumer.sh` is the adapter contract a fork extends.
+
 ## Part II: The pipeline
 
 ### The six workflows
@@ -287,7 +307,7 @@ every downstream consumer would inherit the excuse.
 | `chart.yml`    | every PR + main            | Render *every* chart, evaluate with the Kyverno policies; `ct lint` on owned charts |
 | `e2e.yml`      | PR + dispatch              | Per affected component: kind cluster, install the hardened chart, run the Ginkgo suite |
 | `renovate.yml` | cron every 4h + dispatch   | Self-hosted Renovate over the custom managers; postUpgradeTasks recompute derived fields |
-| `rescan.yml`   | daily 06:17 UTC + dispatch | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set, close them on evidence with graded labels and reopen them on recurrence; the clocks over the supported set to the catalogue status issue; expiry warnings |
+| `rescan.yml`   | daily 06:17 UTC + dispatch | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set, close them on evidence with graded labels and reopen them on recurrence; the clocks over the supported set to the catalogue status issue; expiry warnings; the VEX portability block over the supported set and the consumer smoke test (the README recipe run verbatim against one digest) |
 
 Every GitHub Action is pinned to a full commit SHA, and every third-party
 executable a workflow installs is exact-version-pinned and checksum-verified
@@ -481,7 +501,14 @@ bottom:
 - **govulncheck table** — per binary, per finding: `symbol` / `package` /
   `module → not measured`.
 
-The daily rescan's summary adds the **VEX compilation report** (Req 6.33):
+The daily rescan's summary adds the **consumer smoke test** (Req 9.13: the
+README's verify recipe run verbatim against one supported digest, every
+step's exit code, the suppressions the authoritative consumer landed, and
+the `--vex oci` reading compared with the extracted document) and the **VEX
+portability block** (Req 9.12: per statement the authoritative scanner
+suppressed on a supported platform manifest, each other consumer's result);
+PR scans carry the same block for the image under review. Then the **VEX
+compilation report** (Req 6.33):
 per image, the scanned digest, statements applied, statements dropped — with
 "digest unresolved, no VEX applied" called out. This is what distinguishes
 "compiled nothing" from "never compiled"; both otherwise produce an identical

@@ -316,6 +316,19 @@ rewrites the catalogue status issue with every finding's clocks (Req 6.46,
 6.47), all through the unit-tested `triage/rescan/` Go tools. See
 `triage/README.md`.
 
+- **The VEX consumers are a declared list** (`catalogue-policy.yaml`
+  `consumers.list`, Req 9.11): exactly one authoritative (Trivy, the gate's
+  scanner), every other one an adapter case in `scripts/vex-consumer.sh`
+  emitting the same shape (vulnerability, purl, suppressed). A statement is
+  written for the authoritative matcher; whether it lands elsewhere is the
+  VEX portability block's measurement in every scan summary (Req 9.12),
+  informational unless `consumers.gating` is flipped. The README recipe
+  carries one scan step per declared consumer, rendered from the list, and
+  the rescan runs that recipe verbatim daily against one supported digest
+  (Req 9.13): a step that fails or a suppression the authoritative consumer
+  misses fails the run. Adding a consumer means: the list, an adapter case,
+  a recipe step in `render-verification.sh`, a pinned install (Req 7.5).
+
 ## Pull requests (Req 7)
 
 - One logical change per PR; definition bumps and chart changes do not mix

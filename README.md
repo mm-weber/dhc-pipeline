@@ -58,9 +58,11 @@ RESCAN='--certificate-identity https://github.com/mm-weber/dhc-pipeline/.github/
 cosign verify $ISSUER $BUILD "$REF"                          # signature: the release workflow on main
 cosign verify-attestation $ISSUER $BUILD --type spdxjson "$REF" \
   | jq -r '.payload | @base64d | fromjson | .predicate'      # SBOM
-cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" 2>/dev/null \
-  || cosign verify-attestation $ISSUER $RESCAN --type openvex "$REF" \
-  | jq -r '.payload | @base64d | fromjson | .predicate'      # VEX: releaser or re-attester
+{ cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" 2>/dev/null \
+  || cosign verify-attestation $ISSUER $RESCAN --type openvex "$REF"; } \
+  | jq -r '.payload | @base64d | fromjson | .predicate' > openvex.json   # VEX: releaser or re-attester
+trivy image --vex openvex.json --show-suppressed --severity CRITICAL,HIGH "$REF"   # authoritative consumer
+grype "$REF" --vex openvex.json                                                    # declared consumer, informational
 # BuildKit provenance is attached at build time and is not verified by the
 # policy above (Req 2.25); inspect it with the buildx CLI plugin:
 docker buildx imagetools inspect "$REF" --format '{{ json .Provenance }}'
@@ -69,7 +71,8 @@ docker buildx imagetools inspect "$REF" --format '{{ json .Provenance }}'
 
 ## Triage, recorded
 
-The PR scan gate (Trivy, Grype second opinion on CRITICALs) fails on any
+The PR scan gate (Trivy, the authoritative VEX consumer; Grype as a declared
+second consumer, its results in the VEX portability block) fails on any
 HIGH/CRITICAL not covered by a VEX statement (`not_affected`/`fixed`, with
 `govulncheck` reachability evidence) or a time-boxed accepted-risk exception
 that decays back to un-triaged on expiry. Every decision is a commit:

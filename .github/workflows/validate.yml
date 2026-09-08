@@ -146,6 +146,12 @@ jobs:
         run: scripts/check-governance_test.sh
       - name: check-revocations unit tests (Req 9.5 to 9.7)
         run: scripts/check-revocations_test.sh
+      - name: vex-consumer adapter unit tests (Req 9.11)
+        run: scripts/vex-consumer_test.sh
+      - name: vex-portability block unit tests (Req 9.12)
+        run: scripts/vex-portability_test.sh
+      - name: consumer-smoke unit tests (Req 9.13)
+        run: scripts/consumer-smoke_test.sh
       - name: lint-compat unit tests (Req 4.8)
         run: scripts/lint-compat_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)
