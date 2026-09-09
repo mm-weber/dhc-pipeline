@@ -661,6 +661,33 @@ jobs:
           fi
           echo "number=${number}" >> "$GITHUB_OUTPUT"
 
+      # The detective half of Req 1.15 (review D7): an inactive definition's
+      # declared tags reference today what they referenced at the last
+      # published status, and none appeared since. build.yml's changes job
+      # is the preventive control; this asserts the outcome whatever the
+      # path, against the one record that persists from day to day (the
+      # status issue's fenced JSON, fetched by the step above). Per tag, not
+      # per repository: the active sibling of a shared repository may move.
+      - name: no inactive definition gained a digest or a tag (Req 1.15)
+        id: inactive
+        if: always() && steps.status_previous.outcome == 'success' && steps.enumerate.outcome == 'success'
+        run: |
+          set -euo pipefail
+          [ -s "$OUT/enumeration.tsv" ] || { echo "::error::inactive definitions: ${OUT}/enumeration.tsv is missing or empty; nothing was asserted today (Req 1.15)"; exit 1; }
+          [ -e "$OUT/status/previous.md" ] || { echo "::error::inactive definitions: ${OUT}/status/previous.md is missing (the step that fetches it reports why); nothing was asserted today (Req 1.15)"; exit 1; }
+          rc=0
+          scripts/check-inactive-digests.sh . "$OUT/enumeration.tsv" "$OUT/status/previous.md" "$OUT/inactive.json" || rc=$?
+          # The counts reach the summary whichever way the check went; the
+          # record is written before the verdict except on a refusal.
+          if [ -f "$OUT/inactive.json" ]; then
+            {
+              echo "inactive=$(jq -r '.inactive | length' "$OUT/inactive.json")"
+              echo "asserted=$(jq -r '.asserted' "$OUT/inactive.json")"
+              echo "gains=$(jq -r '.gains | length' "$OUT/inactive.json")"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          exit "$rc"
+
       - name: catalogue status, the clocks over the supported set (Req 6.46)
         id: status
         if: always() && steps.status_previous.outcome == 'success'
@@ -682,11 +709,15 @@ jobs:
           # --vex-reports is the fence the lifecycle tool already gets (D2):
           # a digest scanned without its VEX over-reports, and its findings
           # count as unscanned in the clocks the way they block every close.
+          # The support statement is read from the policy file through its
+          # one reader and published in the issue (Req 6.49; review D7): a
+          # hole in the declaration fails here by name, not in the issue.
+          support=$(scripts/triage-policy.sh . support)
           go -C triage/rescan run ./cmd/rescan-status \
             --enumeration "$OUT/enumeration.tsv" --reattest "$OUT/reattest" --reports "$OUT/trivy" \
             --vex-reports "$OUT/vex" \
             --kev "$OUT/kev.json" --aperture "$aperture" --ceilings "$ceilings" \
-            --kev-ceiling "$(scripts/triage-policy.sh . kev-ceiling)" \
+            --kev-ceiling "$(scripts/triage-policy.sh . kev-ceiling)" --support "$support" \
             --previous-body "$OUT/status/previous.md" --revocations "$OUT/revocations.json" \
             --run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             --out-json "$OUT/status/metrics.json" --out-body "$OUT/status/issue.md"
@@ -775,6 +806,7 @@ jobs:
             echo "- VEX portability: ${{ steps.portability.outputs.blocks || 0 }} supported platform manifest(s) compared, ${{ steps.portability.outputs.divergences || 0 }} divergence(s), ${{ steps.portability.outputs.unmeasured || 0 }} consumer scan(s) not measured"
             echo "- issues closed on evidence: ${{ steps.lifecycle_apply.outputs.closed || 0 }} of ${{ steps.lifecycle.outputs.close || 0 }} decided, reopened: ${{ steps.lifecycle_apply.outputs.reopened || 0 }} of ${{ steps.lifecycle.outputs.reopen || 0 }}, kept open: ${{ steps.lifecycle.outputs.kept || 0 }}, withheld (reports not attested): ${{ steps.lifecycle_apply.outputs.withheld || 0 }}"
             echo "- catalogue status: ${{ steps.status_publish.outputs.url || 'not published' }}, ${{ steps.status.outputs.undecided || 0 }} undecided (${{ steps.status.outputs.over_ceiling || 0 }} over ceiling), ${{ steps.status.outputs.decided || 0 }} decided, ${{ steps.status.outputs.fixed || 0 }} fixed"
+            echo "- inactive definitions: ${{ steps.inactive.outputs.inactive || 'not checked' }}, ${{ steps.inactive.outputs.asserted || 0 }} tag(s) held to the last status, ${{ steps.inactive.outputs.gains || 0 }} gain(s)"
             echo
             # Req 6.33. Without this the run is green whether every statement
             # applied or none of them did: an unresolved digest suppresses

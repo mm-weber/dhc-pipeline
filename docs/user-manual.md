@@ -66,7 +66,7 @@ are this repository's own.
 | `test/`                       | Go module: Ginkgo v2 + Gomega + e2e-framework suite (`e2e/`), reusable assertions (`checks/`), install/harness helpers, Renovate manager fixtures (`renovate/`) |
 | `triage/`                     | The CVE lane: `vex/` (OpenVEX source), `accepted-risk/` (time-boxed exceptions), `LOG.md` (every decision), `upstream/` (drafts for other trackers), `rescan/` (the unit-tested issue-filing Go tool) |
 | `policies/`                   | Kyverno policies: digest pins, allowed registry, non-root — plus `tests/` fixtures |
-| `scripts/`                    | Tested glue; every script but `render-chart.sh` (a helm wrapper) has an `x_test.sh` |
+| `scripts/`                    | Tested glue; every script has an `x_test.sh`, and validate checks both ways |
 | `.github/workflows/`          | The six workflows; `.github/requirements-ci.txt` beside them holds the hash-pinned Python deps |
 | `.specs/dhc-catalogue-mvp/`   | EARS requirements, design, task ledger |
 | `docs/`                       | This manual, conventions, concepts, ADRs, operating-loop evidence |
@@ -704,9 +704,11 @@ repository). An undecided finding shows its age against the policy file's
 ceiling for its severity, the KEV ceiling when CISA lists it. The table is
 for reading; the fenced JSON block under it is the same data as the run's
 `catalogue-status` artifact, and the next rescan reads it back, so a fix
-date survives the reports being replaced. Superseded digests hold no clocks
-(the support statement in `catalogue-policy.yaml`). A Pages dashboard, if
-one is ever wanted, is presentation over that JSON and nothing else.
+date survives the reports being replaced. Superseded digests hold no clocks:
+the support statement in `catalogue-policy.yaml` says so, and the issue's
+opening paragraph quotes it verbatim from there, so the statement and the
+status cannot disagree. A Pages dashboard, if one is ever wanted, is
+presentation over that JSON and nothing else.
 
 ### Clearing a red gate — the four treatments
 
@@ -1029,7 +1031,10 @@ What changes the same day, all of it mechanical (Req 1.14 to 1.16):
 - No new digest is pushed and no new tag applied. The nightly skips it, a
   dispatch naming it is refused, and a pull request that changes a file
   under its directory fails validation naming it (activate it in the same
-  PR if the change is meant to ship).
+  PR if the change is meant to ship). The daily rescan checks the outcome
+  too: each tag the definition declares must reference the digest the last
+  status issue recorded, and no declared tag may have appeared since; a
+  gain fails the run naming the definition, the tag and both digests.
 - Renovate stops tracking it: the tracking block in `renovate.json5` is
   re-rendered (`scripts/render-tracking.sh`) to ignore its directory and any
   chart that deploys only it. Commit the re-rendered block with the policy
@@ -1149,7 +1154,7 @@ kyverno apply policies/require-image-digest.yaml policies/restrict-registries.ya
 kyverno test policies/tests/
 
 # Go unit layers (fast, no cluster, no Docker)
-( cd test && go vet ./... && go test ./harness/... ./checks/... ./install/... )
+( cd test && go vet ./... && go test ./... )   # ./e2e/ skips without a cluster
 ( cd triage/rescan && go test ./... )
 
 # Renovate config + manager fixtures (pins: validate.yml env block)
@@ -1198,7 +1203,8 @@ docker buildx build -f image/hardened-app/image.yaml image/hardened-app/
 
 ### Scripts
 
-Every script but `render-chart.sh` has a sibling `_test.sh` run by validate. Headers are
+Every script has a sibling `_test.sh` run by validate, which checks it both
+ways (a script without a suite, a suite without a live step). Headers are
 documentation — each states what it enforces and why it exists.
 
 | Script | Invocation | Role |
@@ -1206,7 +1212,7 @@ documentation — each states what it enforces and why it exists.
 | `lint-pins.sh` | `[root]` | Digest pins everywhere (64-hex, anchored), no floating tags, definition version-coherence, variant source parity (Req 1.2, 1.6) |
 | `lint-vex-product.sh` | `[root]` | VEX product identity + status/version rules (Req 6.17, 6.19, 6.20) |
 | `lint-accepted-risk.sh` | `[root]` | Exception fields incl. `decided_at`, the policy's largest ceiling from the decision date, per-binary paths, no stray ignore files; doubles as the expiry reporter (Req 6.7, 6.10–6.12) |
-| `triage-policy.sh` | `<root> <query>` | The one reader of the policy's `triage` section: aperture, ceilings, KEV ceiling, warning window, feed URL; refuses a section with holes (Req 6.49) |
+| `triage-policy.sh` | `<root> <query>` | The one reader of the policy's `triage` section: aperture, ceilings, KEV ceiling, warning window, feed URL, the support statement; refuses a section with holes (Req 6.49) |
 | `check-exceptions.sh` | `gate <root> <image> <trivy.json> <kev.json>` / `rescan <root> <reports-dir> <kev.json>` | Exception ceilings tiered by the finding's severity and KEV status; no KEV set is a refusal, never a pass (Req 6.50, 6.51, 6.59, 6.60) |
 | `compile-vex.sh` | `<src> <out> <definition> <digest> [tag…]` | Render VEX source per build: stamp digest, drop out-of-scope, record every drop via `COMPILE_VEX_REPORT` (Req 6.28 to 6.30, 6.32) |
 | `definition-lib.sh` | *sourced* | The one directory-↔-published-name mapping; every consumer goes through it |
@@ -1226,7 +1232,7 @@ documentation — each states what it enforces and why it exists.
 | `lint-accounts.sh` | `[root]` | Every definition runs as a non-root account with uid 65532 (Req 1.4) |
 | `lint-active-set.sh` | `[--changed <file>] [root]` | The active set is well-formed, splits no group, every chart names existing definitions; on a PR, a change under a frozen definition or chart fails (Req 1.16, 1.18, 1.19) |
 | `lint-probes.sh` | `[root]` | Every active definition is deployed by a chart declaring a functional probe (Req 5.8) |
-| `lint-compat.sh` | `[root]` | Every compat decision's review-by date is in the future (Req 4.8) |
+| `lint-compat.sh` | `[root]` | A chart deploying a compat variant records the decision for it, and every decision's review-by date is in the future (Req 4.5, 4.8) |
 | `lint-log-anchors.sh` | `[refs\|statements\|all] [root]` | Every exception ref and statement citation resolves to a `triage/LOG.md` heading (Req 9.18) |
 | `lint-workflow-policy.sh` | `[root]` | Every workflow's cron and permissions equal the policy file's declarations, both directions (Req 7.10) |
 | `lint-rescan-steps.sh` | `[workflow]` | Every rescan step after the scan runs regardless of earlier failures (review D1) |
@@ -1237,6 +1243,7 @@ documentation — each states what it enforces and why it exists.
 | `check-attestation-count.sh` | `<enumeration.tsv> <out.json>` | Exactly one OpenVEX attestation on every tag-referenced digest and platform manifest (Req 6.44, 6.45) |
 | `check-governance.sh` | `<rulesets-dir> <owner/repo> <out.json>` | Committed rulesets against the live ones, both directions, and private vulnerability reporting, through anonymous reads (Req 9.3, 9.9) |
 | `check-revocations.sh` | `<revocations.yaml> <enumeration.tsv> <out.json>` | No catalogue tag references a revoked digest (Req 9.7) |
+| `check-inactive-digests.sh` | `<root> <enumeration.tsv> <previous-status.md> <out.json>` | No inactive definition gained a digest or a tag since the last published status (Req 1.15, the detective half) |
 | `fetch-sboms.sh` | `<root> <enumeration.tsv> <out-dir>` | The attested CycloneDX SBOMs of the supported set, read through verification against the declared identities (Req 6.58) |
 | `reattest.sh` | `<root> <enumeration.tsv> <out-dir>` | Attests today's scan reports and re-attests each digest's OpenVEX document on change, replacing (Req 6.42, 6.43) |
 | `vex-consumer.sh` | `<consumer> <out.jsonl> --root <dir> (--report <trivy.json> \| --scan <ref> …)` | One adapter per declared consumer, emitting the normalised suppression shape (Req 9.11) |

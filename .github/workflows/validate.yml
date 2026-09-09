@@ -205,6 +205,8 @@ jobs:
         run: scripts/check-governance_test.sh
       - name: check-revocations unit tests (Req 9.5 to 9.7)
         run: scripts/check-revocations_test.sh
+      - name: no inactive definition gained a digest or a tag (Req 1.15, the detective half)
+        run: scripts/check-inactive-digests_test.sh
       - name: vex-consumer adapter unit tests (Req 9.11)
         run: scripts/vex-consumer_test.sh
       - name: vex-portability block unit tests (Req 9.12)
@@ -231,22 +233,32 @@ jobs:
 
       - name: runtime account lint unit tests (Req 1.4)
         run: scripts/lint-accounts_test.sh
-      - name: lint-compat unit tests (Req 4.8)
+      - name: lint-compat unit tests (Req 4.5, 4.8)
         run: scripts/lint-compat_test.sh
+      - name: render-chart unit tests (Req 4.6; stub helm, the real yq)
+        run: scripts/render-chart_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)
         run: scripts/check-attestation-count_test.sh
 
-      # Every script suite must be enumerated above: a suite that exists but
-      # never runs in CI passes locally forever and proves nothing (the
-      # scan-image omission, and the same class as the missing-required-check
-      # lesson of 2026-08-26).
-      - name: every script test suite is enumerated in this workflow
+      # Every script has a suite and every suite is enumerated above, as a
+      # live step: a suite that exists but never runs in CI passes locally
+      # forever and proves nothing (the scan-image omission, and the same
+      # class as the missing-required-check lesson of 2026-08-26). The match
+      # is anchored to an uncommented run: line, so a commented-out step no
+      # longer satisfies it, and the check runs both ways since review D7:
+      # a script without a suite is named too (render-chart.sh was the one).
+      - name: every script has a test suite, and every suite runs here
         run: |
           set -euo pipefail
           missing=0
           for t in scripts/*_test.sh; do
-            grep -qF "run: $t" .github/workflows/validate.yml || {
-              echo "::error file=.github/workflows/validate.yml::${t} exists but no step runs it"; missing=1; }
+            grep -qE "^[[:space:]]*run: ${t}([[:space:]]|$)" .github/workflows/validate.yml || {
+              echo "::error file=.github/workflows/validate.yml::${t} exists but no live step runs it"; missing=1; }
+          done
+          for s in scripts/*.sh; do
+            case "$s" in *_test.sh) continue ;; esac
+            [ -f "${s%.sh}_test.sh" ] || {
+              echo "::error file=${s}::${s} has no ${s%.sh}_test.sh (docs/user-manual.md, Part VI: every script has a suite)"; missing=1; }
           done
           exit "$missing"
 
@@ -298,9 +310,11 @@ jobs:
       # for its plain unit test, TestProbeDeclarations (task 14.3, Req 5.5,
       # 5.8): every probe a chart declares is registered, every registration
       # is declared. The YAML half of that contract is lint-probes.sh above.
+      # ./... rather than a hand-kept package list (review D7): a new package
+      # would otherwise build but never test, and nothing would go red.
       - name: helper unit tests
         working-directory: test
-        run: go test ./harness/... ./checks/... ./install/... ./e2e/...
+        run: go test ./...
 
       # The CVE rescan reporter (task 7.2) is its own stdlib-only module: a pure,
       # unit-tested tool that the daily rescan.yml drives to open issues

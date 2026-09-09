@@ -445,6 +445,16 @@ graph TB
      definition's accounts block before), and Req 2.4's registry half has the inverse
      visibility probe, `check-visibility.sh` failing on any catalogue tag served anonymously
      while public release is disabled; its source half is the owner's setting (M15).
+   - **As built, corrected 2026-09-09 (review disposition D7)**: the support statement
+     was declared and read by nothing, decoration by the aperture lesson's own standard.
+     It is kept, since Req 6.49 asks for it, and given its reader and its publication:
+     `triage-policy.sh support` refuses a statement missing either sentence, and the
+     status issue's opening paragraph quotes both verbatim (`--support` on the status
+     tool, the sentences carried in the fenced JSON as `support`), so the statement and
+     the clocks it scopes cannot disagree. The `test/` module runs `go test ./...`
+     rather than a hand-kept package list, and validate's suite completeness check runs
+     both ways (a script without a suite, a suite without a live `run:` line);
+     `render-chart.sh` got the suite it lacked, a stub helm recording its argv.
 8. **Upstream trust: quarantine, declared authenticity, tracked charts (Req 1.3, 1.10 to 1.12, 3.5, 3.7 to 3.12, 4.5, 4.8, 4.9; review F2, F10, F8, F13 ii and iii, F12 d; ADR 0002 amendment; 2026-08-25; as built 2026-09-07, tasks 11.1 to 11.5)**
    - **Context**: from-source patch bumps automerged while their checksum was recomputed
      from whatever upstream served at that instant, so an adversary publishing a
@@ -519,7 +529,11 @@ graph TB
      step over `scripts/check-authenticity.sh`, which files one `supply-chain` issue per
      mismatched definition under a marker and reports lapsed compat review-by dates in the
      same pass (Req 4.9). The compat block is checked twice, yamale for shape and
-     `scripts/lint-compat.sh` for the clock; the ask was cut to the problem and the ask,
+     `scripts/lint-compat.sh` for the clock and, since review D7, for the binding of the
+     trigger to the record (a chart whose `deploys:` names a definition declaring
+     `variant: compat` must carry a `compat:` block naming it, and a block must name a
+     compat variant the chart deploys; before that a second compat variant could have
+     shipped undecided, the block being optional in the schema); the ask was cut to the problem and the ask,
      reviewed twice (prior art; an adversarial pass that found no design reason for the
      init container to share the main image, its separation being secret isolation) and
      filed by the owner as valkey-io/valkey-helm#247 on 2026-09-07. The chart manager
@@ -739,7 +753,15 @@ graph TB
      and activating in the same pull request passes. check-authenticity.sh is
      scoped to the set (Req 3.10 as amended), the inactive count in its summary.
      The rescan's enumeration, the chart gate and the convention lints keep
-     looping every directory, as decided.
+     looping every directory, as decided. Review D7 added the detective half of
+     Req 1.15, the preventive filter being a branch no reference run had taken:
+     the rescan holds each inactive definition's declared tags to the digests
+     the last published status recorded and fails by name on a tag that moved or
+     appeared (`scripts/check-inactive-digests.sh`, per tag rather than per
+     repository since a runtime definition and its compat variant share one).
+     The baseline is the status issue's fenced JSON, the one record that persists
+     from day to day; a first day without one is a warning, not a pass in
+     disguise.
    - **As built** (task 14.3, 2026-09-09): as decided, with one placement
      detail. The registry is keyed by probe name rather than by component, and
      the component side of the mapping lives in YAML: each chart.yaml declares
