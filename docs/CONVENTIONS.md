@@ -76,15 +76,22 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
 - Every GitHub Action is pinned to a full commit SHA, and **every third-party
   executable a workflow installs is pinned to an exact version and verified
   against a checksum recorded here** (Req 7.5). Trivy and grype
-  (`scripts/install-scanners.sh`) and kind, kyverno, helm, ct, syft and crane
-  (`scripts/install-tool.sh`) meet both halves with digests recorded in-repo;
+  (`scripts/install-scanners.sh`) and kind, kyverno, helm, ct, syft, crane,
+  vexctl and cosign (`scripts/install-tool.sh`) meet both halves with
+  digests recorded in-repo (cosign since review D4, 2026-09-09; before that
+  an installer action pinned its version with no checksum here);
   govulncheck is exact-pinned with the Go module sumdb as its checksum control
   (`build.yml`), the renovate/json5 test installs are exact-pinned with
   npm registry integrity verification (`validate.yml`), and the python
   packages CI installs (yamllint, yamale + their deps) are exact-pinned with
   their sha256 hashes recorded in `.github/requirements-ci.txt` and installed
-  with `pip install --require-hashes`. Every one of these
-  pins carries a Renovate manager (Req 7.6). `curl … | sh` from a branch is a
+  with `pip install --require-hashes`. The e2e probe image, test scaffolding
+  rather than a shipped image, is pinned by digest in `e2e.yml`. Every one of
+  these pins carries a Renovate manager (Req 7.6), the Action pins through
+  the built-in `github-actions` manager (bumps reviewed, never automerged)
+  and the two Go modules through `gomod`; a fixture sweeps every
+  `# renovate:` marker in a file some manager reads and fails when one
+  resolves to no dependency. `curl … | sh` from a branch is a
   floating tag with a shell attached: the tag can be repointed and the script
   re-published under the same URL. That is not hypothetical for this toolchain —
   CVE-2026-33634 (March 2026) repointed 76 of 77 `aquasecurity/trivy-action`
@@ -428,7 +435,7 @@ the step altogether.
 | M2 | Review and merge build-layer bumps (`dhi.io/build` frontend, `dhi.io/golang` builders) | deliberate | A toolchain change moves stdlib findings in every compiled image at once; the scan-gate delta is what the reviewer reads | `automerge: true` on the build-layer rule in `renovate.json5` | none |
 | M3 | Decide a finding: write a VEX statement (`vexctl`, `triage/vex/`), an accepted-risk exception (`triage/accepted-risk/`), a fix bump, or a drop, and the LOG entry that argues it (Req 6.4, 6.5) | deliberate | Judgement is the human's; everything mechanical around it (compile, lint, ceilings, the issue lifecycle, expiries, the status clocks) is automated | none: a fork automates evidence, never the decision | per entry: the exception's `expired_at`, the statement's LOG citation |
 | M4 | Sign hardened-app's release tags in its own repository (the `signed-commit` class needs a verified commit) | deliberate | The authenticity signal rests on a key only a person holds; the refresh refuses an unverified bump (Req 3.8) | The definition's class, or an upstream whose release workflow signs with a Sigstore identity | none |
-| M5 | Bump cosign by hand and keep it on the v2 line (`cosign-release` in `build.yml` and `rescan.yml`, ADR 0003) | deliberate | cosign v3 writes a bundle layout Kyverno 1.18.2 and Trivy 0.72.0 could not find (measured 2026-08-22); a move happens only when both consumers are measured to read v3 bundles, and the daily smoke test is the control that would catch an unmeasured one | The pinned version | 2026-10-22: re-measure with kyverno 1.19.0 and trivy 0.74.0, both newer than the ADR's measurement and both pinned since 2026-09-08 |
+| M5 | Keep cosign on the v2 line (`COSIGN_VERSION` in `scripts/install-tool.sh`, ADR 0003): Renovate offers the bumps since D4, a human records the checksum and holds the major | deliberate | cosign v3 writes a bundle layout Kyverno 1.18.2 and Trivy 0.72.0 could not find (measured 2026-08-22); a move happens only when both consumers are measured to read v3 bundles, and the daily smoke test is the control that would catch an unmeasured one | The pinned version | 2026-10-22: re-measure with kyverno 1.19.0 and trivy 0.74.0, both newer than the ADR's measurement and both pinned since 2026-09-08 |
 | M6 | Re-verify the sources of the DHI redistribution memo (`data/dhi-terms-2026-08-21.md`) and re-decide the terms statement in `SECURITY.md` (F12 e) | deliberate | Docker revises the cited pages often; the memo says it holds for a few months, and the DSSA-versus-Apache tension is unresolved by any Docker document | A fork under different terms replaces the memo and the statement | 2026-11-21 |
 | M7 | Review and merge upstream chart version bumps (`chart/<name>/chart.yaml`, the helm-datasource manager, Req 3.11) | deliberate | A chart release can change what the overlay's values mean; the upgrade e2e argues the rest | `automerge: true` on the helm rule | none |
 | M8 | Review and merge grafana repackage bumps (the tarball, `refresh-grafana.sh`, ADR 0002) | deliberate | A repackage bump swaps a binary we did not build; the cross-origin checksum is agreement of origins, not a signature | Convert the definition to from-source, or automerge patch bumps of the repackage archetype | none |
@@ -446,7 +453,6 @@ the step altogether.
 | M20 | Review chart image-pin tag bumps (a new image release reaching a chart; digest-only bumps automerge, Req 3.12) | deliberate | A tag move is a release reaching the deployed chart; the upgrade e2e runs, a human reads its result | `matchUpdateTypes` on the digest automerge rule | none |
 | M21 | When forking, edit the registry-namespace literals in `renovate.json5` by hand: the two chart-pin managers' `matchStrings`, the cert-manager chart-pins group's `matchDepNames`, the digest-automerge rule's `matchPackageNames` (four sites), plus the expectations in `test/renovate/managers.test.mjs` that name them | deliberate | Renovate reads no policy file and a regex manager's match strings take no value from one; the tracking block covers what can be rendered (task 14.2), the namespace cannot be (review 4.7) | `verification.registry` in `catalogue-policy.yaml` is the value; the literals follow it once, and the fixtures fail when a manager stops matching the catalogue's own images | none |
 | M22 | When forking, edit the reference namespace in the Kyverno fixture `policies/tests/resources.yaml` | deliberate | A fixture states its expected values as literals; one that read the value under test would prove nothing. The policy itself renders from the policy file (task 14.1) | `verification.registry`; the fixture follows it once | none |
-| P1 | Track the cosign pin with Renovate: no manager matches a `cosign-release:` line, so M5's bumps are not offered (found 2026-09-08 while moving the install step; ADR 0003 promised the manager) | pending automation | A pin nothing bumps is a stale scanner's failure mode with a signing tool in its place | none: the intended mechanism is a `matchStrings` entry on the workflow manager plus a fixture, and M5 stays the completion step | none |
 | P2 | Re-scope version-scoped VEX statements on a grafana bump: the product lint demands re-scoped statements (Req 6.20), and today a person re-stamps each one in a triage session (2026-09-03 for 13.1.5) | pending automation | The mechanical half is scriptable: a statement whose module version is unchanged by the bump is carried forward under the new product; only a changed module version needs a person | none: the intended mechanism is a postUpgradeTask beside `refresh-grafana.sh` | none |
 
 **Automated since the register was decided** (F13's three automations and
@@ -457,7 +463,9 @@ Req 3.11); automerging digest-only chart image pins (task 11.4, Req 3.12);
 re-verifying every definition's authenticity signal daily (task 11.3,
 Req 3.10); discarding an unchanged nightly rebuild (task 9.2, Req 2.15);
 asserting the repository's governance and its revocation record daily
-(tasks 13.2, 13.3, Req 9.3, 9.7, 9.9).
+(tasks 13.2, 13.3, Req 9.3, 9.7, 9.9); tracking the cosign pin, the Action
+pins, the Go modules and the probe image (review D4, 2026-09-09; the row
+that was P1).
 
 ## Pull requests (Req 7)
 

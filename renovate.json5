@@ -1,12 +1,19 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
 
-  // This is a definitions catalogue, not an app: the only things worth
-  // tracking are the pins inside image/*/image.yaml. Disable every built-in
-  // manager and drive everything from the two custom regex managers below,
-  // so Renovate never opens surprise PRs for unrelated ecosystems.
-  // (When phase 6 adds test/ as a Go module, enable "gomod" here too.)
-  enabledManagers: ["custom.regex"],
+  // This is a definitions catalogue, not an app: the pins worth tracking are
+  // the ones inside image/*/image.yaml and the tool, chart and workflow pins
+  // the custom regex managers below read. Every other built-in manager is
+  // off, so Renovate never opens surprise PRs for unrelated ecosystems. Two
+  // built-ins are on (review D4, 2026-09-09): github-actions, so the
+  // SHA-pinned actions receive bumps (they never did, Req 7.6), and gomod
+  // for the two Go modules (test/, triage/rescan), whose dependencies were
+  // untracked since task 6.1 added the first.
+  enabledManagers: ["custom.regex", "github-actions", "gomod"],
+  // gomod: update go.sum with the bump (the Renovate image installs the Go
+  // version go.mod names), so a module PR arrives buildable rather than
+  // with a stale sum the go job would fail on.
+  postUpdateOptions: ["gomodTidy"],
 
   dependencyDashboard: true,
   // Keep the frontend/builder digests fresh (Req 1.2); the docker manager
@@ -169,6 +176,19 @@
       ],
       // A renovate major (41 → 44 is real today) stages behind Dependency
       // Dashboard approval like every other major, via the Req 3.4 rule below.
+    },
+    {
+      // The e2e probe image (test scaffolding, not a shipped image): pinned
+      // by tag@digest in e2e.yml's env since review D4 (it was a mutable
+      // Docker Hub tag), tracked here so a digest move or a curl release
+      // arrives as a PR. Reviewed, never automerged: the digest automerge
+      // rule below is scoped to the catalogue's own images.
+      customType: "regex",
+      managerFilePatterns: ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      matchStrings: [
+        "PROBE_IMAGE:\\s*(?<depName>[^\\s:@]+):(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[a-f0-9]{64})",
+      ],
+      datasourceTemplate: "docker",
     },
     {
       // Chart image pins, digest-keyed spelling (Req 4.2, 7.6; task 8.7):
@@ -402,6 +422,16 @@
       matchPackageNames: ["ghcr.io/mm-weber/dhc/**"],
       matchUpdateTypes: ["digest"],
       automerge: true,
+    },
+    {
+      // GitHub Actions (review D4): third-party code running with the
+      // workflow's token, so every bump is reviewed, patch included. The
+      // github-tags automerge rule above would otherwise reach them (the
+      // built-in manager resolves actions through github-tags); this rule is
+      // ordered after it so automerge: false wins. Majors stage behind the
+      // dashboard like everything else; the three-day age applies.
+      matchManagers: ["github-actions"],
+      automerge: false,
     },
     {
       // The build layer is our own stricter pin surface — a frontend/builder
