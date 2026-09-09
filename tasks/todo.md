@@ -888,7 +888,7 @@ earlier catalogue.
 - [x] 1. Retired criterion numbers re-anchored in the workflows' headers and step names,
       four scripts and their test strings (6.18 into 6.17, 6.21 and 6.31 into 6.20, 6.23 into
       6.7, 6.24 into 6.11, 6.6 to the declared consumers, 6.2 into 2.22, 8.x and 3.6 retired),
-      the triage README, the grafana exception, ADR 0002; the reviews and the LOG stay history
+      the triage README, ADR 0002; the reviews and the LOG stay history; the grafana exception's two citations wait for the triage session issue #186 makes imminent (touching that file rebuilds grafana through the gate, which the new HIGH already fails)
 - [x] 2. The manual: the amd64 note (both platforms since task 9.3), the deploy walkthrough
       and the chart READMEs read the version from chart.yaml instead of quoting it, the
       overlay claim scoped per chart, "every active definition", the scripts reference

@@ -1,4 +1,4 @@
-# Time-boxed risk decisions for the grafana image (Req 6.7 to 6.12, 6.25 to 6.27; the retired 6.23 and 6.24 folded into 6.7 and 6.11).
+# Time-boxed risk decisions for the grafana image (Req 6.7-6.12, 6.23-6.27).
 #
 # A native Trivy ignorefile, handed to the same scan as --ignorefile. It answers
 # "what are we doing about it?", never "does this apply?" — that second question
@@ -9,7 +9,7 @@
 #
 # The filename is the image scope; `paths:` is the binary scope. Both matter:
 # one file per image stops grafana covering cert-manager, and one entry per
-# binary stops one plugin's upstream covering another's (Req 6.7).
+# binary stops one plugin's upstream covering another's (Req 6.23).
 #
 # Globs, not exact paths. The bundled plugin binaries carry an arch suffix, and
 # a path matching nothing is silent in Trivy — no warning, exit 0, nothing
