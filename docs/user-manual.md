@@ -101,10 +101,13 @@ scheduled.
 ```
 
 Ground rule: GitHub Actions is the **authoritative** environment for builds,
-kind clusters, registry pushes, and scans (Req 8.1). Local runs are for
+kind clusters, registry pushes, and scans. Local runs are for
 iteration speed; CI results are what count. The devcontainer is
 egress-allowlisted, so anything needing `dhi.io` or arbitrary registries
-delegates to CI or the operator host (Req 8.2).
+delegates to CI or the operator host. (An operating convention: the
+requirement group that stated it, Req 8, was retired on 2026-08-26 as
+owner-environment guidance; it lives in the repository's CLAUDE.md and the
+design document's Development Process section.)
 
 ## Part I: Consuming the catalogue
 
@@ -148,7 +151,8 @@ in [chart/valkey/README.md](../chart/valkey/README.md).
 Platform note: releases are currently **linux/amd64 only** (Req 2.1). arm64
 was deliberately withdrawn on 2026-08-04 because nothing scanned it; it
 returns only once the rescan covers it (spec task 8.3), per the rule that no
-platform is published unscanned (Req 2.6).
+platform is published unscanned (Req 2.8, which absorbed the retired Req 2.6
+on 2026-08-26).
 
 ### Verify what you pull
 
@@ -358,7 +362,8 @@ The heart of the PR path. For each affected definition (matrix), the job:
    (Req 1.3).
 3. **Builds** linux/amd64 through the real `dhi.io/build` frontend (the
    frontend compiling the definition *is* the authoritative schema validation,
-   Req 1.5), with a per-image GHA cache. PRs `load:` the image into the
+   Req 7.2, which absorbed the retired Req 1.5), with a per-image GHA
+   cache. PRs `load:` the image into the
    daemon; main builds every platform the definition declares and the policy
    admits (`catalogue-policy.yaml` `release.platforms`), and pushes by digest
    instead.
@@ -377,7 +382,10 @@ The heart of the PR path. For each affected definition (matrix), the job:
    gate* (`continue-on-error`); see
    [Reachability evidence](#reachability-evidence-govulncheck) (Req 6.13).
 7. **Grype second opinion** whenever a CRITICAL survives — different DB,
-   different matcher, informational (Req 6.6).
+   different matcher, informational. (Its criterion, Req 6.6, was retired on
+   2026-08-26 in favour of the declared consumers, Req 9.11 to 9.13, under
+   which Grype reads every scan as the second consumer; the step stays as a
+   convention.)
 8. **Gate.** Any surviving HIGH or CRITICAL fails the job (Req 6.1), with an
    error message that names each finding (id, package, installed and fixed
    version) and the four ways out, strongest first: avoid · fix · prove it
@@ -565,7 +573,7 @@ name. `CODEOWNERS` names the maintainer per lane (Req 9.10), and
 |---------------------------|--------------------------|---------------------------------------------------|-------------|
 | Renovate (`renovate.yml`) | every 4h (Req 3.1)       | Bump PRs; the Dependency Dashboard issue          | Actions tab · issue #5 |
 | Rebuild (`build.yml`)     | daily 04:47 UTC (Req 2.14)| Fresh digests for every definition whose package set changed; a discard line for the rest | Actions tab · the run summary per image |
-| Rescan (`rescan.yml`)     | daily 06:17 UTC (Req 6.2, 2.22)| Enumeration of every catalogue tag; the visibility invariant and the admission proof (Req 2.21, 2.24); every platform manifest scanned by digest; today's reports attested and the OpenVEX document re-attested on change, replacing (Req 6.42, 6.43); the cve issue lifecycle over the supported set, closing on evidence with graded labels and reopening on recurrence (Req 6.52 to 6.57); the clocks to the catalogue status issue (Req 6.46, 6.47); expiry warnings; VEX compile report | Actions tab · `cve`-labeled issues · the "Catalogue status" issue |
+| Rescan (`rescan.yml`)     | daily 06:17 UTC (Req 2.22, which absorbed the retired Req 6.2)| Enumeration of every catalogue tag; the visibility invariant and the admission proof (Req 2.21, 2.24); every platform manifest scanned by digest; today's reports attested and the OpenVEX document re-attested on change, replacing (Req 6.42, 6.43); the cve issue lifecycle over the supported set, closing on evidence with graded labels and reopening on recurrence (Req 6.52 to 6.57); the clocks to the catalogue status issue (Req 6.46, 6.47); expiry warnings; VEX compile report | Actions tab · `cve`-labeled issues · the "Catalogue status" issue |
 
 Both are dispatchable on demand (Renovate with dry-run and debug knobs). A
 healthy quiet day is: Renovate runs green and opens nothing; rescan runs
@@ -714,6 +722,9 @@ Ground rules that hold across all four:
   (Req 6.12).
 - A transfer's upstream issue is filed by the owner from a draft under
   `triage/upstream/` (register row M12).
+- Avoid has a whole-image form: deactivating the definition
+  ([Part IV](#deactivate-a-definition)) stops every new build while its
+  published digests keep their scans, attestations and statuses.
 - Reaching for accept/transfer before ruling out avoid and fix is the failure
   mode the lane is designed to expose — the `blocked:` field must say why the
   stronger treatments were unavailable, and its content is judged at review.
@@ -949,10 +960,11 @@ The walkthrough:
    sections). An active definition with no probe fails validation by name
    (Req 5.8); there is no placeholder value.
 5. **Activate it**: add the directory name to `active_set:` in
-   `catalogue-policy.yaml` (Req 1.13). The active set is the declared source
-   of candidates for the build and test matrices and the tracking scope
-   (the matrices read it from task 14.2 on); an unlisted definition is
-   inactive, and an entry naming no directory is refused by name.
+   `catalogue-policy.yaml` (Req 1.13). The active set is the sole source of
+   candidates for the build and test matrices and the tracking scope
+   (Req 1.14); an unlisted definition is inactive, and an entry naming no
+   directory is refused by name. See [Deactivate a definition](#deactivate-a-definition)
+   for what the switch does.
 6. **Open the PR** — one logical change. The gates do the rest: lints,
    frontend compile, scan gate (expect to triage real findings on a new
    image), chart render, e2e.
@@ -974,6 +986,40 @@ repository; the variant is a tag suffix. Rules that follow, all enforced:
   resolves to the directory name and *reports clean* while matching nothing.
 - Justify the capability increase in the consuming chart's README (the compat
   decision protocol, below).
+
+### Deactivate a definition
+
+The reference set is every directory under `image/`; the active set is the
+list in `catalogue-policy.yaml` naming the ones the catalogue builds,
+tracks, tests and publishes (Req 1.13). Deactivating a definition is
+removing its line, nothing else: the directory stays (a fork may delete it;
+the reference keeps it to demonstrate the switch).
+
+What changes the same day, all of it mechanical (Req 1.14 to 1.16):
+
+- No new digest is pushed and no new tag applied. The nightly skips it, a
+  dispatch naming it is refused, and a pull request that changes a file
+  under its directory fails validation naming it (activate it in the same
+  PR if the change is meant to ship).
+- Renovate stops tracking it: the tracking block in `renovate.json5` is
+  re-rendered (`scripts/render-tracking.sh`) to ignore its directory and any
+  chart that deploys only it. Commit the re-rendered block with the policy
+  change; validate fails on drift.
+- It leaves the e2e matrix, its chart stops being a component, and the
+  daily authenticity re-check no longer covers it.
+- A group moves whole: deactivate valkey and valkey-compat together, or all
+  three cert-manager images, or the lint names the group (Req 1.18).
+
+What does not change: everything already published. Its tags stay (nothing
+is deleted, see SECURITY.md on retention), and the tag-driven planes keep
+running over them: the daily enumeration and scans of every platform
+manifest, re-attestation, the admission proof, the visibility invariant.
+Its supported digests keep their issues, clocks and public counts, and each
+finding keeps every status lane except the fix bump, because no release
+will move its tags again. That is the avoid treatment writ large: the
+catalogue stops standing behind new builds while the record of what it did
+publish stays complete and verifiable. Reactivation is adding the line
+back.
 
 ### Adapt a chart
 
@@ -1052,7 +1098,8 @@ first, then close it.
 
 The devcontainer's egress is allowlist-firewalled: GitHub (incl. releases +
 ghcr.io), Docker Hub, PyPI, npm, the Go proxy, and the grafana download/index
-hosts are reachable; everything else is blocked (Req 8.2). Extending the
+hosts are reachable; everything else is blocked (an operating convention;
+Req 8 retired 2026-08-26). Extending the
 allowlist means editing `/workspace/.devcontainer/init-firewall.sh` and
 rebuilding.
 
@@ -1109,6 +1156,13 @@ docker buildx build -f image/hardened-app/image.yaml image/hardened-app/
   allowlisted (`RENOVATE_ALLOWED_POST_UPGRADE_COMMANDS` already lists the two
   refresh scripts); the cron runs under a concurrency group so runs never
   overlap.
+- **Forking:** the declared values live in `catalogue-policy.yaml` (the
+  registry namespace, the active set, the verification identities, the
+  clocks, the consumers); the rendered artifacts follow them by re-running
+  `scripts/render-verification.sh` and `scripts/render-tracking.sh`. Two
+  files carry the namespace as literals a fork edits once by hand:
+  `renovate.json5`'s manager match strings and rules, and the Kyverno
+  fixture `policies/tests/resources.yaml` (register rows M21, M22).
 
 ## Part VI: Reference
 
@@ -1231,6 +1285,13 @@ three-day minimum release age first.
 - **Supported set**: the digests each definition's current `tags:`
   reference. Issues and clocks run over it; a superseded digest keeps its
   daily scans and attestations and holds no issues.
+- **Reference set**: every definition directory under `image/`, the seven
+  worked examples this repository ships (Req 1.1).
+- **Active set**: the list in `catalogue-policy.yaml` naming the definitions
+  the catalogue builds, tracks, tests and publishes (Req 1.13); the sole
+  source of the build and e2e matrices and the tracking scope. A definition
+  outside it is inactive: frozen, never deleted, its published tags still
+  scanned and attested daily.
 - **Catalogue status issue**: the one issue the rescan rewrites daily with
   every finding's clocks (first seen, decided, fixed) and a fenced JSON block,
   the same data as the `catalogue-status` artifact.

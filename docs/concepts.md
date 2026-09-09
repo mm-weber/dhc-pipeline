@@ -162,6 +162,60 @@ Verification, when images are in a registry: `docker buildx imagetools
 inspect <ref>` (see the attestation manifests), `cosign verify-attestation
 --type slsaprovenance <ref>`, `docker scout attest list <ref>`.
 
+## The builder contract per archetype
+
+Req 1.17, the seam design Decision 11 declared and did not build: what the
+build backend takes in and what it must hand out, so that everything after
+it (scan gate, rescan, publish-on-change, VEX compilation, charts, status)
+depends on the outputs alone and a fork can swap the backend without
+touching a downstream plane. Today the backend is the `dhi.io/build`
+frontend for both archetypes; the declared alternative is apko plus Wolfi
+through the same contract.
+
+**Input: one definition directory.** `image/<name>/` holds `image.yaml` in
+the backend's native syntax and nothing the build reads from elsewhere.
+Every plane that touches an image reads that directory: the build compiles
+it, the frontend being the authoritative validator; Renovate rewrites its
+`vars:` block and source url and the refresh tooling regenerates the derived
+fields; the lints read its pins and its `# authenticity:` marker; the
+active set names it by directory (Req 1.13). A variant that must be built
+(`-compat`) is one more directory under the same contract, byte-equal in
+source to its runtime sibling plus a package, publishing to the sibling's
+repository as a tag suffix.
+
+**Outputs, identical for every archetype.**
+
+1. *An image pushed by digest* to the declared registry namespace: an index
+   with one platform manifest per declared platform, pushed by digest only
+   and tagged last, after the release-time scan, the signature and the
+   attestations exist (Req 2.7 to 2.9). BuildKit provenance is attached at
+   the push, as attestation manifests inside the index (Req 2.2).
+2. *Per-platform SBOM material carrying package pull checksums*: for every
+   platform manifest, an SPDX and a CycloneDX SBOM generated from the pushed
+   digest and attested to it, the CycloneDX one carrying each apk package's
+   pull checksum (syft's `pullChecksum` property, which the SPDX output
+   drops). That checksum is what makes the resolved package set a fact
+   rather than a name list: the publish-on-change comparison canonicalises
+   type, name, version and checksum per platform manifest (Req 1.9, 2.15),
+   so a package republished under an unchanged version still moves the set.
+
+**What differs per archetype is the input's source stanza, and only that.**
+
+| Archetype | Source stanza | Authenticity class | Refresh on a bump |
+|---|---|---|---|
+| compile-from-source (hardened-app, cert-manager, valkey) | `files: url: git+https://…#<tag>` with the commit `checksum:` beside it, built in a build stage whose toolchain is a digest-pinned `-dev` image (`uses:`, the Go ones) or toolchain packages from the pinned repositories (valkey) | `signed-tag` or `signed-commit`, GitHub's verification statement | `refresh-definition.sh` regenerates the checksum and every version-derived field |
+| tarball-repackage (grafana) | `files: url: https://<vendor>/…<version>…tar.gz` with per-architecture sha256 pins in `vars:`, verified by an in-pipeline `sha256sum -c` step | `cross-origin-checksum`, the publisher's version statement and the object store's sidecar agreeing | `refresh-grafana.sh` re-pins both checksums from two origins |
+
+**Downstream reads outputs only, already true by construction.** The scan
+gate and the rescan scan the pushed digest's platform manifests; the
+comparator reads the CycloneDX attestations; the VEX compiler stamps the
+digest and its platform digests; the charts pin the digest; the admission
+proof verifies the signature and attestations; the status planes read what
+is attested. None of them reads a definition to learn about an image. That
+is the whole seam: a backend that produces these two outputs from that one
+input is a drop-in, and the trust-boundary table below names the declared
+alternative per row.
+
 ## Trust boundary: who owns what, and where the seams are
 
 Every component the catalogue depends on, with its owner class (Req 9.15):
@@ -174,8 +228,8 @@ there.
 
 | Component | Owner class | Authenticity or pin | Declared seam alternative |
 |---|---|---|---|
-| Build frontend `dhi.io/build` | substrate-inherited | digest-pinned `# syntax=` line; docker datasource, bumps reviewed by hand | apko plus Wolfi, the documented backend a fork targets; the builder contract per archetype (Req 1.17: definition directory in, image by digest plus SBOM material out) is the seam |
-| Builder images `dhi.io/golang:*-dev` | substrate-inherited | digest-pinned `uses:`; reviewed by hand | Wolfi toolchain images through the same contract |
+| Build frontend `dhi.io/build` | substrate-inherited | digest-pinned `# syntax=` line; docker datasource, bumps reviewed by hand | apko plus Wolfi, the documented backend a fork targets; [the builder contract per archetype](#the-builder-contract-per-archetype) (Req 1.17: definition directory in, image by digest plus SBOM material out) is the seam |
+| Builder images `dhi.io/golang:*-dev` | substrate-inherited | digest-pinned `uses:`; reviewed by hand | Wolfi toolchain images through [the same contract](#the-builder-contract-per-archetype) |
 | Package repositories `dhi.io/apk/<distro>/<release>/main` and their keyring | substrate-inherited | `/main` lines only, enforced by `lint-pins.sh`; packages float by design (Req 1.9), the resolved set is recorded per digest in the attested SBOMs | Wolfi apk repositories; the `dhi.io` login the build step needs is an adoption constraint, stated, not hidden |
 | Runtime base layers (baselayout, certificates, libc) | substrate-inherited | from the repositories above; rebuilt daily, published on change (Req 2.14 to 2.16) | comes with the backend |
 | cert-manager sources (controller, webhook, cainjector) | upstream-inherited, `signed-tag` | GitHub's verification statement for the annotated tag, at bump time and daily | none needed; the class is per definition |
