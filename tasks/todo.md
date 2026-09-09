@@ -906,3 +906,16 @@ and a README that reads the pin cannot rot. Three PRs of documentation
 drift (D4, D5, D6) trace back to one habit, quoting a value a machine
 moves; the manual now says so where the commands are. What D6 leaves to
 D7: the mislabelled pin-lint test and a render-chart.sh suite.
+
+## Review D7: decoration and negative cases (2026-09-09)
+
+Goal: every declared value has a reader, every rule has its negative case,
+every script has a suite the workflow runs (review dispositions table, D7).
+
+- [ ] lint-pins: relabel the mislabelled 1.12 case; add the keyring-not-judged case
+- [ ] lint-compat: a chart deploying a compat variant must record the decision, and a decision must name a deployed variant (Req 4.5)
+- [ ] render-chart_test.sh (stub helm), wired into validate; the manual's exception sentence removed
+- [ ] validate: `go test ./...` in test/; the suite completeness check runs both ways and ignores comments
+- [ ] support statement: `triage-policy.sh support` validates it, the status issue publishes it (Req 6.49)
+- [ ] check-inactive-digests.sh: the detective half of Req 1.15, yesterday's status JSON as the baseline; a rescan step
+- [ ] spec (tasks 15.7, design as-built), manual and CONVENTIONS, gates run as CI runs them
