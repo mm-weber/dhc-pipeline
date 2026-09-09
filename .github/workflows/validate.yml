@@ -39,8 +39,13 @@ jobs:
 
       # Fast deterministic gate; the authoritative definition validator is
       # the dhi.io/build frontend compiling each changed definition (build.yml)
-      - name: pin + definition lint against docs/CONVENTIONS.md (Req 1.5, 1.6, 7.4)
+      - name: pin + definition lint against docs/CONVENTIONS.md (Req 1.6, 7.2, 7.4)
         run: scripts/lint-pins.sh
+
+      # Req 1.4 (review D5): every definition runs as a non-root account with
+      # uid 65532; nothing read the accounts block before this.
+      - name: runtime account lint (Req 1.4)
+        run: scripts/lint-accounts.sh
 
       # Pin + sha256 live in the script (Req 7.5). Invoked by path because the
       # install and the tests share this step, and GITHUB_PATH only reaches
@@ -223,6 +228,9 @@ jobs:
 
       - name: release-policy reader unit tests (D3)
         run: scripts/release-policy_test.sh
+
+      - name: runtime account lint unit tests (Req 1.4)
+        run: scripts/lint-accounts_test.sh
       - name: lint-compat unit tests (Req 4.8)
         run: scripts/lint-compat_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)

@@ -48,15 +48,47 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 PUBLIC=$("$HERE/release-policy.sh" "$ROOT" public)
 REGISTRY=$(python3 -c 'import sys,yaml; print(((yaml.safe_load(open(sys.argv[1])) or {}).get("verification") or {}).get("registry", ""))' "$ROOT/catalogue-policy.yaml")
 
-if [ "$PUBLIC" != "true" ]; then
-  echo "check-visibility: public release is disabled (catalogue-policy.yaml release.public); the visibility invariant does not apply (Req 2.21's WHILE clause)"
-  exit 0
-fi
 if [ -z "$REGISTRY" ]; then
   err "catalogue-policy.yaml declares no verification.registry"
   exit 2
 fi
 HOST="${REGISTRY%%/*}"
+
+# WHILE public release is DISABLED the invariant inverts (Req 2.4; review
+# D5): no catalogue tag may be served to an unauthenticated request. The
+# probe is the same anonymous manifest request with only an anonymous token;
+# 200 is the failure, anything else is the registry keeping the image
+# private. A repository that hands out a token is not a leak (a private
+# ghcr repository still issues one), so only the manifest answer counts. The
+# source half of 2.4, the repository's own visibility, is the owner's
+# setting (register M15) and is not probed here.
+if [ "$PUBLIC" != "true" ]; then
+  WORK=$(mktemp -d)
+  trap 'rm -rf "$WORK"' EXIT
+  cut -f1,2 "$ENUM" | LC_ALL=C sort -u > "$WORK/tags"
+  leaks=0; tags=0
+  while IFS=$'\t' read -r repo tag; do
+    [ -n "$repo" ] || continue
+    tags=$((tags + 1))
+    path="${repo#"${HOST}"/}"
+    token=$(curl -s "https://${HOST}/token?scope=repository:${path}:pull" 2>/dev/null | jq -r '.token // empty' 2>/dev/null || true)
+    auth=()
+    [ -n "$token" ] && auth=(-H "Authorization: Bearer ${token}")
+    code=$(curl -s -o /dev/null -w '%{http_code}' "${auth[@]}" \
+      -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json' \
+      "https://${HOST}/v2/${path}/manifests/${tag}" || echo 000)
+    if [ "$code" = "200" ]; then
+      err "${repo}:${tag} is served to an unauthenticated request while public release is disabled (catalogue-policy.yaml release.public: false); the registry image is not private (Req 2.4)"
+      leaks=$((leaks + 1))
+    fi
+  done < "$WORK/tags"
+  if [ "$leaks" -gt 0 ]; then
+    err "${leaks} tag(s) served while public release is disabled"
+    exit 1
+  fi
+  echo "check-visibility: public release is disabled (catalogue-policy.yaml release.public); none of ${tags} catalogue tag(s) answers an unauthenticated request (Req 2.4)"
+  exit 0
+fi
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT

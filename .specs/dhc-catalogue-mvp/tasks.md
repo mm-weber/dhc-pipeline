@@ -40,16 +40,15 @@
   - [x] 3.2 cert-manager definition (monorepo → three images)
     - One version var driving controller/webhook/cainjector from one pinned source ref + checksum
     - Pin one minor release behind latest upstream (stale-pin bootstrap)
-    - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6_
+    - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6 (retired 2026-08-26)_
   - [x] 3.3 `build.yml`: PR build path and main release path
     - PR: build affected images (amd64 only, `type=gha` cache), no push
     - main: amd64 build → push to private `ghcr.io/mm-weber/dhc` + cosign keyless + Syft SPDX SBOM + BuildKit provenance
     - Verify GHCR packages are private; failure publishes nothing and reports failing step
     - CI-validated: PR path green on all four definitions (amd64+arm64) before the
       amd64-only/cache speed fix
-    - Release path was multi-arch until 2026-08-04 and is now amd64 only, because
-      nothing scanned the arm64 half (Req 2.6). Restoring it is task 9.3 (formerly 8.3)
-    - _Requirements: Req 2.1, Req 2.2, Req 2.3, Req 2.4, Req 2.5, Req 8.1_
+    - Release path was multi-arch until 2026-08-04 and amd64 only from then until task 9.3 restored arm64 (2026-09-02), because nothing scanned the arm64 half (Req 2.6, since retired into 2.8)
+    - _Requirements: Req 2.1, Req 2.2, Req 2.3, Req 2.4, Req 2.5, Req 8.1 (retired 2026-08-26)_
 
 - [x] 4. Upstream tracking live (Day 2)
   - [x] 4.1 `renovate.json5` with regex managers and fixtures
@@ -63,15 +62,15 @@
     - _Requirements: Req 3.1, Req 3.2_
   - [x] 4.3 Prove the operating loop
     - Confirm real bump PRs open from stale pins; grouped cert-manager PR; one real major staged on the dashboard
-    - _Requirements: Req 3.2, Req 3.3, Req 3.4, Req 3.6_
+    - _Requirements: Req 3.2, Req 3.3, Req 3.4, Req 3.6 (retired 2026-08-26)_
 
 - [x] 5. Remaining definitions and chart adaptations (Day 2)
   - [x] 5.1 grafana definition (tarball repackage archetype)
     - Official release tarball onto minimal digest-pinned base; nonroot 65532; writable-path inventory for chart work; stale pin
-    - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6_
+    - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6 (retired 2026-08-26)_
   - [x] 5.2 valkey definition (stateful archetype) [CUT 2nd-last if pressed]
     - Binary repackage, nonroot, stale pin
-    - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6_
+    - _Requirements: Req 1.1, Req 1.2, Req 1.3, Req 1.4, Req 3.6 (retired 2026-08-26)_
   - [x] 5.3 cert-manager chart adaptation
     - Pin upstream chart version; `config/values-hardened.yaml` (digest-pinned image swap, restricted PSS); README documenting every deviation + rationale
     - _Requirements: Req 4.1, Req 4.2, Req 4.3, Req 4.7_
@@ -99,15 +98,15 @@
     - _Requirements: Req 5.6_
   - [x] 6.5 `e2e.yml` workflow
     - Affected-component kind matrix on PRs
-    - _Requirements: Req 5.2, Req 8.1_
+    - _Requirements: Req 5.2, Req 8.1 (retired 2026-08-26)_
 
 - [x] 7. CVE triage lane (Day 3)
   - [x] 7.1 Scan gates
     - Trivy PR gate consuming `triage/vex/`; fail on uncovered HIGH/CRITICAL; Grype second opinion on CRITICAL
-    - _Requirements: Req 6.1, Req 6.6_
+    - _Requirements: Req 6.1, Req 6.6 (retired 2026-08-26)_
   - [x] 7.2 `rescan.yml` daily cron
     - Rescan published images; new HIGH/CRITICAL → templated issue (severity, EPSS, KEV, affected images)
-    - _Requirements: Req 6.2, Req 6.3_
+    - _Requirements: Req 6.2 (retired 2026-08-26), Req 6.3_
   - [x] 7.3 First real triage decision
     - Author OpenVEX via vexctl for a real finding, attach with cosign attest, entry in `triage/LOG.md`; or fix-bump PR when a fix exists
     - _Requirements: Req 6.4, Req 6.5_
@@ -127,21 +126,21 @@
     - Push the built image to a throwaway local registry so it carries a digest; scan that ref
     - The gate scans copies with the purl qualifiers stripped (the local registry host differs), so published statements stay precisely scoped
     - `scripts/lint-vex-product.sh` (+ `_test.sh`) covers the one field stripping blinds the gate to: product names a real definition, `repository_url` equals its `image:`, subcomponents versionless
-    - _Requirements: Req 6.17, Req 6.18, Req 6.19_
+    - _Requirements: Req 6.17, Req 6.18 (retired 2026-08-26), Req 6.19_
 
   - [x] 7.7 Status-dependent product versioning, so a superseded decision stays on the record
     - `lint-vex-product.sh` forbade a version on *every* product purl. Correct for `not_affected` — a claim about code structure, true across rebuilds, where a pinned digest would suppress until the next build and then silently stop. Wrong for `fixed` — a version-scoped claim that, stated versionless, asserts every published image under that name carries the remedy, which is false while an older tag remains in the registry
     - Surfaced by CVE-2026-42151 (#25): a `not_affected` statement written against grafana 13.0.4, superseded when the 13.1.1 bump moved prometheus past the fix. Deleting the statement would have lost the reasoning; keeping it unchanged would have described an image we no longer build
     - Lint reads each statement's `status`: `fixed` requires a versioned product, every other status forbids one
     - `triage/README.md` gains the convention with its reason; `triage/LOG.md` carries the transition
-    - _Requirements: Req 6.20, Req 6.21, Req 6.22_
+    - _Requirements: Req 6.20, Req 6.21 (retired 2026-08-26), Req 6.22_
 
   - [x] 7.8 Per-binary scope for acceptances, so deciding one binary does not decide another
     - One file per image stops grafana covering cert-manager; nothing stopped one binary inside grafana covering another. CVE-2026-27145 (#22) sits in both `plugins-bundled/elasticsearch/` and `plugins-bundled/zipkin/`, built by different upstreams on different schedules and now tracked by two different issues — an entry keyed on `id` + `purls` alone matches `stdlib` in both, so deciding one silently decides the other
     - `lint-accepted-risk.sh`: `paths` joins the required set (6.24), and two entries sharing a vulnerability id may not name the same path (6.25)
     - `build.yml`: report any exception that suppressed nothing (6.26) and add the binary to the suppression table (6.27). A too-narrow path fails safe but reads as untriaged; a too-broad one fails green over a binary nobody argued. Report, never fail — an exception that suppresses nothing leaves nothing uncovered, so Req 6.1 is the wrong lever
     - Trivy 0.72.0 behaviour measured first, on a two-binary tree from the real plugin assets: `paths` scopes, globs work (needed — the arch suffix differs per build), a path matching nothing is silent. Recorded in `design.md` and re-runnable from `triage/upstream/checks/`
-    - _Requirements: Req 6.23, Req 6.24, Req 6.25, Req 6.26, Req 6.27_
+    - _Requirements: Req 6.23, Req 6.24 (both retired 2026-08-26), Req 6.25, Req 6.26, Req 6.27_
 
   - [x] 7.9 Compile VEX per build, so a statement's product is one Trivy matches
     - Measured on the published image, one real finding, one statement each: a tag-versioned product suppresses **nothing** (`pkg:oci/grafana@13.0.4-alpine3.23`, status `fixed` — reported 1, suppressed 0), while a digest-versioned one and a versionless one both work. Trivy builds the product identifier from the RepoDigest, so a tag never matches. Req 6.21 as written could not be satisfied by any statement that had to suppress, and `triage/vex/CVE-2026-42151.openvex.json` is inert today — unnoticed because its finding had already vanished from the scan
@@ -154,9 +153,9 @@
     - The summary earned itself on its first real run. It showed grafana at "2 applied, 0 dropped" against the published **13.0.4**, because `rescan.yml` passed the tags the *definition* declares (13.1.1) rather than the tags the scanned image has (13.0.4). A `fixed` claim written for 13.1.1 therefore suppressed the finding on the release that genuinely carries it — 6.30's exact failure, arriving through the caller. Fixed by resolving each declared tag against the registry and keeping those pointing at the scanned digest
     - Measured while fixing it: Trivy orders VEX statements by `timestamp`, not by array position and not "affected always wins" (later `not_affected` beats earlier `affected`; later `affected` beats earlier `not_affected`). So supersession is load-bearing — the wrong tag set did not merely over-suppress, it applied the *false* claim of the two
     - Attestation had the same defect and worse consequences (6.34): `build.yml` attested `triage/vex/*.json` raw, so every consumer verifying one of our images got products carrying a tag, which matches nothing. Compiling before `cosign attest` also replaces that step's hand-rolled `jq` image filter with the compiler's tested one
-    - _Requirements: Req 6.20, Req 6.21, Req 6.28, Req 6.29, Req 6.30, Req 6.31, Req 6.32, Req 6.33, Req 6.34_
+    - _Requirements: Req 6.20, Req 6.21 (retired 2026-08-26), Req 6.28, Req 6.29, Req 6.30, Req 6.31 (retired 2026-08-26), Req 6.32, Req 6.33, Req 6.34_
 
-- [ ] 8. Wrap-up (Day 3)
+- [x] 8. Wrap-up (Day 3; every subtask ticked, the group's box caught up by review D5 on 2026-09-09)
   - [x] 8.1 valkey chart adaptation [CUT 1st if pressed]
     - As 5.3 for valkey (stateful: probes, persistence off-by-default rationale)
     - Upstream is the valkey project's own chart, `valkey-io/valkey-helm` 0.11.0, whose appVersion 9.1.1 is the version `image/valkey/` builds — no version skew to argue, unlike grafana. It also arrives harder by default (drop-ALL, `readOnlyRootFilesystem`, `runAsNonRoot`, seccomp), so the overlay moves the UID to 65532, states `runAsNonRoot` at **pod** level where `require-nonroot.yaml` reads it, turns on the opt-in readiness probe, and states persistence off
@@ -205,15 +204,15 @@
   - [x] 8.7 Chart image pins drift behind Renovate bumps; Req 5.6 never fires on an image bump (tracked as #64)
     - Renovate managers read only `image/` and `scripts/`, so a definition bump moves nothing under `chart/`: cert-manager chart pins 1.21.0 while the catalogue publishes 1.21.1, grafana chart pins 13.0.4 against a published 13.1.3, and `chart/hardened-app/README.md` claimed Renovate keeps its digest current (corrected — it never did)
     - The upgrade-path spec triggers only on a `chart/<c>/chart.yaml` upstream-version edit (`e2e.yml`), so the ordinary bump path has never exercised Req 5.6 — re-pinning the charts and giving the trigger an image-bump path are the same piece of work
-    - 2026-08-13 done (#64): two chart-pin regex managers over `chart/**` values (docker datasource, ghcr.io anonymous since go-live) — digest-keyed spelling for cert-manager ×3 + hardened-app, tag@digest for grafana + valkey, both capturing tag AND digest so same-tag rebuilds reach the chart too; cert-manager trio grouped into one PR. grafana migrated OFF the chart's bare-hex `sha:` field onto tag@digest (Renovate writes `sha256:<hex>`, which would corrupt bare hex; upstream's `_helpers.tpl` strips `@sha…` from the tag for the version label, verified by local render + kyverno gate at `fail: 0`). Req 5.6 image path: `e2e.yml` snapshots the base branch's values file on any values diff and the suite installs it before upgrading (`DHC_UPGRADE_VALUES_FROM`; owned charts now take `-f`, lifting the old owned-skip — TDD'd in `test/install`). Re-pinned all four charts: cert-manager 1.21.1, grafana 13.1.3, and valkey + hardened-app digests which had BOTH silently drifted behind same-tag rebuilds (found re-pinning; the exact failure mode this task closes). Chart-VERSION tracking (chart.yaml) remains hand-pinned and untracked — separate gap, noted in cert-manager/chart.yaml
+    - 2026-08-13 done (#64): two chart-pin regex managers over `chart/**` values (docker datasource, ghcr.io anonymous since go-live) — digest-keyed spelling for cert-manager ×3 + hardened-app, tag@digest for grafana + valkey, both capturing tag AND digest so same-tag rebuilds reach the chart too; cert-manager trio grouped into one PR. grafana migrated OFF the chart's bare-hex `sha:` field onto tag@digest (Renovate writes `sha256:<hex>`, which would corrupt bare hex; upstream's `_helpers.tpl` strips `@sha…` from the tag for the version label, verified by local render + kyverno gate at `fail: 0`). Req 5.6 image path: `e2e.yml` snapshots the base branch's values file on any values diff and the suite installs it before upgrading (`DHC_UPGRADE_VALUES_FROM`; owned charts now take `-f`, lifting the old owned-skip — TDD'd in `test/install`). Re-pinned all four charts: cert-manager 1.21.1, grafana 13.1.3, and valkey + hardened-app digests which had BOTH silently drifted behind same-tag rebuilds (found re-pinning; the exact failure mode this task closes). Chart-VERSION tracking (chart.yaml) remains hand-pinned and untracked at the time, a gap task 11.4 closed with the helm chart-version manager on 2026-09-07
     - _Requirements: Req 4.2, Req 5.6_
 
 - [x] 9. Production readiness, cluster A: the release path and the published set (review 2026-08-21, findings F3, F9, F6; spec amendment landed before any of these)
   - [x] 9.1 Release arm: push by digest, scan, sign, attest, then tag
     - `build.yml` main arm: `docker/build-push-action` outputs `type=image,name=<registry>/<image>,push-by-digest=true,name-canonical=true,push=true` with no `tags:` (namespace read from the policy file's `registry:`, task 14.1; review 4.11); the release-time scan runs Trivy against the pushed digest per platform manifest (`--image-src remote`, `--platform`), with the same `--vex` (compiled) and `--ignorefile` inputs the PR gate uses, factored into one script both arms call rather than a second copy of the step; `compile-vex.sh` stamps the index digest and every scanned platform digest (Req 6.29) and adds `under_investigation` statements for anything uncovered (Req 2.12); cosign sign, SBOM attest, OpenVEX attest; then `docker buildx imagetools create -t <tag>…` applies the definition-derived tags (Req 2.7 to 2.9)
     - One compiled OpenVEX document per digest, empty when nothing applies (ADR 0003): `compile-vex.sh` merges every applicable statement from every source file into one document and writes it even with zero statements (its "never write an emptied document" test flips); one `cosign attest --type openvex` per digest instead of a loop over files. Measured 2026-08-22: vexctl, Trivy (file and `--vex oci`), cosign v2.6.0/v3.1.2 and Kyverno 1.18.2 all accept the empty list, and Trivy `--vex oci` reads the first OpenVEX attestation only, which is why one document is required rather than tidy
-    - `cosign-release` pinned to an exact v2 version in `build.yml` with a Renovate manager over the pin (Req 7.5, 7.6): CI is on v2.6.0 only by the installer's default, and cosign v3's bundle layout is invisible to Kyverno 1.18.2 and Trivy 0.72.0 (measured, ADR 0003)
-    - Recursive: `cosign sign --recursive` signs the index and every platform manifest; Syft runs once per platform manifest digest and both its SPDX and its CycloneDX output are attested to that manifest (`cosign attest --type spdxjson`, `--type cyclonedx`; CycloneDX carries the apk pull checksum that Syft's SPDX output drops, measured 2026-08-22), and each platform's SPDX document is attested to the index as well, because the index is the digest a tag resolves to and the admission condition (signature, SPDX, OpenVEX; task 9.6) is checked at the reference a consumer pins, not one level down (amended 2026-09-02: the first 9.1 releases carried SPDX on platform manifests only, so no post-9.1 index satisfied the policy); the single OpenVEX document is attested to the index and to each platform manifest. Measure `cosign attest --recursive` on v2.6.0 first and fall back to one `cosign attest` per manifest digest if it does not cover the children. A consumer pinning either the index or a platform digest then verifies signature, SBOM and VEX (independent review 1.8)
+    - `cosign-release` pinned to an exact v2 version in `build.yml` through the installer action, with neither a checksum recorded here nor a Renovate manager over the pin until review D4 (2026-09-09) moved cosign into `scripts/install-tool.sh` (Req 7.5, 7.6; the claim of a manager written here at the time was wrong, register row P1 recorded the gap on 2026-09-08): CI is on v2.6.0 only by the installer's default, and cosign v3's bundle layout is invisible to Kyverno 1.18.2 and Trivy 0.72.0 (measured, ADR 0003)
+    - Recursive: `cosign sign --recursive` signs the index and every platform manifest; Syft runs once per platform manifest digest and both its SPDX and its CycloneDX output are attested to that manifest (`cosign attest --type spdxjson`, `--type cyclonedx`; CycloneDX carries the apk pull checksum that Syft's SPDX output drops, measured 2026-08-22), and each platform's SPDX document is attested to the index as well, because the index is the digest a tag resolves to and the admission condition (signature, SPDX, OpenVEX; task 9.6) is checked at the reference a consumer pins, not one level down (amended 2026-09-02: the first 9.1 releases carried SPDX on platform manifests only, so no post-9.1 index satisfied the policy); the single OpenVEX document is attested to the index and to each platform manifest. Measure `cosign attest --recursive` on v2.6.0 first and fall back to one `cosign attest` per manifest digest if it does not cover the children (as built: the per-manifest fallback shipped and the recursive measurement was never made; build.yml says so beside the step). A consumer pinning either the index or a platform digest then verifies signature, SBOM and VEX (independent review 1.8)
     - Scan reports attested: each platform manifest's release-time Trivy JSON report is converted with `trivy convert --format cosign-vuln` and attested with `cosign attest --type vuln` to that manifest, so the compiled document's `under_investigation` statements derive from a persisted, verifiable input and carry that report's timestamp (Req 2.12, 6.37); no second scan runs. The release-time scan passes `--show-suppressed` and its attested report records the scanner and database versions (Req 6.55), so the release and rescan arms attest reports of one shape. `compile-vex.sh` gains the attested reports and the previously attested OpenVEX document as inputs, the latter so statements carry forward with their original timestamps (cluster B's re-attestation rule)
     - Fail-closed release setting as a declared workflow variable, default off (Req 2.13); the job's permissions stay `contents: read`, `packages: write`, `id-token: write`: the issue link for an `under_investigation` statement arrives with the next rescan (cluster B), not from the signing job
     - The local-registry step (trivy#9399 workaround) stays PR-only; on main the RepoDigest exists because the image was pushed
@@ -268,7 +267,7 @@
   - [x] 10.3 Rescan re-attestation, replacing
     - Per tag-referenced digest from 9.3's enumeration: `trivy convert --format cosign-vuln` of each platform manifest's report, taken with `--show-suppressed` so covered findings stay visible in the attested report, with the scanner and database versions recorded in it (Req 6.42, 6.55), and `cosign attest --type vuln --replace` to that manifest; compile with the attested reports and the previously attested OpenVEX document as inputs; on difference, `cosign attest --type openvex --replace` on the digest and each platform manifest (Req 6.43). ADR 0004 measured on cosign v2.6.0 that `--replace` swaps only the same predicate type and leaves SBOM and scan-report layers alone; `cosign clean` is all-or-nothing and is not used
     - `rescan.yml` permissions: `packages: write`, `id-token: write` added beside `issues: write`; the identity joins the re-attester role in `catalogue-policy.yaml` (attests `openvex` and `vuln` only, 9.6)
-    - Invariants step gains "exactly one OpenVEX attestation per tag-referenced digest and platform manifest" (Req 6.44, 6.45); `triage/upstream/checks/trivy-vex-oci-multiple-attestations.sh` joins the daily consumer smoke test (cluster D, F7) as the regression check for the Trivy behaviour
+    - Invariants step gains "exactly one OpenVEX attestation per tag-referenced digest and platform manifest" (Req 6.44, 6.45); the regression check for the Trivy behaviour rides inside the daily consumer smoke test (cluster D, F7; `scripts/consumer-smoke.sh`'s `--vex oci` comparison), and `triage/upstream/checks/trivy-vex-oci-multiple-attestations.sh` stays the standalone reproduction, run by nobody
     - First run in this repository replaces the three OpenVEX attestations grafana's current digest carries with one (until then `--vex oci` consumers get one of three at random, ADR 0004); the successor never carries the case, and the count-repair path stays as the standing guard (Req 6.43, 6.44; Decision 9)
     - Measured first, in CI, before anything relies on them: keyless `cosign attest --replace` behaves as ADR 0004's key-based spike did, and a replaced entry remains retrievable from Rekor (both listed unmeasured there); the previously attested document and the attested reports are read only through `cosign verify-attestation` against the role identities, never through an unverified download (Req 6.58; independent review 1.9)
     - The differs test canonicalises: document `@id`, `timestamp` and `version` are ignored and statement sets are compared; when a digest carries several OpenVEX attestations, the carry-forward input is their `vexctl merge` (field-preserving, measured in ADR 0003) and the replace repairs the count in the same run (Req 6.43, 6.44; independent review 1.4)
@@ -353,12 +352,12 @@
     - `catalogue-policy.yaml` gains the consumer list (trivy authoritative, grype second; Req 9.11); one adapter contract: scan a digest with the compiled per-digest VEX, emit vulnerability, purl and suppression state normalised; measured basis: grype 0.116.0 accepts `--vex` (critique F7, 2026-08-21)
     - PR and rescan summaries gain the VEX portability block: per statement the authoritative scanner suppressed, each consumer's result, divergences named; informational, a fork flips it to gating (Req 9.12)
     - Daily consumer smoke test: the published instructions run verbatim against one published digest, failing only on a broken instruction step or a suppression missing in the authoritative consumer, remaining consumers reported into the portability block (Req 9.13; review 3.2, aligned to Decision 10's informational-first rejection)
-    - `docs/user-manual.md`'s consumer section and README's verify section gain one scan step per declared consumer, rendered from the policy file's consumer list through task 9.8's rendering so instructions and list cannot drift, on task 10.7's per-predicate-type baseline; no `vexctl merge` step, ADR 0003 retired it (review 3.3); `triage/upstream/checks/trivy-vex-oci-multiple-attestations.sh` joins as the Trivy regression check (task 10.3's hand-off)
+    - `docs/user-manual.md`'s consumer section and README's verify section gain one scan step per declared consumer, rendered from the policy file's consumer list through task 9.8's rendering so instructions and list cannot drift, on task 10.7's per-predicate-type baseline; no `vexctl merge` step, ADR 0003 retired it (review 3.3); the Trivy regression check is the smoke test's own `--vex oci` comparison (task 10.3's hand-off; the standalone reproduction under `triage/upstream/checks/` is not wired in)
     - As built 2026-09-08: `catalogue-policy.yaml consumers` (list, one authoritative, `gating: false`) read by four `triage-policy.sh` queries; `scripts/vex-consumer.sh` (trivy from a report or a scan, grype from a scan, one JSONL shape with a canonical join key), `scripts/vex-portability.sh` (agree, DIVERGENCE, absent, not measured; the gating switch), `scripts/consumer-smoke.sh` (the README recipe extracted and run verbatim, the authoritative assertion, the `--vex oci` comparison), each with its suite written first; the PR gate's block is continue-on-error, the rescan's block runs over the supported set only (review 3.7) and the smoke test picks the first supported full-release digest; the recipe gained one scan step per consumer and lost a grouping bug the smoke test found on its first run. Grype's real matching is measured by the first rescan after the merge
     - _Requirements: Req 9.11, Req 9.12, Req 9.13_
   - [x] 13.5 Manual-controls register
     - `docs/CONVENTIONS.md` register (step, class, why, fork switch): deliberate rows: tool sha256 completion, build-layer bumps reviewed by hand, VEX and exception decisions, hardened-app tag signing; deliberate rows carrying review dates: the cosign v2 pin (ADR 0003) completed the way sha256 pins are, terms sources re-verified by 2026-11-21 (F12 e; classes stay binary per Req 9.14, a review date is a column, not a class, review 3.13); every remaining human step labelled deliberate or pending automation, and the manual's runbook steps cite their register rows (Req 9.14)
-    - As built 2026-09-08: `docs/CONVENTIONS.md`, "Manual controls (Req 9.14)": twenty deliberate rows (M1 to M20) and two pending automation (P1 the cosign pin's Renovate tracking, P2 re-scoping version-scoped statements on a grafana bump), columns step, class, reason, fork switch, review by; the three F13 automations and cluster C's are listed as history; the manual's Renovate table, operator paragraphs, VEX and exception sections, the revocation runbook and SECURITY.md's governance cite their rows by id. Review dates proposed, the owner's to adjust: cosign 2026-10-22 (kyverno 1.19.0 and trivy 0.74.0 both pinned now, newer than ADR 0003's measurement), terms 2026-11-21 (F12 e), valkey compat 2026-11-24 (chart.yaml)
+    - As built 2026-09-08: `docs/CONVENTIONS.md`, "Manual controls (Req 9.14)": twenty deliberate rows (M1 to M20; M21 and M22 joined with task 14.4, P1 closed with review D4, so twenty-two and one on 2026-09-09) and two pending automation (P1 the cosign pin's Renovate tracking, P2 re-scoping version-scoped statements on a grafana bump), columns step, class, reason, fork switch, review by; the three F13 automations and cluster C's are listed as history; the manual's Renovate table, operator paragraphs, VEX and exception sections, the revocation runbook and SECURITY.md's governance cite their rows by id. Review dates proposed, the owner's to adjust: cosign 2026-10-22 (kyverno 1.19.0 and trivy 0.74.0 both pinned now, newer than ADR 0003's measurement), terms 2026-11-21 (F12 e), valkey compat 2026-11-24 (chart.yaml)
     - _Requirements: Req 9.14_
   - [x] 13.6 LOG-anchor lint, F13's mechanical link
     - `lint-accepted-risk.sh` validates each exception's `ref:` resolves to a real `triage/LOG.md` heading; `lint-vex-product.sh` or a sibling validates each source statement's log citation likewise; both directions checked, every decision has a heading (Req 9.18; F13 "mechanically linked", delivered by no earlier cluster, review 3.4); unit-tested like the other lints
@@ -402,6 +401,10 @@
     - cosign installed through `scripts/install-tool.sh` with a version and sha256 (second source: the release's keyless signature verified by hand against the Fulcio root from sigstore/root-signing), replacing the installer action in both workflows and closing register row P1; the built-in `github-actions` manager on, its bumps reviewed by a rule ordered after the github-tags automerge; the probe image pinned by digest (the curl project's multi-arch image on GHCR), pulled by digest and loaded by tag, with a regex manager; `gomod` on with `gomodTidy` for both Go modules; a fixture sweeps every `# renovate:` marker in a file some manager reads; CONVENTIONS' Req 7.5 paragraph and the manual's tables say so
     - As built (2026-09-09): findings 5.2 to 5.5, 5.9 and 5.12 of the review; the installer's suite gains cosign (a real install verified locally), the manager suite eleven checks; the marker sweep named cosign on the tree as it was
     - _Requirements: Req 7.5, Req 7.6_
+  - [x] 15.5 D5: spec amendments where the code is right
+    - requirements.md: 5.2 (published images), 5.5 and 5.8 (the chart's declared probe), 6.1 (Trivy by name, the coupling stated), 6.15 (a structural basis admitted beside reachability), 6.27 (accepted-risk suppressions), 6.37 (the issue map as a declared input); EARS validator green, 147 statements. design.md: Decision 6's bullet says three steps, the release flow gates before it attests, the rescan flow is redrawn to the built order with the D1 rule, retired numbers marked, the automerge sentence exact, the installer signature, the register count, the badges clause. tasks.md: 9.1's cosign and recursive-measurement claims corrected, 10.3 and 13.4 say where the Trivy regression check lives, 13.5's count, group 8 ticked, 8.7's chart-version line closed, retired numbers marked in requirement lists. Two mechanisms for criteria that kept their text: `scripts/lint-accounts.sh` (Req 1.4) and the inverse visibility probe (Req 2.4); `triage-policy.sh` refuses a non-Trivy authoritative consumer (Req 6.1)
+    - As built (2026-09-09): findings 1.1, 2.7, 2.8, 2.11, 5.1, 5.6, 5.8, 6.2, 6.4, 6.5, 6.9, 6.12 and design divergences 1 to 6 of the review; 6.14 and 6.22 stay maintainer-held by their subject, recorded in Decision 7
+    - _Requirements: Req 1.4, Req 2.4, Req 5.2, Req 5.5, Req 5.8, Req 6.1, Req 6.14, Req 6.15, Req 6.22, Req 6.27, Req 6.37_
 
 ## Requirements Coverage
 

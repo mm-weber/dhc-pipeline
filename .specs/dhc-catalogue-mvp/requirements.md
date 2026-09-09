@@ -25,6 +25,7 @@ Cluster C (findings F2, F10, F8, F13 ii and iii, F12 d: upstream trust) added Re
 Cluster D (findings F1, F11, F12 obligations, F7, F13 register: catalogue posture) added Req 9; the greenfield successor (F9 re-decision, 2026-08-25) is design Decision 9 and task group 12.
 A final cleanup (2026-08-25, encoding the 5.1 framing addendum) added Req 1.13 to 1.19 and Req 5.8, and amended Req 1.1, 2.1, 2.2, 2.7, 2.14, 2.21, 2.23, 3.2, 3.10, 3.11, 4.1, 5.5 and 7.7: parameterized instance values, a declared active set, and a documented builder contract, preparing the forkable base and its greenfield successor.
 A primitives pass (2026-08-26, encoding the cross-review numbered 5.x) removed or merged nineteen criteria; a same-day multi-angle code review of that pass restored two of them, 2.4 in revised form and 6.45 unchanged, and repaired four merged texts, leaving 147 criteria.
+A review-disposition pass (2026-09-09, D5 of `reviews/2026-09-09-requirements-vs-implementation-review.md`) amended 5.2, 5.5, 5.8, 6.1, 6.15, 6.27 and 6.37 to the mechanisms as built, where the code had settled a shape the sentence still lacked; no criterion was added or retired.
 
 Criterion numbers are stable identifiers: a removed number is retired, never reused, and the gaps it leaves are deliberate. Retired: 1.5, 1.8, 2.6, 2.18, 2.19, 3.6, 6.2, 6.6, 6.18, 6.21, 6.23, 6.24, 6.31, 6.36, 6.48, and group 8 whole. Rendered ordered-list numbering on a forge may drift after a gap; the source numbers govern. The successor's seed renumbers contiguously once, with a recorded mapping (task 12.1).
 
@@ -127,14 +128,14 @@ Criterion numbers are stable identifiers: a removed number is retired, never reu
 #### Acceptance Criteria
 
 1. THE Test Suite SHALL use Ginkgo v2 with Gomega and sigs.k8s.io/e2e-framework against ephemeral kind clusters.
-2. WHEN a pull request affects an image or chart THE Test Suite SHALL install each affected chart adaptation deploying an active definition's images on a kind cluster in CI.
+2. WHEN a pull request affects an image or chart THE Test Suite SHALL install each affected chart adaptation deploying an active definition's published images on a kind cluster in CI.
 3. WHEN a chart install completes THE Test Suite SHALL assert workload pods reach Ready within five minutes.
 4. WHEN pods are Ready THE Test Suite SHALL assert live pod securityContext matches restricted profile settings, including UID 65532 and read-only root filesystem.
-5. WHEN pods are Ready THE Test Suite SHALL execute each functional probe declared by an active definition that installed chart deploys, executing a probe shared by several definitions once.
+5. WHEN pods are Ready THE Test Suite SHALL execute once the functional probe its installed chart adaptation declares, that probe standing for every active definition that chart deploys.
 6. WHEN a pull request bumps a component version THE Test Suite SHALL verify an upgrade from currently pinned version to proposed version.
 7. IF any assertion fails THEN THE Test Suite SHALL fail its CI check and preserve cluster diagnostic logs as workflow artifacts.
 
-8. IF an active definition declares no functional probe THEN THE CI Pipeline SHALL fail validation naming that definition.
+8. IF an active definition is deployed by no chart adaptation declaring a functional probe THEN THE CI Pipeline SHALL fail validation naming that definition.
 
 ### Requirement 6: CVE Triage With Recorded Decisions
 
@@ -142,7 +143,7 @@ Criterion numbers are stable identifiers: a removed number is retired, never reu
 
 #### Acceptance Criteria
 
-1. WHEN a pull request builds an image THE Scan Gate SHALL scan that image with its declared authoritative consumer and SHALL fail on every uncovered finding in that scan's report.
+1. WHEN a pull request builds an image THE Scan Gate SHALL scan that image with Trivy, its declared authoritative consumer and the scanner whose ignore-file and suppressed-finding reporting it is built on, and SHALL fail on every uncovered finding in that scan's report.
 3. WHEN a rescan finds a new finding within that decision aperture in a supported digest THE Scan Pipeline SHALL open a GitHub issue containing severity, EPSS score, KEV status, and affected images.
 4. WHEN a triage decision concludes not-affected THE Triage Process SHALL record an OpenVEX statement under triage/, which THE CI Pipeline and THE Scan Pipeline attach to affected images under criteria 2.9 and 6.43.
 5. WHEN a triage decision concludes fix THE Triage Process SHALL produce a version-bump or rebuild pull request.
@@ -154,7 +155,7 @@ Criterion numbers are stable identifiers: a removed number is retired, never reu
 12. IF a Trivy ignore file exists outside triage/accepted-risk/ THEN THE CI Pipeline SHALL fail validation.
 13. WHEN a pull request builds an image THE Scan Pipeline SHALL run govulncheck in binary mode against every Go binary in that image and SHALL report, for each finding, whether the vulnerable symbol is reachable.
 14. IF govulncheck reports a vulnerable symbol as reachable in a binary THEN THE Triage Process SHALL NOT record that finding as not_affected with justification vulnerable_code_not_in_execute_path for that image.
-15. WHERE a triage decision records not_affected with justification vulnerable_code_not_in_execute_path THE Triage Process SHALL cite in triage/LOG.md a govulncheck result for that binary at symbol or package level.
+15. WHERE a triage decision records not_affected with justification vulnerable_code_not_in_execute_path THE Triage Process SHALL cite in triage/LOG.md that claim's evidence: for a reachability basis, a govulncheck result for that binary at symbol or package level; for a structural basis, its shipped entrypoint and a component that entrypoint never starts.
 16. IF govulncheck reports a finding at module level only THEN THE Triage Process SHALL treat that result as unmeasured and SHALL NOT cite it as evidence of unreachability.
 17. IF a VEX statement names a product that is not an OCI package URL for an existing image definition, or names a product identifier declaring a repository other than that image definition's published repository, THEN THE CI Pipeline SHALL fail validation.
 19. IF a VEX statement's subcomponent identifier carries a version THEN THE CI Pipeline SHALL fail validation.
@@ -162,7 +163,7 @@ Criterion numbers are stable identifiers: a removed number is retired, never reu
 22. WHEN a triage decision supersedes an earlier VEX statement THE Triage Process SHALL retain that earlier statement in its document and SHALL add a superseding statement carrying a later timestamp.
 25. IF two accepted-risk exceptions in one file record an identical vulnerability identifier AND name an identical binary path THEN THE CI Pipeline SHALL fail validation.
 26. WHEN a scan applies accepted-risk exceptions THE Scan Gate SHALL report every exception that suppressed no finding.
-27. WHEN a scan reports a suppressed finding THE Scan Gate SHALL identify which binary that finding was suppressed in.
+27. WHEN a scan applies an accepted-risk exception that suppressed a finding THE Scan Gate SHALL identify which binary that finding was suppressed in.
 28. WHEN a scan applies VEX statements THE Scan Gate SHALL apply compiled documents in place of source documents.
 29. WHEN a VEX document is compiled THE VEX Compiler SHALL set every product identifier in that document to a sha256 digest of an image being scanned, covering, for an image index, that index's digest and every scanned platform manifest digest.
 30. IF a VEX source statement's product identifier carries a version that is not a tag of an image being scanned THEN THE VEX Compiler SHALL omit that statement from compiled output.
@@ -170,7 +171,7 @@ Criterion numbers are stable identifiers: a removed number is retired, never reu
 33. WHEN a scheduled rescan applies VEX statements THE Scan Pipeline SHALL report every statement that compilation omitted.
 34. WHEN a VEX document is attested to an image THE CI Pipeline SHALL attest a document compiled for that image's digest.
 35. THE Scan Gate SHALL NOT count a VEX statement recording status under_investigation or affected as coverage of a finding.
-37. WHEN a VEX document is compiled THE VEX Compiler SHALL derive it from source statements under triage/vex/, exceptions under triage/accepted-risk/, scan reports attested to that document's digest, and any OpenVEX document previously attested to that digest, and from no other input.
+37. WHEN a VEX document is compiled THE VEX Compiler SHALL derive it from source statements under triage/vex/, exceptions under triage/accepted-risk/, scan reports attested to that document's digest, any OpenVEX document previously attested to that digest, and the open cve issue map that gives a statement its tracking link, and from no other input.
 38. WHEN a VEX document is compiled THE VEX Compiler SHALL add, for every unexpired accepted-risk exception naming a finding in that document's digest that no source statement under triage/vex/ covers, an OpenVEX statement recording status affected, whose timestamp is that finding's first-seen time, taken from a statement previously attested for it or, absent one, from that digest's attested scan report, whose action statement carries that exception's treatment, statement text, upstream issue for a transfer, binary paths and expiry date, and whose action statement timestamp is that exception's decision date.
 39. IF a VEX source statement under triage/vex/ records a status other than not_affected or fixed THEN THE CI Pipeline SHALL fail validation naming that statement.
 40. WHEN THE VEX Compiler carries a statement it wrote forward from a previously attested document THE VEX Compiler SHALL keep that statement's timestamp and SHALL set its last_updated to that compile's scan report timestamp on any change to its status or content.

@@ -428,7 +428,10 @@ definitions.
 - **Image access:** kubelet on each kind node gets a ghcr `config.json`,
   because charts pin the multi-arch *index* digest and a `kind load`-ed image
   carries a single-arch manifest digest — containerd would never match it.
-  Pods therefore pull the exact pinned digest, authenticated.
+  Pods therefore pull the exact pinned digest, authenticated. That digest is
+  the published one (Req 5.2): a definition change is exercised after its
+  release, through the chart-pin bump that follows it and runs the upgrade
+  path (Req 5.6).
 - **Assertions:** workload pods Ready within 5 minutes (Req 5.3); live pod
   securityContext matches the restricted profile — UID/GID 65532,
   RunAsNonRoot, read-only rootfs, seccomp RuntimeDefault (Req 5.4); then the
