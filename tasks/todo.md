@@ -972,3 +972,20 @@ outputs, deployed as an artifact, off by a switch (design Decision 12).
 - Owner-side after merge: enable Pages with source "GitHub Actions"; the
   first deployment happens on the next rescan (dispatch one to see it early).
   Until then the page job fails by name, which is the assertion working.
+
+## D8 follow-up: the decision beside the clock (2026-09-09)
+
+- [x] spec: Req 6.47 amended, Decision 12 note, task 15.9
+- [x] the statement's decision fields parsed and carried (tests first: parse, build, links, summaries)
+- [x] the Decision column in the issue and the page, the full statement under the row
+- [x] the workflow passes the file URL base and the statements directory (absolute)
+- [x] rendered from grafana's live attested document; docs; gates; PR
+
+### Review
+
+- Only the attested document is read: the column says what the signed
+  statement says. The compiler is untouched; the LOG anchor and the "why
+  not avoid" note stay in the exception file for a later decision.
+- The first rehearsal missed the "statement" link: `go -C` runs the tool from
+  its module directory, so a relative statements path found nothing. Passed
+  absolute, with the case in the task note.

@@ -11,6 +11,7 @@
 //	  --support '{"supported_set": "...", "superseded": "..."}' \
 //	  [--kev f] [--previous metrics.json | --previous-body issue.md] [--today YYYY-MM-DD] [--run url] \
 //	  [--definitions definitions.tsv --admission verify-catalogue.json --expiries accepted-risk.txt --out-html index.html] \
+//	  [--source-url <server>/<owner>/<repo>/blob/<ref> --statements triage/vex] \
 //	  --out-json metrics.json --out-body issue.md
 //
 // --support is the support statement as scripts/triage-policy.sh prints it
@@ -19,7 +20,11 @@
 // 15.8): --definitions lists the definitions (the status step derives it
 // through definition-lib.sh), --admission adds the verification policy's
 // verdict per digest to the data and the page, --expiries the exception
-// lint's lapsing entries to the page.
+// lint's lapsing entries to the page. Each finding's decision as attested
+// (Req 6.47 as amended; task 15.9) rides in the data as `attested`, read
+// from the statement its clock came from; --source-url turns the files a
+// statement's notes name into links, --statements marks the hand-written
+// statements on disk so their source is linked too.
 // --enumeration is the rescan's enumeration.tsv (repository, tag, digest,
 // platform, manifest, supported|superseded); only supported rows count.
 // --reattest is the re-attest work directory: <name>__<12 hex>/out/*.openvex.json
@@ -34,6 +39,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -61,6 +67,8 @@ func main() {
 	admissionFile := flag.String("admission", "", "scripts/verify-catalogue.sh's record; the verdict per digest joins the data and the page (optional)")
 	expiriesFile := flag.String("expiries", "", "scripts/lint-accepted-risk.sh's report as the expiries step keeps it; lapsing exceptions join the page (optional)")
 	outHTML := flag.String("out-html", "", "where to write the catalogue page, index.html (optional; Req 6.61)")
+	sourceURL := flag.String("source-url", "", "the base the repository's files are served under (<server>/<owner>/<repo>/blob/<ref>); with it, the files a statement's notes name become links (optional; task 15.9)")
+	statementsDir := flag.String("statements", "", "the hand-written statements directory (triage/vex): a <CVE>.openvex.json there is linked as the decision's source (optional; task 15.9)")
 	outJSON := flag.String("out-json", "", "where to write metrics.json (required)")
 	outBody := flag.String("out-body", "", "where to write the issue body (required)")
 	flag.Parse()
@@ -104,11 +112,22 @@ func main() {
 
 	in := rescan.StatusInputs{
 		Run:        *runURL,
+		SourceURL:  *sourceURL,
 		Aperture:   strings.Split(*apertureFlag, ","),
 		Ceilings:   ceilings,
 		KEVCeiling: *kevCeiling,
 		KEV:        map[string]bool{},
 		Digests:    digests,
+	}
+	if *statementsDir != "" {
+		files, err := filepath.Glob(filepath.Join(*statementsDir, "*.openvex.json"))
+		if err != nil {
+			fatal("statements: " + err.Error())
+		}
+		in.HandStatements = map[string]bool{}
+		for _, f := range files {
+			in.HandStatements[strings.TrimSuffix(filepath.Base(f), ".openvex.json")] = true
+		}
 	}
 	if *kevFile != "" {
 		data, err := os.ReadFile(*kevFile)
