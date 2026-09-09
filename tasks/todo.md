@@ -751,3 +751,30 @@ reads, four silent-success shapes, holes in the pin surface, nine criteria
 whose text lags the code, documentation describing an earlier catalogue,
 and declared values nothing reads. Each disposition is one PR the owner
 picks or declines.
+
+## D1: the rescan's assertions run regardless of earlier steps (2026-09-09)
+
+Branch: `d1-rescan-always`. Review disposition D1 (theme 1 of the
+2026-09-09 review; task 15.1). Goal: no daily assertion or the status issue
+is suspended by an unrelated earlier failure.
+
+- [x] 1. Spec first: design Decision 6's as-built correction (three assertion steps, the
+      always() rule); task group 15 with 15.1 ticked
+- [x] 2. Tests first: scripts/lint-rescan-steps_test.sh (six cases); the lint names each
+      step after the scan without always(); it named 20 on the real workflow before the edit
+- [x] 3. rescan.yml: ids on every producer, `if: always() && steps.<producer>.outcome ==
+      'success'` on every step after the scan, refusals by name on missing inputs, the four
+      invariants independent, the header comment true; validate runs the lint and its suite
+- [x] 4. Rehearsal: an evaluator over the workflow's own conditions for five scenarios; the
+      manual and register M18 describe the new behaviour; validate chain, actionlint,
+      shellcheck; em-dash sweep
+
+**Review (2026-09-09).** Actions cannot run here, so the rehearsal is an
+evaluator over the file's conditions with GitHub's step semantics: an
+authenticity mismatch skips nothing; a re-attestation failure withholds only
+the status chain; a KEV outage withholds the tiers, the issue set and the
+status by name; an enumeration failure skips everything data-dependent and
+still runs the authenticity check, the expiries and the governance half of
+the posture step. The live proof is the next rescan. yamllint's warning
+count rose with the new long error lines (warnings, the file's style); no
+new actionlint class.

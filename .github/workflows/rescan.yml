@@ -10,10 +10,19 @@ name: rescan
 # mirroring the PR gate.
 #
 # The join/dedup/templating is the tested triage/rescan Go tool; this workflow is
-# the I/O around it. GitHub Actions is the authoritative environment (Req 8.1):
-# the Trivy/Grype DBs, the EPSS API, and the CISA feed are reachable here but not
-# from the devcontainer. Scan/feed failures soft-fail (skip + warn) so a transient
-# outage never turns the cron permanently red.
+# the I/O around it. GitHub Actions is the authoritative environment (an
+# operating convention; Req 8 retired 2026-08-26): the Trivy/Grype DBs, the
+# EPSS API, and the CISA feed are reachable here but not from the
+# devcontainer. Failure modes, stated: a manifest whose scan fails is
+# skipped, warned and counted (the enumeration already hard-failed if the
+# world was unreadable); a KEV feed outage is a non-evaluation that fails
+# the run by name (Req 6.60); and every step after the scan runs regardless
+# of what failed above it, under `if: always()` with the outcome of the step
+# that produces its input, refusing by name when that input is missing, so
+# one failure never suspends the day's other assertions or the status issue
+# (review disposition D1, 2026-09-09; scripts/lint-rescan-steps.sh holds
+# the rule). A red run therefore names every promise not kept that day, not
+# only the first.
 
 on:
   schedule:
@@ -84,6 +93,7 @@ jobs:
       # enumeration IS the daily promise, and a partial one that looks
       # complete would silently shrink what the catalogue watches.
       - name: enumerate the catalogue (Req 2.22)
+        id: enumerate
         run: |
           set -euo pipefail
           mkdir -p "$OUT"
@@ -177,6 +187,8 @@ jobs:
       # documents and the dedup the filer relies on both see the closes and
       # reopens of the same run, and nothing is filed twice (Req 6.57).
       - name: issue lifecycle, the evidence (Req 6.52 to 6.57)
+        id: lifecycle_evidence
+        if: always() && steps.scan.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -195,6 +207,7 @@ jobs:
 
       - name: issue lifecycle, decided on evidence (tested)
         id: lifecycle
+        if: always() && steps.lifecycle_evidence.outcome == 'success'
         run: |
           set -euo pipefail
           go -C triage/rescan run ./cmd/rescan-lifecycle \
@@ -208,6 +221,7 @@ jobs:
 
       - name: issue lifecycle, applied (Req 6.52, 6.53, 6.56, 6.57)
         id: lifecycle_apply
+        if: always() && steps.lifecycle.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -265,6 +279,8 @@ jobs:
       # reads the same issues again for its own purpose; both read the marker
       # `<!-- rescan-cve: <ID> -->`, never the title.
       - name: open cve issues (finding -> issue)
+        id: issues_map
+        if: always() && steps.scan.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -285,10 +301,15 @@ jobs:
       # the keyless measurement ADR 0004 left open.
       - name: attest today's reports, re-attest OpenVEX on change (Req 6.42, 6.43)
         id: reattest
+        if: always() && steps.issues_map.outcome == 'success'
         env:
           REATTEST_ISSUES: ${{ github.workspace }}/rescan-out/issues.json
         run: |
           set -uo pipefail
+          for f in "$OUT/enumeration.tsv" "$OUT/issues.json"; do
+            [ -s "$f" ] || { echo "::error::reattest: ${f} is missing; today's reports were not attested and no document re-attested (Req 6.42, 6.43)"; exit 1; }
+          done
+          [ -d "$OUT/trivy" ] || { echo "::error::reattest: ${OUT}/trivy is missing; the scan step produced no reports to attest (Req 6.42)"; exit 1; }
           scripts/reattest.sh . "$OUT/enumeration.tsv" "$OUT"
           rc=$?
           echo "reattested=$(jq -s '[.[] | select(.reattested == true)] | length' "$OUT/reattest.jsonl")" >> "$GITHUB_OUTPUT"
@@ -303,37 +324,47 @@ jobs:
       # and the revocation checks with cluster D. It runs after the scans
       # because the tiers read the day's reports. Each assertion reports by
       # name and ANY failure fails the run — an invariant that soft-fails is
-      # an opinion.
+      # an opinion. The four run independently (D1): one that does not hold
+      # never keeps the next from being checked; the step fails once, at the
+      # end, naming each.
       - name: invariants (Req 2.21, 2.24, 6.44, 6.51)
+        id: invariants
+        if: always() && steps.scan.outcome == 'success'
         run: |
-          set -euo pipefail
-          scripts/check-visibility.sh . "$OUT/enumeration.tsv"
+          set -uo pipefail
+          [ -s "$OUT/enumeration.tsv" ] || { echo "::error::invariants: ${OUT}/enumeration.tsv is missing; nothing was asserted today (Req 2.21, 2.24, 6.44, 6.51)"; exit 1; }
+          rc=0
+          scripts/check-visibility.sh . "$OUT/enumeration.tsv" || rc=1
           # Req 2.24: the rendered admission policy, applied by the kyverno
           # CLI against the live registry, must admit every tag-referenced
           # digest and reject the declared unsigned control. The proof lives
           # here rather than in kyverno test fixtures because the set it
           # must admit changes daily (task 9.6).
-          scripts/verify-catalogue.sh . "$OUT/enumeration.tsv" "$OUT/verify-catalogue.json"
+          scripts/verify-catalogue.sh . "$OUT/enumeration.tsv" "$OUT/verify-catalogue.json" || rc=1
           # Req 6.51, 6.60: every unexpired exception re-evaluated against
           # today's severity and KEV status. The feed is fetched here, once,
           # and an outage is a NON-EVALUATION that fails the run (fail closed,
-          # the owner's call); the issue enrichment below reuses the file.
+          # the owner's call); the issue enrichment and the status below
+          # refuse by name when the file is absent.
           feed=$(scripts/triage-policy.sh . kev-feed)
-          if ! curl -fsSL --max-time 60 "$feed" -o "$OUT/kev.json"; then
+          if curl -fsSL --max-time 60 "$feed" -o "$OUT/kev.json"; then
+            scripts/check-exceptions.sh rescan . "$OUT/trivy" "$OUT/kev.json" || rc=1
+          else
+            rm -f "$OUT/kev.json"
             echo "::error::the CISA KEV feed (${feed}) is unavailable: the exception tiers were not evaluated today, which is a failure of this run, not a pass (Req 6.60)"
-            exit 1
+            rc=1
           fi
-          scripts/check-exceptions.sh rescan . "$OUT/trivy" "$OUT/kev.json"
           # Req 6.44, 6.45 (ADR 0004): exactly one OpenVEX attestation on every
           # tag-referenced digest and platform manifest, read from the .att
           # manifests the way a consumer reads them, after today's replaces.
-          scripts/check-attestation-count.sh "$OUT/enumeration.tsv" "$OUT/attestation-count.json"
+          scripts/check-attestation-count.sh "$OUT/enumeration.tsv" "$OUT/attestation-count.json" || rc=1
           # Req 9.5 (task 13.3): the revocation record, read once here into the
           # JSON the status step lists; its verdict (no catalogue tag on a
           # revoked digest, Req 9.7) is asserted by the posture step at the
           # end, so a half-executed revocation fails the run after the day's
           # issues and status are published, not instead of them.
           scripts/check-revocations.sh triage/revocations.yaml "$OUT/enumeration.tsv" "$OUT/revocations.json" || true
+          exit "$rc"
 
       # Task 11.3 (Req 3.10, 4.9): every definition's declared authenticity
       # signal re-verified against its origin, daily. A mismatch (a tag that
@@ -343,6 +374,7 @@ jobs:
       # human decides. Lapsed compat review-by dates are reported here too.
       - name: authenticity signals (Req 3.10, 4.9)
         id: authenticity
+        if: always() # reads the definitions and their origins, nothing from this run
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -384,6 +416,7 @@ jobs:
       # scope, like issues and clocks (review 3.7).
       - name: VEX portability over the supported set (Req 9.12)
         id: portability
+        if: always() && steps.scan.outcome == 'success'
         continue-on-error: true
         run: |
           set -uo pipefail
@@ -430,8 +463,10 @@ jobs:
       # full-release tag in the enumeration, so it rotates as releases do.
       - name: consumer smoke test (Req 9.13)
         id: smoke
+        if: always() && steps.enumerate.outcome == 'success'
         run: |
           set -uo pipefail
+          [ -s "$OUT/enumeration.tsv" ] || { echo "::error::consumer smoke: ${OUT}/enumeration.tsv is missing; the recipe was not run today (Req 9.13)"; exit 1; }
           mkdir -p "$OUT/smoke"
           ref=$(awk -F'\t' '$6 == "supported" && $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+/ {print $1"@"$3; exit}' "$OUT/enumeration.tsv")
           [ -n "$ref" ] || { echo "::error::consumer smoke: no supported full-release digest in today's enumeration to run the recipe against (Req 9.13)"; exit 1; }
@@ -454,6 +489,8 @@ jobs:
       # Reuses the linter rather than recomputing dates: one implementation of
       # "expired" and "expiring", so the notice and the gate can never disagree.
       - name: accepted-risk expiries (Req 6.10)
+        id: expiries
+        if: always() # reads the exception files, nothing from this run
         run: |
           set -uo pipefail
           # Explicit rather than transitive: unlike validate.yml this workflow
@@ -479,13 +516,16 @@ jobs:
           printf '%s\n' "$expiring"
 
       - name: enrich — EPSS + CISA KEV
+        id: enrich
+        if: always() && steps.scan.outcome == 'success'
         run: |
           set -euo pipefail
           mapfile -t cves < <(grep -E '^CVE-' "$OUT/cves.txt" 2>/dev/null || true)
           # The CISA KEV catalogue was fetched by the invariants step above,
-          # fail-closed (Req 6.60); a missing file here means that step did
-          # not run, which is itself a failure.
-          [ -s "$OUT/kev.json" ] || { echo "::error::no KEV catalogue on disk; the invariants step must run first"; exit 1; }
+          # fail-closed (Req 6.60); a missing file here means the feed was
+          # not fetched today, so no issue set and no status are built on a
+          # KEV status nobody evaluated.
+          [ -s "$OUT/kev.json" ] || { echo "::error::enrich: no KEV catalogue on disk (the invariants step reports why); today's issue set and status are not built (Req 6.60)"; exit 1; }
           # EPSS bulk lookup, comma-separated CVEs (best-effort). MVP catalogue CVE
           # counts sit well under the API's per-request limit; batch if that changes.
           if [ "${#cves[@]}" -gt 0 ]; then
@@ -497,6 +537,8 @@ jobs:
           fi
 
       - name: dedup — already-open CVE issues
+        id: dedup
+        if: always() && steps.enrich.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -515,8 +557,12 @@ jobs:
 
       - name: build issue set (tested reporter)
         id: report
+        if: always() && steps.dedup.outcome == 'success'
         run: |
           set -euo pipefail
+          for f in "$OUT/epss.json" "$OUT/kev.json" "$OUT/existing.json"; do
+            [ -s "$f" ] || { echo "::error::build issue set: ${f} is missing; no issue set today (Req 6.3)"; exit 1; }
+          done
           go -C triage/rescan run ./cmd/rescan-report \
             --aperture "$(scripts/triage-policy.sh . aperture)" \
             --trivy "$OUT/trivy" --epss "$OUT/epss.json" --kev "$OUT/kev.json" --existing "$OUT/existing.json" \
@@ -526,7 +572,8 @@ jobs:
           echo "new CVE issues to file: ${n}"
 
       - name: Grype second opinion on CRITICAL (Req 6.6)
-        if: steps.report.outputs.count != '0'
+        id: grype
+        if: always() && steps.report.outcome == 'success' && steps.report.outputs.count != '0'
         run: |
           set -uo pipefail
           # Corroborate each CRITICAL we're about to file, on its affected images.
@@ -539,7 +586,8 @@ jobs:
               done
 
       - name: file new-CVE issues (Req 6.3)
-        if: steps.report.outputs.count != '0'
+        id: file_issues
+        if: always() && steps.report.outcome == 'success' && steps.report.outputs.count != '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -571,6 +619,7 @@ jobs:
       # tested rescan Go package; these steps are its I/O.
       - name: catalogue status, the previously published data (Req 6.46)
         id: status_previous
+        if: always() && steps.reattest.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -591,8 +640,16 @@ jobs:
 
       - name: catalogue status, the clocks over the supported set (Req 6.46)
         id: status
+        if: always() && steps.status_previous.outcome == 'success'
         run: |
           set -euo pipefail
+          # The clocks read today's attested documents, today's reports, the
+          # KEV catalogue and the revocation record; each missing input is
+          # named, and the status is not published on a guess.
+          for f in "$OUT/enumeration.tsv" "$OUT/kev.json" "$OUT/revocations.json" "$OUT/status/previous.md"; do
+            [ -e "$f" ] || { echo "::error::catalogue status: ${f} is missing (the step that produces it reports why); no status published today (Req 6.46, 6.47)"; exit 1; }
+          done
+          [ -d "$OUT/reattest" ] || { echo "::error::catalogue status: ${OUT}/reattest is missing; the clocks need today's documents (Req 6.46)"; exit 1; }
           aperture=$(scripts/triage-policy.sh . aperture)
           ceilings=""
           for sev in ${aperture//,/ }; do
@@ -611,6 +668,7 @@ jobs:
 
       - name: catalogue status, published to the status issue (Req 6.47)
         id: status_publish
+        if: always() && steps.status.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NUMBER: ${{ steps.status_previous.outputs.number }}
@@ -627,6 +685,8 @@ jobs:
           echo "status issue: ${url}"
 
       - name: upload the status data (Req 6.47)
+        id: status_upload
+        if: always() && steps.status.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: catalogue-status
@@ -640,15 +700,23 @@ jobs:
       # (bypass_actors is outside the compared set, anonymous reads withhold
       # it: the export carries it and SECURITY.md states it). And no catalogue
       # tag may still reference a digest the revocation record names. Each
-      # failure fails the run by name. The step runs last so a posture failure
-      # never starves the day's scans, issues and status of their run; the
-      # summary still prints.
+      # failure fails the run by name. The step runs last and, like every
+      # step after the scan, regardless of what failed above it (D1): the
+      # governance half needs nothing from this run, the revocation half
+      # needs the enumeration and refuses by name without it.
       - name: posture invariants (Req 9.3, 9.7, 9.9)
         id: governance
+        if: always()
         run: |
           set -uo pipefail
           scripts/check-governance.sh .github/rulesets "$GITHUB_REPOSITORY" "$OUT/governance.json"; rc=$?
-          scripts/check-revocations.sh triage/revocations.yaml "$OUT/enumeration.tsv" "$OUT/revocations.json" || rc=1
+          if [ -s "$OUT/enumeration.tsv" ]; then
+            scripts/check-revocations.sh triage/revocations.yaml "$OUT/enumeration.tsv" "$OUT/revocations.json" || rc=1
+          else
+            echo "::error::posture: ${OUT}/enumeration.tsv is missing; whether a catalogue tag references a revoked digest was not asserted today (Req 9.7)"
+            echo '{"revocations":[],"referenced":[]}' > "$OUT/revocations.json"
+            rc=1
+          fi
           {
             echo "revoked=$(jq '.revocations | length' "$OUT/revocations.json")"
             echo "revoked_referenced=$(jq '.referenced | length' "$OUT/revocations.json")"
