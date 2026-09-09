@@ -381,6 +381,9 @@ The heart of the PR path. For each affected definition (matrix), the job:
    Go binary found in the exported image filesystem — *evidence, not a second
    gate* (`continue-on-error`); see
    [Reachability evidence](#reachability-evidence-govulncheck) (Req 6.13).
+   A tool that did not install or produced no output for a binary fails the
+   step by name (the build goes on, the red step stays), so "no Go binaries
+   found" is never said about an image nobody looked at (review D3).
 7. **Grype second opinion** whenever a CRITICAL survives — different DB,
    different matcher, informational. (Its criterion, Req 6.6, was retired on
    2026-08-26 in favour of the declared consumers, Req 9.11 to 9.13, under
@@ -466,9 +469,14 @@ design (Req 2.7 to 2.13; "look first, sign what you looked at, label last"):
    gate uses (compiled VEX + accepted-risk file). No report for any manifest
    means nothing is signed and nothing is tagged (Req 2.26).
 4. **Fail-closed switch** (`catalogue-policy.yaml` `release.fail_closed`):
-   when on, an uncovered finding stops here, unsigned and untagged (Req 2.13).
-   Off by default: the finding becomes an `under_investigation` statement and
-   the release completes (Req 2.12).
+   when on, an uncovered finding stops here, unsigned and untagged (Req 2.13),
+   naming each finding per platform manifest in the annotation and the
+   summary, the way the PR gate does. Off by default: the finding becomes an
+   `under_investigation` statement and the release completes (Req 2.12). The
+   switch, the publish policy, the platforms and the cron are read through
+   `scripts/release-policy.sh`, which refuses a misspelt value (`yes`,
+   `True`, `on_change`) instead of taking the fail-open branch on it; validate
+   runs the same check (review D3).
 5. **Attest each manifest's scan report** (`trivy convert --format
    cosign-vuln`, `cosign attest --type vuln`).
 6. **Compile the OpenVEX document a second time**, folding in what the scan

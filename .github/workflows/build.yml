@@ -204,10 +204,13 @@ jobs:
           f="image/${NAME}/image.yaml"
           # Declared values live in one committed place (Req 7.7, task 9.8): the
           # registry namespace every release criterion binds through, and the
-          # fail-closed switch Req 2.13 reads.
+          # release switches Req 2.13 and 2.17 read. The switches come through
+          # their one reader (review D3): a misspelt value (yes, True,
+          # on_change) is a refusal there, where it used to take the fail-open
+          # branch as a raw string.
           registry=$(yq '.verification.registry' catalogue-policy.yaml | tr -d '"')
-          fail_closed=$(yq '.release.fail_closed' catalogue-policy.yaml | tr -d '"')
-          publish_policy=$(yq '.release.publish_policy' catalogue-policy.yaml | tr -d '"')
+          fail_closed=$(scripts/release-policy.sh . fail-closed)
+          publish_policy=$(scripts/release-policy.sh . publish-policy)
           # tr strips quotes so this works under either yq (mikefarah on the
           # runner emits raw scalars; python-yq would quote them).
           img=$(yq '.image' "$f" | tr -d '"')
@@ -227,7 +230,7 @@ jobs:
           # policy file ADMITS platforms (Req 7.7), so a declared platform the
           # policy does not admit is refused here by name, rather than
           # becoming a published platform nothing agreed to stand behind.
-          admitted=$(yq '.release.platforms[]' catalogue-policy.yaml | tr -d '"')
+          admitted=$(scripts/release-policy.sh . platforms)
           platforms=""
           while read -r p; do
             [ -n "$p" ] || continue
@@ -754,7 +757,16 @@ jobs:
           set -uo pipefail
           ref=$(printf '%s\n' "$TAGS" | head -n1)
           go version
-          go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
+          # Silence reads as failure (review D3): a tool that did not install
+          # or did not run fails this step by name, so the summary can never
+          # say "no Go binaries" about an image nobody looked at. The step
+          # stays non-gating (continue-on-error above): the build goes on,
+          # the red step and its annotation stay.
+          if ! go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"; then
+            echo "::error::govulncheck ${GOVULNCHECK_VERSION} did not install; no reachability evidence was produced for ${ref} (Req 6.13)"
+            { echo "### govulncheck — ${ref}"; echo; echo "_govulncheck did not install; no reachability evidence today (Req 6.13)._"; } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
           PATH="$(go env GOPATH)/bin:$PATH"; export PATH
 
           # Export the image filesystem rather than guessing paths: which Go
@@ -768,17 +780,21 @@ jobs:
 
           # -size +1M skips the shell utilities and keeps this to plausible Go
           # binaries; `go version -m` is the actual test, and it fails fast on
-          # anything that is not one.
-          args=()
+          # anything that is not one (no execute-bit filter: the bit is not
+          # what makes a file a Go binary, review D3).
+          args=(); candidates=0; broken=()
           while IFS= read -r f; do
             go version -m "$f" >/dev/null 2>&1 || continue
+            candidates=$((candidates + 1))
             rel=${f#rootfs/}
             out="gv/$(printf '%s' "$rel" | tr '/' '_').json"
             # govulncheck exits non-zero when it FINDS something, so its exit
-            # status is not an error signal here.
-            govulncheck -mode=binary -format json "$f" > "$out" 2>/dev/null || true
-            if [ -s "$out" ]; then args+=("${rel}=${out}"); fi
-          done < <(find rootfs -type f -perm -u+x -size +1M 2>/dev/null)
+            # status is not an error signal here; an EMPTY output is, since the
+            # JSON stream always carries at least the config and progress
+            # messages for a binary it could read.
+            govulncheck -mode=binary -format json "$f" > "$out" 2>"$out.err" || true
+            if [ -s "$out" ]; then args+=("${rel}=${out}"); else broken+=("${rel}: $(tr -d '\n' < "$out.err" | cut -c1-160)"); fi
+          done < <(find rootfs -type f -size +1M 2>/dev/null)
 
           # Drop the export before anything else runs. A repackage image is
           # ~1.1 GB and this doubles it on disk; the first run left 94 MB free
@@ -791,8 +807,15 @@ jobs:
           {
             echo "### govulncheck — ${ref}"
             echo
-            if [ "${#args[@]}" -eq 0 ]; then
-              echo "_no Go binaries found in this image._"
+            if [ "${#broken[@]}" -gt 0 ]; then
+              echo "_govulncheck produced no output for ${#broken[@]} Go binary(ies); that is the tool not running, not absence of findings:_"
+              printf -- '- %s\n' "${broken[@]}"
+              echo
+            fi
+            if [ "${candidates}" -eq 0 ]; then
+              echo "_no Go binaries found in this image (no file over 1 MiB that \`go version -m\` reads)._"
+            elif [ "${#args[@]}" -eq 0 ]; then
+              echo "_${candidates} Go binary(ies) found, none measured._"
             else
               scripts/govulncheck-report.sh "${args[@]}"
               echo
@@ -801,6 +824,10 @@ jobs:
               echo "> \`not measured\` is silence, not absence — a stripped binary looks the same."
             fi
           } | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "${#broken[@]}" -gt 0 ]; then
+            echo "::error::govulncheck produced no output for ${#broken[@]} Go binary(ies) in ${ref}; the reachability evidence for them was not produced (Req 6.13): ${broken[*]}"
+            exit 1
+          fi
 
       - name: Grype second opinion (CRITICAL present)
         if: github.event_name == 'pull_request' && steps.trivy.outputs.crit != '0'
@@ -952,8 +979,28 @@ jobs:
           NAME: ${{ matrix.name }}
           UNCOVERED: ${{ steps.relscan.outputs.uncovered }}
           DIGEST: ${{ steps.build.outputs.digest }}
+          MANIFESTS: ${{ steps.manifests.outputs.digests }}
         run: |
-          echo "::error::${NAME}: ${UNCOVERED} uncovered finding(s) in the release-time scan of ${DIGEST} and the declared fail-closed setting is enabled, so this digest is signed by nothing, attested by nothing and carries no tag (Req 2.13). It stays frozen and pullable by digest; the ways out are the same four the gate offers."
+          set -uo pipefail
+          # The findings are NAMED, per platform manifest, the way the PR gate
+          # names them (review D3): a count with no name forces archaeology on
+          # whoever has to decide, and the release reports are not uploaded.
+          {
+            echo "### Fail-closed release gate: ${NAME} (${DIGEST})"
+            echo
+            echo "| Platform manifest | Finding | Severity | Package | Fixed |"
+            echo "|---|---|---|---|---|"
+            while IFS= read -r m; do
+              [ -n "$m" ] || continue
+              jq -r --arg m "${m:0:19}…" '.Results[]?.Vulnerabilities[]?
+                | "| `\($m)` | \(.VulnerabilityID) | \(.Severity) | \(.PkgName)@\(.InstalledVersion) | \(.FixedVersion // "none") |"' \
+                "trivy-${m#sha256:}.json" 2>/dev/null || echo "| \`${m:0:19}…\` | report unreadable | | | |"
+            done < <(printf '%s\n' "$MANIFESTS")
+          } >> "$GITHUB_STEP_SUMMARY"
+          found=$(jq -rs '[.[] | .Results[]?.Vulnerabilities[]?
+                           | "\(.VulnerabilityID) (\(.Severity) \(.PkgName)@\(.InstalledVersion), fixed: \(.FixedVersion // "none"))"]
+                          | unique | join("; ")' trivy-*.json 2>/dev/null || echo "reports unreadable")
+          echo "::error::${NAME}: ${UNCOVERED} uncovered finding(s) in the release-time scan of ${DIGEST}: ${found}. The declared fail-closed setting is enabled, so this digest is signed by nothing, attested by nothing and carries no tag (Req 2.13). It stays frozen and pullable by digest; the ways out are the same four the gate offers."
           exit 1
 
       # Req 2.9 + 6.37: the scan report becomes a verifiable input rather than a

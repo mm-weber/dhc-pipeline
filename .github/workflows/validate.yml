@@ -71,6 +71,12 @@ jobs:
       - name: workflow schedule + permissions vs policy file (Req 7.10)
         run: scripts/lint-workflow-policy.sh
 
+      # Review D3: the release switches are well-formed, or the run refuses
+      # naming the key. build.yml reads them through the same reader, so a
+      # value this step accepts is the value the release branches on.
+      - name: release switches well-formed (Req 2.13, 2.14, 2.17, 7.7)
+        run: scripts/release-policy.sh . check
+
       # Review disposition D1 (2026-09-09): every step of the rescan after
       # the scan runs regardless of earlier failures (`if: always()` with
       # its producer's outcome), so no daily assertion or the status issue
@@ -214,6 +220,9 @@ jobs:
 
       - name: rescan step-condition lint unit tests (D1)
         run: scripts/lint-rescan-steps_test.sh
+
+      - name: release-policy reader unit tests (D3)
+        run: scripts/release-policy_test.sh
       - name: lint-compat unit tests (Req 4.8)
         run: scripts/lint-compat_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)

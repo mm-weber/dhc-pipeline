@@ -394,6 +394,10 @@
     - The publish-on-change comparator reads the published CycloneDX SBOM through `cosign verify-attestation` against the issuer and the roles the policy file admits for cyclonedx, the read `fetch-sboms.sh` already makes; no admitted identity is a refusal, a non-admitted signer is `attestation-unreadable` and publishes. The issue lifecycle applies its closes and reopens after re-attestation and withholds them, by the digests' names, on a day any digest's reports failed to attest (Req 6.52 to 6.54, 6.57 read literally). `rescan-status` receives `--vex-reports`, the fence the lifecycle tool has
     - As built (2026-09-09): findings 2.2, 6.11 and 6.15 of the review; three new comparator test cases (a non-admitted identity, no admitted role, the verified invocation); design Decisions 6 and 7 carry the as-built corrections; the compiler's issue map lags closes and reopens by one day, stated in the workflow
     - _Requirements: Req 2.15, Req 2.23, Req 6.46, Req 6.52, Req 6.53, Req 6.54, Req 6.57, Req 6.58_
+  - [x] 15.3 D3: silence reads as failure
+    - `scripts/release-policy.sh`, the one reader of the `release` section, accepts exactly the tokens the criteria name and refuses the rest; build.yml's meta step and check-visibility.sh read through it, validate runs its `check`. The fail-closed release gate names each uncovered finding per platform manifest. The govulncheck step fails by name when the tool did not install or produced no output for a binary, non-gating as before. `lint-workflow-policy.sh` fails a declared schedule absent from its workflow and reads `.yaml` too
+    - As built (2026-09-09): findings 6.1, 2.1, 2.10, 2.13 and 5.13 of the review; the reader's suite (22 cases), two new lint cases; the meta step, the gate and the govulncheck step rehearsed locally with stubs (a misspelt switch refuses with exit 2; the gate names findings per manifest; install failure and empty output fail by name)
+    - _Requirements: Req 2.13, Req 2.14, Req 2.17, Req 6.13, Req 7.7, Req 7.10_
 
 ## Requirements Coverage
 

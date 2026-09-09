@@ -803,3 +803,25 @@ the compiler's open-issue map, is written where it happens. The withholding
 expression was rehearsed on a fixture record; the comparator's new read is
 tested against a stub that behaves like Fulcio verification; Go was not
 touched.
+
+## D3: silence reads as failure (2026-09-09)
+
+Branch: `d3-silence-fails`. Review disposition D3 (theme 3; task 15.3).
+Goal: nothing happening never reads as all clear.
+
+- [x] 1. Tests first: release-policy_test.sh (22 cases: exact tokens, YAML 1.1 spellings
+      refused, missing keys, platforms, cron, check); two lint-workflow-policy cases
+- [x] 2. scripts/release-policy.sh, the one reader of the release section; build.yml's meta
+      step and check-visibility.sh read through it; validate runs `check`
+- [x] 3. build.yml: the fail-closed gate names findings per manifest; the govulncheck step
+      fails by name on a failed install or empty output, execute-bit filter dropped
+- [x] 4. lint-workflow-policy.sh: a declared cron absent from its workflow fails; .yaml read
+- [x] 5. Rehearsals with stubs (meta step, gate, govulncheck's three branches); design
+      Decision 6 as-built; task 15.3; manual; validate chain; actionlint identical to main
+
+**Review (2026-09-09).** The boolean switches are checked against the
+file's own text rather than a parsed value, because the two YAML readers in
+play disagree on `yes`; that is the whole point of the refusal. The
+govulncheck step stays non-gating: the build continues, the step is red and
+annotated, and the summary can no longer say "no Go binaries" about an
+image the tool never read. The canary build on this PR runs the step live.

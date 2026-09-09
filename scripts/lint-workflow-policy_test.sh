@@ -4,8 +4,10 @@
 # permissions block (workflow default and explicit per-job) must equal what
 # catalogue-policy.yaml's `workflows:` section declares, each mismatch failing
 # by name. GitHub reads workflow YAML literally, so the lint is what binds the
-# literal values to the declared ones. A declared schedule not yet wired into
-# its workflow passes (forward-only; task 9.2 wires build.yml's cron).
+# literal values to the declared ones. A declared schedule absent from its
+# workflow fails too (review D3, 2026-09-09: deleting build.yml's cron used
+# to pass with a notice, and Req 2.14 would have stopped silently), and both
+# workflow spellings, .yml and .yaml, are read.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 LINT="$HERE/lint-workflow-policy.sh"
@@ -72,6 +74,8 @@ EOF
 name: wired-later
 on:
   pull_request:
+  schedule:
+    - cron: "47 4 * * *"
 permissions:
   contents: read
 jobs:
@@ -81,10 +85,35 @@ jobs:
 EOF
 }
 
-# 1: everything matching (including a declared-but-unwired schedule) passes
+# 1: everything matching passes
 fresh
 out=$("$LINT" "$SB" 2>&1); rc=$?
 [ "$rc" -eq 0 ] && pass "matching tree passes" || fail "matching tree passes" "exit=$rc" "$out"
+
+# 1b (D3): a declared schedule absent from its workflow fails naming both.
+#     Deleting the cron from build.yml used to pass with a notice.
+fresh
+python3 - "$SB/.github/workflows/wired-later.yml" <<'PY'
+import sys
+p = sys.argv[1]; s = open(p).read().replace('  schedule:\n    - cron: "47 4 * * *"\n', '')
+open(p, "w").write(s)
+PY
+out=$("$LINT" "$SB" 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "wired-later.yml" <<<"$out" && grep -qF "47 4 * * *" <<<"$out"; then
+  pass "a declared schedule absent from its workflow fails naming both"
+else
+  fail "a declared schedule absent from its workflow fails naming both" "exit=$rc" "$out"
+fi
+
+# 1c (D3): a workflow spelled .yaml is read too; undeclared, it fails by name
+fresh
+cp "$SB/.github/workflows/plain.yml" "$SB/.github/workflows/extra.yaml"
+out=$("$LINT" "$SB" 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "extra.yaml" <<<"$out"; then
+  pass "a .yaml workflow is read and an undeclared one fails by name"
+else
+  fail "a .yaml workflow is read and an undeclared one fails by name" "exit=$rc" "$out"
+fi
 
 # 2: cron drift fails naming the workflow and both values
 fresh

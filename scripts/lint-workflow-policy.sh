@@ -5,10 +5,12 @@
 # workflow YAML, so this lint is what binds the literals to the one committed
 # home of declared values (Req 7.7); each mismatch fails by name.
 #
-# Direction is deliberate: a schedule declared but not yet wired into its
-# workflow passes with a notice (task 9.2 wires build.yml's cron), while a
-# cron or permissions block present in a workflow must match its declaration
-# exactly, and every workflow file must be declared.
+# Both directions, since review D3 (2026-09-09): a cron or permissions block
+# present in a workflow must match its declaration exactly, every workflow
+# file (.yml or .yaml) must be declared, and a schedule declared for a
+# workflow that carries none fails too. That last case passed with a notice
+# while task 9.2 was wiring build.yml's cron; once wired, its absence is the
+# drift that silently stops a daily promise (Req 2.14, 2.22).
 #
 # YAML via python3 + PyYAML (the lint-accepted-risk.sh precedent; installed by
 # validate.yml's yamllint step, present in the devcontainer).
@@ -33,7 +35,7 @@ def err(wf, msg):
     print(f"::error file=.github/workflows/{wf}::lint-workflow-policy: {wf}: {msg} (Req 7.10)")
     failures += 1
 
-for path in sorted(glob.glob(os.path.join(root, ".github", "workflows", "*.yml"))):
+for path in sorted(glob.glob(os.path.join(root, ".github", "workflows", "*.yml")) + glob.glob(os.path.join(root, ".github", "workflows", "*.yaml"))):
     wf = os.path.basename(path)
     # GitHub refuses to run a workflow whose YAML does not parse, and says so
     # only on the run page: no job starts, so a required check simply never
@@ -59,7 +61,10 @@ for path in sorted(glob.glob(os.path.join(root, ".github", "workflows", "*.yml")
     elif len(crons) > 1:
         err(wf, f"carries {len(crons)} schedule triggers; one declared value covers one")
     elif not crons and want_cron:
-        print(f"lint-workflow-policy: {wf}: declared schedule '{want_cron}' not yet wired into the workflow (allowed; wire it to close the loop)")
+        # Review D3 (2026-09-09): a declared schedule the workflow lacks is
+        # drift in the direction that silently stops a daily promise
+        # (Req 2.14, 2.22); it used to pass with a notice.
+        err(wf, f"declares schedule '{want_cron}' in catalogue-policy.yaml but the workflow carries no schedule trigger")
 
     def diff_perms(where, actual, wanted):
         actual = actual or {}
