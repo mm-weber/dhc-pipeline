@@ -47,7 +47,9 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
 ## Pinning (Req 1.2, 1.3, 1.6)
 
 - Every base image reference carries `@sha256:<digest>`. No exceptions.
-- Every upstream source is `git+https://...#<ref>` plus a `checksum:` line.
+- Every compile-from-source upstream is `git+https://...#<ref>` plus a
+  `checksum:` line; a repackaged tarball pins its per-architecture sha256 in
+  `vars:` and verifies it in the build (the Definitions section below).
 - Every definition declares, beside its source url, how its upstream's
   authenticity is established: `# authenticity: signed-tag` (an annotated tag
   GitHub verifies: cert-manager), `signed-commit` (a lightweight tag on a
@@ -117,9 +119,10 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
   source) is digest- or checksum-pinned and moves through the merge path.
   Three mechanisms make the float safe rather than blind:
   - **The resolved set is recorded per digest.** Each platform manifest's
-    resolved package set, with apk pull checksums, is in the SPDX and
-    CycloneDX SBOMs attested to that manifest (and each platform's SPDX to
-    the index, which is what a tag resolves to), so "what exactly is in
+    resolved package set is in the SPDX and CycloneDX SBOMs attested to that
+    manifest (and each platform's SPDX to the index, which is what a tag
+    resolves to); the apk pull checksums are in the CycloneDX one, which
+    Syft's SPDX output drops (measured 2026-08-22), so "what exactly is in
     this digest" is a signed answer, not a rebuild.
   - **The pushed digest is scanned before it is tagged.** The release arm
     scans every platform manifest of the digest it just pushed, by that
@@ -135,8 +138,9 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
 ## Definitions (Req 1.7, 7.2, ADR 0001)
 
 Definitions are native DHI syntax, built by the real `dhi.io/build` frontend.
-One file per component at `image/<name>/image.yaml`. Rules, all enforced by
-`scripts/lint-pins.sh` in CI:
+One file per component at `image/<name>/image.yaml`. Rules, each with the
+gate that holds it (`scripts/lint-pins.sh` in validate unless another is
+named; a rule naming none is a convention held at review):
 
 - Line 1 is the frontend pin, **digest-pinned** — one step stricter than the
   upstream catalog (the frontend is the compiler AND the actions stdlib; its
@@ -164,8 +168,12 @@ One file per component at `image/<name>/image.yaml`. Rules, all enforced by
   archetype.
 - Version state lives in `vars:` with the catalog's names (`VERSION`,
   `SEMVER_*`, `COMMIT_SHA`) — that block is the Renovate bump surface.
-- Runtime `accounts:` declare `nonroot` 65532 with `run-as` (Req 1.4).
-- Alpine variants only for now; the deb path is unverified (ADR 0001).
+- Runtime `accounts:` declare `nonroot` 65532 with `run-as` (Req 1.4;
+  `scripts/lint-accounts.sh`).
+- Alpine variants only for now; the deb path is unverified (ADR 0001). A
+  convention, not a lint: `lint-pins.sh` accepts a `dhi.io/deb/<distro>/main`
+  repository by shape (Req 1.12), so the first deb definition is a review
+  decision, not a red check.
 - The linter is the fast gate; the **frontend itself is the authoritative
   validator** — it compiles every definition on each PR build (Req 7.2, which
   absorbed the retired Req 1.5 on 2026-08-26).
@@ -238,10 +246,10 @@ tool pins, workflow and CI dependency pins) carry one manager each:
 | Archetype | Source shape | Datasource | postUpgradeTask |
 |---|---|---|---|
 | compile-from-source | `url: git+https://…#vX.Y.Z` | `github-tags` | `refresh-definition.sh` |
-| tarball-repackage | `url: https://<vendor>/…-X.Y.Z.linux-…` | `github-releases` | `refresh-grafana.sh` |
+| tarball-repackage | `url: https://dl.grafana.com/grafana/release/<version>/…_linux_${target.arch}.tar.gz` (the per-build artifact; the legacy `/oss/release/` alias is not read) | `github-releases` | `refresh-grafana.sh` |
 | build layer | `syntax=` / `uses:` / `GOLANG_REFERENCE:` | `docker` | none (reviewed by hand) |
 | upstream chart version | `upstream:` block in `chart/<name>/chart.yaml` | `helm` (the chart repository) | none (never automerged; a bump runs the e2e upgrade path, Req 3.11) |
-| chart image pins | tag@digest or digest values in `chart/<name>/config/values-hardened.yaml` | `docker` (ghcr.io) | none (digest-only bumps automerge, Req 3.12) |
+| chart image pins | tag@digest or digest values in `chart/<name>/config/values-hardened.yaml` (an owned chart's in its `values.yaml`) | `docker` (ghcr.io) | none (digest-only bumps automerge, Req 3.12) |
 
 - **The download host and the version datasource are separate concerns.** A
   vendor that ships prebuilt tarballs off its own CDN can still be tracked

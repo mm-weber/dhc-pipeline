@@ -4,19 +4,20 @@
 # Verify that EVERY per-arch pinned checksum in a definition matches the bytes
 # upstream actually serves at the pinned url.
 #
-# Why this exists, and why it is not the build's job. The build already verifies
-# the checksum — but only for the arch it is building, and nothing builds arm64
-# any more (build.yml `platforms:`, Req 2.1). So an arm64 pin can enter the repo
-# and pass every check without a single machine fetching the bytes it names.
-# That already happened once while arm64 was still built: grafana 13.1.1 had
-# both arch pins supplied by hand via REFRESH_GRAFANA_SHA256_* and no machine
-# ever fetched the arm64 tarball they claimed to describe. Back then a release
-# build would eventually have caught it; now nothing would.
+# Why this exists, and why it is not the build's job. The build verifies the
+# checksum only for the arch it is building, and the PR gate builds amd64
+# only (build.yml: `load:` needs a single platform). So an arm64 pin can enter
+# the repository and pass every pre-merge check without a single machine
+# fetching the bytes it names, and first be tested by the release build after
+# merge, which builds every declared platform (Req 2.1; arm64 restored by task
+# 9.3 on 2026-09-02 after a month withdrawn). That happened once: grafana
+# 13.1.1 had both arch pins supplied by hand via REFRESH_GRAFANA_SHA256_* and
+# no machine had fetched the arm64 tarball they claimed to describe.
 #
-# This is therefore the only thing keeping the arm64 pins honest, which is what
-# makes restoring the platform (task 8.3) a build-matrix change rather than a
-# re-pinning exercise. Definitions still declare arm64 in `platforms:` and still
-# carry per-arch pins; the release path just publishes one of them.
+# This is therefore what keeps the arm64 pins honest before merge: every
+# per-arch pin is fetched and checked against the bytes upstream serves, at PR
+# time, and the daily authenticity re-check does the same for the tarball's
+# two origins (check-authenticity.sh, Req 3.10).
 #
 # A pin nobody exercised is not a pin. This closes that gap without qemu and
 # without building an image, so it costs one download per arch.

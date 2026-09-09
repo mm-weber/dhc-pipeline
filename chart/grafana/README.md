@@ -1,6 +1,7 @@
 # grafana (hardened adaptation)
 
-Upstream chart `grafana` **10.5.15** from https://grafana.github.io/helm-charts,
+Upstream chart `grafana` from https://grafana.github.io/helm-charts, at the version
+[`chart.yaml`](chart.yaml) pins (Renovate moves it, so it is not quoted here),
 consumed unmodified (Req 4.1). All deltas live in
 [`config/values-hardened.yaml`](config/values-hardened.yaml) and are applied
 with `-f`; no upstream template is edited, forked, or patched.
@@ -9,12 +10,15 @@ Render / install:
 
 ```bash
 helm template dhc-grafana grafana \
-  --repo https://grafana.github.io/helm-charts --version 10.5.15 \
+  --repo https://grafana.github.io/helm-charts \
+  --version "$(yq '.upstream.version' chart/grafana/chart.yaml)" \
   -f chart/grafana/config/values-hardened.yaml
 ```
 
-**Version note:** the grafana Helm chart lags the app. The newest chart (10.5.15)
-ships appVersion `12.3.1`, and no chart targets grafana 13.x. We pin the latest
+(`scripts/render-chart.sh chart/grafana` is the same command, the way CI runs it.)
+
+**Version note:** the grafana Helm chart lags the app. The newest chart (10.5.15
+when this was written, 2026-08) shipped appVersion `12.3.1`, and no chart targets grafana 13.x. We pin the latest
 chart for its templates and override the image to our hardened grafana **13.x**
 build (the exact pin lives in `config/values-hardened.yaml`, kept current by
 Renovate's chart-pin manager). Grafana's `grafana.ini` and `grafana server` CLI
@@ -32,7 +36,7 @@ agreement of independent origins, not a signature.
 
 | Change | Why | Requirement |
 |---|---|---|
-| `image` → digest-pinned `ghcr.io/mm-weber/dhc/grafana:13.1.3-alpine3.23@sha256:…` (registry/repository/tag; the digest rides on `tag`) | Deploy the hardened catalogue build, not upstream `docker.io/grafana/grafana`; digest-pinned. The chart's bare-hex `sha:` field is deliberately unused: Renovate's chart-pin manager (task 8.7) writes digests as `sha256:<hex>`, and the chart strips a trailing `@sha…` from the tag for its version label (`_helpers.tpl`), so the tag carries the digest the same way valkey's does | Req 4.2 |
+| `image` → the digest-pinned catalogue tag `config/values-hardened.yaml` carries (registry/repository/tag; the digest rides on `tag`; Renovate moves it) | Deploy the hardened catalogue build, not upstream `docker.io/grafana/grafana`; digest-pinned. The chart's bare-hex `sha:` field is deliberately unused: Renovate's chart-pin manager (task 8.7) writes digests as `sha256:<hex>`, and the chart strips a trailing `@sha…` from the tag for its version label (`_helpers.tpl`), so the tag carries the digest the same way valkey's does | Req 4.2 |
 | `securityContext.runAsUser/runAsGroup/fsGroup: 65532` | The chart defaults to grafana's UID **472**; our runtime image runs as 65532 | Req 4.3 |
 | `containerSecurityContext.readOnlyRootFilesystem: true` | The chart omits it; the rest (drop-ALL caps, `allowPrivilegeEscalation: false`, seccomp RuntimeDefault) are chart defaults and merge in | Req 4.3 |
 | `initChownData.enabled: false` | It chowns the data dir via a **busybox shell** init container; with an emptyDir data volume + `fsGroup`, the kubelet sets ownership, so it's unnecessary — and our images ship no shell (see compat note) | Req 4.5, Req 4.6 |

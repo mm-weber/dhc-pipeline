@@ -2,8 +2,9 @@ name: renovate
 
 # Self-hosted Renovate (Req 3.1): opens/updates upstream bump PRs on a ≤6h
 # cadence — every 4h, giving margin against GitHub's scheduler delay. Also
-# runnable on demand with dry-run + log-level knobs for iteration (Req 3.6
-# bootstrap / task 4.3 proving the loop).
+# runnable on demand with dry-run + log-level knobs for iteration (the
+# bootstrap of task 4.3, whose criterion Req 3.6 was retired 2026-08-26
+# once the loop had been proven).
 #
 # OPERATOR secrets:
 #   RENOVATE_TOKEN  — a PAT Renovate acts as. Needs contents + pull-requests

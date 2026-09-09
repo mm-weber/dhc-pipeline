@@ -1,13 +1,15 @@
 name: rescan
 
 # Daily CVE rescan of the PUBLISHED images under the declared registry
-# namespace (catalogue-policy.yaml verification.registry; Req 6.2).
+# namespace (catalogue-policy.yaml verification.registry; Req 2.22, which
+# absorbed the retired Req 6.2).
 # Trivy re-scans each catalogue image for HIGH/CRITICAL honouring our OpenVEX
 # statements in triage/vex/. Findings that are new — not already tracked by an
 # open `cve` issue — are enriched with EPSS (FIRST.org) and CISA KEV status and
 # filed as one GitHub issue per CVE, listing severity, EPSS, KEV, and affected
-# images (Req 6.3). A CRITICAL also gets a Grype second opinion (Req 6.6),
-# mirroring the PR gate.
+# images (Req 6.3). A CRITICAL also gets a Grype second opinion, mirroring
+# the PR gate (a convention; Req 6.6 retired for the declared consumers,
+# Req 9.11 to 9.13).
 #
 # The join/dedup/templating is the tested triage/rescan Go tool; this workflow is
 # the I/O around it. GitHub Actions is the authoritative environment (an
@@ -592,7 +594,7 @@ jobs:
           echo "count=${n}" >> "$GITHUB_OUTPUT"
           echo "new CVE issues to file: ${n}"
 
-      - name: Grype second opinion on CRITICAL (Req 6.6)
+      - name: Grype second opinion on CRITICAL (convention; Req 9.11 to 9.13)
         id: grype
         if: always() && steps.report.outcome == 'success' && steps.report.outputs.count != '0'
         run: |

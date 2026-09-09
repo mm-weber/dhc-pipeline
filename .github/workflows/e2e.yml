@@ -1,6 +1,6 @@
 name: e2e
 
-# Phase-6 integration suite (Req 5.2, Req 8.1). For each chart-backed component
+# Phase-6 integration suite (Req 5.2). For each chart-backed component
 # a PR touches, provision an ephemeral kind cluster whose pods pull the
 # component's digest-pinned ghcr.io/mm-weber/dhc images straight from the
 # registry (pulled, not kind-loaded — the credentials step below says why),
@@ -11,7 +11,7 @@ name: e2e
 # upgrade path instead (Req 5.6). Diagnostics
 # are uploaded on failure (Req 5.7). GitHub Actions is the authoritative
 # environment for this — chart repos and Docker Hub are unreachable from the
-# devcontainer (Req 8.1).
+# devcontainer (an operating convention; Req 8 retired 2026-08-26).
 
 on:
   pull_request:

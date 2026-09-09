@@ -104,7 +104,8 @@ daemon:
    summary lists them under **separate headings** — a suppression whose reason is
    "we decided to live with it" must never read as "it does not apply".
 2. **Grype** runs as an independent **second opinion** — different DB and matcher
-   — whenever a `CRITICAL` remains (Req 6.6).
+   — whenever a `CRITICAL` remains (a convention; its criterion, Req 6.6, was
+   retired 2026-08-26 for the declared consumers, Req 9.11 to 9.13).
 3. The gate **fails the PR** if any `HIGH` or `CRITICAL` survives suppression
    (Req 6.1). Trivy and Grype reports are attached as workflow artifacts, and the
    counts are written to the job summary.
@@ -123,7 +124,7 @@ Four ways, in order of strength — the gate's error message names all four:
 Reaching for the last one before ruling out the first two is the failure mode
 this lane is designed to make visible, which is what `blocked:` is for.
 
-## The daily rescan (Req 6.2, 6.3, 6.42 to 6.57)
+## The daily rescan (Req 2.22, 6.3, 6.42 to 6.57)
 
 The scan gate only sees a CVE at PR time; new advisories land against already-
 published images every day. `.github/workflows/rescan.yml` runs on a daily cron
@@ -158,7 +159,7 @@ published images every day. `.github/workflows/rescan.yml` runs on a daily cron
    with **EPSS** (FIRST.org) and **CISA KEV** status and filed one **issue per
    CVE** (Req 6.3; `cmd/rescan-report`), carrying a `<!-- rescan-cve: CVE-… -->`
    marker, the durable identity the lifecycle reads back. A **Grype** second
-   opinion runs on each CRITICAL being filed (Req 6.6).
+   opinion runs on each CRITICAL being filed (a convention, Req 9.11 to 9.13).
 5. **The clocks.** For every finding on a supported digest, first seen and
    decided from the attested statements and fixed as the first day absent from
    every supported digest of its repository, carried forward from the
@@ -278,9 +279,9 @@ vexctl create \
   when building it. No version means the claim holds for every build of that
   image. A digest belongs in compiler output and never in source: nobody can
   review it, and it goes stale at the next rebuild of the same release.
-- **`fixed` must carry one** (Req 6.21), because a remedy is always about
+- **`fixed` must carry one** (Req 6.20), because a remedy is always about
   particular versions.
-- **Versionless is an argument, not a default** (Req 6.31). It claims every
+- **Versionless is an argument, not a default** (Req 6.20). It claims every
   build of the image, including releases nobody has examined, so `status_notes`
   has to say why the claim survives a version change, marked with the literal
   token `version-independent:`. Which scope is right depends on the kind of

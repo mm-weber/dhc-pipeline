@@ -13,7 +13,8 @@ deploys:
 # /api/health answers 2xx, so the server is up and its database is reachable.
 probe: http-health
 
-# NOTE: the grafana Helm chart lags the app — the newest chart (10.5.15) ships
+# NOTE: the grafana Helm chart lags the app — the newest chart (10.5.15 when
+# this was written, 2026-08) ships
 # appVersion 12.3.1, and no chart targets grafana 13.x. We pin the latest chart
 # for its templates and override the image to our hardened grafana 13.x build
 # (image.registry/repository/tag in config/values-hardened.yaml, kept current
@@ -23,5 +24,5 @@ probe: http-health
 
 # Render (chart CI gate, task 5.5) and install (e2e, phase 6):
 #   helm template dhc-grafana grafana \
-#     --repo https://grafana.github.io/helm-charts --version 10.5.15 \
+#     --repo https://grafana.github.io/helm-charts --version <the version above> \
 #     -f chart/grafana/config/values-hardened.yaml

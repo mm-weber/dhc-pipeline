@@ -267,27 +267,27 @@ fresh
   > "$SB/triage/accepted-risk/grafana.yaml"
 run_case "bad entry among good ones is caught" 1 "CVE-2026-99999"
 
-# --- Req 6.24: an exception names the binaries it covers --------------------
+# --- Req 6.7, 6.11 (formerly 6.24): an exception names the binaries it covers -
 
 # 22: without paths, an entry keyed on id + purls matches its package in EVERY
 #     binary of the image, so deciding one binary silently decides the rest
 fresh
 { echo "vulnerabilities:"; valid_body "$OK_DATE" | grep -v "^    paths:"; } \
   > "$SB/triage/accepted-risk/grafana.yaml"
-run_case "missing 'paths' fails" 1 "Req 6.24"
+run_case "missing 'paths' fails" 1 "Req 6.7, 6.11"
 
 # 23: an empty list names no binary, so it scopes nothing
 fresh
 { echo "vulnerabilities:"; valid_body "$OK_DATE" | sed 's|^    paths: .*|    paths: []|'; } \
   > "$SB/triage/accepted-risk/grafana.yaml"
-run_case "empty 'paths' fails" 1 "Req 6.24"
+run_case "empty 'paths' fails" 1 "Req 6.7, 6.11"
 
 # 24: a paths value that is not a list cannot scope anything either
 fresh
 { echo "vulnerabilities:"; valid_body "$OK_DATE" \
     | sed 's|^    paths: .*|    paths: "usr/share/grafana/bin/grafana"|'; } \
   > "$SB/triage/accepted-risk/grafana.yaml"
-run_case "scalar 'paths' fails" 1 "Req 6.24"
+run_case "scalar 'paths' fails" 1 "Req 6.7, 6.11"
 
 # --- Req 6.25: two entries for one CVE may not claim the same binary --------
 

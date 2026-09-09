@@ -13,8 +13,9 @@ properties: it answers a **question** (not builds a feature); it's
 **timeboxed** (the answer has a price cap); its output is **knowledge, not
 code** (the code is disposable — ours lives in gitignored `temp/`, the
 knowledge in ADR 0001); it runs **before the risky decision**, on the riskiest
-assumption. Encode both outcomes as requirements up front (Req 1.7/1.8's
-WHERE/IF pair) and a spike cannot fail — either result is a decision.
+assumption. Encode both outcomes as requirements up front (Req 1.7 and the
+since-retired 1.8 were that WHERE/IF pair; ADR 0001 records the outcome) and
+a spike cannot fail — either result is a decision.
 
 ## BuildKit: frontends, LLB, and the content-addressed DAG
 

@@ -7,7 +7,8 @@
 > (see `.specs/dhc-catalogue-mvp/tasks.md`, task 12). When that happens this
 > repository is archived intact, history and all, and the catalogue it
 > publishes under `ghcr.io/mm-weber/dhc` is archived with it: existing
-> digests stay pullable and verifiable, but no new digests, tags, scans or
+> digests stay pullable, and verifiable where they were signed (the legacy
+> stratum SECURITY.md describes is signed at the index only), but no new digests, tags, scans or
 > statements will follow here. Do not build anything on this catalogue that
 > expects continuity; wait for the successor.
 
@@ -37,15 +38,20 @@ to describe where the substrate comes from.
 | `chart/` | Upstream charts pinned + hardened via overrides only; one owned chart |
 | `test/` | Ginkgo/kind e2e: readiness, live securityContext, functional probes, upgrades |
 | `triage/` | OpenVEX source, accepted-risk exceptions, decision log, upstream investigations |
-| `policies/` | Kyverno gate: digest pins, allowed registry, non-root |
+| `policies/` | Kyverno: the chart gate (digest pins, allowed registry, non-root) and the admission policy the daily proof applies (signature, SBOM and OpenVEX from the declared identities); two of the four are rendered from the policy file |
 | `scripts/` | Tested glue: pin lints, VEX compiler, scanner installs |
 | `.specs/` | EARS requirements, design, task ledger (the honest one — open gaps included) |
 | `docs/` | [User manual](docs/user-manual.md), conventions, ADRs, operating-loop evidence |
 
 ## Verify an image
 
-Every image published to `ghcr.io/mm-weber/dhc` is signed (cosign keyless via
-GitHub OIDC) and carries an SPDX SBOM, OpenVEX, and BuildKit provenance:
+Every digest a catalogue tag references carries a cosign keyless signature
+(GitHub OIDC), an SPDX SBOM and an OpenVEX document, and the daily admission
+proof holds it to that (Req 2.24); digests released since 2026-09-01 carry
+them on every platform manifest too, with BuildKit provenance. One digest
+under a catalogue repository is deliberately unsigned, the must-reject
+control the proof tests itself against, and the legacy stratum SECURITY.md
+describes is signed at the index only:
 
 <!-- render-verification:begin -->
 ```sh

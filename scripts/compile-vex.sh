@@ -421,7 +421,7 @@ for path in scan_reports:
                 continue
             if key in affected:
                 # The same package at the same version in another binary, under
-                # its own entry (one entry per binary, Req 6.23): one statement
+                # its own entry (one entry per binary, Req 6.7): one statement
                 # per finding and package, carrying every decision made about it.
                 have = affected[key]["action_statement"]
                 more = action_statement(entry)
