@@ -285,6 +285,16 @@ tool pins, workflow and CI dependency pins) carry one manager each:
   the workload writes there (Req 4.4).
 - Every deviation from upstream defaults appears in `chart/<name>/README.md`
   as: *what changed → why → requirement or upstream issue link* (Req 4.7).
+- **Every chart declares what it deploys and how it is proved.**
+  `chart/<c>/chart.yaml` names the definition directories the chart deploys
+  (`deploys:`, the e2e matrix and the tracking scope read it, task 14.2) and
+  the functional probe the e2e suite runs once its pods are Ready (`probe:`,
+  a registration name in `test/e2e`'s `probes` map, task 14.3). One probe
+  per chart, executed once per install for every definition it deploys
+  (Req 5.5). validate fails an active definition whose chart names no probe
+  (Req 5.8); a Go unit test holds declared names and registrations equal
+  both ways. There is no placeholder: a chart with nothing to prove declares
+  no probe, and its definitions stay inactive.
 
 ## Policy gate (Req 4.6)
 

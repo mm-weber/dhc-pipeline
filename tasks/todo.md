@@ -664,3 +664,39 @@ deploys list on the valkey chart names both valkey definitions on purpose;
 14.3's probe lint will lean on that. Every validate step in CI's order,
 kyverno, actionlint (findings identical to main's), shellcheck pass; no em
 dashes in added lines.
+
+## Task 14.3: probes declared per definition (2026-09-09)
+
+Branch: `task-14.3-probes`. Goal: each chart declares the functional probe
+the e2e suite runs when its pods are Ready (`probe:` in chart.yaml), the
+suite resolves it through a registry keyed by probe name, and validate
+fails an active definition no chart-with-a-probe deploys (Req 5.5, 5.8),
+never forcing a placeholder.
+
+- [x] 1. Tests first: lint-probes_test.sh (covered, uncovered active definition named,
+      inactive uncovered passes, a chart without a probe, a malformed set); Go: ParseDeclaration
+      cases in install_test.go, TestProbeDeclarations (every declared probe registered,
+      every registration declared) in the e2e package
+- [x] 2. `probe:` in all four chart.yaml files (certificate-issuance, http-health, http-200,
+      set-get); schema `probe: str(required=False)`
+- [x] 3. Go: install.ParseDeclaration (deploys + probe); e2e registry `probes` keyed by
+      name, probeFor(component) from the declaration; componentSpecs lose the hardcoded
+      Probe; assertHealthy resolves it; validate's go test step adds ./e2e/
+- [x] 4. scripts/lint-probes.sh (Req 5.8) in validate; every-suite check
+- [x] 5. Docs (manual e2e assertions, add-a-definition step, Adapt a chart), CONVENTIONS
+      chart section; design as-built; tasks tick; gofmt, shellcheck, actionlint, em-dash sweep;
+      Go compiles in CI (proxy unreachable locally today)
+
+**Review (2026-09-09).** The registry ended up keyed by probe name, not by
+component, because that is what lets a YAML-only lint answer Req 5.8 and a
+Go unit test bind the names to registrations both ways; the component side
+of the mapping is the `deploys:` plus `probe:` pair in chart.yaml. Nine lint
+cases red before the script and green after; the lint on the real tree
+named all seven definitions until the four declarations landed, then
+reported four registrations covering seven. Go could not compile here today
+(the proxy's address left the firewall snapshot and sigs.k8s.io is not
+reachable for a direct fetch), so the Go changes are gofmt-checked and
+reviewed line by line, with CI's go job and the four-component e2e run as
+the verdict. Every validate step in CI's order passes locally; the local
+runner now sets the push-shape env so the active-set step stops reading as
+a failure.

@@ -97,6 +97,12 @@ jobs:
       - name: tracking scope rendering drift check (Req 1.14)
         run: scripts/render-tracking.sh --check
 
+      # Req 5.8 (task 14.3): every active definition is deployed by a chart
+      # that declares a functional probe; the Go side (TestProbeDeclarations,
+      # below) holds the declared names to the suite's registry.
+      - name: every active definition declares a functional probe (Req 5.8)
+        run: scripts/lint-probes.sh
+
       - name: definition-lib unit tests (directory vs published name)
         run: scripts/definition-lib_test.sh
 
@@ -194,6 +200,9 @@ jobs:
 
       - name: tracking-scope rendering unit tests (Req 1.14)
         run: scripts/render-tracking_test.sh
+
+      - name: probe lint unit tests (Req 5.8)
+        run: scripts/lint-probes_test.sh
       - name: lint-compat unit tests (Req 4.8)
         run: scripts/lint-compat_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)
@@ -257,9 +266,13 @@ jobs:
         working-directory: test
         run: go build ./...
 
+      # ./e2e/ runs cluster-free here (DHC_E2E unset: the Ginkgo specs skip)
+      # for its plain unit test, TestProbeDeclarations (task 14.3, Req 5.5,
+      # 5.8): every probe a chart declares is registered, every registration
+      # is declared. The YAML half of that contract is lint-probes.sh above.
       - name: helper unit tests
         working-directory: test
-        run: go test ./harness/... ./checks/... ./install/...
+        run: go test ./harness/... ./checks/... ./install/... ./e2e/...
 
       # The CVE rescan reporter (task 7.2) is its own stdlib-only module: a pure,
       # unit-tested tool that the daily rescan.yml drives to open issues

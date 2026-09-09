@@ -45,6 +45,39 @@ func TestParsePin(t *testing.T) {
 	})
 }
 
+// TestParseDeclaration reads the deploys list and the probe name a chart.yaml
+// declares (tasks 14.2, 14.3): both present, a probe absent (empty, not an
+// error), a deploys list absent (an error, every chart names its definitions),
+// and an upstream pin beside them changing nothing.
+func TestParseDeclaration(t *testing.T) {
+	t.Run("deploys and probe", func(t *testing.T) {
+		data := []byte("upstream:\n  name: valkey\n  repository: https://x\n  version: 0.12.0\ndeploys:\n  - valkey-compat\n  - valkey\nprobe: set-get\n")
+		got, err := ParseDeclaration(data)
+		if err != nil {
+			t.Fatalf("ParseDeclaration returned error: %v", err)
+		}
+		if got.Probe != "set-get" || len(got.Deploys) != 2 || got.Deploys[0] != "valkey-compat" || got.Deploys[1] != "valkey" {
+			t.Errorf("ParseDeclaration = %+v, want deploys [valkey-compat valkey] and probe set-get", got)
+		}
+	})
+
+	t.Run("no probe is the empty string, not an error", func(t *testing.T) {
+		got, err := ParseDeclaration([]byte("deploys: [app]\n"))
+		if err != nil {
+			t.Fatalf("ParseDeclaration returned error: %v", err)
+		}
+		if got.Probe != "" || len(got.Deploys) != 1 {
+			t.Errorf("ParseDeclaration = %+v, want deploys [app] and no probe", got)
+		}
+	})
+
+	t.Run("no deploys list is an error", func(t *testing.T) {
+		if _, err := ParseDeclaration([]byte("probe: http-200\n")); err == nil {
+			t.Error("ParseDeclaration(no deploys) returned nil error, want error")
+		}
+	})
+}
+
 // TestArgs exercises the helm argv builder (Req 5.6): owned charts install from
 // a local directory, adapted charts from --repo/--version with a hardened values
 // overlay, upgrades take a version override, only install creates the namespace,

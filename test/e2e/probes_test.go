@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -17,10 +18,51 @@ import (
 
 	"github.com/mm-weber/dhc-pipeline/test/checks"
 	"github.com/mm-weber/dhc-pipeline/test/harness"
+	"github.com/mm-weber/dhc-pipeline/test/install"
 )
 
 // probeFunc runs a component's functional probe against the live cluster (Req 5.5).
 type probeFunc func(ctx context.Context, r *resources.Resources, c harness.Component) error
+
+// probes is the registry of functional probes, keyed by the registration name
+// a chart declares as `probe:` in chart/<c>/chart.yaml (task 14.3). A chart
+// deploys one or more definitions (`deploys:`) and declares one probe, so a
+// registration shared by several definitions executes once per install
+// (Req 5.5): the three cert-manager images are proved by one Certificate
+// issuance, the valkey pair by one SET and GET. The four reference
+// registrations are today's probes; a fork adds a line here and names it in
+// its chart. TestProbeDeclarations holds the two sides equal both ways, and
+// scripts/lint-probes.sh fails validate for an active definition whose chart
+// names no probe (Req 5.8). There is no no-op registration on purpose.
+var probes = map[string]probeFunc{
+	"certificate-issuance": probeCertManager,
+	"http-health":          httpProbe("/api/health"),
+	"http-200":             httpProbe("/healthz"),
+	"set-get":              probeValkey,
+}
+
+// probeFor resolves the probe a component's chart declares, by name, through
+// the registry. A chart naming no probe or an unregistered one is an error
+// naming the chart file, never a silently skipped probe.
+func probeFor(c harness.Component) (probeFunc, error) {
+	rel := filepath.Join(c.ChartDir, "chart.yaml")
+	b, err := os.ReadFile(filepath.Join(repoRoot(), rel))
+	if err != nil {
+		return nil, err
+	}
+	d, err := install.ParseDeclaration(b)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", rel, err)
+	}
+	if d.Probe == "" {
+		return nil, fmt.Errorf("%s declares no functional probe (probe:), and no active definition goes without one (Req 5.5, 5.8)", rel)
+	}
+	p, ok := probes[d.Probe]
+	if !ok {
+		return nil, fmt.Errorf("%s declares probe %q, which test/e2e registers no probe under (Req 5.5)", rel, d.Probe)
+	}
+	return p, nil
+}
 
 func ptr[T any](v T) *T { return &v }
 

@@ -421,10 +421,17 @@ definitions.
 - **Assertions:** workload pods Ready within 5 minutes (Req 5.3); live pod
   securityContext matches the restricted profile — UID/GID 65532,
   RunAsNonRoot, read-only rootfs, seccomp RuntimeDefault (Req 5.4); then the
-  per-component functional probe (Req 5.5): cert-manager issues a Certificate
-  to Ready, grafana answers its HTTP health endpoint, valkey completes a
-  SET/GET round-trip through the Service (via a Job using the live
-  Deployment's own image), hardened-app returns HTTP 200.
+  functional probe the chart declares (`probe:` in `chart/<c>/chart.yaml`,
+  resolved through the `probes` registry in `test/e2e`; Req 5.5):
+  `certificate-issuance` (cert-manager issues a Certificate to Ready, one
+  probe for its three images), `http-health` (grafana answers its HTTP
+  health endpoint), `set-get` (valkey completes a SET/GET round-trip through
+  the Service via a Job using the live Deployment's own image, one probe for
+  both valkey definitions), `http-200` (hardened-app returns HTTP 200). One
+  probe per chart, executed once per install however many definitions the
+  chart deploys. validate fails an active definition whose chart declares no
+  probe (`scripts/lint-probes.sh`, Req 5.8), and a Go unit test holds every
+  declared name to a registration and every registration to a chart.
 - **Upgrade path on bumps** (Req 5.6): two bump shapes are detected — a
   chart-version bump (`chart/<c>/chart.yaml` `upstream.version` changed vs the
   base branch) and an image/values bump (the deployed values file changed; the
@@ -936,7 +943,11 @@ The walkthrough:
    postUpgradeTask must leave the definition coherent (see
    `refresh-definition.sh` / `refresh-grafana.sh`).
 4. **Wire e2e** if the image deploys via a chart: register the component in
-   `test/harness`, add its probe (next sections).
+   `test/harness`, name the definition in the chart's `deploys:` list and
+   declare its probe there (`probe:`, a registration in `test/e2e`'s
+   `probes` map; add a registration if none proves the right thing, next
+   sections). An active definition with no probe fails validation by name
+   (Req 5.8); there is no placeholder value.
 5. **Activate it**: add the directory name to `active_set:` in
    `catalogue-policy.yaml` (Req 1.13). The active set is the declared source
    of candidates for the build and test matrices and the tracking scope
@@ -1001,11 +1012,12 @@ repository; the variant is a tag suffix. Rules that follow, all enforced:
    rule it out (Req 4.5). Forking the chart to remove the offending piece is
    the rejected option: unmodified-upstream is the stronger constraint.
 5. **Prove it**: `render-chart.sh` + `kyverno apply` must come back `fail: 0`;
-   register the component in the e2e harness (`test/harness`, plus the `ALL`
-   list in `e2e.yml` — the affected-regex `image/<c>(-|/)` already catches
-   variant directories) and give it a functional probe that exercises real
-   behavior, not liveness (valkey's probe SETs and GETs; "answers PING but
-   stores nothing" fails).
+   register the component in the e2e harness (`test/harness`), list the
+   definitions it deploys in `chart/<c>/chart.yaml` (`deploys:`, which is
+   what puts it on the e2e matrix), and declare a functional probe there
+   (`probe:`) that exercises real behavior, not liveness (valkey's probe SETs
+   and GETs; "answers PING but stores nothing" fails), registering a new one
+   in `test/e2e` if none of the four fits.
 
 ### Policies
 

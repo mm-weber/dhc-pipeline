@@ -46,6 +46,32 @@ func ParsePin(data []byte) (Pin, error) {
 	return p, nil
 }
 
+// Declaration is the part of chart/<c>/chart.yaml the e2e suite reads besides
+// the upstream pin (tasks 14.2, 14.3): the definition directories the chart
+// deploys (Req 1.14, 5.2) and the functional probe registration the suite
+// runs once the chart's pods are Ready (Req 5.5, 5.8). Both charts shapes
+// carry it; the owned chart's chart.yaml holds nothing else.
+type Declaration struct {
+	Deploys []string `json:"deploys"`
+	Probe   string   `json:"probe"`
+}
+
+// ParseDeclaration reads a chart.yaml's deploys list and probe name. A chart
+// deploying nothing is an error (every chart directory names its definitions,
+// scripts/lint-active-set.sh); an absent probe is not, it is the empty string,
+// because whether a definition may go without one is the active set's
+// question (scripts/lint-probes.sh), not this reader's.
+func ParseDeclaration(data []byte) (Declaration, error) {
+	var d Declaration
+	if err := yaml.Unmarshal(data, &d); err != nil {
+		return Declaration{}, err
+	}
+	if len(d.Deploys) == 0 {
+		return Declaration{}, fmt.Errorf("chart declares no deploys list")
+	}
+	return d, nil
+}
+
 // Args builds the argv for `helm <Verb> ...`.
 func Args(spec Spec) []string {
 	args := []string{spec.Verb, spec.Release}

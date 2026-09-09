@@ -14,6 +14,12 @@
 # checks each entry names an existing definition.
 upstream: include('upstream', required=False)
 deploys: list(str(), min=1)
+# `probe` (task 14.3, Req 5.5, 5.8) names the functional probe the e2e suite
+# runs once the chart's pods are Ready, a registration in test/e2e's `probes`
+# map. Optional here on purpose: scripts/lint-probes.sh fails an ACTIVE
+# definition whose chart declares none, and a required field would only
+# invite a placeholder (a probe that passes by doing nothing).
+probe: str(required=False)
 compat: include('compat', required=False)
 ---
 upstream:

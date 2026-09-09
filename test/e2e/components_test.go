@@ -10,14 +10,15 @@ import (
 )
 
 // componentSpec is a per-component e2e case: the catalogue Component plus the
-// pod selector + replica count readiness waits on, any extra install args, and
-// the functional probe (Req 5.5).
+// pod selector + replica count readiness waits on and any extra install args.
+// The functional probe (Req 5.5) is no longer a field: the chart declares it
+// (`probe:` in chart/<c>/chart.yaml, task 14.3) and assertHealthy resolves it
+// through the probes registry, so a chart and its probe cannot drift apart.
 type componentSpec struct {
 	harness.Component
 	Selector  string
 	Replicas  int
 	ExtraArgs []string
-	Probe     probeFunc
 }
 
 // componentSpecs are the four components that have a hardened chart.
@@ -28,25 +29,21 @@ var componentSpecs = []componentSpec{
 		Replicas:  3,
 		// The chart ships CRDs off by default; the issuance probe needs them.
 		ExtraArgs: []string{"--set", "crds.enabled=true"},
-		Probe:     probeCertManager,
 	},
 	{
 		Component: component("grafana"),
 		Selector:  "app.kubernetes.io/instance=grafana",
 		Replicas:  1,
-		Probe:     httpProbe("/api/health"),
 	},
 	{
 		Component: component("hardened-app"),
 		Selector:  "app.kubernetes.io/instance=hardened-app",
 		Replicas:  1,
-		Probe:     httpProbe("/healthz"),
 	},
 	{
 		Component: component("valkey"),
 		Selector:  "app.kubernetes.io/instance=valkey",
 		Replicas:  1,
-		Probe:     probeValkey,
 	},
 }
 

@@ -14,6 +14,11 @@ deploys:
   - valkey-compat
   - valkey
 
+# The functional probe (task 14.3, Req 5.5, 5.8), one for both definitions: a
+# Job writes a key through the Service and reads it back, so a server that
+# answers PING but stores nothing fails.
+probe: set-get
+
 # NOTE: this is the valkey project's own chart, so its appVersion follows the
 # server release (0.11.0 ships 9.1.1, 0.12.0 ships 9.1.2). The image pin in
 # config/values-hardened.yaml may run a patch ahead of it between a definition

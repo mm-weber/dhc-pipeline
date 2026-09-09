@@ -113,6 +113,26 @@ for n in (doc.get("deploys") or []) if isinstance(doc, dict) else []:
 PY
 }
 
+# chart_probe <chart.yaml> -> the functional probe the chart declares for the
+# e2e suite (task 14.3's `probe:`, Req 5.5), a registration name the suite
+# resolves (test/e2e, the `probes` registry); nothing when none is declared.
+# A value that is not a string is refused (exit 2) naming the file: there is
+# no placeholder shape, a chart with nothing to prove declares no probe.
+chart_probe() { # chart.yaml path
+  python3 - "$1" <<'PY'
+import sys, yaml
+path = sys.argv[1]
+doc = yaml.safe_load(open(path)) or {}
+p = doc.get("probe") if isinstance(doc, dict) else None
+if p is None:
+    sys.exit(0)
+if not isinstance(p, str):
+    print(f"::error file={path}::chart_probe: probe must be a registration name (a string), got {p!r} (Req 5.5)", file=sys.stderr)
+    sys.exit(2)
+print(p)
+PY
+}
+
 # active_components <root> -> one line per chart directory whose deploys list
 # meets the active set: "<chart>\t<its active definitions, space-separated,
 # declared order>". A chart deploying only inactive definitions is not a
