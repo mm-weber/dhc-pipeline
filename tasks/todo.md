@@ -732,3 +732,22 @@ naming its successor and the retirement date. Internal anchors checked by
 script; the validate chain passes; the two em-dash hits in the diff are
 pre-existing phrases carried through. Task group 14 is complete; 12.1 is
 the last unticked task.
+
+## Requirements versus implementation review (2026-09-09)
+
+Branch: `review-2026-09-09`. Every live criterion (147) and the spec and
+document layer above them compared with the working tree at `0b31759`;
+`.specs/dhc-catalogue-mvp/reviews/2026-09-09-requirements-vs-implementation-review.md`.
+
+- [x] Eight readings, one per group and one for tasks, design and documents;
+      every PARTIAL or NOT HELD verdict re-checked by hand before it entered the document
+- [x] Live state measured: first post-fix nightly discarded all seven; scheduled rescan green
+- [x] Verdict, group tables, findings, the deferred ledger (the dashboard question),
+      eight proposed dispositions, confidence notes; no em dashes
+
+**Review.** 114 held, 26 partial, 3 not held (process criteria), 4 owner-side.
+The themes: rescan assertions that depend on step order, three unverified
+reads, four silent-success shapes, holes in the pin surface, nine criteria
+whose text lags the code, documentation describing an earlier catalogue,
+and declared values nothing reads. Each disposition is one PR the owner
+picks or declines.
