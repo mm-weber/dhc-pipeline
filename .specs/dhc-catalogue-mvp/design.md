@@ -297,6 +297,20 @@ graph TB
      the policy file; no admitted identity is a refusal (exit 2), an attestation from a
      non-admitted identity is `attestation-unreadable` and publishes. Equality must be
      proven, and now by the same identities admission is.
+   - **As built, corrected 2026-09-09 (review disposition D3)**: four places where nothing
+     happening read as all clear. The release switches were read by yq as raw strings and
+     matched against `true` and `on-change`, so `yes`, `True` or `on_change` took the
+     fail-open branch; they now come through one reader, `scripts/release-policy.sh`, which
+     accepts exactly the tokens the criteria name (checked against the file's own text,
+     since PyYAML and mikefarah's yq disagree on `yes`) and refuses anything else, and
+     validate runs its `check`. The fail-closed release gate reported a count; it now names
+     each uncovered finding per platform manifest, the PR gate's shape (Req 2.13). The
+     govulncheck step printed "no Go binaries found" when the tool had not installed or had
+     produced no output; both now fail the step by name while the step stays non-gating
+     (Req 6.13), and the execute-bit filter went, `go version -m` being the test. And
+     `lint-workflow-policy.sh` passed a declared schedule absent from its workflow with a
+     notice and read only `.yml` files; it now fails that drift (Req 2.14 stops silently
+     otherwise) and reads both spellings (Req 7.10).
 7. **Statuses and clocks: every known finding carries a published status, and the clocks are read from attestations (Req 6.38 to 6.54; review F5, F4, F13 i; ADR 0003, ADR 0004; 2026-08-23; as built 2026-09-06, tasks 10.1 to 10.7)**
    - **Context**: the two-lane model published only `not_affected` and `fixed`; an accepted
      or transferred finding was invisible to anyone pulling the image, which review A had

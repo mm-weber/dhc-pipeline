@@ -41,15 +41,12 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=definition-lib.sh
 . "$HERE/definition-lib.sh"
 
-# python3, not yq: the runner and the devcontainer ship different yq dialects
+# The public-release switch through its one reader (review D3): a misspelt
+# value is a refusal there, never "not public" here. python3, not yq, for
+# the registry: the runner and the devcontainer ship different yq dialects
 # (compile-vex.sh precedent).
-read -r PUBLIC REGISTRY < <(python3 - "$ROOT/catalogue-policy.yaml" <<'PY'
-import sys, yaml
-doc = yaml.safe_load(open(sys.argv[1]))
-public = str((doc.get("release") or {}).get("public", False)).lower()
-print(public, (doc.get("verification") or {}).get("registry", ""))
-PY
-)
+PUBLIC=$("$HERE/release-policy.sh" "$ROOT" public)
+REGISTRY=$(python3 -c 'import sys,yaml; print(((yaml.safe_load(open(sys.argv[1])) or {}).get("verification") or {}).get("registry", ""))' "$ROOT/catalogue-policy.yaml")
 
 if [ "$PUBLIC" != "true" ]; then
   echo "check-visibility: public release is disabled (catalogue-policy.yaml release.public); the visibility invariant does not apply (Req 2.21's WHILE clause)"
