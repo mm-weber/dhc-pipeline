@@ -19,6 +19,13 @@ deploys:
   - cert-manager-webhook
   - cert-manager-cainjector
 
+# The functional probe the e2e suite runs once the pods are Ready (task 14.3,
+# Req 5.5, 5.8): a registration name test/e2e's `probes` registry resolves.
+# One probe for the three images: a SelfSigned Issuer signs a Certificate and
+# the probe waits for it to go Ready, which only happens when controller,
+# webhook and cainjector all work.
+probe: certificate-issuance
+
 # Render (chart CI gate, task 5.5) and install (e2e, phase 6):
 #   helm template dhc-cert-manager cert-manager \
 #     --repo https://charts.jetstack.io --version v1.21.0 \

@@ -657,6 +657,22 @@ graph TB
      scoped to the set (Req 3.10 as amended), the inactive count in its summary.
      The rescan's enumeration, the chart gate and the convention lints keep
      looping every directory, as decided.
+   - **As built** (task 14.3, 2026-09-09): as decided, with one placement
+     detail. The registry is keyed by probe name rather than by component, and
+     the component side of the mapping lives in YAML: each chart.yaml declares
+     `probe: <name>` beside its `deploys:` list, the e2e suite resolves the name
+     through the `probes` map when the chart's pods are Ready, and the hardcoded
+     per-component probe field is gone. Keying by name is what lets a YAML-only
+     lint answer Req 5.8 (every active definition is deployed by a chart naming
+     a probe) without parsing Go, while a cluster-free Go unit test
+     (TestProbeDeclarations) holds declared names and registrations equal in
+     both directions, the Renovate-fixture discipline. The four reference
+     registrations are today's probes: certificate-issuance, http-health,
+     http-200, set-get. A shared registration executes once per install for
+     every definition its chart deploys (cert-manager's three, the valkey pair,
+     Req 5.5). No placeholder exists anywhere in the chain: the schema keeps
+     `probe` optional, the lint refuses an active definition without one, and
+     the resolver errors on a missing or unregistered name rather than skipping.
 
 ## System Flows
 

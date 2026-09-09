@@ -9,6 +9,10 @@ upstream:
 deploys:
   - grafana
 
+# The functional probe (task 14.3, Req 5.5, 5.8): an in-cluster curl of
+# /api/health answers 2xx, so the server is up and its database is reachable.
+probe: http-health
+
 # NOTE: the grafana Helm chart lags the app — the newest chart (10.5.15) ships
 # appVersion 12.3.1, and no chart targets grafana 13.x. We pin the latest chart
 # for its templates and override the image to our hardened grafana 13.x build

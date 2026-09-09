@@ -42,6 +42,8 @@ func assertReadyHardened(ctx context.Context, r *resources.Resources, s componen
 func assertHealthy(ctx context.Context, r *resources.Resources, s componentSpec) {
 	GinkgoHelper()
 	assertReadyHardened(ctx, r, s)
-	By("functional probe")
-	Expect(s.Probe(ctx, r, s.Component)).To(Succeed())
+	By("functional probe, the one the chart declares (Req 5.5)")
+	probe, err := probeFor(s.Component)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(probe(ctx, r, s.Component)).To(Succeed())
 }

@@ -5,3 +5,7 @@
 # and never reads this file.
 deploys:
   - hardened-app
+
+# The functional probe (task 14.3, Req 5.5, 5.8): an in-cluster curl of
+# /healthz answers 2xx.
+probe: http-200
