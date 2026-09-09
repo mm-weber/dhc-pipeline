@@ -390,6 +390,10 @@
     - Every step after the scan in `rescan.yml` declares `if: always()` with the outcome of its producer and refuses by name when its input file is missing; the four assertions inside `invariants` run independently; the header comment says what the file does; `scripts/lint-rescan-steps.sh` holds the rule in validate (a step after the scan without `always()` fails naming it)
     - As built (2026-09-09): findings 2.9, 3.1, 3.5, 3.9 and 9.1 of the review; design Decision 6's as-built correction of the same date records the three assertion steps and the rule
     - _Requirements: Req 2.21, Req 2.22, Req 2.24, Req 3.10, Req 4.9, Req 6.10, Req 6.44, Req 6.46, Req 6.47, Req 9.3, Req 9.7, Req 9.9, Req 9.12, Req 9.13_
+  - [x] 15.2 D2: verified reads
+    - The publish-on-change comparator reads the published CycloneDX SBOM through `cosign verify-attestation` against the issuer and the roles the policy file admits for cyclonedx, the read `fetch-sboms.sh` already makes; no admitted identity is a refusal, a non-admitted signer is `attestation-unreadable` and publishes. The issue lifecycle applies its closes and reopens after re-attestation and withholds them, by the digests' names, on a day any digest's reports failed to attest (Req 6.52 to 6.54, 6.57 read literally). `rescan-status` receives `--vex-reports`, the fence the lifecycle tool has
+    - As built (2026-09-09): findings 2.2, 6.11 and 6.15 of the review; three new comparator test cases (a non-admitted identity, no admitted role, the verified invocation); design Decisions 6 and 7 carry the as-built corrections; the compiler's issue map lags closes and reopens by one day, stated in the workflow
+    - _Requirements: Req 2.15, Req 2.23, Req 6.46, Req 6.52, Req 6.53, Req 6.54, Req 6.57, Req 6.58_
 
 ## Requirements Coverage
 

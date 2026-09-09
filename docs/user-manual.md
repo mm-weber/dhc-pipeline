@@ -653,7 +653,11 @@ before filing.
 
 An issue is a triage decision waiting to happen. Work it exactly like a red
 gate (next section); you never close it by hand. The next rescan closes it
-on evidence (task 10.6; Req 6.52 to 6.57). When the finding is absent from
+on evidence (task 10.6; Req 6.52 to 6.57), and only on evidence it has
+attested: the closes and reopens are applied after the day's reports are
+attested, and on a day any digest's reports fail to attest they are
+withheld by the digest's name and re-decided the next day (review D2).
+When the finding is absent from
 every supported digest's attested report, the issue closes with the label
 the attested SBOMs justify: `resolved:fixed` when every occurrence of the
 recorded package bumped, `resolved:removed` when the package left every

@@ -288,6 +288,15 @@ graph TB
      promise is kept: a failed re-attestation still withholds the status (its documents are
      the clocks' input), a KEV outage still withholds the tiers, the issue set and the
      status (a non-evaluation, Req 6.60), and both say so by name.
+   - **As built, corrected 2026-09-09 (review disposition D2)**: the publish-on-change
+     comparator (Req 2.15) read the published CycloneDX SBOM through `cosign download
+     attestation`, an unverified read that any attestation under the repository could
+     satisfy, while the issue lifecycle read the same document through
+     `cosign verify-attestation` against the roles that attest cyclonedx (Req 6.58). The
+     comparator now makes the verified read too, taking the issuer and identities from
+     the policy file; no admitted identity is a refusal (exit 2), an attestation from a
+     non-admitted identity is `attestation-unreadable` and publishes. Equality must be
+     proven, and now by the same identities admission is.
 7. **Statuses and clocks: every known finding carries a published status, and the clocks are read from attestations (Req 6.38 to 6.54; review F5, F4, F13 i; ADR 0003, ADR 0004; 2026-08-23; as built 2026-09-06, tasks 10.1 to 10.7)**
    - **Context**: the two-lane model published only `not_affected` and `fixed`; an accepted
      or transferred finding was invisible to anyone pulling the image, which review A had
@@ -381,6 +390,19 @@ graph TB
      2026-09-05 against the real supported set: 25 issues, 7 digests, 14 verified SBOMs,
      16 closes (6 `fixed` on SBOM proof, 10 `accepted`), no reopen.
 
+   - **As built, corrected 2026-09-09 (review disposition D2)**: two reads of the day's
+     evidence fell short of the criteria's word "attested". The issue lifecycle gathered
+     its evidence and applied its closes and reopens right after the scan, on the run's
+     own scan reports, before the re-attestation step attested them (Req 6.52 to 6.54,
+     6.57); the application now runs after re-attestation and applies nothing on a day the
+     reports of any digest failed to attest, naming the digests and failing by name (a
+     digest whose scan failed needs no rule: the tool already treats it as unscanned and
+     keeps its issues open). The cost is one day's lag in the compiler's open-issue map,
+     read before the closes: a statement may name an issue that closes minutes later and
+     learns of a reopened one tomorrow; the link is a pointer, not a status. And the
+     status tool was not handed `--vex-reports`, the fence the lifecycle tool gets, so a
+     digest scanned without its VEX (over-reporting) fed the clocks while the same digest
+     blocked every close; both tools now read the compile reports.
 8. **Upstream trust: quarantine, declared authenticity, tracked charts (Req 1.3, 1.10 to 1.12, 3.5, 3.7 to 3.12, 4.5, 4.8, 4.9; review F2, F10, F8, F13 ii and iii, F12 d; ADR 0002 amendment; 2026-08-25; as built 2026-09-07, tasks 11.1 to 11.5)**
    - **Context**: from-source patch bumps automerged while their checksum was recomputed
      from whatever upstream served at that instant, so an adversary publishing a
