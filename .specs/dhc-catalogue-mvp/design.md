@@ -271,6 +271,23 @@ graph TB
      in that window are real releases (scanned, signed, attested, tagged in order) and
      stay, superseded, under Decision 9's no-deletion rule; the cost was daily rescans of
      their platform manifests and one digest-only chart-pin PR per definition per night.
+   - **As built, corrected 2026-09-09 (review disposition D1)**: the daily assertions are
+     not one step. They are three (`invariants` for Req 2.21, 2.24, 6.44 and 6.51;
+     `authenticity signals` for 3.10 and 4.9; `posture invariants` for 9.3, 9.7 and 9.9,
+     placed last by tasks 13.2 and 13.3 so a governance failure never starves the day's
+     issues and status), beside the standalone portability block (9.12), the smoke test
+     (9.13), the expiry notice (6.10) and the status publication (6.46, 6.47). Until this
+     correction each of them ran only if everything above it had succeeded, so a designed
+     persistent failure (an upstream signal that moved, register M18) or a KEV feed outage
+     suspended every later assertion and the status issue for as long as it lasted (review
+     2026-09-09, theme 1). The rule now: every step after the scan declares its condition
+     with `always()` and the outcome of the step that produces its input, refuses by name
+     when that input is missing, and the four assertions inside `invariants` run
+     independently and fail the step together. A validate lint holds the rule
+     (`scripts/lint-rescan-steps.sh`). Order still matters for data, never for whether a
+     promise is kept: a failed re-attestation still withholds the status (its documents are
+     the clocks' input), a KEV outage still withholds the tiers, the issue set and the
+     status (a non-evaluation, Req 6.60), and both say so by name.
 7. **Statuses and clocks: every known finding carries a published status, and the clocks are read from attestations (Req 6.38 to 6.54; review F5, F4, F13 i; ADR 0003, ADR 0004; 2026-08-23; as built 2026-09-06, tasks 10.1 to 10.7)**
    - **Context**: the two-lane model published only `not_affected` and `fixed`; an accepted
      or transferred finding was invisible to anyone pulling the image, which review A had
