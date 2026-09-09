@@ -26,7 +26,7 @@ fail() { echo "FAIL $1"; shift; [ $# -gt 0 ] && printf '%s\n' "$@" | sed 's/^/  
 REF="ghcr.io/mm-weber/dhc/hardened-app:0.1.0-alpine3.23"
 AMD64_DIGEST="sha256:1851851851851851851851851851851851851851851851851851851851851851"
 
-# DSSE envelope the way `cosign download attestation` prints one per line:
+# DSSE envelope the way `cosign verify-attestation` prints one per line:
 # {"payload": base64(in-toto statement)}. Built with python3 so the base64 is
 # real, not hand-rolled.
 dsse() { # <predicateType> <predicate-json-file>
@@ -89,20 +89,53 @@ fi
 echo "docker stub: unexpected args $*" >&2; exit 64
 STUB
 
+  # cosign is asked to VERIFY, never to download (review D2, Req 6.58's
+  # discipline applied to the comparator): the stub answers only when the
+  # issuer and identity match what it was told the bundle was signed with,
+  # which is what the real tool does against Fulcio's certificate.
   cat > "$SB/bin/cosign" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "cosign $*" >> "${STUB_ARGV}"
-if [ "$1 $2" = "download attestation" ]; then
-  digest="${3##*@}"
+if [ "$1" = "verify-attestation" ]; then
+  type=""; issuer=""; identity=""; ref=""
+  while [ $# -gt 1 ]; do shift
+    case "$1" in
+      --type) type="$2"; shift ;;
+      --certificate-oidc-issuer) issuer="$2"; shift ;;
+      --certificate-identity) identity="$2"; shift ;;
+      *) ref="$1" ;;
+    esac
+  done
+  [ "$type" = cyclonedx ] || { echo "stub: unexpected --type $type" >&2; exit 64; }
+  if [ "$issuer" != "${STUB_ISSUER}" ] || [ "$identity" != "${STUB_IDENTITY}" ]; then
+    echo "Error: no matching attestations: none of the signatures were made by ${identity}" >&2; exit 1
+  fi
+  digest="${ref##*@}"
   f="${STUB_ATT_DIR}/${digest#sha256:}.jsonl"
-  [ -f "$f" ] || { echo "no attestations for $3" >&2; exit 1; }
+  [ -f "$f" ] || { echo "Error: no attestations for $ref" >&2; exit 1; }
   cat "$f"
   exit 0
 fi
 echo "cosign stub: unexpected args $*" >&2; exit 64
 STUB
   chmod +x "$SB/bin/docker" "$SB/bin/cosign"
-  export STUB_ARGV="$SB/argv" STUB_INDEX="$SB/index.json" STUB_ATT_DIR="$SB/att"
+  # The policy file the comparator reads the admitted identities from: the
+  # releaser attests cyclonedx, the re-attester does not.
+  cat > "$SB/catalogue-policy.yaml" <<'EOF'
+verification:
+  issuer: https://issuer.example/oidc
+  roles:
+    releaser:
+      identity: https://github.com/acme/repo/.github/workflows/build.yml@refs/heads/main
+      attests: [spdxjson, cyclonedx, vuln, openvex]
+    re-attester:
+      identity: https://github.com/acme/repo/.github/workflows/rescan.yml@refs/heads/main
+      attests: [openvex, vuln]
+EOF
+  export STUB_ARGV="$SB/argv" STUB_INDEX="$SB/index.json" STUB_ATT_DIR="$SB/att" \
+         STUB_ISSUER="https://issuer.example/oidc" \
+         STUB_IDENTITY="https://github.com/acme/repo/.github/workflows/build.yml@refs/heads/main" \
+         PACKAGE_SET_DIFF_ROOT="$SB"
   unset STUB_NO_TAG
   : > "$SB/argv"
 
@@ -191,6 +224,26 @@ out=$(run - "linux/amd64=$SB/loc.cdx.json")
 [ "$(verdict verdict)" = "verdict=different" ] && [ "$(verdict reason)" = "reason=attestation-unreadable" ] \
   && pass "unfetchable attestation is different" || fail "unfetchable attestation is different" "$(cat "$SB/verdict")"
 
+# 7b (review D2): a CycloneDX attestation signed by an identity the policy
+#     does not admit is not read at all. Before this the comparator used
+#     `cosign download attestation`, so anyone able to push an attestation
+#     under the repository could make the nightly discard a rebuild.
+fresh
+export STUB_IDENTITY="https://github.com/someone-else/repo/.github/workflows/build.yml@refs/heads/main"
+out=$(run - "linux/amd64=$SB/loc.cdx.json")
+[ "$(verdict verdict)" = "verdict=different" ] && [ "$(verdict reason)" = "reason=attestation-unreadable" ] \
+  && pass "an attestation from a non-admitted identity is different, not equal" || fail "an attestation from a non-admitted identity is different, not equal" "$(cat "$SB/verdict")" "$out"
+grep -qi "admitted" <<<"$out" && pass "and the reason names the admission" || fail "and the reason names the admission" "$out"
+grep -q "cosign download" "$SB/argv" && fail "cosign is never asked to download" "$(cat "$SB/argv")" || pass "cosign is never asked to download"
+
+# 7c: a policy file naming no issuer or no role that attests cyclonedx is a
+#     refusal (exit 2), never a verdict: without admitted identities nothing
+#     can be verified, so nothing can be proven equal.
+fresh
+printf 'verification:\n  issuer: https://issuer.example/oidc\n  roles:\n    releaser:\n      identity: https://github.com/acme/repo/.github/workflows/build.yml@refs/heads/main\n      attests: [spdxjson, openvex]\n' > "$SB/catalogue-policy.yaml"
+out=$(run - "linux/amd64=$SB/loc.cdx.json"); rc=$?
+[ "$rc" -eq 2 ] && grep -q "cyclonedx" <<<"$out" && pass "no admitted cyclonedx identity is a refusal naming it" || fail "no admitted cyclonedx identity is a refusal naming it" "rc=$rc" "$out"
+
 # 8: platform sets must match exactly, both directions.
 fresh
 out=$(run - "linux/amd64=$SB/loc.cdx.json" "linux/arm64=$SB/loc.cdx.json")
@@ -238,8 +291,8 @@ fresh
 run - "linux/amd64=$SB/loc.cdx.json" >/dev/null
 grep -qF "docker buildx imagetools inspect --raw $REF" "$SB/argv" \
   && pass "resolves the published index by ref" || fail "resolves the published index by ref" "$(cat "$SB/argv")"
-grep -qF "cosign download attestation ghcr.io/mm-weber/dhc/hardened-app@${AMD64_DIGEST}" "$SB/argv" \
-  && pass "fetches attestations by manifest digest" || fail "fetches attestations by manifest digest" "$(cat "$SB/argv")"
+grep -qF "cosign verify-attestation --type cyclonedx --certificate-oidc-issuer https://issuer.example/oidc --certificate-identity https://github.com/acme/repo/.github/workflows/build.yml@refs/heads/main ghcr.io/mm-weber/dhc/hardened-app@${AMD64_DIGEST}" "$SB/argv" \
+  && pass "verifies the attestation by manifest digest against the admitted identity" || fail "verifies the attestation by manifest digest against the admitted identity" "$(cat "$SB/argv")"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi

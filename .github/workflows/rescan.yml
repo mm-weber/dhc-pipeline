@@ -182,10 +182,12 @@ jobs:
       # attested scan reports, the SBOMs attested to the supported platform
       # manifests (read through verification, Req 6.58) and the merged
       # triage artifacts; the tested Go package decides what closes, with
-      # which evidence-graded label, and what reopens; gh applies it. Right
-      # after the scan, so the issue map the compiler stamps into today's
-      # documents and the dedup the filer relies on both see the closes and
-      # reopens of the same run, and nothing is filed twice (Req 6.57).
+      # which evidence-graded label, and what reopens; gh applies it. The
+      # evidence and the decision are gathered right after the scan; the
+      # application waits until after re-attestation (review D2), because
+      # 6.52 to 6.54 and 6.57 close and reopen on ATTESTED reports. The dedup
+      # the filer relies on still runs after the application, so nothing is
+      # filed twice (Req 6.57).
       - name: issue lifecycle, the evidence (Req 6.52 to 6.57)
         id: lifecycle_evidence
         if: always() && steps.scan.outcome == 'success'
@@ -219,6 +221,53 @@ jobs:
             echo "${k}=$(jq ".${k} | length" "$OUT/lifecycle/actions.json")" >> "$GITHUB_OUTPUT"
           done
 
+      # Task 10.3: the open `cve` issues, finding -> URL, read before the
+      # compile so a statement the compiler writes can name where the finding
+      # is being worked (task 9.1's promise, Req 6.40). Read before today's
+      # closes and reopens are applied (they wait for re-attestation, D2), so
+      # a statement may name an issue that closes minutes later and learns
+      # of a reopened one tomorrow; the link is a pointer, not a status. The
+      # dedup step below reads the same issues again for its own purpose;
+      # both read the marker `<!-- rescan-cve: <ID> -->`, never the title.
+      - name: open cve issues (finding -> issue)
+        id: issues_map
+        if: always() && steps.scan.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2016  # $m is a jq binding, not a shell variable
+          gh issue list --state open --label cve --limit 500 --json url,body \
+            --jq '[.[] | (.body | capture("rescan-cve: (?<id>[A-Za-z0-9][A-Za-z0-9._-]*)") // empty) as $m | {key: $m.id, value: .url}] | from_entries' \
+            > "$OUT/issues.json" || echo '{}' > "$OUT/issues.json"
+          echo "open cve issues mapped: $(jq 'length' "$OUT/issues.json")"
+
+      # Req 6.42, 6.43 (task 10.3; ADR 0004): every tag-referenced digest gets
+      # today's scan reports attested with --replace, and its OpenVEX document
+      # re-attested with --replace only when the statement set changed or a
+      # count is wrong. The previous document is read through
+      # cosign verify-attestation against the policy's role identities and
+      # never downloaded unverified (Req 6.58). The JSONL record carries the
+      # .att layer lists and Rekor indexes before and after: the first run is
+      # the keyless measurement ADR 0004 left open.
+      - name: attest today's reports, re-attest OpenVEX on change (Req 6.42, 6.43)
+        id: reattest
+        if: always() && steps.issues_map.outcome == 'success'
+        env:
+          REATTEST_ISSUES: ${{ github.workspace }}/rescan-out/issues.json
+        run: |
+          set -uo pipefail
+          for f in "$OUT/enumeration.tsv" "$OUT/issues.json"; do
+            [ -s "$f" ] || { echo "::error::reattest: ${f} is missing; today's reports were not attested and no document re-attested (Req 6.42, 6.43)"; exit 1; }
+          done
+          [ -d "$OUT/trivy" ] || { echo "::error::reattest: ${OUT}/trivy is missing; the scan step produced no reports to attest (Req 6.42)"; exit 1; }
+          scripts/reattest.sh . "$OUT/enumeration.tsv" "$OUT"
+          rc=$?
+          echo "reattested=$(jq -s '[.[] | select(.reattested == true)] | length' "$OUT/reattest.jsonl")" >> "$GITHUB_OUTPUT"
+          echo "unchanged=$(jq -s '[.[] | select(.reattested == false and .skipped == null and .failed == null)] | length' "$OUT/reattest.jsonl")" >> "$GITHUB_OUTPUT"
+          echo "skipped=$(jq -s '[.[] | select(.skipped != null)] | length' "$OUT/reattest.jsonl")" >> "$GITHUB_OUTPUT"
+          exit "$rc"
+
       - name: issue lifecycle, applied (Req 6.52, 6.53, 6.56, 6.57)
         id: lifecycle_apply
         if: always() && steps.lifecycle.outcome == 'success'
@@ -226,6 +275,22 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # Req 6.52 to 6.54 and 6.57 speak of ATTESTED scan reports (review
+          # D2): this step runs after re-attestation and applies nothing on a
+          # day the reports of any digest failed to attest. A digest skipped
+          # whole (its scan failed) needs no rule here: the lifecycle tool
+          # already treats it as unscanned and keeps its issues open. The run
+          # is red by the digest's name either way; the lifecycle re-decides
+          # tomorrow on attested evidence.
+          [ -s "$OUT/reattest.jsonl" ] || { echo "::error::issue lifecycle: no re-attestation record on disk; closes and reopens are withheld today (Req 6.54)"; exit 1; }
+          unattested=$(jq -r 'select(.failed != null) | "\(.repository | split("/") | last)@\(.digest[0:19])"' "$OUT/reattest.jsonl" | sort -u)
+          if [ -n "$unattested" ]; then
+            n=$(jq '(.close | length) + (.reopen | length) + (.relabel | length)' "$OUT/lifecycle/actions.json")
+            echo "::error::issue lifecycle: ${n} close, reopen and relabel action(s) withheld today: the reports of $(grep -c . <<<"$unattested") digest(s) were not attested ($(paste -sd, <<<"$unattested")); the lifecycle re-decides tomorrow on attested evidence (Req 6.52 to 6.54, 6.57)"
+            { echo "closed=0"; echo "reopened=0"; echo "relabelled=0"; echo "withheld=${n}"; } >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "withheld=0" >> "$GITHUB_OUTPUT"
           # The graded labels exist before use, idempotently, as the policy
           # file declares them (Req 6.56).
           jq -r 'to_entries[] | "\(.value.name)\t\(.value.color)\t\(.value.description)"' "$OUT/lifecycle/labels.json" \
@@ -272,50 +337,6 @@ jobs:
             echo "reopened=${reopened}"
             echo "relabelled=${relabelled}"
           } >> "$GITHUB_OUTPUT"
-
-      # Task 10.3: the open `cve` issues, finding -> URL, read before the
-      # compile so a statement the compiler writes can name where the finding
-      # is being worked (task 9.1's promise, Req 6.40). The dedup step below
-      # reads the same issues again for its own purpose; both read the marker
-      # `<!-- rescan-cve: <ID> -->`, never the title.
-      - name: open cve issues (finding -> issue)
-        id: issues_map
-        if: always() && steps.scan.outcome == 'success'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          # shellcheck disable=SC2016  # $m is a jq binding, not a shell variable
-          gh issue list --state open --label cve --limit 500 --json url,body \
-            --jq '[.[] | (.body | capture("rescan-cve: (?<id>[A-Za-z0-9][A-Za-z0-9._-]*)") // empty) as $m | {key: $m.id, value: .url}] | from_entries' \
-            > "$OUT/issues.json" || echo '{}' > "$OUT/issues.json"
-          echo "open cve issues mapped: $(jq 'length' "$OUT/issues.json")"
-
-      # Req 6.42, 6.43 (task 10.3; ADR 0004): every tag-referenced digest gets
-      # today's scan reports attested with --replace, and its OpenVEX document
-      # re-attested with --replace only when the statement set changed or a
-      # count is wrong. The previous document is read through
-      # cosign verify-attestation against the policy's role identities and
-      # never downloaded unverified (Req 6.58). The JSONL record carries the
-      # .att layer lists and Rekor indexes before and after: the first run is
-      # the keyless measurement ADR 0004 left open.
-      - name: attest today's reports, re-attest OpenVEX on change (Req 6.42, 6.43)
-        id: reattest
-        if: always() && steps.issues_map.outcome == 'success'
-        env:
-          REATTEST_ISSUES: ${{ github.workspace }}/rescan-out/issues.json
-        run: |
-          set -uo pipefail
-          for f in "$OUT/enumeration.tsv" "$OUT/issues.json"; do
-            [ -s "$f" ] || { echo "::error::reattest: ${f} is missing; today's reports were not attested and no document re-attested (Req 6.42, 6.43)"; exit 1; }
-          done
-          [ -d "$OUT/trivy" ] || { echo "::error::reattest: ${OUT}/trivy is missing; the scan step produced no reports to attest (Req 6.42)"; exit 1; }
-          scripts/reattest.sh . "$OUT/enumeration.tsv" "$OUT"
-          rc=$?
-          echo "reattested=$(jq -s '[.[] | select(.reattested == true)] | length' "$OUT/reattest.jsonl")" >> "$GITHUB_OUTPUT"
-          echo "unchanged=$(jq -s '[.[] | select(.reattested == false and .skipped == null and .failed == null)] | length' "$OUT/reattest.jsonl")" >> "$GITHUB_OUTPUT"
-          echo "skipped=$(jq -s '[.[] | select(.skipped != null)] | length' "$OUT/reattest.jsonl")" >> "$GITHUB_OUTPUT"
-          exit "$rc"
 
       # The single home for every daily assertion the catalogue makes about
       # its own state (task 9.4): visibility (Req 2.21), the admission proof
@@ -650,13 +671,18 @@ jobs:
             [ -e "$f" ] || { echo "::error::catalogue status: ${f} is missing (the step that produces it reports why); no status published today (Req 6.46, 6.47)"; exit 1; }
           done
           [ -d "$OUT/reattest" ] || { echo "::error::catalogue status: ${OUT}/reattest is missing; the clocks need today's documents (Req 6.46)"; exit 1; }
+          [ -d "$OUT/vex" ] || { echo "::error::catalogue status: ${OUT}/vex is missing; without the compile reports a digest scanned without its VEX cannot be told from a scanned one (Req 6.46)"; exit 1; }
           aperture=$(scripts/triage-policy.sh . aperture)
           ceilings=""
           for sev in ${aperture//,/ }; do
             ceilings="${ceilings:+${ceilings},}${sev}=$(scripts/triage-policy.sh . ceiling "$sev")"
           done
+          # --vex-reports is the fence the lifecycle tool already gets (D2):
+          # a digest scanned without its VEX over-reports, and its findings
+          # count as unscanned in the clocks the way they block every close.
           go -C triage/rescan run ./cmd/rescan-status \
             --enumeration "$OUT/enumeration.tsv" --reattest "$OUT/reattest" --reports "$OUT/trivy" \
+            --vex-reports "$OUT/vex" \
             --kev "$OUT/kev.json" --aperture "$aperture" --ceilings "$ceilings" \
             --kev-ceiling "$(scripts/triage-policy.sh . kev-ceiling)" \
             --previous-body "$OUT/status/previous.md" --revocations "$OUT/revocations.json" \
@@ -745,7 +771,7 @@ jobs:
             echo "- revocations: ${{ steps.governance.outputs.revoked || 0 }} recorded, ${{ steps.governance.outputs.revoked_referenced || 0 }} still referenced by a catalogue tag"
             echo "- consumer smoke test: ${{ steps.smoke.outputs.ref || 'not run' }}, ${{ steps.smoke.outputs.failed_steps || 0 }} failed step(s); statements: ${{ steps.smoke.outputs.suppressed || 0 }} suppressed a reported finding, ${{ steps.smoke.outputs.unneeded || 0 }} had nothing to suppress, ${{ steps.smoke.outputs.missing || 0 }} missing in the authoritative consumer"
             echo "- VEX portability: ${{ steps.portability.outputs.blocks || 0 }} supported platform manifest(s) compared, ${{ steps.portability.outputs.divergences || 0 }} divergence(s), ${{ steps.portability.outputs.unmeasured || 0 }} consumer scan(s) not measured"
-            echo "- issues closed on evidence: ${{ steps.lifecycle_apply.outputs.closed || 0 }} of ${{ steps.lifecycle.outputs.close || 0 }} decided, reopened: ${{ steps.lifecycle_apply.outputs.reopened || 0 }} of ${{ steps.lifecycle.outputs.reopen || 0 }}, kept open: ${{ steps.lifecycle.outputs.kept || 0 }}"
+            echo "- issues closed on evidence: ${{ steps.lifecycle_apply.outputs.closed || 0 }} of ${{ steps.lifecycle.outputs.close || 0 }} decided, reopened: ${{ steps.lifecycle_apply.outputs.reopened || 0 }} of ${{ steps.lifecycle.outputs.reopen || 0 }}, kept open: ${{ steps.lifecycle.outputs.kept || 0 }}, withheld (reports not attested): ${{ steps.lifecycle_apply.outputs.withheld || 0 }}"
             echo "- catalogue status: ${{ steps.status_publish.outputs.url || 'not published' }}, ${{ steps.status.outputs.undecided || 0 }} undecided (${{ steps.status.outputs.over_ceiling || 0 }} over ceiling), ${{ steps.status.outputs.decided || 0 }} decided, ${{ steps.status.outputs.fixed || 0 }} fixed"
             echo
             # Req 6.33. Without this the run is green whether every statement

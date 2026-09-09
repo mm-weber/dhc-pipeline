@@ -778,3 +778,28 @@ still runs the authenticity check, the expiries and the governance half of
 the posture step. The live proof is the next rescan. yamllint's warning
 count rose with the new long error lines (warnings, the file's style); no
 new actionlint class.
+
+## D2: verified reads (2026-09-09)
+
+Branch: `d2-verified-reads`. Review disposition D2 (theme 2; task 15.2).
+Goal: no read of the day's evidence trusts what a sibling verifies.
+
+- [x] 1. Tests first: the comparator suite's cosign stub verifies issuer and identity;
+      cases for a non-admitted signer, no admitted role, the verified invocation
+- [x] 2. package-set-diff.sh reads the published CycloneDX through cosign verify-attestation
+      against the policy file's cyclonedx roles (PACKAGE_SET_DIFF_ROOT seam)
+- [x] 3. rescan.yml: the lifecycle's application moves after re-attestation and withholds
+      every action, by the digests' names, on a day any digest's reports failed to attest;
+      rescan-status gets --vex-reports and its guard; comments and summary line true
+- [x] 4. Spec: Decisions 6 and 7 as-built corrections; task 15.2; the manual's issue
+      paragraph; step-graph rehearsal; validate chain; em-dash sweep
+
+**Review (2026-09-09).** The 6.54 question was decided by ordering rather
+than by amending the criterion: closes and reopens now happen after the
+reports they rest on are attested, and are withheld when that failed, so
+the text holds literally; a skipped digest needs no rule because the tool
+already treats a missing report as unscanned. The one cost, a day's lag in
+the compiler's open-issue map, is written where it happens. The withholding
+expression was rehearsed on a fixture record; the comparator's new read is
+tested against a stub that behaves like Fulcio verification; Go was not
+touched.

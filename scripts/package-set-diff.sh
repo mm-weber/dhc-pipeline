@@ -7,6 +7,16 @@
 # the canonicalised package set of the local build against the one recorded in
 # the CycloneDX SBOMs attested to the digest the full release tag points at.
 #
+# The published side is READ THROUGH VERIFICATION (review disposition D2,
+# 2026-09-09): `cosign verify-attestation --type cyclonedx` against the
+# issuer and the identities catalogue-policy.yaml admits for cyclonedx, the
+# same read scripts/fetch-sboms.sh makes for the issue lifecycle (Req 6.58).
+# Until then this script used `cosign download attestation`, which reads any
+# attestation under the repository regardless of who signed it, so an
+# attestation from any identity could have made the nightly discard a
+# rebuild. The policy file is found under PACKAGE_SET_DIFF_ROOT, defaulting
+# to this script's parent directory; no admitted identity is a refusal.
+#
 # The projection is exactly what Req 2.15 names and nothing else: package
 # type, name and version (the purl with its qualifiers dropped) plus the
 # package pull checksum (syft's `syft:metadata:pullChecksum` property; apk
@@ -33,7 +43,8 @@
 #                        sets all publish (Req 2.16), with the reason named.
 #
 # Exit 0 for either verdict. Exit 2 refuses: bad usage, a local SBOM that
-# does not parse, or a tool this script needs (docker, cosign, jq) missing
+# does not parse, a policy file naming no issuer or no role that attests
+# cyclonedx, or a tool this script needs (docker, cosign, jq) missing
 # from PATH, because each of those means our own build or environment is
 # broken and no comparison can be trusted. A missing tool is NOT an
 # unreadable attestation: measured 2026-09-08, build.yml installed cosign
@@ -49,6 +60,7 @@ if [ "$#" -lt 5 ]; then
   exit 2
 fi
 NAME="$1"; REF="$2"; LOCAL_DIGEST="$3"; OUT="$4"; shift 4
+ROOT="${PACKAGE_SET_DIFF_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 
 # The environment is checked before anything is read: a tool that is not
 # there is a refusal, never a verdict, so a broken runner can neither publish
@@ -59,6 +71,24 @@ for tool in docker cosign jq; do
     exit 2
   fi
 done
+
+# The identities the published side is read through (Req 2.23's declared
+# inputs): the issuer and every role that attests cyclonedx. None is a
+# refusal, since nothing could then be verified and nothing proven equal.
+[ -f "$ROOT/catalogue-policy.yaml" ] || { err "no catalogue-policy.yaml under ${ROOT}; the admitted identities are declared there (Req 2.23)"; exit 2; }
+ISSUER=$(python3 -c 'import sys,yaml; print((yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("issuer",""))' "$ROOT/catalogue-policy.yaml")
+mapfile -t IDS < <(python3 - "$ROOT/catalogue-policy.yaml" <<'PY'
+import sys, yaml
+doc = yaml.safe_load(open(sys.argv[1])) or {}
+for role in ((doc.get("verification") or {}).get("roles") or {}).values():
+    if "cyclonedx" in (role.get("attests") or []) and role.get("identity"):
+        print(role["identity"])
+PY
+)
+if [ -z "$ISSUER" ] || [ "${#IDS[@]}" -eq 0 ]; then
+  err "catalogue-policy.yaml names no issuer or no role that attests cyclonedx; the published SBOM cannot be read through verification, so equality cannot be proven (Req 2.15, 2.23)"
+  exit 2
+fi
 
 declare -A local_cdx=()
 for pair in "$@"; do
@@ -127,19 +157,23 @@ fi
 repo="${REF%:*}"
 any_diff=""
 while IFS=$'\t' read -r platform digest; do
-  # The attested CycloneDX document for this platform manifest. It travels
-  # in a bundle beside the SPDX, OpenVEX and vuln predicates; equality that
-  # cannot be read is equality that cannot be claimed.
-  if ! cosign download attestation "${repo}@${digest}" > "$WORK/bundle" 2>"$WORK/cosign.err"; then
-    different attestation-unreadable \
-      "no attestation bundle for ${platform} (${repo}@${digest}): $(tr -d '\n' < "$WORK/cosign.err")"
-  fi
-  jq -c '.payload | @base64d | fromjson
-         | select(.predicateType == "https://cyclonedx.org/bom") | .predicate' \
-    "$WORK/bundle" 2>/dev/null | head -n1 > "$WORK/pub.cdx.json"
+  # The attested CycloneDX document for this platform manifest, read only
+  # through verification against an admitted identity (D2, the fetch-sboms
+  # read): the first role whose signature verifies wins; equality that cannot
+  # be read this way is equality that cannot be claimed.
+  : > "$WORK/pub.cdx.json"; : > "$WORK/cosign.err"
+  for id in "${IDS[@]}"; do
+    if cosign verify-attestation --type cyclonedx --certificate-oidc-issuer "$ISSUER" --certificate-identity "$id" "${repo}@${digest}" </dev/null 2>>"$WORK/cosign.err" \
+         | jq -cn 'first(inputs | .payload | @base64d | fromjson
+                         | select(.predicateType == "https://cyclonedx.org/bom") | .predicate)' > "$WORK/pub.cdx.json" 2>/dev/null \
+       && [ -s "$WORK/pub.cdx.json" ]; then
+      break
+    fi
+    : > "$WORK/pub.cdx.json"
+  done
   if [ ! -s "$WORK/pub.cdx.json" ]; then
     different attestation-unreadable \
-      "the bundle on ${platform} (${repo}@${digest}) carries no CycloneDX attestation"
+      "no CycloneDX attestation on ${platform} (${repo}@${digest}) verifies against an admitted identity ($(printf '%s, ' "${IDS[@]}" | sed 's/, $//')): $(grep -v '^$' "$WORK/cosign.err" | tail -n1 | tr -d '\n')"
   fi
   project "$WORK/pub.cdx.json" > "$WORK/pub-${platform//\//-}.set"
 
