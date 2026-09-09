@@ -111,7 +111,7 @@ stage() { # tool, asset, url, shipped-digest — verified binary into $STAGE, 1 
   # Fetch to a file, never a pipe: `curl … | sha256sum` will hash a truncated
   # body and print a confident, wrong digest. -f makes an HTTP error an error
   # instead of a hashed error page.
-  if ! curl -fsSL --max-time 300 -o "$tarball" "$url"; then
+  if ! curl -fsSL --max-time 300 --retry 3 --retry-delay 5 --retry-all-errors -o "$tarball" "$url"; then
     err "${tool}: could not fetch ${asset} from ${url}"
     return 1
   fi

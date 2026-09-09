@@ -221,7 +221,10 @@ fi
 # Fetch to a file, never a pipe: tar reading from curl unpacks whatever a
 # truncated or substituted body holds, and a piped sha256sum hashes it and
 # prints a confident, wrong digest.
-if ! curl -fsSL --max-time 300 -o "$WORK/$asset" "$url"; then
+# --retry on transient failures (a release-asset CDN hiccup failed the e2e
+# install once, 2026-09-09); the checksum below is what decides, so a retry
+# can only ever fetch the same bytes or fail again.
+if ! curl -fsSL --max-time 300 --retry 3 --retry-delay 5 --retry-all-errors -o "$WORK/$asset" "$url"; then
   err "${TOOL}: could not fetch ${asset} from ${url}"
   exit 1
 fi
