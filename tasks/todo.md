@@ -825,3 +825,32 @@ play disagree on `yes`; that is the whole point of the refusal. The
 govulncheck step stays non-gating: the build continues, the step is red and
 annotated, and the summary can no longer say "no Go binaries" about an
 image the tool never read. The canary build on this PR runs the step live.
+
+## D4: the pin surface (2026-09-09)
+
+Branch: `d4-pin-surface`. Review disposition D4 (theme 4; task 15.4).
+Goal: every pin the conventions claim is pinned and tracked, is.
+
+- [x] 1. cosign: sha256 from the release's checksums file, second source the keyless
+      signature verified by hand (openssl; Fulcio chain from sigstore/root-signing;
+      release identity in the SAN); install-tool.sh case and tests; both workflows install
+      through it; a real install verified locally (v2.6.0)
+- [x] 2. renovate.json5: github-actions and gomod on (gomodTidy), Actions never automerged,
+      a probe-image manager; strict validator green
+- [x] 3. e2e.yml: the probe image is the curl project's GHCR multi-arch image pinned by
+      digest, pulled by digest and loaded by tag (pull, tag and a run as 65532 rehearsed);
+      the Go comment corrected
+- [x] 4. managers.test.mjs: eighth tool pin, the probe manager, the built-ins and their
+      rules, and a marker sweep (named cosign on main's tree)
+- [x] 5. CONVENTIONS' 7.5 paragraph true; P1 closed into the automated paragraph; M5
+      updated; the manual's tables; design as-built; task 15.4; validate chain
+
+**Review (2026-09-09).** Docker Hub's address had left the firewall
+snapshot, so the probe image's digest could not be resolved there; the
+curl project's own image on GHCR resolved, runs curl 8.11.1 as UID 65532
+and spares the runner Docker Hub's anonymous rate limit, so the pin moved
+registries rather than waiting. cosign's Rekor entry is unreachable from
+here, so the second source is the offline half of keyless verification:
+the signature against the certificate's key and the certificate against
+Fulcio's chain, identity read from the SAN. Go was not compiled here; the
+comment change in the suite is prose.

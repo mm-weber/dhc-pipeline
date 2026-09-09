@@ -1188,6 +1188,28 @@ until the new digests are recorded, which is the design working, not a defect.
 A checksum that updates itself would verify nothing. (Tasks 1.3 and 8.6;
 issues #54/#55/#63/#74.)
 
+**As built, corrected 2026-09-09 (review disposition D4).** The pin surface had
+four holes the paragraph above did not admit. cosign arrived through the
+`sigstore/cosign-installer` action with an exact version and no checksum recorded
+here, and no manager could match its line (register row P1); it is now the eighth
+tool in `install-tool.sh`, its sha256 recorded and verified against the release's
+checksums file and, by hand, against its keyless signature (the certificate
+chaining to the Fulcio root in sigstore/root-signing, cosign's release identity in
+the SAN), and the pin-script manager tracks it. The 25 SHA-pinned Actions received
+no bump because only the regex managers were on; the built-in `github-actions`
+manager is now on, under the three-day age rule, with a rule ordered after the
+github-tags automerge so Action bumps are reviewed, never automerged. The e2e
+probe image was a mutable Docker Hub tag with a comment claiming a digest; it is
+now the curl project's own multi-arch image on GHCR, pinned by digest in
+`e2e.yml`, pulled by digest and loaded into kind under its tag (a loaded image
+cannot match an index digest), with a regex manager of its own. The two Go
+modules (`test/`, `triage/rescan`) were untracked since task 6.1 despite the
+config's own note; `gomod` is on with `gomodTidy`, the Renovate image installing
+the Go version go.mod names. And the fixture suite, which had counted "exactly
+one dep" around the unmatched cosign marker, now sweeps every `# renovate:` marker
+in a file some manager reads and fails when one resolves to no dependency, the
+check that names cosign on the tree as it was.
+
 ## Data Models
 
 Definition schema: native `dhi.io/build` syntax (ADR 0001), validated by the frontend itself

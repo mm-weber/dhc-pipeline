@@ -54,7 +54,7 @@ function extract(manager, content) {
 }
 
 const read = (rel) => readFileSync(join(root, rel), "utf8");
-const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr, workflowMgr, chartDigestMgr, chartTagMgr, pipMgr, goBumpMgr, helmMgr] =
+const [sourceMgr, dockerMgr, grafanaMgr, scannerMgr, workflowMgr, probeMgr, chartDigestMgr, chartTagMgr, pipMgr, goBumpMgr, helmMgr] =
   config.customManagers;
 
 // managerFilePatterns is the half extract() cannot exercise: a pattern that
@@ -431,8 +431,10 @@ check(
   // bumps, and a stale tool fails silently (Req 7.6). syft joined with the
   // release arm's per-manifest SBOMs (task 9.1), crane with the rescan's
   // enumeration (9.3), vexctl with the rescan's re-attestation merge (10.3),
-  // tag enumeration (task 9.3).
-  check("tool pins: install-tool.sh yields exactly seven deps", pins.length === 7, `${pins.length}`);
+  // tag enumeration (task 9.3), cosign with review D4 (it arrived through an
+  // installer action with a version and no checksum, and no manager matched
+  // its line; register row P1).
+  check("tool pins: install-tool.sh yields exactly eight deps", pins.length === 8, `${pins.length}`);
 
   for (const [tool, depName] of [
     ["kind", "kubernetes-sigs/kind"],
@@ -442,6 +444,7 @@ check(
     ["syft", "anchore/syft"],
     ["crane", "google/go-containerregistry"],
     ["vexctl", "openvex/vexctl"],
+    ["cosign", "sigstore/cosign"],
   ]) {
     const dep = pins.find((d) => d.depName === depName);
     check(`tool pins: ${tool} is tracked as ${depName}`, !!dep);
@@ -486,6 +489,7 @@ check(
     );
   }
   check("workflow pins: build.yml yields exactly one dep", build.length === 1, `${build.length}`);
+  check("workflow pins: no cosign-release key remains for this manager to miss (D4)", !/^\s+cosign-release:/m.test(read(".github/workflows/build.yml")) && !/^\s+cosign-release:/m.test(read(".github/workflows/rescan.yml")));
 
   const validate = extract(workflowMgr, read(".github/workflows/validate.yml"));
   for (const [name, re] of [
@@ -755,6 +759,59 @@ check(
     check("tracking scope: renovate file-match module loadable", false, `${e.message}: path moved on a renovate major?`);
   }
   rmSync(sb, { recursive: true, force: true });
+}
+
+// --- the probe image, the built-in managers, and marker completeness (D4) --
+{
+  // The e2e probe image is pinned by tag@digest in e2e.yml and tracked.
+  const e2e = extract(probeMgr, read(".github/workflows/e2e.yml"));
+  const d = dep(e2e, { datasource: "docker", depName: "ghcr.io/curl/curl-container/curl-multi" });
+  check("probe image: e2e.yml's PROBE_IMAGE is captured as a docker dep with tag and digest", !!d && isTag(d.currentValue) && is64(d.currentDigest), JSON.stringify(e2e));
+  check("probe image: exactly one dep", e2e.length === 1, `${e2e.length}`);
+  check("probe image: the workflow env-pin manager does not capture it", extract(workflowMgr, read(".github/workflows/e2e.yml")).length === 0);
+  check("probe image: the manager reads workflow files", filePatternMatches(probeMgr, ".github/workflows/e2e.yml") && !filePatternMatches(probeMgr, "image/grafana/image.yaml"));
+  // The pin is what the workflow pulls: a tag alone would be the mutable
+  // reference D4 removed.
+  check("probe image: the workflow pins by digest", /PROBE_IMAGE: \S+@sha256:[a-f0-9]{64}/.test(read(".github/workflows/e2e.yml")));
+
+  // Two built-in managers on (D4): the SHA-pinned actions and the Go modules.
+  check("managers: github-actions is enabled", config.enabledManagers.includes("github-actions"), JSON.stringify(config.enabledManagers));
+  check("managers: gomod is enabled with gomodTidy", config.enabledManagers.includes("gomod") && (config.postUpdateOptions ?? []).includes("gomodTidy"), JSON.stringify(config.postUpdateOptions));
+  const actionsRule = config.packageRules.findIndex((r) => JSON.stringify(r.matchManagers) === JSON.stringify(["github-actions"]));
+  const tagsAutomerge = config.packageRules.findIndex((r) => r.automerge === true && JSON.stringify(r.matchDatasources) === JSON.stringify(["github-tags"]));
+  check("actions: a rule says automerge: false for the github-actions manager", actionsRule >= 0 && config.packageRules[actionsRule].automerge === false);
+  check("actions: that rule is ordered after the github-tags automerge rule, so it wins", actionsRule > tagsAutomerge, `${actionsRule} vs ${tagsAutomerge}`);
+  check("actions: every uses: is a full commit SHA with a version comment the manager reads", (() => {
+    const { readdirSync } = require("node:fs");
+    let ok = true;
+    for (const f of readdirSync(join(root, ".github/workflows")).filter((n) => /\.ya?ml$/.test(n))) {
+      for (const m of read(`.github/workflows/${f}`).matchAll(/^\s+(?:- )?uses:\s*(\S+)(.*)$/gm)) {
+        if (!/^[^@]+@[a-f0-9]{40}$/.test(m[1]) || !/#\s*v\d/.test(m[2])) { ok = false; console.log(`     ${f}: ${m[1]}${m[2]}`); }
+      }
+    }
+    return ok;
+  })());
+
+  // Every `# renovate:` marker in a file some manager reads resolves to a
+  // dependency of a manager reading that file: the miss class D4 closed
+  // (cosign's marker sat in build.yml, a file the workflow manager reads,
+  // beside a pin its regex could not match, and this suite counted "exactly
+  // one dep" around it). Files no manager reads (review measurements, test
+  // fixtures) are out of scope by construction.
+  const { execSync } = require("node:child_process");
+  const files = execSync("git ls-files -z", { cwd: root }).toString().split("\0").filter(Boolean)
+    .filter((f) => config.customManagers.some((mgr) => filePatternMatches(mgr, f)));
+  let markers = 0, unresolved = [];
+  for (const f of files) {
+    const text = (() => { try { return read(f); } catch { return ""; } })();
+    for (const m of text.matchAll(/#\s*renovate:\s*datasource=(\S+)\s+depName=(\S+)/g)) {
+      markers++;
+      const [, ds, name] = m;
+      const found = config.customManagers.some((mgr) => filePatternMatches(mgr, f) && extract(mgr, text).some((d) => d.depName === name && d.datasource === ds));
+      if (!found) unresolved.push(`${f}: ${ds} ${name}`);
+    }
+  }
+  check(`markers: every # renovate: marker resolves to a manager dep (${markers} markers)`, markers > 0 && unresolved.length === 0, unresolved.join("; "));
 }
 
 if (failures > 0) {

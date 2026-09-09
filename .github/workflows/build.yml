@@ -279,7 +279,7 @@ jobs:
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
       # cosign serves two steps on main: the publish-on-change comparator
-      # below reads the published SBOM through `cosign download attestation`,
+      # below reads the published SBOM through `cosign verify-attestation`,
       # and the release part signs and attests with it. It is installed here,
       # before both. Until 2026-09-08 it was installed in the release part
       # only, after the comparator; the runner image ships no cosign, so the
@@ -287,19 +287,22 @@ jobs:
       # attestation, which by design publishes, and every nightly rebuild
       # from 2026-09-02 published every definition (measured: 28 needless
       # digests). The comparator now refuses outright when a tool is missing.
+      #
+      # Through scripts/install-tool.sh since review D4 (2026-09-09), like
+      # every other workflow-installed binary: an exact version AND a sha256
+      # recorded in this repository, and the pin-script Renovate manager over
+      # it (Req 7.5, 7.6; register row P1 closed). The sigstore/cosign-installer
+      # action it replaces pinned the version only, and no manager could
+      # match its `cosign-release:` line. The v2 line stays deliberate (ADR
+      # 0003, measured): cosign v3 writes a bundle layout Kyverno 1.18.2 and
+      # Trivy 0.72.0 cannot find, so v3 waits behind the major gate.
       - name: install cosign
         if: github.ref == 'refs/heads/main'
-        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
-        with:
-          # Pinned to the v2 line deliberately (ADR 0003, measured): cosign v3
-          # writes a bundle layout Kyverno 1.18.2 and Trivy 0.72.0 cannot find,
-          # so a v3 signature is invisible to both consumers this catalogue
-          # makes promises to. CI was on v2 only by the installer's default,
-          # which is not a pin. Not yet Renovate-tracked: no manager matches
-          # a `cosign-release:` line (found 2026-09-08 while moving this
-          # step; the tracking is a follow-up, Req 7.6).
-          # renovate: datasource=github-releases depName=sigstore/cosign
-          cosign-release: v2.6.0
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/bin"
+          scripts/install-tool.sh cosign "${RUNNER_TEMP}/bin"
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
       # ---- Daily rebuild, publish-on-change (task 9.2, Req 2.14-2.17) ----
       # The scheduled path builds LOCALLY first: same definition, same pins,

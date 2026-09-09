@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install-tool.sh <kind|kyverno|helm|ct|syft|crane> [<destdir>]
+# install-tool.sh <kind|kyverno|helm|ct|syft|crane|vexctl|cosign> [<destdir>]
 #
 # Install one workflow tool pinned to an exact version and verified against a
 # sha256 recorded in this file (Req 7.5, docs/CONVENTIONS.md "Pinning").
@@ -80,6 +80,17 @@ CRANE_SHA256="0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0"
 # renovate: datasource=github-releases depName=openvex/vexctl
 VEXCTL_VERSION="0.4.4"
 VEXCTL_SHA256="d315e2778af88b999ad4bba30a08aa2677ed701638e16c341b6d57b43c1e064d"
+
+# cosign v2: the line with `attest --replace` and the bundle layout Kyverno
+# 1.18.2 and Trivy 0.72.0 read (ADR 0003, task 9.1); v3 changes the bundle
+# and stays behind the major gate. Pin verified 2026-09-09 (review D4):
+# cosign_checksums.txt agrees, and the release's keyless signature over the
+# binary verifies with its certificate's key (openssl), the certificate
+# chaining to the Fulcio root in sigstore/root-signing with the identity
+# keyless@projectsigstore.iam.gserviceaccount.com, issued 2025-09-12.
+# renovate: datasource=github-releases depName=sigstore/cosign
+COSIGN_VERSION="2.6.0"
+COSIGN_SHA256="ea5c65f99425d6cfbb5c4b5de5dac035f14d09131c1a0ea7c7fc32eab39364f9"
 
 err() { printf '::error::install-tool: %s\n' "$1" >&2; }
 
@@ -171,8 +182,23 @@ case "$TOOL" in
     member=""
     extras=""
     ;;
+  cosign)
+    # Signs, attests and verifies every release and re-attestation (Req 2.9,
+    # 6.42, 6.43) and reads attestations for the comparator and the
+    # lifecycle (Req 2.15, 6.58). Installed here rather than through the
+    # sigstore/cosign-installer action since review D4, so the binary's
+    # checksum is recorded in this repository and the pin is tracked
+    # (Req 7.5, 7.6; register row P1 closed).
+    version="$COSIGN_VERSION"
+    shipped="$COSIGN_SHA256"
+    asset="cosign-linux-amd64"
+    url="${BASE_URL}/sigstore/cosign/releases/download/v${COSIGN_VERSION}/${asset}"
+    tarball=""
+    member=""
+    extras=""
+    ;;
   *)
-    err "usage: install-tool.sh <kind|kyverno|helm|ct|syft|crane|vexctl> [<destdir>], got '${TOOL}'"
+    err "usage: install-tool.sh <kind|kyverno|helm|ct|syft|crane|vexctl|cosign> [<destdir>], got '${TOOL}'"
     exit 1
     ;;
 esac

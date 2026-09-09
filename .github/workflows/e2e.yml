@@ -107,7 +107,14 @@ jobs:
         component: ${{ fromJSON(needs.affected.outputs.names) }}
     env:
       CLUSTER: dhc-e2e
-      PROBE_IMAGE: curlimages/curl:8.11.1
+      # The HTTP probe's image (task 6.5): curl's own container from the curl
+      # project's registry, pinned by digest (review D4: it was a mutable
+      # Docker Hub tag, the CVE-2026-33634 re-publication shape). Pulled by
+      # digest and loaded into kind under its tag; the suite receives the tag
+      # it loaded, since a loaded image cannot match an index digest (the
+      # reason the catalogue images are pulled, below). Test scaffolding, not
+      # a shipped image; the probe-image Renovate manager tracks it.
+      PROBE_IMAGE: ghcr.io/curl/curl-container/curl-multi:8.11.1@sha256:2db4e6a8fd6a0e4d0db5828b2722cf6db15c3005178a4c65588b903e4784ba11
       ARTIFACTS: ${{ github.workspace }}/e2e-artifacts
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -167,9 +174,15 @@ jobs:
           kubectl wait --for=condition=Ready nodes --all --timeout=120s
 
       - name: load probe image into kind
+        id: probe
         run: |
+          set -euo pipefail
+          # Pull by digest, load by tag: the bytes are the pinned ones, the
+          # name is what containerd matches a pod's image against.
           docker pull "$PROBE_IMAGE"
-          kind load docker-image --name "$CLUSTER" "$PROBE_IMAGE"
+          docker tag "$PROBE_IMAGE" "${PROBE_IMAGE%@*}"
+          kind load docker-image --name "$CLUSTER" "${PROBE_IMAGE%@*}"
+          echo "tag=${PROBE_IMAGE%@*}" >> "$GITHUB_OUTPUT"
 
       # On a bump the upgrade-path spec (Req 5.6) installs the base state then
       # upgrades to the proposed one. Two bump shapes: a chart bump moves
@@ -213,7 +226,7 @@ jobs:
         env:
           COMPONENT: ${{ matrix.component }}
           DHC_E2E: "1"
-          DHC_PROBE_IMAGE: ${{ env.PROBE_IMAGE }}
+          DHC_PROBE_IMAGE: ${{ steps.probe.outputs.tag }}
           DHC_UPGRADE_FROM: ${{ steps.upgrade.outputs.from }}
           DHC_UPGRADE_VALUES_FROM: ${{ steps.upgrade.outputs.values_from }}
           DHC_ARTIFACTS: ${{ env.ARTIFACTS }}
