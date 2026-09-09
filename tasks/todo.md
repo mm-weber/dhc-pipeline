@@ -930,7 +930,7 @@ every script has a suite the workflow runs (review dispositions table, D7).
   existed: the new inactive-digest suite had no validate step until it named it.
 - Rehearsed as CI runs them: every validate lint-job step in order (the npm step
   skipped locally), yamale over the four charts, actionlint (one pre-existing
-  SC2129 on main), shellcheck at warning severity, lint-rescan-steps (24 steps
+  SC2129 on main), shellcheck at warning severity, lint-rescan-steps (23 steps
   after the scan carry always()), lint-workflow-policy, the rescan module's go
   vet and go test offline, the status tool with and without `--support`, the
   new rescan step's shell with stubs on both verdicts, and the check itself
