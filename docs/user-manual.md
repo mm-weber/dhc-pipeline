@@ -543,6 +543,18 @@ per image, the scanned digest, statements applied, statements dropped — with
 "compiled nothing" from "never compiled"; both otherwise produce an identical
 green run.
 
+A red rescan names every promise it did not keep that day, not only the
+first: since review disposition D1 (2026-09-09) every step after the scan
+runs regardless of what failed above it, with the outcome of the step that
+produces its input as its only condition, and refuses by name when that
+input is missing. So an upstream signal that moved (a `supply-chain` issue,
+register M18) no longer suspends the visibility invariant, the admission
+proof, the posture checks, the smoke test or the status issue while it
+waits for a decision; a KEV feed outage still withholds the exception
+tiers, the issue set and the status, because those are evaluations nobody
+made, and says so. Read the summary's annotations top to bottom; each
+failing step is one line.
+
 ### Branch protection
 
 Matrix legs are named dynamically (`build grafana`, `e2e valkey`), so no leg

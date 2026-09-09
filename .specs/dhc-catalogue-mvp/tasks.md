@@ -385,6 +385,12 @@
     - As built (2026-09-09): concepts.md "The builder contract per archetype" (input, the two outputs, the per-archetype source stanza, downstream reads outputs only), linked from both backend rows of the trust-boundary table; CONVENTIONS' Req 8.2 parenthetical and Req 1.5 citations re-anchored (Req 8 retired, Req 7.2 absorbed 1.5) and the second-opinion sentence states 6.6's retirement under Req 9.11 to 9.13; the manual's retired citations (8.1, 8.2, 2.6, 1.5, 6.6, 6.2) likewise; CONVENTIONS section "Active set, reference set, deactivation", the manual's "Deactivate a definition", glossary entries and a forking note; register rows M21 (renovate.json5 namespace literals) and M22 (the Kyverno fixture); the 14.2 present tense in the policy-file and schema comments; README's positioning sentence deferred to 12.1
     - _Requirements: Req 1.17, Req 4.1_
 
+- [ ] 15. Review dispositions (`reviews/2026-09-09-requirements-vs-implementation-review.md`; each row of its "Proposed dispositions" table joins here as the owner picks it, one pull request each)
+  - [x] 15.1 D1: the rescan's assertions run regardless of earlier steps
+    - Every step after the scan in `rescan.yml` declares `if: always()` with the outcome of its producer and refuses by name when its input file is missing; the four assertions inside `invariants` run independently; the header comment says what the file does; `scripts/lint-rescan-steps.sh` holds the rule in validate (a step after the scan without `always()` fails naming it)
+    - As built (2026-09-09): findings 2.9, 3.1, 3.5, 3.9 and 9.1 of the review; design Decision 6's as-built correction of the same date records the three assertion steps and the rule
+    - _Requirements: Req 2.21, Req 2.22, Req 2.24, Req 3.10, Req 4.9, Req 6.10, Req 6.44, Req 6.46, Req 6.47, Req 9.3, Req 9.7, Req 9.9, Req 9.12, Req 9.13_
+
 ## Requirements Coverage
 
 | Requirement | Covered By Tasks |

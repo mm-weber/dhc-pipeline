@@ -71,6 +71,14 @@ jobs:
       - name: workflow schedule + permissions vs policy file (Req 7.10)
         run: scripts/lint-workflow-policy.sh
 
+      # Review disposition D1 (2026-09-09): every step of the rescan after
+      # the scan runs regardless of earlier failures (`if: always()` with
+      # its producer's outcome), so no daily assertion or the status issue
+      # is suspended by an unrelated failure. A step added without it fails
+      # here by name.
+      - name: rescan steps run regardless of earlier failures (D1)
+        run: scripts/lint-rescan-steps.sh
+
       # The active set (task 14.2): well-formed (Req 1.19), splitting no
       # byte-equal pair or grouped monorepo (Req 1.18), every chart directory
       # naming the definitions it deploys; on a pull request, a change under
@@ -203,6 +211,9 @@ jobs:
 
       - name: probe lint unit tests (Req 5.8)
         run: scripts/lint-probes_test.sh
+
+      - name: rescan step-condition lint unit tests (D1)
+        run: scripts/lint-rescan-steps_test.sh
       - name: lint-compat unit tests (Req 4.8)
         run: scripts/lint-compat_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)
