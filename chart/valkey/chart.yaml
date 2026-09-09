@@ -5,6 +5,15 @@ upstream:
   repository: https://valkey-io.github.io/valkey-helm
   version: 0.12.0   # chart appVersion 9.1.1
 
+# The definitions this chart deploys (task 14.2, Req 1.14, 5.2). The chart
+# runs the `-compat` tag, built from image/valkey-compat/; the runtime
+# definition is listed too because the pair builds byte-equal source
+# (scripts/lint-pins.sh, variant parity) and this chart is the one workload
+# either image has, so it is the vehicle for both definitions' probe.
+deploys:
+  - valkey-compat
+  - valkey
+
 # NOTE: this is the valkey project's own chart, so its appVersion follows the
 # server release (0.11.0 ships 9.1.1, 0.12.0 ships 9.1.2). The image pin in
 # config/values-hardened.yaml may run a patch ahead of it between a definition

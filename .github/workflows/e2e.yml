@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       component:
-        description: "Single component (cert-manager|grafana|hardened-app|valkey); empty = all"
+        description: "Single component (a chart directory deploying an active definition); empty = all"
         required: false
         type: string
 
@@ -28,8 +28,11 @@ permissions:
 
 jobs:
   # Which chart-backed components does this PR touch? Emits a JSON array for the
-  # matrix. The image side of the regex below is `image/<c>(-|/)`, so a variant
-  # directory (image/valkey-compat/) marks its component affected too.
+  # matrix. A component is a chart directory whose `deploys:` list meets the
+  # active set (Req 1.14, 5.2; task 14.2), and a changed definition reaches its
+  # component through that list, never through a name prefix: three definitions
+  # share cert-manager's chart, and the valkey chart deploys the compat variant
+  # on the runtime definition's behalf.
   affected:
     name: affected components
     runs-on: ubuntu-latest
@@ -48,24 +51,43 @@ jobs:
           DISPATCH: ${{ github.event.inputs.component }}
         run: |
           set -euo pipefail
-          ALL="cert-manager grafana hardened-app valkey"
+          . scripts/definition-lib.sh
+          # "<chart>\t<its active definitions>" per component; a malformed
+          # active set is the reader's refusal and fails this job (and so the
+          # e2e gate) by name.
+          active_components . > "${RUNNER_TEMP}/components"
+          ALL=$(cut -f1 "${RUNNER_TEMP}/components")
+          # The simplest component for a harness smoke test: hardened-app
+          # while it is active, else the first component there is.
+          simplest=$(printf '%s\n' "$ALL" | grep -xF hardened-app || printf '%s\n' "$ALL" | head -n1)
 
           if [ "$EVENT" = "workflow_dispatch" ]; then
-            names="${DISPATCH:-$ALL}"
+            if [ -n "$DISPATCH" ]; then
+              if ! printf '%s\n' "$ALL" | grep -qxF -- "$DISPATCH"; then
+                echo "::error::dispatch names '${DISPATCH}', which is no chart directory deploying an active definition (chart/*/chart.yaml deploys, catalogue-policy.yaml active_set; Req 1.14, 5.2)"
+                exit 1
+              fi
+              names=$DISPATCH
+            else
+              names=$ALL
+            fi
           else
             git fetch --no-tags --depth=1 origin "$BASE_REF"
             changed=$(git diff --name-only "origin/${BASE_REF}...HEAD")
             names=""
-            for c in $ALL; do
-              # affected if the component's chart or any of its image definitions changed
-              if printf '%s\n' "$changed" | grep -qE "^chart/${c}/|^image/${c}(-|/)"; then
+            while IFS=$'\t' read -r c defs; do
+              [ -n "$c" ] || continue
+              # affected if the component's chart or any active definition it deploys changed
+              pattern="^chart/${c}/"
+              for d in $defs; do pattern="${pattern}|^image/${d}/"; done
+              if printf '%s\n' "$changed" | grep -qE "$pattern"; then
                 names="$names $c"
               fi
-            done
+            done < "${RUNNER_TEMP}/components"
             # When the e2e harness itself changes (this workflow or the Go suite),
             # smoke-test it on the simplest component so a harness edit is exercised.
             if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/e2e\.yml$|^test/(e2e|checks|install|harness)/'; then
-              names="$names hardened-app"
+              names="$names $simplest"
             fi
           fi
 

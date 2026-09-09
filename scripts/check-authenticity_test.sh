@@ -74,7 +74,14 @@ statement() { # version amd64 arm64
   printf '{"packages":[{"os":"linux","arch":"amd64","url":"https://x/app_%s_linux_amd64.tar.gz","sha256":"%s"},{"os":"linux","arch":"arm64","url":"https://x/app_%s_linux_arm64.tar.gz","sha256":"%s"}]}\n' "$1" "$2" "$1" "$3" > "$SB/versions/$1"
 }
 sidecars() { printf '%s\n' "$1" > "$SB/dist/app_amd64.tar.gz.sha256"; printf '%s\n' "$2" > "$SB/dist/app_arm64.tar.gz.sha256"; }
-run() { PATH="$SB/bin:$PATH" "$CHECK" "$SB/root" "$SB/out.jsonl" 2>&1; }
+# The check re-verifies ACTIVE definitions (Req 3.10 as amended; task 14.2):
+# a case that writes no policy file gets every definition it created listed,
+# the pre-14.2 behaviour; a case about deactivation writes its own.
+policy() { { printf 'active_set:\n'; printf '  - %s\n' "$@"; } > "$SB/root/catalogue-policy.yaml"; }
+run() {
+  [ -f "$SB/root/catalogue-policy.yaml" ] || policy $(ls "$SB/root/image")
+  PATH="$SB/bin:$PATH" "$CHECK" "$SB/root" "$SB/out.jsonl" 2>&1
+}
 rec() { jq -r "$1" "$SB/out.jsonl"; }
 
 # 1: every class verifies: exit 0, one record per definition, all ok
@@ -139,6 +146,23 @@ out=$(run); rc=$?
 grep -q "::warning::check-authenticity: chart valkey: the compat decision's review-by date 2026-09-01 has passed (today 2026-09-06)" <<<"$out" && pass "the lapse is reported by name" || fail "lapse" "$out"
 grep -q "1 lapsed compat review-by date(s)" <<<"$out" && pass "and counted" || fail "count" "$out"
 [ "$(rec 'select(.class == "compat" and .ok) | .definition')" = "chart/grafana" ] && pass "a future date is recorded as ahead" || fail "future" "$(cat "$SB/out.jsonl")"
+
+# 7: Req 3.10 (task 14.2): an inactive definition is outside the tracking
+#    scope, so its signal is not re-verified: a tag that moved under it does
+#    not fail the run, no record is written for it, and the summary says so
+fresh
+git_def cm signed-tag cert-manager/cert-manager v1.21.1 "$COMMIT"; refs "refs/tags/v1.21.1^{}|$COMMIT" "refs/tags/v1.21.1|$TAGOBJ"; verification tag cert-manager/cert-manager "$TAGOBJ" true valid
+git_def old signed-tag acme/old v1.0.0 "$COMMIT"; refs "refs/tags/v1.0.0^{}|$OTHER" "refs/tags/v1.0.0|$TAGOBJ"
+policy cm
+out=$(run); rc=$?
+[ "$rc" -eq 0 ] && pass "an inactive definition's moved tag does not fail the run" || fail "inactive" "rc=$rc" "$out"
+[ "$(rec '.definition' | sort | tr '\n' ' ')" = "cm " ] && pass "no record for the inactive definition" || fail "records" "$(cat "$SB/out.jsonl")"
+grep -q "1 inactive definition(s) not re-verified" <<<"$out" && pass "the summary counts the inactive definition" || fail "summary" "$out"
+grep -q "old" <<<"$(rec '.definition')" && fail "inactive not recorded" || pass "the inactive definition is named nowhere in the records"
+# and a malformed set is the reader's refusal, not a silent empty scope
+policy cm typo
+out=$(run); rc=$?
+[ "$rc" -eq 2 ] && grep -q "typo" <<<"$out" && pass "a malformed active set refuses naming the entry" || fail "malformed" "rc=$rc" "$out"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all check-authenticity tests passed"

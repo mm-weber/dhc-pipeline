@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0 # the active-set lint diffs a pull request against its base (task 14.2)
 
       # Exact pins + hashes in the requirements file (Req 7.5, #74): pip
       # refuses any artifact whose sha256 is not recorded there.
@@ -26,7 +28,8 @@ jobs:
       # decision have a shape (yamale) and a clock (lint-compat.sh).
       - name: chart pins and compat decisions (Req 4.5, 4.8)
         run: |
-          yamale -s chart/chart.schema.yaml chart/cert-manager/chart.yaml chart/grafana/chart.yaml chart/valkey/chart.yaml
+          yamale -s chart/chart.schema.yaml \
+            chart/cert-manager/chart.yaml chart/grafana/chart.yaml chart/hardened-app/chart.yaml chart/valkey/chart.yaml
           scripts/lint-compat.sh
 
       # Req 9.6 (task 13.3): every entry of the revocation record fits its
@@ -67,6 +70,32 @@ jobs:
 
       - name: workflow schedule + permissions vs policy file (Req 7.10)
         run: scripts/lint-workflow-policy.sh
+
+      # The active set (task 14.2): well-formed (Req 1.19), splitting no
+      # byte-equal pair or grouped monorepo (Req 1.18), every chart directory
+      # naming the definitions it deploys; on a pull request, a change under
+      # an inactive definition or under a chart deploying no active
+      # definition fails naming it (Req 1.16). The pull request's paths come
+      # from the diff against its base; a push to main has nothing to refuse.
+      - name: active-set coherence and scope (Req 1.16, 1.18, 1.19)
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE_REF"
+            git diff --name-only "origin/${BASE_REF}...HEAD" > "${RUNNER_TEMP}/changed"
+            scripts/lint-active-set.sh --changed "${RUNNER_TEMP}/changed" .
+          else
+            scripts/lint-active-set.sh .
+          fi
+
+      # Renovate reads no policy file, so the tracking scope reaches it as a
+      # rendered ignorePaths block; a hand edit or a stale render goes red
+      # here (Req 1.14, 7.9 pattern).
+      - name: tracking scope rendering drift check (Req 1.14)
+        run: scripts/render-tracking.sh --check
 
       - name: definition-lib unit tests (directory vs published name)
         run: scripts/definition-lib_test.sh
@@ -159,6 +188,12 @@ jobs:
         run: scripts/consumer-smoke_test.sh
       - name: lint-log-anchors unit tests (Req 9.18)
         run: scripts/lint-log-anchors_test.sh
+
+      - name: active-set lint unit tests (Req 1.16, 1.18, 1.19)
+        run: scripts/lint-active-set_test.sh
+
+      - name: tracking-scope rendering unit tests (Req 1.14)
+        run: scripts/render-tracking_test.sh
       - name: lint-compat unit tests (Req 4.8)
         run: scripts/lint-compat_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)

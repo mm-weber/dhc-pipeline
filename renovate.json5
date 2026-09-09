@@ -23,6 +23,19 @@
   // security patch was skipped silently on every run ("Reached branch limit").
   prConcurrentLimit: 20,
 
+  // The tracking scope (Req 1.14, 3.2, 3.11; task 14.2). Renovate cannot read
+  // catalogue-policy.yaml, so scripts/render-tracking.sh renders its active
+  // set here as ignorePaths: one glob per inactive definition directory and
+  // per chart directory deploying no active definition, so no bump opens for
+  // a frozen definition. Every path is skipped before any manager reads it
+  // (measured on 41.173.1). Empty while everything is active, the reference
+  // instance's state. Do not edit between the markers: validate fails on
+  // drift (Req 7.9); edit the active set or a chart's deploys list and
+  // re-render.
+  // render-tracking:begin
+  ignorePaths: [],
+  // render-tracking:end
+
   customManagers: [
     {
       // Upstream source: the single version knob. `url: git+https://…#vX.Y.Z`

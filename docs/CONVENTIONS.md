@@ -248,6 +248,19 @@ tool pins, workflow and CI dependency pins) carry one manager each:
   both that it captures its own definitions and that it does **not** capture
   the others. `renovate-config-validator --strict` proves the config parses;
   only the fixtures prove the regexes still match.
+- **The tracking scope is the active set** (`catalogue-policy.yaml`
+  `active_set`, Req 1.14; task 14.2). Renovate reads no policy file, so
+  `scripts/render-tracking.sh` renders the set into the delimited
+  `ignorePaths` block of `renovate.json5`: one glob per inactive definition
+  directory and per chart directory whose `deploys:` list names no active
+  definition, so no bump opens for a frozen definition (Renovate skips every
+  file under an ignored path before any manager reads it). validate fails on
+  drift between the block and the set; edit the set or a chart's `deploys:`
+  and re-render, never the block. The same mapping drives the build and e2e
+  matrices: `scripts/definition-lib.sh` reads the set and each chart's
+  `deploys:` list, and `scripts/lint-active-set.sh` holds the set coherent
+  (a byte-equal pair or a source-grouped monorepo activates or deactivates
+  whole, Req 1.18; every entry is a definition directory, Req 1.19).
 
 ## Chart override style (Req 4)
 
@@ -400,6 +413,11 @@ asserting the repository's governance and its revocation record daily
   release bump has aged three days before its PR exists (Req 3.7).
 - Review checklist: pins intact, conventions above, README deviations updated,
   test evidence for behavior claims.
+- A definition outside the active set is frozen: a pull request changing a
+  file under its directory, or under a chart deploying no active definition,
+  fails validation naming it (Req 1.16). Activate the definition in the same
+  pull request (`active_set` in `catalogue-policy.yaml`) or leave it; deleting
+  the directory passes, since a deletion changes nothing frozen.
 - The ruleset that enforces the gates is code: `.github/rulesets/main_sec.json`
   (GitHub's export format) is compared daily against the live ruleset
   through anonymous reads, both directions (Req 9.8, 9.9); `CODEOWNERS` names
