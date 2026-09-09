@@ -97,6 +97,21 @@ source_repository() { # definition path
     | head -n1 | sed -E 's#\.git$##'
 }
 
+# definition_tags <image.yaml> -> the definition's declared `tags:`, one per
+# line, declared order; nothing without the key. This is the reading behind
+# "supported": a tag some current definition lists (requirements.md, Terms).
+# The enumeration and the catalogue page's definitions list both read
+# through it (task 15.8), so the two cannot disagree on what a definition
+# declares. python3 rather than yq: the runner ships mikefarah yq, the
+# devcontainer a python wrapper, and their dialects disagree.
+definition_tags() { # definition path
+  python3 - "$1" <<'PY'
+import sys, yaml
+for t in (yaml.safe_load(open(sys.argv[1])) or {}).get("tags") or []:
+    print(t)
+PY
+}
+
 # chart_deploys <chart.yaml> -> the definition directories the chart declares
 # it deploys (task 14.2's `deploys:` list), one per line, declared order;
 # nothing when the list is absent. The e2e matrix and 14.3's probe lint map

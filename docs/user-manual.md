@@ -313,7 +313,7 @@ tells you how portable the statements have proven to be so far, and
 | `chart.yml`    | every PR + main            | Render *every* chart, evaluate with the Kyverno policies; `ct lint` on owned charts |
 | `e2e.yml`      | PR + dispatch              | Per affected component: kind cluster, install the hardened chart, run the Ginkgo suite |
 | `renovate.yml` | cron every 4h + dispatch   | Self-hosted Renovate over the custom managers; postUpgradeTasks recompute derived fields |
-| `rescan.yml`   | daily 06:17 UTC + dispatch | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set, close them on evidence with graded labels and reopen them on recurrence; the clocks over the supported set to the catalogue status issue; expiry warnings; the VEX portability block over the supported set and the consumer smoke test (the README recipe run verbatim against one digest) |
+| `rescan.yml`   | daily 06:17 UTC + dispatch | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set, close them on evidence with graded labels and reopen them on recurrence; the clocks over the supported set to the catalogue status issue and the catalogue page to GitHub Pages; expiry warnings; the VEX portability block over the supported set and the consumer smoke test (the README recipe run verbatim against one digest) |
 
 Every GitHub Action is pinned to a full commit SHA, and every third-party
 executable a workflow installs is exact-version-pinned and checksum-verified
@@ -598,7 +598,7 @@ name. `CODEOWNERS` names the maintainer per lane (Req 9.10), and
 |---------------------------|--------------------------|---------------------------------------------------|-------------|
 | Renovate (`renovate.yml`) | every 4h (Req 3.1)       | Bump PRs; the Dependency Dashboard issue          | Actions tab · issue #5 |
 | Rebuild (`build.yml`)     | daily 04:47 UTC (Req 2.14)| Fresh digests for every definition whose package set changed; a discard line for the rest | Actions tab · the run summary per image |
-| Rescan (`rescan.yml`)     | daily 06:17 UTC (Req 2.22, which absorbed the retired Req 6.2)| Enumeration of every catalogue tag; the visibility invariant and the admission proof (Req 2.21, 2.24); every platform manifest scanned by digest; today's reports attested and the OpenVEX document re-attested on change, replacing (Req 6.42, 6.43); the cve issue lifecycle over the supported set, closing on evidence with graded labels and reopening on recurrence (Req 6.52 to 6.57); the clocks to the catalogue status issue (Req 6.46, 6.47); expiry warnings; VEX compile report | Actions tab · `cve`-labeled issues · the "Catalogue status" issue |
+| Rescan (`rescan.yml`)     | daily 06:17 UTC (Req 2.22, which absorbed the retired Req 6.2)| Enumeration of every catalogue tag; the visibility invariant and the admission proof (Req 2.21, 2.24); every platform manifest scanned by digest; today's reports attested and the OpenVEX document re-attested on change, replacing (Req 6.42, 6.43); the cve issue lifecycle over the supported set, closing on evidence with graded labels and reopening on recurrence (Req 6.52 to 6.57); the clocks to the catalogue status issue (Req 6.46, 6.47) and the catalogue page to GitHub Pages (Req 6.61, 6.62); expiry warnings; VEX compile report | Actions tab · `cve`-labeled issues · the "Catalogue status" issue · the catalogue page |
 
 Both are dispatchable on demand (Renovate with dry-run and debug knobs). A
 healthy quiet day is: Renovate runs green and opens nothing; rescan runs
@@ -709,6 +709,39 @@ the support statement in `catalogue-policy.yaml` says so, and the issue's
 opening paragraph quotes it verbatim from there, so the statement and the
 status cannot disagree. A Pages dashboard, if one is ever wanted, is
 presentation over that JSON and nothing else.
+
+### The catalogue page
+
+The picture of the catalogue (Req 6.61, 6.62; design Decision 12):
+https://mm-weber.github.io/dhc-pipeline/. The status tool renders it in the
+same step as the issue, from the same data through a second template, plus
+three inputs the issue does not need: the definitions list (name, active or
+inactive, published repository, declared tags, derived through
+`definition-lib.sh` in the policy file's order), the day's admission proof
+(`verify-catalogue.json`: admitted or not, per digest) and the exception
+lint's report (lapsing and lapsed entries, attributed to the definition whose
+exception file carries them). One card per definition: its tags and the
+digest they reference, the platforms, whether the digest was scanned,
+attested and admitted by the verification policy that day, its findings
+within the aperture by severity with the undecided and over-ceiling counts,
+its lapsing exceptions; an inactive definition shows as inactive with its
+frozen tags, and a declared tag no digest carries today is listed as such.
+Beneath the cards: the support statement with the day's superseded count,
+the clocks table, the revocation record, and `metrics.json`, the data the
+page was drawn from. Every number is that JSON's or a count over it; the
+page loads nothing from anywhere and runs no code.
+
+Publication is a Pages deployment from a workflow artifact, never a commit:
+the rescan job uploads `rescan-out/site/` (index.html and metrics.json) and
+a second job with `pages: write` deploys it under GitHub's `github-pages`
+environment, then reads the served `metrics.json` back until its
+`generated_at` is the run's, failing by name otherwise (the CDN can lag a
+minute). The page is a fork switch, `release.page` in `catalogue-policy.yaml`
+(read through `release-policy.sh page`): a fork without Pages turns it off
+and its rescan stays green. Enabling Pages with source "GitHub Actions" is an
+owner setting (CONVENTIONS register row M23); the `github-pages` environment
+GitHub creates with it must stay without reviewers, or the nightly page
+waits for a human.
 
 ### Clearing a red gate — the four treatments
 
@@ -1236,7 +1269,7 @@ documentation — each states what it enforces and why it exists.
 | `lint-log-anchors.sh` | `[refs\|statements\|all] [root]` | Every exception ref and statement citation resolves to a `triage/LOG.md` heading (Req 9.18) |
 | `lint-workflow-policy.sh` | `[root]` | Every workflow's cron and permissions equal the policy file's declarations, both directions (Req 7.10) |
 | `lint-rescan-steps.sh` | `[workflow]` | Every rescan step after the scan runs regardless of earlier failures (review D1) |
-| `release-policy.sh` | `<root> <query>` | The one reader of the policy's `release` section; a misspelt switch is a refusal (Req 2.13, 2.14, 2.17, 7.7) |
+| `release-policy.sh` | `<root> <query>` | The one reader of the policy's `release` section, the page switch included; a misspelt switch is a refusal (Req 2.13, 2.14, 2.17, 6.61, 7.7) |
 | `render-verification.sh` | `[--check] [root]` | Renders the two Kyverno policies and the consumer recipe from the policy file; `--check` fails on drift (Req 7.8, 7.9) |
 | `render-tracking.sh` | `[--check] [root]` | Renders the active set into Renovate's ignore block; `--check` fails on drift (Req 1.14) |
 | `check-authenticity.sh` | `<root> <out.jsonl>` | Daily re-verification of every active definition's authenticity signal and the compat clocks (Req 3.10, 4.9) |
@@ -1292,7 +1325,7 @@ three-day minimum release age first.
 | **Req 3** — Upstream tracking | renovate.yml (4h cron) · renovate.json5 managers · refresh tasks · manager fixtures · Dependency Dashboard · three-day quarantine · declared authenticity signals (bump, PR, daily) · chart-version manager |
 | **Req 4** — Chart adaptation | `chart/*/` overlays + READMEs · chart.yml render + Kyverno gate · compat decision protocol |
 | **Req 5** — Integration tests | `test/` Ginkgo suite · e2e.yml kind matrix · upgrade path on both bump shapes · diagnostics artifacts |
-| **Req 6** — CVE triage | Scan gate + rescan cron · `triage/` two lanes, three published verbs · compile-vex (affected from exceptions, carry-forward) + both lints · govulncheck evidence · re-attestation replacing, exactly one OpenVEX per digest · issue filing, closing and reopening on evidence · the catalogue status issue |
+| **Req 6** — CVE triage | Scan gate + rescan cron · `triage/` two lanes, three published verbs · compile-vex (affected from exceptions, carry-forward) + both lints · govulncheck evidence · re-attestation replacing, exactly one OpenVEX per digest · issue filing, closing and reopening on evidence · the catalogue status issue · the catalogue page on GitHub Pages (Req 6.61, 6.62) |
 | **Req 7** — Conventions & enforcement | `docs/CONVENTIONS.md` · validate.yml battery · PR template · pinned + verified tool installs with managers over the pins |
 | **Req 9** — Catalogue posture | `SECURITY.md` · `check-governance.sh`, `check-revocations.sh`, `check-visibility.sh`, `verify-catalogue.sh` in the rescan · the declared consumers, the portability block and the smoke test · the manual-controls register · the trust-boundary table · `lint-log-anchors.sh` |
 | Req 8 | Retired 2026-08-26: the operating-environment guidance lives in CLAUDE.md and the design's Development Process section |

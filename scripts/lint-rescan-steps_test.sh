@@ -64,6 +64,26 @@ wf '      - name: enumerate' '        run: true' '      - name: summary' '      
 out=$("$LINT" "$SB/rescan.yml" 2>&1); rc=$?
 expect "no step with id scan is refused" 1 "$rc" "$out" "id: scan"
 
+# 7: a second job is a publication too (the catalogue page, task 15.8): it
+#    passes when its own if: carries always(), fails by name when it does not
+#    or when it declares none; the scan job is found by its scan step
+fresh; wf '      - name: scan' '        id: scan' '        run: true' \
+   '      - name: summary' '        if: always()' '        run: true'
+printf '  page:\n    needs: rescan\n    if: always() && needs.rescan.outputs.page == %s\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/deploy-pages@abc\n' "'true'" >> "$SB/rescan.yml"
+out=$("$LINT" "$SB/rescan.yml" 2>&1); rc=$?
+expect "a second job conditioned on always() passes, counted" 0 "$rc" "$out" "1 step(s) after the scan" "1 other job(s) conditioned on always()"
+fresh; wf '      - name: scan' '        id: scan' '        run: true'
+printf '  page:\n    needs: rescan\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/deploy-pages@abc\n' >> "$SB/rescan.yml"
+out=$("$LINT" "$SB/rescan.yml" 2>&1); rc=$?
+expect "a second job without if: fails naming it" 1 "$rc" "$out" "job 'page' declares no if: (it needs one containing always())"
+fresh; wf '      - name: scan' '        id: scan' '        run: true'
+printf '  page:\n    needs: rescan\n    if: needs.rescan.result == %s\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/deploy-pages@abc\n' "'success'" >> "$SB/rescan.yml"
+out=$("$LINT" "$SB/rescan.yml" 2>&1); rc=$?
+expect "a second job whose if: lacks always() fails naming it" 1 "$rc" "$out" "job 'page' has if:" "without always()"
+fresh; printf 'jobs:\n  a:\n    steps: []\n  b:\n    steps: []\n' > "$SB/rescan.yml"
+out=$("$LINT" "$SB/rescan.yml" 2>&1); rc=$?
+expect "no job has a scan step: refused by name" 1 "$rc" "$out" "no step with"
+
 # 6: a missing or unparseable file is a refusal by name
 out=$("$LINT" "$SB/nope.yml" 2>&1); rc=$?
 expect "a missing workflow is refused" 1 "$rc" "$out" "nope.yml"

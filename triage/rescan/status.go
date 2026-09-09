@@ -78,6 +78,7 @@ type SupportedDigest struct {
 	Digest        string
 	Tags          []string
 	Manifests     []string // its platform manifest digests, from the enumeration
+	Platforms     []string // its platforms (os/arch), from the enumeration, in order (Req 6.61)
 	Document      *VEXDocument
 	Reports       []TrivyReport
 	VEXUnresolved bool // the VEX compile for it failed today: scanned without --vex, so over-reporting
@@ -130,6 +131,10 @@ type StatusData struct {
 	// published here so the statement and the clocks it scopes cannot
 	// disagree (review D7). nil when the tool was not given one.
 	Support *SupportStatement `json:"support,omitempty"`
+	// SupersededTags counts the catalogue tags the enumeration marked
+	// superseded (referenced, scanned and attested, outside the supported
+	// set): the support statement's other half, as a number (task 15.8).
+	SupersededTags int `json:"superseded_tags"`
 }
 
 // SupportStatement names the supported set and what a superseded digest
@@ -137,6 +142,26 @@ type StatusData struct {
 type SupportStatement struct {
 	SupportedSet string `json:"supported_set"`
 	Superseded   string `json:"superseded"`
+}
+
+// Definition is one definition directory as the catalogue page draws it
+// (Req 6.61): its name, whether the active set lists it, the repository it
+// publishes to and the tags it declares. Read from the list the status step
+// derives through definition-lib.sh, never from YAML here.
+type Definition struct {
+	Name       string
+	Active     bool
+	Repository string
+	Tags       []string
+}
+
+// Expiry is one accepted-risk exception the lint reports as lapsing within
+// the warning window, or lapsed, attributed to the definition whose
+// exception file carries it (Req 6.10, 6.61).
+type Expiry struct {
+	Definition string
+	Lapsed     bool
+	Message    string
 }
 type StatusPolicy struct {
 	Aperture   []string       `json:"aperture"`
@@ -148,10 +173,15 @@ type RepoStatus struct {
 	Digests    []DigestStatus `json:"digests"`
 }
 type DigestStatus struct {
-	Digest   string   `json:"digest"`
-	Tags     []string `json:"tags"`
-	Scanned  bool     `json:"scanned"`  // at least one platform manifest report today
-	Document bool     `json:"document"` // a compiled document today
+	Digest    string   `json:"digest"`
+	Tags      []string `json:"tags"`
+	Platforms []string `json:"platforms,omitempty"` // os/arch per platform manifest (task 15.8)
+	Scanned   bool     `json:"scanned"`             // at least one platform manifest report today
+	Document  bool     `json:"document"`            // a compiled document today
+	// Admitted is the day's admission proof for this digest (verify-catalogue,
+	// Req 2.23): true when the verification policy admitted it, false when it
+	// did not, absent when no proof was read (task 15.8).
+	Admitted *bool `json:"admitted,omitempty"`
 }
 
 // FindingClock is one finding's stopwatch in one repository, over that
@@ -333,7 +363,7 @@ func BuildStatus(in StatusInputs) StatusData {
 		}
 		complete, _ := d.scanState()
 		repos[d.Repository].Digests = append(repos[d.Repository].Digests, DigestStatus{
-			Digest: d.Digest, Tags: d.Tags, Scanned: complete, Document: d.Document != nil})
+			Digest: d.Digest, Tags: d.Tags, Platforms: d.Platforms, Scanned: complete, Document: d.Document != nil})
 		// A repository counts as looked at only when every platform manifest
 		// of every supported digest has a report: absence read from half a
 		// scan would be a fix date invented.

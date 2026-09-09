@@ -16,6 +16,12 @@ release:
   # Req 2.15/2.17: on-change discards a scheduled rebuild whose package set
   # equals the published one; always publishes every rebuild.
   publish_policy: on-change
+  # Req 6.61/6.62: on = the rescan renders the catalogue page and deploys it
+  # with the day's status JSON to this repository's GitHub Pages site, an
+  # artifact deployment (no commit), and fails by name when Pages is off or
+  # the served data is not the run's. A fork without Pages turns it off and
+  # its rescan stays green (design Decision 12; register row M23).
+  page: true
   # Req 2.14's daily rebuild cron; task 9.2 wires it into build.yml as the
   # literal GitHub requires, and lint-workflow-policy keeps the two equal.
   # Before the 06:17 rescan so the rescan sees fresh digests.
@@ -176,6 +182,11 @@ workflows:
       packages: write # re-attestation pushes .att manifests (task 10.3, Req 6.42, 6.43)
       id-token: write # keyless signing as the re-attester role
       issues: write
+    jobs:
+      page:
+        permissions:
+          pages: write # the catalogue page deployment (task 15.8, Req 6.61)
+          id-token: write # the deployment API's OIDC token
   renovate.yml:
     schedule: "0 */4 * * *"
     permissions:

@@ -46,6 +46,11 @@ jobs:
   rescan:
     name: rescan published images
     runs-on: ubuntu-latest
+    outputs:
+      # Read through release-policy.sh (Req 7.7); the page job below keys on
+      # it, so a fork without Pages turns the page off and stays green.
+      page: ${{ steps.switches.outputs.page }}
+      generated: ${{ steps.status.outputs.generated }}
     defaults:
       run:
         # Plain bash, no injected flags (#73): the default shell is
@@ -64,6 +69,14 @@ jobs:
         with:
           go-version-file: triage/rescan/go.mod
           cache: false # stdlib-only tool, no go.sum to key a cache on
+
+      # The release switches this workflow keys on, read through their one
+      # reader (Req 7.7): a malformed switch fails here by name (D3).
+      - name: release switches (Req 7.7)
+        id: switches
+        run: |
+          set -euo pipefail
+          echo "page=$(scripts/release-policy.sh . page)" >> "$GITHUB_OUTPUT"
 
       - name: log in to ghcr.io
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
@@ -701,6 +714,27 @@ jobs:
           done
           [ -d "$OUT/reattest" ] || { echo "::error::catalogue status: ${OUT}/reattest is missing; the clocks need today's documents (Req 6.46)"; exit 1; }
           [ -d "$OUT/vex" ] || { echo "::error::catalogue status: ${OUT}/vex is missing; without the compile reports a digest scanned without its VEX cannot be told from a scanned one (Req 6.46)"; exit 1; }
+          # The catalogue page's two other inputs (Req 6.61): the day's
+          # admission proof and the exception lint's report, each named
+          # when missing rather than drawn as "not checked".
+          [ -s "$OUT/verify-catalogue.json" ] || { echo "::error::catalogue page: ${OUT}/verify-catalogue.json is missing (the invariants step reports why); no page rendered today (Req 6.61)"; exit 1; }
+          [ -e "$OUT/accepted-risk.txt" ] || { echo "::error::catalogue page: ${OUT}/accepted-risk.txt is missing (the expiries step reports why); no page rendered today (Req 6.61)"; exit 1; }
+          # One card per definition: the list the page draws from, through
+          # definition-lib's readers (the active set, the published
+          # repository, the declared tags), active ones in the policy file's
+          # order, then the inactive directories.
+          . scripts/definition-lib.sh
+          active=$(active_definitions .)
+          : > "$OUT/status/definitions.tsv"
+          for n in $active; do
+            printf '%s\tactive\t%s\t%s\n' "$n" "$(published_repository "image/$n/image.yaml")" "$(definition_tags "image/$n/image.yaml" | paste -sd,)" >> "$OUT/status/definitions.tsv"
+          done
+          for f in image/*/image.yaml; do
+            n=$(basename "$(dirname "$f")")
+            grep -qxF "$n" <<<"$active" && continue
+            printf '%s\tinactive\t%s\t%s\n' "$n" "$(published_repository "$f")" "$(definition_tags "$f" | paste -sd,)" >> "$OUT/status/definitions.tsv"
+          done
+          mkdir -p "$OUT/site"
           aperture=$(scripts/triage-policy.sh . aperture)
           ceilings=""
           for sev in ${aperture//,/ }; do
@@ -720,10 +754,14 @@ jobs:
             --kev-ceiling "$(scripts/triage-policy.sh . kev-ceiling)" --support "$support" \
             --previous-body "$OUT/status/previous.md" --revocations "$OUT/revocations.json" \
             --run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-            --out-json "$OUT/status/metrics.json" --out-body "$OUT/status/issue.md"
+            --definitions "$OUT/status/definitions.tsv" --admission "$OUT/verify-catalogue.json" --expiries "$OUT/accepted-risk.txt" \
+            --out-json "$OUT/status/metrics.json" --out-body "$OUT/status/issue.md" --out-html "$OUT/site/index.html"
+          # The site is the page and the data it was drawn from, nothing else.
+          cp "$OUT/status/metrics.json" "$OUT/site/metrics.json"
           for k in findings undecided over_ceiling decided fixed; do
             echo "${k}=$(jq ".aggregates.${k}" "$OUT/status/metrics.json")" >> "$GITHUB_OUTPUT"
           done
+          echo "generated=$(jq -r .generated_at "$OUT/status/metrics.json")" >> "$GITHUB_OUTPUT"
 
       - name: catalogue status, published to the status issue (Req 6.47)
         id: status_publish
@@ -750,6 +788,16 @@ jobs:
         with:
           name: catalogue-status
           path: rescan-out/status/metrics.json
+
+      # Req 6.61: the catalogue page and its data, as the Pages artifact the
+      # page job below deploys. An artifact, never a commit: everything else
+      # enters this repository as a pull request (design Decision 12).
+      - name: upload the catalogue page (Req 6.61)
+        id: site_upload
+        if: always() && steps.status.outcome == 'success' && steps.switches.outputs.page == 'true'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: rescan-out/site
 
       # Tasks 13.2 and 13.3 (Req 9.3, 9.7, 9.9): the posture invariants,
       # asserted daily. Governance through anonymous reads: the committed
@@ -872,3 +920,52 @@ jobs:
           name: rescan-${{ github.run_id }}
           path: rescan-out/
           if-no-files-found: warn
+
+  # Req 6.61, 6.62 (task 15.8; design Decision 12): the catalogue page goes
+  # live. A job of its own so the rescan's token never holds pages: write;
+  # this one holds nothing else. GitHub's github-pages environment is what
+  # the deployment API requires (the one environment: key in the repository,
+  # no reviewers on it, register row M23). Keyed on the policy file's page
+  # switch through the rescan job's output; runs whatever the rescan's own
+  # result once the status step produced the site (its generation date is
+  # the second key), so a failed status step is the one named failure and
+  # a failed deployment or read-back is named here.
+  page:
+    name: publish the catalogue page
+    needs: rescan
+    if: always() && needs.rescan.outputs.page == 'true' && needs.rescan.outputs.generated != ''
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: deploy the catalogue page (Req 6.61)
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+      # Req 6.62: the served data is the run's. Pages serves through a CDN
+      # that can lag the deployment by a minute; the read-back retries, and
+      # a page that never shows today's date fails the run by name.
+      - name: the served status data is this run's (Req 6.62)
+        env:
+          PAGE_URL: ${{ steps.deploy.outputs.page_url }}
+          GENERATED: ${{ needs.rescan.outputs.generated }}
+        run: |
+          set -euo pipefail
+          [ -n "$GENERATED" ] || { echo "::error::catalogue page: the rescan reported no generation date; nothing to read back against (Req 6.62)"; exit 1; }
+          url="${PAGE_URL%/}/metrics.json"
+          for i in $(seq 1 12); do
+            served=$(curl -fsS -H 'Cache-Control: no-cache' "$url" | jq -r '.generated_at // empty' 2>/dev/null || true)
+            if [ "$served" = "$GENERATED" ]; then
+              echo "catalogue page: ${PAGE_URL} serves the status data generated ${GENERATED}"
+              echo "- catalogue page: ${PAGE_URL} (data generated ${GENERATED})" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "attempt ${i}: ${url} serves generated_at '${served:-nothing}', expected ${GENERATED}; waiting"
+            sleep 10
+          done
+          echo "::error::catalogue page: ${url} still serves generated_at '${served:-nothing}' after the deployment, expected ${GENERATED} (Req 6.62)"
+          exit 1

@@ -236,5 +236,17 @@ check "active_components: exit 0" "0" "$(active_components "$SB" >/dev/null 2>&1
 policy 'active_set: [app, typo]'
 check "active_components: a malformed active set is the reader's refusal (exit 2)" "2" "$(active_components "$SB" >/dev/null 2>&1; echo $?)"
 
+# --- the declared tags (Req 6.61; task 15.8) --------------------------------
+# definition_tags <image.yaml> -> the tags: list, one per line, declared
+# order; nothing without the key. The same reading the enumeration makes
+# (supported = a current definition lists the tag), shared since D8 so the
+# page's definitions list and the enumeration cannot read differently.
+fresh; def app 'image: ghcr.io/mm-weber/dhc/app' 'tags:' '  - 1-alpine3.23' '  - "1.2-alpine3.23"' "  - '1.2.3-alpine3.23' # full" 'variant: runtime'
+check "definition_tags: declared order, quotes and comments dropped" "1-alpine3.23,1.2-alpine3.23,1.2.3-alpine3.23" "$(definition_tags "$SB/image/app/image.yaml" | paste -sd,)"
+fresh; def app 'image: ghcr.io/mm-weber/dhc/app' 'variant: runtime'
+check "definition_tags: no tags key, nothing" "" "$(definition_tags "$SB/image/app/image.yaml")"
+fresh; def app 'image: ghcr.io/mm-weber/dhc/app' 'tags: [1-alpine3.23, 1.2-alpine3.23]'
+check "definition_tags: flow style reads the same" "1-alpine3.23,1.2-alpine3.23" "$(definition_tags "$SB/image/app/image.yaml" | paste -sd,)"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
