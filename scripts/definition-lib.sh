@@ -86,6 +86,54 @@ for n in names:
 PY
 }
 
+# --- the mapping the matrices need (Req 1.14, 1.18, 5.2; task 14.2) ----------
+
+# source_repository <definition> -> the GitHub owner/repo of the definition's
+# first git+ source, the depName Renovate tracks and groups bumps under
+# (Req 3.3); empty for a repackaged tarball. The second half of Req 1.18's
+# "group": two definitions bumped from one source move together.
+source_repository() { # definition path
+  sed -nE 's#.*url:[[:space:]]*["'\'']?git\+https://github\.com/([^/"'\'' ]+/[^/"'\'' #]+).*#\1#p' "$1" \
+    | head -n1 | sed -E 's#\.git$##'
+}
+
+# chart_deploys <chart.yaml> -> the definition directories the chart declares
+# it deploys (task 14.2's `deploys:` list), one per line, declared order;
+# nothing when the list is absent. The e2e matrix and 14.3's probe lint map
+# definitions to chart-backed components through this, never through name
+# prefixes: three definitions share cert-manager's chart, and the valkey
+# chart deploys the compat variant on the runtime definition's behalf.
+chart_deploys() { # chart.yaml path
+  python3 - "$1" <<'PY'
+import sys, yaml
+doc = yaml.safe_load(open(sys.argv[1])) or {}
+for n in (doc.get("deploys") or []) if isinstance(doc, dict) else []:
+    if isinstance(n, str) and n:
+        print(n)
+PY
+}
+
+# active_components <root> -> one line per chart directory whose deploys list
+# meets the active set: "<chart>\t<its active definitions, space-separated,
+# declared order>". A chart deploying only inactive definitions is not a
+# component today; one deploying a mix keeps its active definitions. Reads the
+# active set through active_definitions, so a malformed set is that refusal.
+active_components() { # root
+  local root="${1%/}" active f c d keep
+  active=$(active_definitions "$root") || return $?
+  for f in "$root"/chart/*/chart.yaml; do
+    [ -f "$f" ] || continue
+    c="${f%/chart.yaml}"; c="${c##*/}"
+    keep=""
+    while IFS= read -r d; do
+      [ -n "$d" ] || continue
+      if printf '%s\n' "$active" | grep -qxF -- "$d"; then keep="${keep:+$keep }$d"; fi
+    done < <(chart_deploys "$f")
+    [ -n "$keep" ] && printf '%s\t%s\n' "$c" "$keep"
+  done
+  return 0
+}
+
 # --- authenticity (Req 1.10, 1.11, 3.8; task 11.2) ---------------------------
 # Each definition declares, beside its source url, how its upstream's
 # authenticity is established:

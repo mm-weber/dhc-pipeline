@@ -11,6 +11,14 @@ upstream:
   repository: https://charts.jetstack.io
   version: v1.21.1
 
+# The definitions this chart deploys (task 14.2, Req 1.14, 5.2): the e2e
+# matrix maps a changed definition to its chart-backed component through this
+# list, and the probe lint (14.3) reads it too. One chart, three images.
+deploys:
+  - cert-manager-controller
+  - cert-manager-webhook
+  - cert-manager-cainjector
+
 # Render (chart CI gate, task 5.5) and install (e2e, phase 6):
 #   helm template dhc-cert-manager cert-manager \
 #     --repo https://charts.jetstack.io --version v1.21.0 \

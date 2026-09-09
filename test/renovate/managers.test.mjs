@@ -695,6 +695,68 @@ check(
   );
 }
 
+// --- the tracking scope (task 14.2; Req 1.14, 3.2, 3.11) --------------------
+// Renovate cannot read catalogue-policy.yaml, so scripts/render-tracking.sh
+// renders the active set into the delimited ignorePaths block. Three things
+// are worth proving here: the committed block matches the active set, a
+// deactivation renders the paths one expects, and Renovate's OWN file filter
+// (the function the extract phase runs before any manager reads a file)
+// drops every package file under them.
+{
+  const { spawnSync } = require("node:child_process");
+  const { mkdtempSync, cpSync, writeFileSync, rmSync } = require("node:fs");
+  const { tmpdir } = require("node:os");
+  check("tracking scope: the committed block is an ignorePaths array", Array.isArray(config.ignorePaths), JSON.stringify(config.ignorePaths));
+  const chk = spawnSync(join(root, "scripts/render-tracking.sh"), ["--check", root], { encoding: "utf8" });
+  check("tracking scope: the committed block matches the active set (render-tracking --check)", chk.status === 0, `${chk.stdout}${chk.stderr}`);
+  // The reference instance activates everything (design Decision 11), so it ignores nothing.
+  check("tracking scope: the reference instance ignores no path", (config.ignorePaths ?? []).length === 0, JSON.stringify(config.ignorePaths));
+
+  const sb = mkdtempSync(join(tmpdir(), "dhc-tracking-"));
+  for (const d of ["image", "chart"]) cpSync(join(root, d), join(sb, d), { recursive: true });
+  cpSync(join(root, "renovate.json5"), join(sb, "renovate.json5"));
+  const policy = read("catalogue-policy.yaml");
+  check("tracking scope: the fixture deactivates a listed definition", policy.includes("  - grafana\n"));
+  writeFileSync(join(sb, "catalogue-policy.yaml"), policy.replace("  - grafana\n", ""));
+  const r = spawnSync(join(root, "scripts/render-tracking.sh"), [sb], { encoding: "utf8" });
+  check("tracking scope: rendering with grafana inactive exits 0", r.status === 0, `${r.stdout}${r.stderr}`);
+  let rendered;
+  try {
+    rendered = JSON5.parse(readFileSync(join(sb, "renovate.json5"), "utf8"));
+    check("tracking scope: the rendered block is JSON5 the config loader reads", true);
+  } catch (e) {
+    check("tracking scope: the rendered block is JSON5 the config loader reads", false, e.message);
+  }
+  const want = ["image/grafana/**", "chart/grafana/**"];
+  check(
+    "tracking scope: the inactive definition's directory and the chart deploying only it are ignored",
+    !!rendered && JSON.stringify(rendered.ignorePaths) === JSON.stringify(want),
+    JSON.stringify(rendered?.ignorePaths),
+  );
+  try {
+    const fm = require("renovate/dist/workers/repository/extract/file-match.js");
+    const files = [
+      "image/grafana/image.yaml",
+      "chart/grafana/chart.yaml",
+      "chart/grafana/config/values-hardened.yaml",
+      "image/valkey/image.yaml",
+      "chart/valkey/config/values-hardened.yaml",
+      "scripts/install-tool.sh",
+    ];
+    const kept = fm.getFilteredFileList({ ignorePaths: rendered?.ignorePaths ?? [] }, files);
+    check(
+      "tracking scope: renovate's own file filter drops every package file under an ignored path (measured 41.173.1)",
+      JSON.stringify(kept) === JSON.stringify(["image/valkey/image.yaml", "chart/valkey/config/values-hardened.yaml", "scripts/install-tool.sh"]),
+      JSON.stringify(kept),
+    );
+    const none = fm.getFilteredFileList({ ignorePaths: [] }, files);
+    check("tracking scope: an empty block ignores nothing", none.length === files.length, JSON.stringify(none));
+  } catch (e) {
+    check("tracking scope: renovate file-match module loadable", false, `${e.message}: path moved on a renovate major?`);
+  }
+  rmSync(sb, { recursive: true, force: true });
+}
+
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed`);
   process.exit(1);

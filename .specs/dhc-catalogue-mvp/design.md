@@ -630,6 +630,33 @@ graph TB
      activation step. One fixture literal remains by design: `policies/tests/
      resources.yaml` names the reference namespace, the one file a fork edits
      with the value.
+   - **As built** (task 14.2, 2026-09-08): as decided, with these measured
+     details. The definition-to-component mapping is a `deploys:` list in every
+     chart directory's chart.yaml, the owned chart included (a chart.yaml beside
+     Helm's Chart.yaml carrying only the list; `upstream` became optional in the
+     schema for it), and the valkey chart lists both valkey definitions, since
+     the pair builds byte-equal source and that chart is the one workload either
+     has. Both matrices read the set through `definition-lib.sh`
+     (`active_definitions`, `active_components`): build.yml filters every branch
+     at one point and refuses a dispatch naming an inactive definition, its
+     canary falling to the first active definition; e2e.yml's affected job maps
+     a changed definition to its chart through the list, the harness smoke test
+     falling to the first component. The tracking scope is `ignorePaths`,
+     rendered by `render-tracking.sh` between comment markers in renovate.json5
+     (line-based splicing, the file's comments kept), measured on 41.173.1:
+     Renovate's `getFilteredFileList` drops every file under the globs before a
+     manager reads it, and the strict validator accepts both the empty and the
+     populated block; `ignoreDeps` and `matchFileNames` were not needed, since
+     every frozen thing is a directory. `lint-active-set.sh` derives the
+     Req 1.18 groups from the definitions themselves, two keys: the published
+     repository (the pair lint-pins.sh holds byte-equal) and the git source
+     repository (what Renovate groups under Req 3.3), so no group list is
+     maintained by hand; its Req 1.16 half reads the pull request's diff and
+     counts only paths that still exist, so deleting a retired directory passes
+     and activating in the same pull request passes. check-authenticity.sh is
+     scoped to the set (Req 3.10 as amended), the inactive count in its summary.
+     The rescan's enumeration, the chart gate and the convention lints keep
+     looping every directory, as decided.
 
 ## System Flows
 

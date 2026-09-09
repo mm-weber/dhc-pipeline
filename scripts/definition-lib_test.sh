@@ -196,5 +196,45 @@ check "active_definitions: no catalogue-policy.yaml is refused (exit 2)" "2" "$r
 case "$out" in *catalogue-policy.yaml*) check "active_definitions: the refusal names the policy file" "ok" "ok" ;;
   *) check "active_definitions: the refusal names the policy file" "names catalogue-policy.yaml" "$out" ;; esac
 
+# --- the mapping the matrices need (Req 1.14, 1.18, 5.2; task 14.2) ----------
+
+# 19: source_repository: the GitHub owner/repo of the first git+ source, the
+#     name Renovate groups bumps under (Req 3.3); a tarball has none
+fresh
+def cm 'image: ghcr.io/acme/imgs/cm' 'contents:' '  builds:' '    - contents:' '        files:' '          - url: git+https://github.com/cert-manager/cert-manager.git#v1.21.1' '            checksum: abc'
+def app 'image: ghcr.io/acme/imgs/app' '          - url: "git+https://github.com/acme/app#v0.1.0"'
+def tarball 'image: ghcr.io/acme/imgs/tarball' '          - url: https://dl.example.com/release/1.0/app_linux_amd64.tar.gz'
+check "source_repository: .git suffix and ref stripped" "cert-manager/cert-manager" "$(source_repository "$SB/image/cm/image.yaml")"
+check "source_repository: quoted url without .git" "acme/app" "$(source_repository "$SB/image/app/image.yaml")"
+check "source_repository: a tarball has no source repository" "" "$(source_repository "$SB/image/tarball/image.yaml")"
+
+# 20: chart_deploys: the definitions a chart's chart.yaml declares it deploys,
+#     in declared order; a chart.yaml without the list yields nothing
+fresh
+mkdir -p "$SB/chart/cm" "$SB/chart/bare"
+printf 'upstream:\n  name: cert-manager\n  repository: https://charts.example\n  version: v1\ndeploys:\n  - cm-controller\n  - cm-webhook\n' > "$SB/chart/cm/chart.yaml"
+printf 'upstream:\n  name: x\n  repository: https://charts.example\n  version: v1\n' > "$SB/chart/bare/chart.yaml"
+check "chart_deploys: the declared list in order" "$(printf 'cm-controller\ncm-webhook')" "$(chart_deploys "$SB/chart/cm/chart.yaml")"
+check "chart_deploys: no deploys list yields nothing" "" "$(chart_deploys "$SB/chart/bare/chart.yaml")"
+
+# 21: active_components: each chart directory whose deploys list meets the
+#     active set, as "<chart>\t<active definitions it deploys>"; a chart
+#     deploying only inactive definitions is not a component today, and one
+#     deploying a mix keeps only its active definitions
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+def cm-a 'image: ghcr.io/acme/imgs/cm-a'
+def cm-b 'image: ghcr.io/acme/imgs/cm-b'
+def old 'image: ghcr.io/acme/imgs/old'
+mkdir -p "$SB/chart/app" "$SB/chart/cm" "$SB/chart/old"
+printf 'deploys: [app]\n' > "$SB/chart/app/chart.yaml"
+printf 'deploys: [cm-b, cm-a, old]\n' > "$SB/chart/cm/chart.yaml"
+printf 'deploys: [old]\n' > "$SB/chart/old/chart.yaml"
+policy 'active_set: [app, cm-a, cm-b]'
+check "active_components: charts meeting the active set, with their active definitions" "$(printf 'app\tapp\ncm\tcm-b cm-a')" "$(active_components "$SB")"
+check "active_components: exit 0" "0" "$(active_components "$SB" >/dev/null 2>&1; echo $?)"
+policy 'active_set: [app, typo]'
+check "active_components: a malformed active set is the reader's refusal (exit 2)" "2" "$(active_components "$SB" >/dev/null 2>&1; echo $?)"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

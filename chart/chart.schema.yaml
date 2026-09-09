@@ -5,7 +5,15 @@
 # review-by date has passed is scripts/lint-compat.sh's question (Req 4.8),
 # because a yamale day() constraint is a static literal with no notion of
 # today (measured; independent review 1.5).
-upstream: include('upstream')
+#
+# `deploys` (task 14.2, Req 1.14, 5.2) names the definition directories the
+# chart deploys; every chart directory declares it, the owned chart included,
+# which is why `upstream` is optional here: chart/hardened-app/chart.yaml has
+# no upstream pin (Chart.yaml beside it is Helm's own). scripts/render-chart.sh
+# still refuses an adapted chart without one. scripts/lint-active-set.sh
+# checks each entry names an existing definition.
+upstream: include('upstream', required=False)
+deploys: list(str(), min=1)
 compat: include('compat', required=False)
 ---
 upstream:
