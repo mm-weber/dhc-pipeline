@@ -79,7 +79,7 @@ graph TB
 
 | Layer | Technology | Rationale |
 |-------|------------|-----------|
-| Definitions | Real `dhi.io/build` syntax — spike A succeeded, fallback B retired (ADR 0001) | Req 1.7/1.8; literal job practice; the frontend compiling each definition is the schema gate |
+| Definitions | Real `dhi.io/build` syntax — spike A succeeded, fallback B retired (ADR 0001) | Req 1.7 (1.8 retired 2026-08-26); literal job practice; the frontend compiling each definition is the schema gate |
 | Build | BuildKit / buildx bake, GitHub Actions | Docker-native, no bespoke engine |
 | Tracking | Renovate self-hosted (`renovatebot/github-action`) | Industry standard for monorepo/fleet tracking; `postUpgradeTasks` recomputes source checksums (hosted app forbids them) |
 | Charts | Upstream charts + values overrides (rudder-style `config/`) | Upstream untouched; deviations reviewable (Req 4) |
@@ -90,13 +90,13 @@ graph TB
 
 ### Key Design Decisions
 
-1. **Real DHI frontend first, thin renderer fallback (Req 1.7/1.8)**
+1. **Real DHI frontend first, thin renderer fallback (Req 1.7; 1.8 retired 2026-08-26)**
    - **Context**: The JD's first bullet is authoring definition files; DHI's catalog is open source.
    - **Options**: (A) build with Docker's `# syntax=dhi.io/build` frontend; (B) DHI-style YAML rendered to Dockerfiles; (C) plain Dockerfiles FROM dhi.io bases.
    - **Decision**: **A** — the timeboxed spike produced working builds in native DHI syntax, so
      fallback B was retired (ADR 0001, accepted). Every definition opens with a digest-pinned
      `# syntax=dhi.io/build:…` directive; the frontend compiling each changed definition in
-     `build.yml` is the schema-conformance gate (Req 1.5), while `validate.yml`/`lint-pins.sh`
+     `build.yml` is the schema-conformance gate (Req 7.2, which absorbed 1.5), while `validate.yml`/`lint-pins.sh`
      covers pinning conventions.
    - **Trade-offs**: the frontend is a black box we don't control; accepted because it is the
      literal tool of the role being practiced. C rejected (abandons definition authoring).
@@ -113,12 +113,12 @@ graph TB
      `versioningTemplate` ranks `+security-NN` builds semver would silently equate — **ADR 0002**).
      Further surfaces: the dhi.io build layer (docker datasource), chart image pins and the
      pinned toolchain (both below). Monorepo grouping, Dependency Dashboard for majors (Req 3.4);
-     automerge covers digest **and patch** updates on the github-tags datasource, gated on CI —
-     broader than Req 3.5's minimum, and repackage bumps never automerge (they swap a binary we
-     did not build).
+     automerge covers digest **and patch** updates on the github-tags datasource, gated on CI,
+     exactly Req 3.5's scope since the cluster C amendment; repackage bumps never automerge
+     (they swap a binary we did not build), nor do Action bumps (review D4).
    - **Trade-offs**: We own the runner config; slower than hosted app to first PR.
 
-3. **Stale-pin bootstrap for immediate real history (Req 3.6)**
+3. **Stale-pin bootstrap for immediate real history (Req 3.6, retired 2026-08-26 once the loop had been proven)**
    - **Decision**: Initial pins sit ≥1 release behind latest so Renovate opens genuine PRs (including one real major staged in the dashboard) from day 1; cron keeps history growing after the 3 days.
    - **Trade-offs**: First builds are of slightly-old versions; acceptable, honest, and itself demonstrates the bump flow.
 
@@ -165,11 +165,11 @@ graph TB
      rebuild publishes only when the resolved package set changed (Req 2.14 to 2.16), which
      is what stops provenance timestamps alone from minting digests and opening chart-pin
      PRs. arm64 returns when, and only when, both the release-time scan and the rescan scan
-     every platform manifest (Req 2.18 to 2.20; task 8.3 is absorbed by task 9.3). The ten
+     every platform manifest (Req 2.20; 2.18 and 2.19 retired 2026-08-26; task 8.3 is absorbed by task 9.3). The ten
      legacy tags are not re-pointed (cosign signed the index only, so a re-pointed tag
      would serve an unsigned manifest; independent review 1.2, measured): the rescan
      enumerates every catalogue tag daily and scans every platform manifest of every
-     tag-referenced digest instead (Req 2.18, 2.22), satisfying Req 2.6 as written with
+     tag-referenced digest instead (Req 2.22; 2.18 retired), satisfying the retired Req 2.6 as it was written with
      every existing signature intact; critique F9 (a) amended 2026-08-22.
      Visibility becomes a daily invariant (Req 2.21). Verification inputs live in one
      declared place as **roles**: the *releaser* (`build.yml` at `refs/heads/main`) is the
@@ -250,14 +250,18 @@ graph TB
      pull request, invisible in a fork's diff) and per-workflow `env:` blocks (policy
      scattered across files, snippets hand-transcribed). A fork's switches are then one
      file's values.
-   - **Daily invariants are one mechanism (revision finding A5)**: the rescan gains a single
-     `invariants` step that runs every daily assertion the catalogue makes about its own
-     state, each reported by name and any failure failing the run: anonymous pull per
-     repository and tag (Req 2.21) and the verification proof over every tag-referenced
-     digest plus the control digest (Req 2.24) from this cluster; the upstream-checksum
-     re-check from cluster C (review F2, checkpoint 3); ruleset drift, private vulnerability
-     reporting enabled and no tag on a revoked digest from cluster D (F1, F11). One step, one
-     report shape, one place a fork adds an invariant.
+   - **Daily invariants are one convention (revision finding A5; as built, three steps)**:
+     the rescan asserts everything the catalogue promises about its own state daily, each
+     assertion reported by name and any failure failing the run. Decided as one step; built
+     as three, for a reason the D1 correction below records: `invariants` (anonymous pull
+     per repository and tag, Req 2.21; the verification proof over every tag-referenced
+     digest plus the control digest, Req 2.24; the exception tiers, 6.51; the attestation
+     count, 6.44), `authenticity signals` (the upstream re-check from cluster C, Req 3.10,
+     and the compat clock, 4.9) and `posture invariants` (ruleset drift, private
+     vulnerability reporting and no tag on a revoked digest from cluster D, Req 9.3, 9.7,
+     9.9), the last placed after the day's issues and status so a governance failure never
+     starves them. One convention, three report shapes, and a fork adds an invariant to the
+     step whose inputs it shares.
 
    - **As built, corrected 2026-09-08 (task 9.2)**: from 2026-09-02 to 2026-09-08 every
      nightly rebuild published every definition. Not a package-set change: build.yml
@@ -417,6 +421,30 @@ graph TB
      status tool was not handed `--vex-reports`, the fence the lifecycle tool gets, so a
      digest scanned without its VEX (over-reporting) fed the clocks while the same digest
      blocked every close; both tools now read the compile reports.
+   - **As built, corrected 2026-09-09 (review disposition D5)**: seven criteria said
+     something other than what the code does, and the code was right; their texts now say
+     it (requirements.md, the 2026-09-09 line of its introduction). Req 6.37 names the open
+     cve issue map as the compiler's fifth input (a statement's tracking link is live GitHub
+     state, task 10.3's promise). Req 6.27 is scoped to accepted-risk suppressions, the lane
+     whose report carries a binary column. Req 6.15 admits the structural basis a claim may
+     rest on (the shipped entrypoint and the component it never starts), the basis of the
+     catalogue's one such statement (CVE-2026-42151), beside the reachability basis that
+     cites govulncheck; either way the LOG entry names its evidence, and the anchor lint
+     holds the citation. Req 6.14 and 6.22 stay as written: their subject is THE Triage
+     Process, and criteria with that subject are held by the maintainer at review, the
+     shape, citation and scope of a statement being what CI holds (lint-vex-product,
+     lint-log-anchors, compile-vex); nothing in CI compares a govulncheck result to a
+     statement or checks that a superseded statement was retained, and the criteria do not
+     ask it to. Req 5.2 says the published images are installed (a definition change is
+     exercised after its release, through the chart-pin bump, Req 5.6); Req 5.5 and 5.8 say
+     the probe is the chart's declaration standing for every definition it deploys (task
+     14.3). Req 6.1 names Trivy as the authoritative consumer, the coupling Decision 10
+     stated, and `triage-policy.sh` refuses a policy file marking another consumer
+     authoritative until a gate adapter exists. Two criteria kept their text and gained a
+     mechanism: Req 1.4 has `scripts/lint-accounts.sh` in validate (nothing read a
+     definition's accounts block before), and Req 2.4's registry half has the inverse
+     visibility probe, `check-visibility.sh` failing on any catalogue tag served anonymously
+     while public release is disabled; its source half is the owner's setting (M15).
 8. **Upstream trust: quarantine, declared authenticity, tracked charts (Req 1.3, 1.10 to 1.12, 3.5, 3.7 to 3.12, 4.5, 4.8, 4.9; review F2, F10, F8, F13 ii and iii, F12 d; ADR 0002 amendment; 2026-08-25; as built 2026-09-07, tasks 11.1 to 11.5)**
    - **Context**: from-source patch bumps automerged while their checksum was recomputed
      from whatever upstream served at that instant, so an adversary publishing a
@@ -608,9 +636,11 @@ graph TB
      fails the run; more is reported. Grype's real matching is first measured by the
      first rescan after the merge (its database is unreachable from the devcontainer);
      the rehearsal used a stub that honours the statements.
-     The register (13.5) has twenty deliberate rows and two pending automation (the cosign
-     pin's Renovate tracking, found missing on 2026-09-08 though ADR 0003 promised it; the
-     mechanical half of re-scoping version-scoped statements on a grafana bump), review
+     The register (13.5) had twenty deliberate rows and two pending automation at that
+     date (the cosign pin's Renovate tracking, found missing on 2026-09-08 though ADR 0003
+     promised it, closed by review D4 on 2026-09-09; the mechanical half of re-scoping
+     version-scoped statements on a grafana bump), and carries twenty-two deliberate rows
+     and one pending since task 14.4 and D4; review
      dates as a column (cosign v2 re-measured by 2026-10-22, the terms memo by 2026-11-21,
      the valkey compat by 2026-11-24), and the manual's operator paragraphs cite rows by id.
      F13's mechanical link (13.6) is one resolver, `scripts/lint-log-anchors.sh`, called for
@@ -649,7 +679,7 @@ graph TB
      every-chart decision of task 5.5 stands); and the
      definition-to-component mapping the matrices and probes need is
      declared as a `deploys:` list in each chart's chart.yaml. Deliberate
-     divergences, recorded: rescan enumeration and badges stay tag-driven
+     divergences, recorded: rescan enumeration stays tag-driven (badges were retired before they were built)
      for inactive definitions (Decision 7 unchanged), and a deactivated
      definition's findings keep every status lane except the fix bump,
      deactivation being the avoid treatment writ large.
@@ -757,10 +787,12 @@ merge to main, the daily schedule, or a manual dispatch
       digest and every platform manifest digest, as one document
   ─► scan every platform manifest (by its own digest), VEX + exceptions applied
         no report for any platform manifest ─► sign nothing, tag nothing, red run (2.26)
+        fail-closed setting on and anything uncovered ─► attest nothing, sign nothing,
+        tag nothing, red run naming each finding per manifest (2.13; the gate runs before
+        the attestations, so under fail-closed no scan report is attested either)
   ─► attest each platform manifest's scan report (cosign `vuln` predicate, via `trivy convert`)
   ─► compile VEX, pass 2: append affected from unexpired exceptions (6.38) and
       under_investigation for every uncovered finding (2.12)
-        fail-closed setting on and anything uncovered ─► sign nothing, tag nothing, red run (2.13)
   ─► cosign sign, recursive · SBOM attest per platform manifest, each SPDX also on the index · one OpenVEX attest on
       index and platform manifests (ADR 0003)
   ─► apply tags (imagetools create on the index) ─► published (Req 2.10)
@@ -770,22 +802,37 @@ merge to main, the daily schedule, or a manual dispatch
 
 ```
 daily 06:17 UTC ─► enumerate every catalogue tag → digest (2.22)
+  ─► scan every platform manifest of every tag-referenced digest by its own digest (2.22),
+      each digest's source VEX compiled first (pass 1); a failed manifest is counted, named
+  ─► issue lifecycle, evidence and decision (6.52 to 6.57): every cve issue against today's
+      reports, the SBOMs read through verification (6.58) and the merged triage artifacts;
+      decided now, applied only after the reports are attested (below)
+  ─► open cve issue map, finding → URL, for the compiler's tracking links (6.37)
   per tag-referenced digest:
-  ─► scan every platform manifest by its own digest (2.22)
   ─► attest each scan report, --replace (6.42)
   ─► compile VEX (6.37): source statements · affected from unexpired exceptions (6.38)
         · carry-forward, timestamp kept, last_updated on change (6.40)
         · lapsed exception ─► under_investigation, original timestamp, status note (6.41)
         · new uncovered finding ─► under_investigation from the attested report
   ─► differs from the attested document? ─► cosign attest --replace on digest + manifests (6.43)
-  invariants step (one report shape): anonymous pull per repository and tag (2.21)
-        · verification proof + control digest (2.24) · exactly one OpenVEX attestation (6.44)
-        · exceptions against current severity and KEV (6.51) · authenticity signals (3.10)
-        · private reporting enabled (9.3) · ruleset drift (9.9) · no revoked tag (9.7)
-        · consumer smoke, recipe verbatim (9.13)
-  ─► clocks from attestations over that supported set (6.46) ─► status issue + artifact (6.47)
-  ─► issues over that supported set: open (6.3) · close, evidence-graded labels (6.52 to 6.56)
-        · reopen on recurrence (6.57) · expiry warnings (6.10)
+  ─► issue lifecycle, applied: close with evidence-graded labels (6.52 to 6.56) · reopen on
+      recurrence (6.57); withheld whole, by digest name, on a day any digest's reports
+      failed to attest (6.54, review D2)
+  ─► invariants, four independent assertions: anonymous pull per repository and tag (2.21)
+        · verification proof + control digest (2.24) · exceptions against current severity
+        and KEV, the feed fetched here, an outage a red non-evaluation (6.51, 6.60)
+        · exactly one OpenVEX attestation (6.44); the revocation record read for the status
+  ─► authenticity signals (3.10) · lapsed compat review-by dates (4.9)
+  ─► VEX portability block over the supported set (9.12, informational)
+  ─► consumer smoke, the README recipe verbatim (9.13)
+  ─► expiry warnings (6.10)
+  ─► issues: enrich (EPSS, KEV) · dedup · issue set · file new-CVE issues (6.3)
+  ─► clocks from attestations over the supported set (6.46) ─► status issue + artifact (6.47)
+  ─► posture: private reporting enabled (9.3) · ruleset drift (9.9) · no revoked tag (9.7)
+  ─► summary, artifacts
+  every step after the scan runs under always() with its producer's outcome as its
+  only condition, refusing by name on a missing input (review D1); the run fails once,
+  naming every promise not kept that day
 ```
 
 ### Upstream bump flow (the operating heart)
@@ -1172,7 +1219,7 @@ floating tag with a shell attached. Installs run as the runner user into
 Two installers, deliberately siblings rather than one generalisation:
 `install-scanners.sh` has the tested contract "both scanners (trivy, grype)
 verified before either installs", which the gate depends on;
-`install-tool.sh <kind|kyverno|helm|ct>` installs exactly one tool per call,
+`install-tool.sh <kind|kyverno|helm|ct|syft|crane|vexctl|cosign>` installs exactly one tool per call,
 including helm's nested-tarball member and ct's `etc/` lint configs from the
 same verified bytes. The checksum control varies by ecosystem, chosen rather
 than uniform: recorded sha256 for release binaries (the two scripts), the Go

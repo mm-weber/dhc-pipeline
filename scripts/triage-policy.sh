@@ -105,6 +105,13 @@ elif query in ("consumers", "authoritative-consumer", "other-consumers", "consum
         refuse_c("consumer names must be unique")
     if sum(flags) != 1:
         refuse_c(f"exactly one consumer must be authoritative, {sum(flags)} are")
+    # Req 6.1 as amended (review D5, 2026-09-09): the scan gate is built on
+    # Trivy's ignore-file and suppressed-finding reporting, so the
+    # authoritative consumer is Trivy by name (design Decision 10 states the
+    # coupling). A fork flipping this needs a gate adapter for its scanner
+    # first; until then the flip is a refusal, not a silent Trivy gate.
+    if names[flags.index(True)] != "trivy":
+        refuse_c(f"the authoritative consumer is '{names[flags.index(True)]}', but the scan gate is built on trivy (Req 6.1); a different authoritative consumer needs a gate adapter for it first (design Decision 10)")
     if query == "consumers":
         for n, f in zip(names, flags):
             print(f"{n}\t{'true' if f else 'false'}")

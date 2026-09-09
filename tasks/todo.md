@@ -854,3 +854,27 @@ here, so the second source is the offline half of keyless verification:
 the signature against the certificate's key and the certificate against
 Fulcio's chain, identity read from the SAN. Go was not compiled here; the
 comment change in the suite is prose.
+
+## D5: spec amendments where the code is right (2026-09-09)
+
+Branch: `d5-spec-amendments`. Review disposition D5 (theme 5; task 15.5).
+Goal: the criteria, the design and the ledger say what the code does.
+
+- [x] 1. requirements.md: 5.2, 5.5, 5.8, 6.1, 6.15, 6.27, 6.37 amended; EARS validator green
+- [x] 2. design.md: Decision 6's bullet, both flows redrawn to the built order, retired
+      numbers marked, four stale sentences; the D5 as-built note under Decision 7 with the
+      holder rule for Triage Process criteria
+- [x] 3. tasks.md: 9.1 (two claims), 10.3 and 13.4, 13.5, group 8, 8.7, retired numbers
+- [x] 4. Mechanisms for the two criteria that kept their text: lint-accounts.sh (Req 1.4,
+      six cases) and the inverse visibility probe (Req 2.4, two cases); triage-policy.sh
+      refuses a non-Trivy authoritative consumer (Req 6.1, one case)
+- [x] 5. Manual's e2e note; validate chain; em-dash sweep
+
+**Review (2026-09-09).** Where the review offered an either/or, the choice
+went to the option consistent with a recorded decision: Trivy by name
+(Decision 10's coupling), a maintainer-held reading for the Triage Process
+criteria (their subject), a structural basis admitted for 6.15 rather than a
+measurement the devcontainer cannot make. The EARS validator's rule that
+lowercase "the" may not outnumber "THE" shaped three sentences. The
+existing pin-lint fixtures carry no accounts block, so Req 1.4's lint is its
+own script rather than seventy fixture edits.

@@ -129,6 +129,17 @@ consumers_policy '  list:
   gating: false'
 out=$(q consumers); rc=$?
 [ "$rc" -eq 2 ] && grep -q "exactly one consumer must be authoritative" <<<"$out" && pass "no authoritative consumer: refused" || fail "no authoritative" "rc=$rc" "$out"
+# Req 6.1 as amended (review D5): the gate is built on Trivy's ignore file
+# and suppressed-finding reporting, so the authoritative consumer is Trivy
+# by name; declaring another is a refusal that says what a fork must add.
+consumers_policy '  list:
+    - name: grype
+      authoritative: true
+    - name: trivy
+      authoritative: false
+  gating: false'
+out=$(q authoritative-consumer); rc=$?
+[ "$rc" -eq 2 ] && grep -q "gate adapter" <<<"$out" && grep -q "grype" <<<"$out" && pass "a non-Trivy authoritative consumer: refused naming the coupling (Req 6.1)" || fail "non-trivy authoritative" "rc=$rc" "$out"
 fresh
 out=$(q consumers); rc=$?
 [ "$rc" -eq 2 ] && grep -q "consumers.list is missing" <<<"$out" && pass "no consumers section: refused by name" || fail "no consumers section" "rc=$rc" "$out"

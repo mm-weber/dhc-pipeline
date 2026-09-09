@@ -111,8 +111,10 @@ out=$(run)
 grep -q "solo" <<<"$out" && grep -q "9.0.5-alpine3.23" <<<"$out" \
   && pass "all failures are listed" || fail "all failures are listed" "$out"
 
-# 6: WHILE public release is enabled — disabled means the invariant does not
-#    apply, and no probe is sent at all.
+# 6: WHILE public release is disabled the invariant inverts (Req 2.4, review
+#    D5): a tag served to an unauthenticated request is the failure, one kept
+#    private is the pass. Before D5 the disabled state exited 0 without a
+#    probe, so a fork starting private had no check that it was.
 fresh
 cat > "$SB/root/catalogue-policy.yaml" <<'EOF'
 release:
@@ -121,9 +123,21 @@ verification:
   registry: ghcr.io/acme/dhc
 EOF
 out=$(run); rc=$?
-[ "$rc" -eq 0 ] && pass "disabled public release exits 0" || fail "disabled public release exits 0" "$out"
-[ ! -s "$SB/argv" ] && pass "and probes nothing" || fail "and probes nothing" "$(cat "$SB/argv")"
-grep -qi "disabled" <<<"$out" && pass "saying why" || fail "saying why" "$out"
+[ "$rc" -eq 1 ] && pass "disabled public release with a tag served anonymously fails" || fail "disabled public release with a tag served anonymously fails" "exit=$rc" "$out"
+grep -q "Req 2.4" <<<"$out" && grep -q "solo:1-alpine3.23" <<<"$out" && pass "naming the served tag and the criterion" || fail "naming the served tag and the criterion" "$out"
+grep -c "/manifests/" "$SB/argv" | grep -qx 3 && pass "one manifest probe per enumerated tag, still" || fail "one manifest probe per enumerated tag, still" "$(cat "$SB/argv")"
+fresh
+cat > "$SB/root/catalogue-policy.yaml" <<'EOF'
+release:
+  public: false
+verification:
+  registry: ghcr.io/acme/dhc
+EOF
+export STUB_MANIFEST_FAIL="/manifests/"
+out=$(run); rc=$?
+[ "$rc" -eq 0 ] && pass "disabled public release with every manifest refused exits 0" || fail "disabled public release with every manifest refused exits 0" "exit=$rc" "$out"
+grep -qi "disabled" <<<"$out" && grep -q "none of 3" <<<"$out" && pass "saying why and how many" || fail "saying why and how many" "$out"
+unset STUB_MANIFEST_FAIL
 
 # 7: a missing enumeration is a refusal, not a vacuous pass — an invariant
 #    verified against nothing has verified nothing.

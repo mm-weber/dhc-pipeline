@@ -139,7 +139,11 @@ triage:
 # A fork adds a consumer here and an adapter case there (Docker Scout is
 # the example the review named: credentials, a third pinned CLI); the
 # `gating` switch, off here, is what a fork flips to fail a run on a
-# divergence (design Decision 10's rejected-for-now option).
+# divergence (design Decision 10's rejected-for-now option). The
+# authoritative consumer is trivy by name (Req 6.1 as amended by review D5):
+# the gate is built on Trivy's ignore file and suppressed-finding
+# reporting, so marking another consumer authoritative is a refusal until a
+# gate adapter for it exists.
 consumers:
   list:
     - name: trivy
