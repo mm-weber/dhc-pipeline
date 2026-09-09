@@ -939,3 +939,36 @@ every script has a suite the workflow runs (review dispositions table, D7).
 - Not run locally: the `test/` module (its dependencies are not in the offline
   cache); its only change is the workflow's `go test ./...`, the same four
   packages the hand-kept list named.
+
+## Review D8: the catalogue page (2026-09-09)
+
+Goal: a page a reader takes in at a glance, rendered from the rescan's own
+outputs, deployed as an artifact, off by a switch (design Decision 12).
+
+- [x] spec: Req 6.61, 6.62; Decision 12; task 15.8; register M23
+- [x] release-policy.sh `page` switch (tests first); policy file `release.page`
+- [x] definition-lib `definition_tags`; enumerate reads through it
+- [x] status tool: platforms + admitted per digest; definitions, admission, expiries inputs; the HTML page (tests first)
+- [x] rescan.yml: switch read, site rendered, Pages artifact, `page` job with read-back; policy file workflows entry; lints
+- [x] docs: README, SECURITY.md, manual, concepts trust table
+- [x] gates as CI runs them; PR
+
+### Review (D8)
+
+- Decision first (one question, answered: the catalogue page), spec second
+  (Req 6.61, 6.62, Decision 12, task 15.8, register M23), then the build,
+  test-first throughout: 4 release-policy cases, 3 definition-lib cases,
+  4 inputs tests, 3 page tests, 4 lint-rescan-steps cases.
+- The page is a second template over the same status data; the three extra
+  inputs (definitions, admission proof, exception report) are the workflow's
+  own outputs. No arithmetic on the page: counts over the JSON only.
+- Publication is an artifact deployment, never a commit; a second job holds
+  `pages: write`; the served data is read back and must be the run's; the
+  whole thing is a fork switch (`release.page`).
+- Rehearsed: the page from the live status issue's data, the definitions
+  block (policy order), the read-back loop on a matching and a stale date,
+  every validate step, actionlint (one pre-existing SC2129), shellcheck at
+  warning severity, lint-workflow-policy, lint-rescan-steps (24 steps, 1 job).
+- Owner-side after merge: enable Pages with source "GitHub Actions"; the
+  first deployment happens on the next rescan (dispatch one to see it early).
+  Until then the page job fails by name, which is the assertion working.

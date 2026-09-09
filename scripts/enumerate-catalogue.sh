@@ -48,10 +48,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
-# repository -> its supported tags, one "repo tag" line per pair. python3
-# rather than yq: the runner ships mikefarah yq, the devcontainer a python
-# wrapper, and their dialects disagree (build.yml's tr-strip comment); the
-# stdlib parser reads both worlds identically. compile-vex.sh precedent.
+# repository -> its supported tags, one "repo tag" line per pair, read
+# through definition-lib's definition_tags (the one reading of a
+# definition's declared tags, shared with the catalogue page since task
+# 15.8; the stdlib YAML parser reads both yq dialects' worlds identically).
 : > "$WORK/supported"
 : > "$WORK/repos"
 for f in "$ROOT"/image/*/image.yaml; do
@@ -59,12 +59,9 @@ for f in "$ROOT"/image/*/image.yaml; do
   repo=$(published_repository "$f")
   [ -n "$repo" ] || { err "no image: value in ${f}"; exit 1; }
   echo "$repo" >> "$WORK/repos"
-  python3 - "$f" "$repo" <<'PY' >> "$WORK/supported"
-import sys, yaml
-doc = yaml.safe_load(open(sys.argv[1]))
-for t in doc.get("tags") or []:
-    print(f"{sys.argv[2]}\t{t}")
-PY
+  while IFS= read -r t; do
+    [ -n "$t" ] && printf '%s\t%s\n' "$repo" "$t" >> "$WORK/supported"
+  done < <(definition_tags "$f")
 done
 LC_ALL=C sort -u "$WORK/repos" -o "$WORK/repos"
 LC_ALL=C sort -u "$WORK/supported" -o "$WORK/supported"

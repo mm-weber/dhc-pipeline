@@ -10,6 +10,7 @@
 #   publish-policy   on-change|always   what a scheduled rebuild publishes (2.15, 2.17)
 #   schedule         the daily rebuild's cron, five fields (2.14)
 #   platforms        the admitted platforms, os/arch, one per line (7.7)
+#   page             true|false   the catalogue page is published to Pages (6.61)
 #   check            every switch above, refusing the first hole; prints them
 #
 # Each switch is returned only when it is written exactly as the criteria
@@ -26,7 +27,7 @@ set -euo pipefail
 
 err() { printf '::error::release-policy: %s\n' "$1" >&2; }
 if [ "$#" -ne 2 ]; then
-  err "usage: release-policy.sh <root> <public|fail-closed|publish-policy|schedule|platforms|check>"
+  err "usage: release-policy.sh <root> <public|fail-closed|publish-policy|schedule|platforms|page|check>"
   exit 2
 fi
 ROOT="${1%/}"; QUERY="$2"
@@ -95,9 +96,11 @@ elif query == "schedule":
     print(schedule())
 elif query == "platforms":
     print("\n".join(platforms()))
+elif query == "page":
+    print(boolean("page"))
 elif query == "check":
-    pub, fc, pp, sch, pl = boolean("public"), boolean("fail_closed"), publish_policy(), schedule(), platforms()
-    print(f"release-policy: public={pub} fail_closed={fc} publish_policy={pp} schedule=\"{sch}\" {len(pl)} platform(s): {', '.join(pl)}")
+    pub, fc, pp, sch, pl, pg = boolean("public"), boolean("fail_closed"), publish_policy(), schedule(), platforms(), boolean("page")
+    print(f"release-policy: public={pub} fail_closed={fc} publish_policy={pp} page={pg} schedule=\"{sch}\" {len(pl)} platform(s): {', '.join(pl)}")
 else:
-    refuse(f"unknown query '{query}'; one of public, fail-closed, publish-policy, schedule, platforms, check")
+    refuse(f"unknown query '{query}'; one of public, fail-closed, publish-policy, schedule, platforms, page, check")
 PY

@@ -193,4 +193,10 @@ sponsored by or endorsed by Docker, Inc.
 
 The catalogue status issue, rewritten in place by every rescan, carries the
 clocks and the current counts:
-https://github.com/mm-weber/dhc-pipeline/issues/151.
+https://github.com/mm-weber/dhc-pipeline/issues/151. The same data, drawn as
+one card per definition with the clocks beneath, is the catalogue page the
+rescan deploys to GitHub Pages as a workflow artifact:
+https://mm-weber.github.io/dhc-pipeline/ (`metrics.json` beside it is the
+data the page was rendered from). The page loads nothing from anywhere and
+runs no code; a deployment that fails, or a page that serves any day's data
+but the run's, fails the rescan by name.

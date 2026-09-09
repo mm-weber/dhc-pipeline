@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -53,6 +54,9 @@ func LoadSupported(enumeration, reattestDir, reportsDir, vexReportsDir string) (
 		}
 		if !slices.Contains(d.Manifests, cols[4]) {
 			d.Manifests = append(d.Manifests, cols[4])
+		}
+		if !slices.Contains(d.Platforms, cols[3]) {
+			d.Platforms = append(d.Platforms, cols[3])
 		}
 	}
 	if err := sc.Err(); err != nil {
@@ -104,4 +108,119 @@ func LoadSupported(enumeration, reattestDir, reportsDir, vexReportsDir string) (
 		out = append(out, *d)
 	}
 	return out, nil
+}
+
+// The catalogue page's inputs (Req 6.61; task 15.8).
+
+// LoadDefinitions reads the definitions list the status step derives through
+// definition-lib.sh: one row per definition, name, "active" or "inactive",
+// the published repository, and the declared tags comma-joined (empty for
+// none), in the order the step wrote them.
+func LoadDefinitions(path string) ([]rescan.Definition, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var out []rescan.Definition
+	for i, line := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		cols := strings.Split(line, "\t")
+		if len(cols) != 4 || cols[0] == "" || cols[2] == "" {
+			return nil, fmt.Errorf("%s:%d: expected name, active|inactive, repository, tags; got %q", path, i+1, line)
+		}
+		var active bool
+		switch cols[1] {
+		case "active":
+			active = true
+		case "inactive":
+		default:
+			return nil, fmt.Errorf("%s:%d: %q is neither active nor inactive", path, i+1, cols[1])
+		}
+		d := rescan.Definition{Name: cols[0], Active: active, Repository: cols[2]}
+		if cols[3] != "" {
+			d.Tags = strings.Split(cols[3], ",")
+		}
+		out = append(out, d)
+	}
+	return out, nil
+}
+
+// LoadAdmission reads scripts/verify-catalogue.sh's record: the verification
+// policy's verdict per tag-referenced digest, keyed by "<repository>@<digest>";
+// true for pass, false for anything else. The declared must-reject control is
+// the policy's proof, not a catalogue digest, and is left out.
+func LoadAdmission(path string) (map[string]bool, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var doc struct {
+		Control   string `json:"control"`
+		Resources []struct {
+			Name   string `json:"name"`
+			Ref    string `json:"ref"`
+			Result string `json:"result"`
+		} `json:"resources"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	out := map[string]bool{}
+	for _, r := range doc.Resources {
+		if strings.HasPrefix(r.Name, "control") || r.Ref == doc.Control {
+			continue
+		}
+		out[r.Ref] = r.Result == "pass"
+	}
+	return out, nil
+}
+
+// LoadExpiries reads scripts/lint-accepted-risk.sh's report as the rescan's
+// expiries step keeps it: every workflow-command line about an exception file
+// that says an entry "expires in" (lapsing within the warning window) or "is
+// in the past" (lapsed), attributed to the definition the file is named for.
+// Other findings of the lint are not the page's to show.
+func LoadExpiries(path string) ([]rescan.Expiry, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var out []rescan.Expiry
+	for _, line := range strings.Split(string(data), "\n") {
+		m := expiryLine.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		msg := m[2]
+		lapsed := strings.Contains(msg, "is in the past")
+		if !lapsed && !strings.Contains(msg, "expires in") {
+			continue
+		}
+		msg = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(msg, "risk treatment (Req 6.11):"), "risk treatment:"))
+		out = append(out, rescan.Expiry{Definition: m[1], Lapsed: lapsed, Message: msg})
+	}
+	return out, nil
+}
+
+var expiryLine = regexp.MustCompile(`^::(?:warning|error) file=triage/accepted-risk/([^.,]+)\.yaml[^:]*::(.*)$`)
+
+// CountSuperseded counts the catalogue tags the enumeration marked
+// superseded, once per (repository, tag) whatever their platforms: the
+// support statement's other half as the page prints it (task 15.8).
+func CountSuperseded(enumeration string) (int, error) {
+	data, err := os.ReadFile(enumeration)
+	if err != nil {
+		return 0, err
+	}
+	seen := map[string]bool{}
+	for _, line := range strings.Split(string(data), "\n") {
+		cols := strings.Split(line, "\t")
+		if len(cols) < 6 || cols[5] != "superseded" {
+			continue
+		}
+		seen[cols[0]+"\t"+cols[1]] = true
+	}
+	return len(seen), nil
 }

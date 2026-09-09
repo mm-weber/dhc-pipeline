@@ -10,10 +10,16 @@
 //	  --aperture CRITICAL,HIGH --ceilings CRITICAL=30,HIGH=90 --kev-ceiling 14 \
 //	  --support '{"supported_set": "...", "superseded": "..."}' \
 //	  [--kev f] [--previous metrics.json | --previous-body issue.md] [--today YYYY-MM-DD] [--run url] \
+//	  [--definitions definitions.tsv --admission verify-catalogue.json --expiries accepted-risk.txt --out-html index.html] \
 //	  --out-json metrics.json --out-body issue.md
 //
 // --support is the support statement as scripts/triage-policy.sh prints it
 // (Req 6.49); the issue publishes it beside the clocks it scopes (review D7).
+// --out-html renders the catalogue page from the same data (Req 6.61; task
+// 15.8): --definitions lists the definitions (the status step derives it
+// through definition-lib.sh), --admission adds the verification policy's
+// verdict per digest to the data and the page, --expiries the exception
+// lint's lapsing entries to the page.
 // --enumeration is the rescan's enumeration.tsv (repository, tag, digest,
 // platform, manifest, supported|superseded); only supported rows count.
 // --reattest is the re-attest work directory: <name>__<12 hex>/out/*.openvex.json
@@ -51,6 +57,10 @@ func main() {
 	runURL := flag.String("run", "", "the run's URL, recorded in the data (optional)")
 	revocationsFile := flag.String("revocations", "", "the revocation record as JSON, scripts/check-revocations.sh's output; its revocations list is carried into the status (optional)")
 	supportFlag := flag.String("support", "", "the support statement as JSON {supported_set, superseded}, scripts/triage-policy.sh's support output; published in the issue (required)")
+	definitionsFile := flag.String("definitions", "", "the definitions list for the catalogue page: name, active|inactive, repository, tags comma-joined, tab-separated (required with --out-html)")
+	admissionFile := flag.String("admission", "", "scripts/verify-catalogue.sh's record; the verdict per digest joins the data and the page (optional)")
+	expiriesFile := flag.String("expiries", "", "scripts/lint-accepted-risk.sh's report as the expiries step keeps it; lapsing exceptions join the page (optional)")
+	outHTML := flag.String("out-html", "", "where to write the catalogue page, index.html (optional; Req 6.61)")
 	outJSON := flag.String("out-json", "", "where to write metrics.json (required)")
 	outBody := flag.String("out-body", "", "where to write the issue body (required)")
 	flag.Parse()
@@ -142,6 +152,24 @@ func main() {
 
 	status := rescan.BuildStatus(in)
 	status.Support = &support
+	if status.SupersededTags, err = inputs.CountSuperseded(*enumeration); err != nil {
+		fatal(err.Error())
+	}
+	if *admissionFile != "" {
+		admitted, err := inputs.LoadAdmission(*admissionFile)
+		if err != nil {
+			fatal("admission: " + err.Error())
+		}
+		for i := range status.Repositories {
+			for j := range status.Repositories[i].Digests {
+				d := &status.Repositories[i].Digests[j]
+				if v, ok := admitted[status.Repositories[i].Repository+"@"+d.Digest]; ok {
+					v := v
+					d.Admitted = &v
+				}
+			}
+		}
+	}
 	if *revocationsFile != "" {
 		data, err := os.ReadFile(*revocationsFile)
 		if err != nil {
@@ -164,6 +192,25 @@ func main() {
 	}
 	if err := os.WriteFile(*outBody, []byte(rescan.RenderStatusIssue(status)), 0o644); err != nil {
 		fatal(err.Error())
+	}
+	if *outHTML != "" {
+		if *definitionsFile == "" {
+			fatal("--out-html needs --definitions: the page is one card per definition (Req 6.61)")
+		}
+		defs, err := inputs.LoadDefinitions(*definitionsFile)
+		if err != nil {
+			fatal("definitions: " + err.Error())
+		}
+		var expiries []rescan.Expiry
+		if *expiriesFile != "" {
+			if expiries, err = inputs.LoadExpiries(*expiriesFile); err != nil {
+				fatal("expiries: " + err.Error())
+			}
+		}
+		page := rescan.RenderCataloguePage(rescan.BuildPage(status, defs, expiries))
+		if err := os.WriteFile(*outHTML, []byte(page), 0o644); err != nil {
+			fatal(err.Error())
+		}
 	}
 	ag := status.Aggregates
 	fmt.Printf("rescan-status: %d finding(s) over %d supported digest(s): %d undecided (%d over ceiling), %d decided, %d fixed\n",

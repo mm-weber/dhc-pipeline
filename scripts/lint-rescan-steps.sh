@@ -13,7 +13,10 @@
 # its real data dependency beside it (`steps.<producer>.outcome ==
 # 'success'`) and refusing by name inside the step when an input file is
 # missing. Steps before the scan are the producers (login, install,
-# enumerate) and are not judged.
+# enumerate) and are not judged. A second job (the catalogue page's
+# deployment, task 15.8) is a publication too: its job-level `if:` must
+# contain `always()`, keyed on the rescan job's outputs rather than its
+# result, so the page goes live whatever else failed that day.
 #
 # Reads the workflow as YAML (PyYAML, the validate job's dependency); a
 # missing scan step or an unreadable file is a refusal, not a vacuous pass.
@@ -32,15 +35,24 @@ except Exception as e:  # noqa: BLE001
     print(f"::error file={path}::lint-rescan-steps: not parseable YAML: {e}")
     sys.exit(1)
 jobs = (wf or {}).get("jobs") or {}
-if len(jobs) != 1:
-    print(f"::error file={path}::lint-rescan-steps: expected one job, found {len(jobs)}")
+scan_job = next((n for n, j in jobs.items() if any(s.get("id") == "scan" for s in ((j or {}).get("steps") or []))), None)
+if scan_job is None:
+    print(f"::error file={path}::lint-rescan-steps: no step with `id: scan` in any job; the rule needs the boundary it is measured from")
     sys.exit(1)
-steps = list(jobs.values())[0].get("steps") or []
-scan = next((i for i, s in enumerate(steps) if s.get("id") == "scan"), None)
-if scan is None:
-    print(f"::error file={path}::lint-rescan-steps: no step with `id: scan`; the rule needs the boundary it is measured from")
-    sys.exit(1)
+steps = jobs[scan_job].get("steps") or []
+scan = next(i for i, s in enumerate(steps) if s.get("id") == "scan")
 violations = 0
+others = 0
+for name, job in jobs.items():
+    if name == scan_job:
+        continue
+    cond = str((job or {}).get("if") or "")
+    if "always()" not in cond:
+        what = "declares no if: (it needs one containing always())" if not cond else f"has if: '{cond}' without always()"
+        print(f"::error file={path}::lint-rescan-steps: job '{name}' {what}; a job after the rescan is a publication and runs whatever the rescan's result, keyed on its outputs (review disposition D1; task 15.8)")
+        violations += 1
+    else:
+        others += 1
 later = steps[scan + 1:]
 for s in later:
     name = s.get("name") or s.get("uses") or "<unnamed>"
@@ -52,5 +64,5 @@ for s in later:
 if violations:
     print(f"lint-rescan-steps: {violations} violation(s)")
     sys.exit(1)
-print(f"lint-rescan-steps: {len(later)} step(s) after the scan carry always(); no daily assertion or publication is suspended by an unrelated failure")
+print(f"lint-rescan-steps: {len(later)} step(s) after the scan and {others} other job(s) conditioned on always(); no daily assertion or publication is suspended by an unrelated failure")
 PY

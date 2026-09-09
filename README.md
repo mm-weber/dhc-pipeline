@@ -30,6 +30,13 @@ adaptations, the tests, the published promise and its invariants. It is not
 affiliated with, sponsored by or endorsed by Docker, Inc.; the names are used
 to describe where the substrate comes from.
 
+The catalogue's picture of itself is one page, rendered by the daily rescan
+from its own outputs and published as a workflow artifact:
+https://mm-weber.github.io/dhc-pipeline/. One card per definition (tags,
+digests, platforms, whether each digest was scanned, attested and admitted by
+the verification policy that day, findings by severity, lapsing exceptions),
+the clocks beneath, the status data itself beside it.
+
 ## Layout
 
 | Path | What |

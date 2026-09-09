@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dhc catalogue</title>
+<style>
+  body { margin: 0 auto; max-width: 72rem; padding: 1.5rem; font: 15px/1.5 system-ui, sans-serif; color: #1a1a1a; background: #fafaf8; }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.1rem; margin: 0 0 .25rem; }
+  h3 { font-size: 1.05rem; margin: 2rem 0 .5rem; }
+  p.lead { margin: 0 0 1rem; color: #444; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: 1rem; }
+  .card { border: 1px solid #d8d8d2; border-radius: 6px; padding: .9rem 1rem; background: #fff; }
+  .card .state { float: right; font-size: .8rem; padding: .1rem .5rem; border-radius: 1rem; background: #e6f4ea; color: #1e6b32; }
+  .card .state.inactive { background: #f1f1ef; color: #666; }
+  .card .repo { font-family: ui-monospace, monospace; font-size: .85rem; color: #555; word-break: break-all; }
+  .card ul { margin: .4rem 0; padding-left: 1.1rem; }
+  .card li { margin: .15rem 0; }
+  .mono { font-family: ui-monospace, monospace; font-size: .85rem; }
+  .yes { color: #1e6b32; } .no { color: #a11d1d; font-weight: 600; } .na { color: #777; }
+  .warn { color: #8a5a00; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  th, td { text-align: left; padding: .3rem .5rem; border-bottom: 1px solid #e4e4de; vertical-align: top; }
+  th { background: #f1f1ec; }
+  tr.over td { background: #fff1f1; }
+  footer { margin-top: 2rem; font-size: .85rem; color: #555; }
+</style>
+</head>
+<body>
+<h1>dhc catalogue</h1>
+<p class="lead">The catalogue as the daily rescan saw it, generated {{.GeneratedAt}}{{if .Run}} (<a href="{{.Run}}">run</a>){{end}}.
+Every number is the published status data's (<a href="metrics.json">metrics.json</a>) or a count over it; the same data is rewritten into the status issue and uploaded as the <code>catalogue-status</code> artifact.</p>
+{{if .Support}}<p class="lead">The supported set is {{.Support.SupportedSet}}; a superseded tag-referenced digest is {{.Support.Superseded}}. Today: {{.SupersededTags}} superseded tag(s) beside the supported digests below.</p>{{end}}
+<p class="lead">Decision aperture {{join .Policy.Aperture}}; exception ceilings {{joinInt .Policy.Ceilings .Policy.Aperture}}, KEV {{.Policy.KEVCeiling}} days.
+Findings {{.Aggregates.Findings}}, undecided {{.Aggregates.Undecided}} (over ceiling {{.Aggregates.OverCeiling}}{{if .Aggregates.OldestUndecidedDays}}, oldest {{ptr .Aggregates.OldestUndecidedDays}} days{{end}}), decided {{.Aggregates.Decided}}, fixed {{.Aggregates.Fixed}}; median days to decision {{num .Aggregates.MedianDaysToDecision}}, to fix {{num .Aggregates.MedianDaysToFix}}.</p>
+
+<h3>Definitions</h3>
+{{if not .Cards}}<p class="warn">no definitions were listed for this page.</p>{{end}}
+<div class="grid">
+{{range .Cards}}
+<section class="card">
+  <span class="state{{if not .Active}} inactive{{end}}">{{if .Active}}active{{else}}inactive{{end}}</span>
+  <h2 id="{{.Name}}">{{.Name}}</h2>
+  <div class="repo">{{.Repository}}</div>
+  <ul>
+  {{range .Digests}}
+    <li><span class="mono">{{join .Tags}}</span> &rarr; <span class="mono">{{short .Digest}}</span>{{if .Platforms}} ({{join .Platforms}}){{end}}<br>
+      today: <span class="{{if .Scanned}}yes{{else}}no{{end}}">{{if .Scanned}}scanned{{else}}not scanned{{end}}</span>,
+      <span class="{{if .Document}}yes{{else}}no{{end}}">{{if .Document}}attested{{else}}not attested{{end}}</span>,
+      <span class="{{if .Admitted}}{{if deref .Admitted}}yes{{else}}no{{end}}{{else}}na{{end}}">{{admission .Admitted}}</span></li>
+  {{end}}
+  {{if .Unpublished}}<li class="warn">declared, no digest today: <span class="mono">{{join .Unpublished}}</span></li>{{end}}
+  {{if not .Digests}}{{if not .Unpublished}}<li class="na">no tags declared</li>{{end}}{{end}}
+  </ul>
+  <div>findings within the aperture: {{range $i, $s := .Severities}}{{if $i}} &middot; {{end}}{{$s.Severity}} {{$s.Count}}{{end}}; undecided {{.Undecided}}{{if .OverCeiling}}, <span class="no">over ceiling {{.OverCeiling}}</span>{{else}}, over ceiling 0{{end}}; fixed {{.Fixed}}</div>
+  {{if .Expiries}}<ul>{{range .Expiries}}<li class="{{if .Lapsed}}no{{else}}warn{{end}}">exception {{if .Lapsed}}lapsed{{else}}lapsing{{end}}: {{.Message}}</li>{{end}}</ul>{{end}}
+</section>
+{{end}}
+</div>
+
+<h3>Clocks over the supported set</h3>
+<p class="lead">First seen is the statement's timestamp, decided its decision time, fixed the first day a finding was absent from every supported digest of its repository. Ages of undecided findings are measured against the ceilings above.</p>
+<table>
+<tr><th>Repository</th><th>Finding</th><th>Severity</th><th>KEV</th><th>Status</th><th>First seen</th><th>Decided</th><th>Age / ceiling</th></tr>
+{{if not .Open}}<tr><td colspan="8">nothing undecided or decided-and-present today</td></tr>{{end}}
+{{range .Open}}<tr{{if .OverCeiling}} class="over"{{end}}><td>{{shortName .Repository}}</td><td>{{.ID}}</td><td>{{.Severity}}</td><td>{{yesNo .KEV}}</td><td>{{.Status}}{{if .Decision}} ({{.Decision}}){{end}}</td><td>{{day .FirstSeen}}</td><td>{{day .Decided}}</td><td>{{if .AgeDays}}{{ptr .AgeDays}} / {{ptr .CeilingDays}}{{else}}n/a{{end}}</td></tr>
+{{end}}
+</table>
+{{if .Fixed}}
+<details><summary>fixed ({{len .Fixed}})</summary>
+<table>
+<tr><th>Repository</th><th>Finding</th><th>Severity</th><th>First seen</th><th>Decided</th><th>Fixed</th><th>Days to fix</th></tr>
+{{range .Fixed}}<tr><td>{{shortName .Repository}}</td><td>{{.ID}}</td><td>{{.Severity}}</td><td>{{day .FirstSeen}}</td><td>{{day .Decided}}</td><td>{{.Fixed}}</td><td>{{ptr .DaysToFix}}</td></tr>
+{{end}}
+</table>
+</details>
+{{end}}
+
+<h3>Revocations</h3>
+{{if not .Revocations}}<p class="lead">none recorded.</p>{{else}}
+<table>
+<tr><th>Repository</th><th>Digest</th><th>Date</th><th>Reason</th><th>Outcome</th><th>Advisory</th></tr>
+{{range .Revocations}}<tr><td>{{shortName .Image}}</td><td class="mono">{{short .Digest}}</td><td>{{.Date}}</td><td>{{.Reason}}</td><td>{{outcome .}}</td><td><a href="{{.Advisory}}">{{advisoryName .Advisory}}</a></td></tr>
+{{end}}
+</table>
+{{end}}
+
+<footer>Rendered by the daily rescan from its own outputs and deployed as a workflow artifact; nothing here was written by hand. The verification recipe, the policies and the records live in the repository.</footer>
+</body>
+</html>
