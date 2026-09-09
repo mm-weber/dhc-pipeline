@@ -28,5 +28,5 @@ probe: certificate-issuance
 
 # Render (chart CI gate, task 5.5) and install (e2e, phase 6):
 #   helm template dhc-cert-manager cert-manager \
-#     --repo https://charts.jetstack.io --version v1.21.0 \
+#     --repo https://charts.jetstack.io --version <the version above> \
 #     -f chart/cert-manager/config/values-hardened.yaml

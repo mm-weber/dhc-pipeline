@@ -878,3 +878,31 @@ measurement the devcontainer cannot make. The EARS validator's rule that
 lowercase "the" may not outnumber "THE" shaped three sentences. The
 existing pin-lint fixtures carry no accounts block, so Req 1.4's lint is its
 own script rather than seventy fixture edits.
+
+## D6: documentation truth pass, the rest (2026-09-09)
+
+Branch: `d6-docs-truth`. Review disposition D6 (theme 6; task 15.6).
+Goal: no document, comment, error message or step name describes an
+earlier catalogue.
+
+- [x] 1. Retired criterion numbers re-anchored in the workflows' headers and step names,
+      four scripts and their test strings (6.18 into 6.17, 6.21 and 6.31 into 6.20, 6.23 into
+      6.7, 6.24 into 6.11, 6.6 to the declared consumers, 6.2 into 2.22, 8.x and 3.6 retired),
+      the triage README, the grafana exception, ADR 0002; the reviews and the LOG stay history
+- [x] 2. The manual: the amd64 note (both platforms since task 9.3), the deploy walkthrough
+      and the chart READMEs read the version from chart.yaml instead of quoting it, the
+      overlay claim scoped per chart, "every active definition", the scripts reference
+      complete (36 scripts), the requirements map (Req 9 in, Req 8 retired), the
+      requirements-ci.txt path, render-chart.sh named as the one untested script
+- [x] 3. README's signing claim and policies row; SECURITY.md's tense; CONVENTIONS' source
+      rule, enforcement claim, Alpine convention, tarball shape, chart-pin path, SBOM
+      checksum sentence; concepts.md's spike sentence; verify-arch-pins.sh's header; the
+      grafana skew notes dated; valkey's stale appVersion comment gone
+- [x] 4. Validate chain green; the three suites whose strings moved pass
+
+**Review (2026-09-09).** The chart READMEs stopped quoting the version
+rather than gaining a lint that holds them equal: Renovate moves the pin,
+and a README that reads the pin cannot rot. Three PRs of documentation
+drift (D4, D5, D6) trace back to one habit, quoting a value a machine
+moves; the manual now says so where the commands are. What D6 leaves to
+D7: the mislabelled pin-lint test and a render-chart.sh suite.

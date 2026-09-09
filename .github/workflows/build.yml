@@ -5,7 +5,8 @@ name: build
 # release concern, Req 2.1) — then load it into the docker daemon and run the
 # CVE scan gate: Trivy over HIGH/CRITICAL, failing on anything not excused by an
 # OpenVEX statement in triage/vex/ (Req 6.1), with a Grype second opinion
-# whenever a CRITICAL is present (Req 6.6).
+# whenever a CRITICAL is present (a convention: its criterion, Req 6.6, was
+# retired 2026-08-26 for the declared consumers, Req 9.11 to 9.13).
 # main: same build, then push to the declared registry namespace
 # (catalogue-policy.yaml verification.registry, task 14.1) with a cosign
 # keyless signature, an SPDX SBOM (Syft), and BuildKit provenance attached
@@ -14,7 +15,8 @@ name: build
 # 2026-08-13 public release — its WHILE clause ended with the visibility flip.
 #
 # Builds run on GitHub Actions runners — the authoritative build environment
-# (Req 8.1). Pulling the frontend + golang builder needs a dhi.io login:
+# (an operating convention; Req 8 retired 2026-08-26). Pulling the frontend
+# + golang builder needs a dhi.io login:
 # operator adds repo secrets DHI_USERNAME + DHI_TOKEN (Docker Hub creds with
 # DHI access). GHCR uses the built-in GITHUB_TOKEN.
 
@@ -839,7 +841,8 @@ jobs:
         run: |
           set -euo pipefail
           ref=$(printf '%s\n' "$TAGS" | head -n1)
-          # A different DB + matcher corroborating Trivy's CRITICAL (Req 6.6);
+          # A different DB + matcher corroborating Trivy's CRITICAL (a convention;
+          # Req 6.6 retired for the declared consumers, Req 9.11 to 9.13);
           # informational — the authoritative gate is the Trivy result below.
           grype "$ref" -o table | tee grype.txt
           {

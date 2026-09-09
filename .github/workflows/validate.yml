@@ -158,7 +158,7 @@ jobs:
       - name: install-tool unit tests (Req 7.5)
         run: scripts/install-tool_test.sh
 
-      - name: VEX product identity lint (Req 6.17-6.21)
+      - name: VEX product identity lint (Req 6.17, 6.19, 6.20)
         run: scripts/lint-vex-product.sh
       # Req 9.18 (task 13.6): every source statement's log citation resolves
       # to a heading in triage/LOG.md (the exception half runs inside

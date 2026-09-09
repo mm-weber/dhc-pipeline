@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # lint-vex-product.sh [root] — check the product identifiers of every OpenVEX
-# statement under triage/vex/ (Req 6.17-6.21, 6.31).
+# statement under triage/vex/ (Req 6.17, 6.19, 6.20; the retired 6.18, 6.21 and 6.31 folded into 6.17 and 6.20 on 2026-08-26).
 #
 #   Req 6.17 — the product is an OCI purl naming an image this repo defines
-#   Req 6.18 — its repository_url is that definition's published repository
+#   Req 6.17 — its repository_url is that definition's published repository
 #   Req 6.19 — the suppression is scoped by versionless subcomponent purls
 #   Req 6.20 — a product version is a tag that definition publishes
-#   Req 6.21 — a 'fixed' statement carries a version
+#   Req 6.20 — a 'fixed' statement carries a version
 #   Req 6.39 — a source statement records not_affected or fixed, nothing else
-#   Req 6.31 — a versionless product says why its claim survives a bump
+#   Req 6.20 — a versionless product says why its claim survives a bump
 #
 # A wrong product identifier produces no error of any kind. Trivy suppresses a
 # finding only when the product AND the subcomponent match, and a statement that
@@ -135,16 +135,16 @@ check_product() { # rel, cve, product purl, subcomponent count, status, status_n
   # one. Compared case-sensitively: OpenVEX status labels are a closed set of
   # lower-case strings, so no consumer reads 'Fixed' as the fixed label.
   if [ "$status" = "fixed" ] && [ -z "$version" ]; then
-    report "$rel" 6.21 "$cve product '$purl' records status 'fixed' but carries no version — a fixed claim is about the versions that carry the remedy, and stated versionless it excuses this CVE on every image ever published under that name, including the older tag still pullable from the registry. Name the published tag the fix shipped in"
+    report "$rel" 6.20 "$cve product '$purl' records status 'fixed' but carries no version — a fixed claim is about the versions that carry the remedy, and stated versionless it excuses this CVE on every image ever published under that name, including the older tag still pullable from the registry. Name the published tag the fix shipped in"
   fi
 
-  # Req 6.31. Versionless claims every build of this image, including releases
+  # Req 6.20. Versionless claims every build of this image, including releases
   # nobody has examined yet, so a structural argument written about one release
   # keeps excusing the finding after a bump that changed what it links. Left to
   # a default every statement drifts here, because versionless suppresses most
   # and costs least to write — the note is what turns it back into a decision.
   if [ -z "$version" ] && [[ "$notes" != *"version-independent:"* ]]; then
-    report "$rel" 6.31 "$cve product '$purl' carries no version, so it claims every build of this image — including releases nobody has examined yet — and its 'status_notes' does not say why the claim survives a version change. Either scope it to the published tag it was argued about, or write 'version-independent: <why>' into status_notes (triage/README.md)"
+    report "$rel" 6.20 "$cve product '$purl' carries no version, so it claims every build of this image — including releases nobody has examined yet — and its 'status_notes' does not say why the claim survives a version change. Either scope it to the published tag it was argued about, or write 'version-independent: <why>' into status_notes (triage/README.md)"
   fi
 
   # The purl name is the image; there is no "does this image exist" check
@@ -181,7 +181,7 @@ check_product() { # rel, cve, product purl, subcomponent count, status, status_n
   # the first is the comparison for all of them.
   expected="$(published_repository "$ROOT/${defs[0]}")"
   if [ -z "$expected" ]; then
-    report "$rel" 6.18 "$cve product '$purl' resolves to '$shown_defs', which declares no 'image:' — there is no published repository to compare against"
+    report "$rel" 6.17 "$cve product '$purl' resolves to '$shown_defs', which declares no 'image:' — there is no published repository to compare against"
     return
   fi
 
@@ -201,9 +201,9 @@ check_product() { # rel, cve, product purl, subcomponent count, status, status_n
   done
 
   if [ -z "$repo" ]; then
-    report "$rel" 6.18 "$cve product '$purl' carries no 'repository_url' value — Trivy's root component purl always has one, so a product without it matches nothing and the author gets no hint of that. Expected the repository '$shown_defs' publishes: '$expected' (slashes percent-encoded)"
+    report "$rel" 6.17 "$cve product '$purl' carries no 'repository_url' value — Trivy's root component purl always has one, so a product without it matches nothing and the author gets no hint of that. Expected the repository '$shown_defs' publishes: '$expected' (slashes percent-encoded)"
   elif [ "$repo" != "$expected" ]; then
-    report "$rel" 6.18 "$cve product '$purl' declares repository '$repo', but '$shown_defs' publishes '$expected' — Trivy compares this string exactly, so the statement is inert: the finding stays and nothing says why"
+    report "$rel" 6.17 "$cve product '$purl' declares repository '$repo', but '$shown_defs' publishes '$expected' — Trivy compares this string exactly, so the statement is inert: the finding stays and nothing says why"
   fi
 }
 

@@ -1,6 +1,7 @@
 # valkey (hardened adaptation)
 
-Upstream chart `valkey` **0.11.0** from https://valkey-io.github.io/valkey-helm,
+Upstream chart `valkey` from https://valkey-io.github.io/valkey-helm, at the version
+[`chart.yaml`](chart.yaml) pins (Renovate moves it, so it is not quoted here),
 consumed unmodified (Req 4.1). All deltas live in
 [`config/values-hardened.yaml`](config/values-hardened.yaml) and are applied
 with `-f`; no upstream template is edited, forked, or patched.
@@ -9,9 +10,12 @@ Render / install:
 
 ```bash
 helm template dhc-valkey valkey \
-  --repo https://valkey-io.github.io/valkey-helm --version 0.11.0 \
+  --repo https://valkey-io.github.io/valkey-helm \
+  --version "$(yq '.upstream.version' chart/valkey/chart.yaml)" \
   -f chart/valkey/config/values-hardened.yaml
 ```
+
+(`scripts/render-chart.sh chart/valkey` is the same command, the way CI runs it.)
 
 **Version note:** this is the valkey project's own chart, so its appVersion
 follows the server release (0.11.0 ships `9.1.1`, 0.12.0 ships `9.1.2`). The

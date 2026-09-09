@@ -111,7 +111,7 @@ stmt_status() { # status JSON (empty omits the key), CVE, [product JSON blobs…
   # to affected (OpenVEX §Status Justifications). Branching keeps every fixture
   # a document a VEX consumer would accept, so a case that passes here is not
   # passing on a shape only this lint tolerates.
-  # Req 6.31: a versionless product has to say why its claim survives a version
+  # Req 6.20 (formerly 6.31): a versionless product has to say why its claim survives a version
   # change, and most fixtures here are versionless, so the default notes carry
   # that token. $NOTES replaces them for the cases that test the rule itself.
   local notes="${NOTES:-}"
@@ -407,7 +407,7 @@ run_case "the subcomponent defect is reported in the same run" 1 "$TEMPO@v1.5.1"
 # images that do not have the fix.
 fresh; vex_status '"fixed"' "$CVE1" "$GRAFANA_PRODUCT" "$PROM"
 run_case "fixed with a versionless product fails" 1
-run_case "versionless fixed product is reported under Req 6.21" 1 "Req 6.21"
+run_case "versionless fixed product is reported under Req 6.20" 1 "Req 6.20"
 run_case "versionless fixed product quotes the product" 1 "$GRAFANA_PRODUCT"
 run_case "versionless fixed product names the status that requires a version" 1 "fixed"
 run_case "versionless fixed product says a version is what is missing" 1 "version"
@@ -458,7 +458,7 @@ run_case "a version against a definition with no tags fails" 1 "Req 6.20"
 fresh; vex "$CVE1" "$GRAFANA_PRODUCT" "$TEMPO"
 refute_case "not_affected with a versionless product is not reported" 0 "::error"
 
-# --- Req 6.31: versionless is an argument, not a default --------------------
+# --- Req 6.20 (formerly 6.31): versionless is an argument, not a default ------
 #
 # Compilation made scope meaningful and immediately made the default wrong.
 # A versionless product claims every build of the image, forever, so a
@@ -476,7 +476,7 @@ refute_case "not_affected with a versionless product is not reported" 0 "::error
 fresh; NOTES="Architectural analysis of the shipped entrypoint; see triage/LOG.md 2026-07-26."
 vex "$CVE1" "$GRAFANA_PRODUCT" "$TEMPO"
 run_case "versionless without a version-independence note fails" 1
-run_case "it is reported under Req 6.31" 1 "Req 6.31"
+run_case "it is reported under Req 6.20" 1 "Req 6.20"
 run_case "the message quotes the product" 1 "$GRAFANA_PRODUCT"
 run_case "the message says what to write" 1 "version-independent:"
 # The author needs the reason, not the rule: what a versionless claim covers is
@@ -507,7 +507,7 @@ write_doc "$SB/triage/vex/$CVE1.openvex.json" "$(cat <<EOF
 }
 EOF
 )"
-run_case "versionless with no status_notes at all fails" 1 "Req 6.31"
+run_case "versionless with no status_notes at all fails" 1 "Req 6.20"
 
 # 37: the version rule no longer depends on the status at all. What a version
 # may be is a property of the source format — compilation looks a tag up
@@ -567,13 +567,13 @@ run_case "an upper-case status is not a hand-authored label either" 1 "Req 6.39"
 # value it is an ordinary character. A fixed product whose only '@' sits there
 # is still versionless, and a not_affected one still clean.
 fresh; vex_status '"fixed"' "$CVE1" "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana&tag=13.1.1@sha256" "$PROM"
-run_case "an '@' inside a qualifier value is not a product version" 1 "Req 6.21"
+run_case "an '@' inside a qualifier value is not a product version" 1 "Req 6.20"
 fresh; vex "$CVE1" "pkg:oci/grafana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana&tag=13.1.1@sha256" "$TEMPO"
 run_case "an '@' inside a qualifier leaves a not_affected product clean" 0
 
 # 43: an empty version component is no version — purl reads 'name@' unversioned
 fresh; vex_status '"fixed"' "$CVE1" "pkg:oci/grafana@?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgrafana" "$PROM"
-run_case "a fixed product with an empty version component fails" 1 "Req 6.21"
+run_case "a fixed product with an empty version component fails" 1 "Req 6.20"
 
 # --- making one rule conditional must not make the others conditional -------
 
@@ -592,14 +592,14 @@ run_case "a fixed statement with no subcomponents still fails" 1 "subcomponent"
 # 45: the missing version and the missing definition are both the author's to
 # fix; stopping at the first sends them round the loop twice
 fresh; vex_status '"fixed"' "$CVE1" "pkg:oci/graphana?repository_url=ghcr.io%2Fmm-weber%2Fdhc%2Fgraphana" "$PROM"
-run_case "a versionless fixed product with no definition reports the version" 1 "Req 6.21"
+run_case "a versionless fixed product with no definition reports the version" 1 "Req 6.20"
 run_case "a versionless fixed product with no definition reports both defects" 1 "image/graphana/image.yaml"
 
 # 46: but an identifier that is not a purl at all gets one diagnosis, not two.
 # "Add a version" is noise when the whole shape is wrong.
 fresh; vex_status '"fixed"' "$CVE1" "ghcr.io/mm-weber/dhc/grafana:13.1.1-alpine3.23" "$PROM"
 run_case "a fixed statement with a bare image reference fails" 1 "not a package URL"
-refute_case "a non-purl fixed product is not also reported as versionless" 1 "Req 6.21"
+refute_case "a non-purl fixed product is not also reported as versionless" 1 "Req 6.20"
 
 # --- mixed statuses in one document -----------------------------------------
 
@@ -612,7 +612,7 @@ write_doc "$SB/triage/vex/mixed.openvex.json" \
   "$(stmt_status '"not_affected"' "$CVE3" "$(prod "$GRAFANA_PINNED" "$TEMPO")")"
 run_case "the versionless fixed statement in a mixed file is named by its CVE" 1 "$CVE2"
 run_case "the versioned not_affected statement is named in the same run" 1 "$CVE3"
-run_case "a mixed-status file reports Req 6.21" 1 "Req 6.21"
+run_case "a mixed-status file reports Req 6.20" 1 "Req 6.20"
 run_case "a mixed-status file reports Req 6.20 in the same run" 1 "Req 6.20"
 refute_case "the clean fixed statement beside them is not reported" 1 "$CVE1"
 

@@ -66,8 +66,8 @@ are this repository's own.
 | `test/`                       | Go module: Ginkgo v2 + Gomega + e2e-framework suite (`e2e/`), reusable assertions (`checks/`), install/harness helpers, Renovate manager fixtures (`renovate/`) |
 | `triage/`                     | The CVE lane: `vex/` (OpenVEX source), `accepted-risk/` (time-boxed exceptions), `LOG.md` (every decision), `upstream/` (drafts for other trackers), `rescan/` (the unit-tested issue-filing Go tool) |
 | `policies/`                   | Kyverno policies: digest pins, allowed registry, non-root — plus `tests/` fixtures |
-| `scripts/`                    | Tested glue; every `x.sh` has an `x_test.sh` |
-| `.github/workflows/`          | The six workflows + `requirements-ci.txt` (hash-pinned Python deps) |
+| `scripts/`                    | Tested glue; every script but `render-chart.sh` (a helm wrapper) has an `x_test.sh` |
+| `.github/workflows/`          | The six workflows; `.github/requirements-ci.txt` beside them holds the hash-pinned Python deps |
 | `.specs/dhc-catalogue-mvp/`   | EARS requirements, design, task ledger |
 | `docs/`                       | This manual, conventions, concepts, ADRs, operating-loop evidence |
 | `renovate.json5`              | All upstream tracking: custom regex managers only |
@@ -148,11 +148,13 @@ is `valkey:<ver>-alpine3.23-compat`, required because the upstream valkey
 chart runs an unconditional `/bin/sh` init container; the cost is documented
 in [chart/valkey/README.md](../chart/valkey/README.md).
 
-Platform note: releases are currently **linux/amd64 only** (Req 2.1). arm64
-was deliberately withdrawn on 2026-08-04 because nothing scanned it; it
-returns only once the rescan covers it (spec task 8.3), per the rule that no
-platform is published unscanned (Req 2.8, which absorbed the retired Req 2.6
-on 2026-08-26).
+Platform note: releases are **linux/amd64 and linux/arm64**, the platforms
+the policy file admits (`release.platforms`) and every definition declares
+(Req 2.1). arm64 was withdrawn on 2026-08-04 because nothing scanned it and
+returned with task 9.3 on 2026-09-02, once the release-time scan and the
+rescan covered every platform manifest by its own digest, per the rule that
+no platform is published unscanned (Req 2.8, which absorbed the retired
+Req 2.6 on 2026-08-26).
 
 ### Verify what you pull
 
@@ -216,36 +218,36 @@ What each artifact gives you:
 
 Adapted charts consume the upstream chart **unmodified** at a pinned version
 and apply one overlay file (Req 4.1). Rendering locally is one command per
-chart — these are the pins at the time of writing; `chart/<name>/chart.yaml`
-is authoritative:
+chart, reading the version from `chart/<name>/chart.yaml`, which Renovate
+moves and which is therefore never quoted here (a quoted version rots the
+day after a chart bump; three did, review 2026-09-09):
 
 ```sh
-# cert-manager — upstream chart v1.21.0 (jetstack)
-helm template dhc-cert-manager cert-manager \
-  --repo https://charts.jetstack.io --version v1.21.0 \
-  -f chart/cert-manager/config/values-hardened.yaml
-
-# grafana — upstream chart 10.5.15 (grafana community)
-helm template dhc-grafana grafana \
-  --repo https://grafana.github.io/helm-charts --version 10.5.15 \
-  -f chart/grafana/config/values-hardened.yaml
-
-# valkey — upstream chart 0.11.0 (valkey project's own)
-helm template dhc-valkey valkey \
-  --repo https://valkey-io.github.io/valkey-helm --version 0.11.0 \
-  -f chart/valkey/config/values-hardened.yaml
+# an adapted chart: cert-manager, grafana or valkey
+c=cert-manager
+helm template "dhc-$c" "$(yq '.upstream.name' chart/$c/chart.yaml)" \
+  --repo "$(yq '.upstream.repository' chart/$c/chart.yaml)" \
+  --version "$(yq '.upstream.version' chart/$c/chart.yaml)" \
+  -f chart/$c/config/values-hardened.yaml
 
 # hardened-app — owned chart, hardening baked into defaults
 helm template hardened-app chart/hardened-app
 ```
 
-Every overlay does the same three things: swap images to **digest-pinned**
-catalogue builds (Req 4.2), enforce the restricted profile — `runAsNonRoot`,
-UID/GID 65532, read-only root filesystem, no privilege escalation, drop-ALL
-capabilities, seccomp `RuntimeDefault` (Req 4.3) — and mount `emptyDir`
-volumes at each path the workload genuinely writes (Req 4.4). Every deviation
-from upstream defaults is tabled in that chart's README with its reason
-(Req 4.7).
+`scripts/render-chart.sh chart/<name>` does exactly this for either shape.
+
+Every overlay swaps images to **digest-pinned** catalogue builds (Req 4.2)
+and states what the restricted profile needs that upstream does not already
+set: `runAsNonRoot`, UID/GID 65532, read-only root filesystem, no privilege
+escalation, drop-ALL capabilities, seccomp `RuntimeDefault` (Req 4.3), with
+`emptyDir` volumes at each path the workload genuinely writes (Req 4.4).
+How much of that an overlay has to say differs by chart: grafana's and
+valkey's set most of it, cert-manager's sets the UID trio and disables the
+startup API check because the rest are upstream defaults (verified in the
+rendered manifests), hardened-app's chart bakes it into its own values. The
+live pods are held to the whole profile by the e2e suite either way, and
+every deviation from upstream defaults is tabled in that chart's README with
+its reason (Req 4.7).
 
 Per-chart notes worth knowing before you deploy:
 
@@ -327,7 +329,7 @@ digest-pinned with a real 64-hex digest, no floating tags (failing output
 names the offending reference, Req 1.6, Req 7.4), plus version-coherence
 across a definition's derived fields; the Kyverno policy self-tests;
 `lint-accepted-risk.sh` (Req 6.11, 6.12); `lint-vex-product.sh`
-(Req 6.17–6.21); and the unit tests of every script in `scripts/`. Then
+(Req 6.17, 6.19, 6.20); and the unit tests of every script in `scripts/`. Then
 `renovate-config-validator --strict` plus the manager fixtures
 (`test/renovate/managers.test.mjs`), which prove each regex manager still
 extracts its dependencies — and does not capture anyone else's.
@@ -617,7 +619,7 @@ published digests and the build layer flow the same day. Age is one half of
 the defence; the declared signal is the other: a refresh verifies the
 definition's `# authenticity:` class before it writes a field and refuses by
 name otherwise (Req 3.8), a repackage checksum change is re-verified at PR
-time (Req 3.9), and the daily rescan re-verifies every definition and files a
+time (Req 3.9), and the daily rescan re-verifies every active definition and files a
 `supply-chain` issue on a mismatch (Req 3.10). Each PR shape comes with
 different automation and a different reviewer job:
 
@@ -1196,17 +1198,17 @@ docker buildx build -f image/hardened-app/image.yaml image/hardened-app/
 
 ### Scripts
 
-Every script has a sibling `_test.sh` run by validate. Headers are
+Every script but `render-chart.sh` has a sibling `_test.sh` run by validate. Headers are
 documentation — each states what it enforces and why it exists.
 
 | Script | Invocation | Role |
 |--------|------------|------|
 | `lint-pins.sh` | `[root]` | Digest pins everywhere (64-hex, anchored), no floating tags, definition version-coherence, variant source parity (Req 1.2, 1.6) |
-| `lint-vex-product.sh` | `[root]` | VEX product identity + status/version rules (Req 6.17–6.21, 6.31) |
+| `lint-vex-product.sh` | `[root]` | VEX product identity + status/version rules (Req 6.17, 6.19, 6.20) |
 | `lint-accepted-risk.sh` | `[root]` | Exception fields incl. `decided_at`, the policy's largest ceiling from the decision date, per-binary paths, no stray ignore files; doubles as the expiry reporter (Req 6.7, 6.10–6.12) |
 | `triage-policy.sh` | `<root> <query>` | The one reader of the policy's `triage` section: aperture, ceilings, KEV ceiling, warning window, feed URL; refuses a section with holes (Req 6.49) |
 | `check-exceptions.sh` | `gate <root> <image> <trivy.json> <kev.json>` / `rescan <root> <reports-dir> <kev.json>` | Exception ceilings tiered by the finding's severity and KEV status; no KEV set is a refusal, never a pass (Req 6.50, 6.51, 6.59, 6.60) |
-| `compile-vex.sh` | `<src> <out> <definition> <digest> [tag…]` | Render VEX source per build: stamp digest, drop out-of-scope, record every drop via `COMPILE_VEX_REPORT` (Req 6.28–6.32) |
+| `compile-vex.sh` | `<src> <out> <definition> <digest> [tag…]` | Render VEX source per build: stamp digest, drop out-of-scope, record every drop via `COMPILE_VEX_REPORT` (Req 6.28 to 6.30, 6.32) |
 | `definition-lib.sh` | *sourced* | The one directory-↔-published-name mapping; every consumer goes through it |
 | `refresh-definition.sh` | `<dir>` | postUpgradeTask, from-source archetype: recompute checksum/vars/tags/ldflags from the bumped ref |
 | `refresh-grafana.sh` | `<dir>` | postUpgradeTask, repackage archetype: three-source build-id resolution, per-arch sha re-pin, existence-gated (ADR 0002) |
@@ -1221,11 +1223,32 @@ documentation — each states what it enforces and why it exists.
 | `render-chart.sh` | `<chart-dir>` | Render either chart shape to stdout for the policy gate |
 | `accepted-risk-report.sh` | `<trivy.json> <file>` | Per-binary suppression table + dead-entry report (Req 6.26, 6.27) |
 | `govulncheck-report.sh` | `label=file …` | Reachability table; module-level collapses to "not measured" (Req 6.16) |
+| `lint-accounts.sh` | `[root]` | Every definition runs as a non-root account with uid 65532 (Req 1.4) |
+| `lint-active-set.sh` | `[--changed <file>] [root]` | The active set is well-formed, splits no group, every chart names existing definitions; on a PR, a change under a frozen definition or chart fails (Req 1.16, 1.18, 1.19) |
+| `lint-probes.sh` | `[root]` | Every active definition is deployed by a chart declaring a functional probe (Req 5.8) |
+| `lint-compat.sh` | `[root]` | Every compat decision's review-by date is in the future (Req 4.8) |
+| `lint-log-anchors.sh` | `[refs\|statements\|all] [root]` | Every exception ref and statement citation resolves to a `triage/LOG.md` heading (Req 9.18) |
+| `lint-workflow-policy.sh` | `[root]` | Every workflow's cron and permissions equal the policy file's declarations, both directions (Req 7.10) |
+| `lint-rescan-steps.sh` | `[workflow]` | Every rescan step after the scan runs regardless of earlier failures (review D1) |
+| `release-policy.sh` | `<root> <query>` | The one reader of the policy's `release` section; a misspelt switch is a refusal (Req 2.13, 2.14, 2.17, 7.7) |
+| `render-verification.sh` | `[--check] [root]` | Renders the two Kyverno policies and the consumer recipe from the policy file; `--check` fails on drift (Req 7.8, 7.9) |
+| `render-tracking.sh` | `[--check] [root]` | Renders the active set into Renovate's ignore block; `--check` fails on drift (Req 1.14) |
+| `check-authenticity.sh` | `<root> <out.jsonl>` | Daily re-verification of every active definition's authenticity signal and the compat clocks (Req 3.10, 4.9) |
+| `check-attestation-count.sh` | `<enumeration.tsv> <out.json>` | Exactly one OpenVEX attestation on every tag-referenced digest and platform manifest (Req 6.44, 6.45) |
+| `check-governance.sh` | `<rulesets-dir> <owner/repo> <out.json>` | Committed rulesets against the live ones, both directions, and private vulnerability reporting, through anonymous reads (Req 9.3, 9.9) |
+| `check-revocations.sh` | `<revocations.yaml> <enumeration.tsv> <out.json>` | No catalogue tag references a revoked digest (Req 9.7) |
+| `fetch-sboms.sh` | `<root> <enumeration.tsv> <out-dir>` | The attested CycloneDX SBOMs of the supported set, read through verification against the declared identities (Req 6.58) |
+| `reattest.sh` | `<root> <enumeration.tsv> <out-dir>` | Attests today's scan reports and re-attests each digest's OpenVEX document on change, replacing (Req 6.42, 6.43) |
+| `vex-consumer.sh` | `<consumer> <out.jsonl> --root <dir> (--report <trivy.json> \| --scan <ref> …)` | One adapter per declared consumer, emitting the normalised suppression shape (Req 9.11) |
+| `vex-portability.sh` | `--root <dir> --label <l> --out <md> --json <auth.jsonl> [<other.jsonl>…]` | The portability block: agree, DIVERGENCE, absent per statement and consumer (Req 9.12) |
+| `consumer-smoke.sh` | `--root <dir> --readme <file> --ref <digest> --out <md> --json <f>` | The README's verify recipe run verbatim against one supported digest (Req 9.13) |
 
 ### Renovate managers
 
-`renovate.json5` — `enabledManagers: ["custom.regex"]` only. One manager per
-pin surface; every one is fixture-tested in both directions:
+`renovate.json5` — `enabledManagers: ["custom.regex", "github-actions", "gomod"]`
+(review D4): the regex managers below, the built-in one for the SHA-pinned
+Actions and the built-in one for the two Go modules. One manager per pin
+surface; every regex manager is fixture-tested in both directions:
 
 | Surface | Shape | Datasource | postUpgradeTask |
 |---------|-------|------------|-----------------|
@@ -1264,7 +1287,8 @@ three-day minimum release age first.
 | **Req 5** — Integration tests | `test/` Ginkgo suite · e2e.yml kind matrix · upgrade path on both bump shapes · diagnostics artifacts |
 | **Req 6** — CVE triage | Scan gate + rescan cron · `triage/` two lanes, three published verbs · compile-vex (affected from exceptions, carry-forward) + both lints · govulncheck evidence · re-attestation replacing, exactly one OpenVEX per digest · issue filing, closing and reopening on evidence · the catalogue status issue |
 | **Req 7** — Conventions & enforcement | `docs/CONVENTIONS.md` · validate.yml battery · PR template · pinned + verified tool installs with managers over the pins |
-| **Req 8** — Operating environment | All heavy operations on Actions; devcontainer delegates (operating convention) |
+| **Req 9** — Catalogue posture | `SECURITY.md` · `check-governance.sh`, `check-revocations.sh`, `check-visibility.sh`, `verify-catalogue.sh` in the rescan · the declared consumers, the portability block and the smoke test · the manual-controls register · the trust-boundary table · `lint-log-anchors.sh` |
+| Req 8 | Retired 2026-08-26: the operating-environment guidance lives in CLAUDE.md and the design's Development Process section |
 
 ### Troubleshooting
 

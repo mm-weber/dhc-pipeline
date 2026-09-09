@@ -63,8 +63,8 @@ tagged) and 2026-09-02 (every platform manifest of every tag-referenced digest
 scanned daily). Digests published before those dates form a legacy stratum:
 signed at the index only, their platform manifests unsigned, enumerated and
 scanned daily since 2026-09-02 but never re-signed. The epoch the promise
-attaches to is the successor repository's first release; this repository is
-archived intact.
+attaches to is the successor repository's first release; this repository will
+be archived intact when that release is cut (task 12.1).
 
 **Retention from the epoch: nothing is deleted.** A catalogue tag is never
 removed except through a recorded revocation; it moves forward as its

@@ -449,7 +449,7 @@ contains "and the binaries"                       "$(doc -r '.statements[0].acti
 contains "and the expiry"                         "$(doc -r '.statements[0].action_statement')" "2026-11-02"
 check "and does not say the treatment twice"  "1" "$(doc -r '.statements[0].action_statement' | grep -o 'transfer:' | wc -l | tr -d ' ')"
 
-# 30b: one entry per binary (Req 6.23), so the same package at the same version
+# 30b: one entry per binary (Req 6.7), so the same package at the same version
 #      in two binaries arrives as two suppressions under two entries; the
 #      document states the finding once and carries both decisions.
 fresh

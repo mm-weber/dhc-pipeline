@@ -115,7 +115,8 @@ triaged.
 - `dl.grafana.com` is blocked by the devcontainer firewall, so the checksum
   fetch cannot be exercised locally. `REFRESH_GRAFANA_SHA256_AMD64/_ARM64`
   stub it for the unit tests; the live path first runs in GitHub Actions, which
-  is the authoritative environment anyway (Req 8.1).
+  is the authoritative environment anyway (an operating convention; Req 8
+  retired 2026-08-26).
 - `dates.release` is not regenerated — it is not derivable from the tarball url
   and would need a GitHub API call. It goes stale on a bump and is corrected by
   the reviewer. Worth automating if a second repackage image appears.

@@ -127,12 +127,12 @@ for index, entry in enumerate(entries):
             print(f"::error file={rel},line={line}::risk treatment (Req 6.11): {label} is missing '{field}' ({WHY[field]})")
             errors += 1
 
-    # Req 6.24. purls scope to a package, never to a binary, so an entry
+    # Req 6.7 and 6.11 (the retired 6.24 folded in). purls scope to a package, never to a binary, so an entry
     # without paths matches its package wherever it appears in the image.
     paths = entry.get("paths")
     clean_paths = [str(p).strip() for p in paths if str(p).strip()] if isinstance(paths, list) else []
     if not clean_paths:
-        print(f"::error file={rel},line={line}::risk treatment (Req 6.24): {label} names no 'paths' — an entry keyed on id and purls alone matches its package in every binary of the image, so deciding one binary silently decides the rest")
+        print(f"::error file={rel},line={line}::risk treatment (Req 6.7, 6.11): {label} names no 'paths' — an entry keyed on id and purls alone matches its package in every binary of the image, so deciding one binary silently decides the rest")
         errors += 1
 
     # Req 6.25. Trivy applies one matching entry; a second claim on the same

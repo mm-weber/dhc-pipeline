@@ -1,6 +1,7 @@
 # cert-manager (hardened adaptation)
 
-Upstream chart `cert-manager` **v1.21.0** from https://charts.jetstack.io,
+Upstream chart `cert-manager` from https://charts.jetstack.io, at the version
+[`chart.yaml`](chart.yaml) pins (Renovate moves it, so it is not quoted here),
 consumed unmodified (Req 4.1). All deltas live in
 [`config/values-hardened.yaml`](config/values-hardened.yaml) and are applied
 with `-f`; no upstream template is edited, forked, or patched.
@@ -9,9 +10,12 @@ Render / install:
 
 ```bash
 helm template dhc-cert-manager cert-manager \
-  --repo https://charts.jetstack.io --version v1.21.0 \
+  --repo https://charts.jetstack.io \
+  --version "$(yq '.upstream.version' chart/cert-manager/chart.yaml)" \
   -f chart/cert-manager/config/values-hardened.yaml
 ```
+
+(`scripts/render-chart.sh chart/cert-manager` is the same command, the way CI runs it.)
 
 **Upstream authenticity:** the three images come from
 `image/cert-manager-{controller,webhook,cainjector}/`, whose source is
