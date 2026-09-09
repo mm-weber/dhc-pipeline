@@ -484,3 +484,27 @@ func TestRenderStatusIssue_ListsRevocations(t *testing.T) {
 		t.Fatalf("revocations did not round-trip: %+v", back.Revocations)
 	}
 }
+
+func TestRenderStatusIssue_PublishesTheSupportStatement(t *testing.T) {
+	s := StatusData{SchemaVersion: 1, GeneratedAt: "2026-09-09T06:17:00Z"}
+	if body := RenderStatusIssue(s); strings.Contains(body, "support statement") {
+		t.Fatalf("without a statement nothing is claimed:\n%s", body)
+	}
+	s.Support = &SupportStatement{SupportedSet: "the digests each definition's current tags: reference", Superseded: "scanned and attested daily; outside issue scope"}
+	body := RenderStatusIssue(s)
+	want := "The supported set is the digests each definition's current tags: reference; a superseded tag-referenced digest is scanned and attested daily; outside issue scope (the support statement, `catalogue-policy.yaml` `triage.support`, Req 6.49)."
+	if !strings.Contains(body, want) {
+		t.Errorf("the statement is published as declared; want %q in:\n%s", want, body)
+	}
+	raw, ok := ExtractFencedJSON(body)
+	if !ok {
+		t.Fatalf("no fenced json block in:\n%s", body)
+	}
+	back, err := ParseStatus(raw)
+	if err != nil {
+		t.Fatalf("fenced block does not parse: %v", err)
+	}
+	if back.Support == nil || *back.Support != *s.Support {
+		t.Errorf("the statement round-trips through the data: got %+v", back.Support)
+	}
+}

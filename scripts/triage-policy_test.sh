@@ -150,6 +150,27 @@ consumers_policy '  list:
 out=$(q consumer-gating); rc=$?
 [ "$rc" -eq 2 ] && grep -q "consumers.gating must be true or false" <<<"$out" && pass "a non-boolean gating switch: refused" || fail "gating non-boolean" "rc=$rc" "$out"
 
+# The support statement (Req 6.49; review D7): declared once, read here,
+# published by the status issue. A hole is a refusal like any other.
+support_policy() { # <yaml body under triage.support:>
+  fresh
+  printf '  support:\n%s\n' "$1" >> "$SB/catalogue-policy.yaml"
+}
+support_policy '    supported_set: "the digests each definition'"'"'s current tags: reference"
+    superseded: "scanned and attested daily; outside issue scope"'
+expected='{"superseded": "scanned and attested daily; outside issue scope", "supported_set": "the digests each definition'"'"'s current tags: reference"}'
+[ "$(q support)" = "$expected" ] && pass "support: both sentences as JSON, keys sorted" || fail "support statement" "$(q support)" "$expected"
+fresh; out=$(q support); rc=$?
+[ "$rc" -eq 2 ] && grep -q "support statement is missing: triage.support needs supported_set and superseded" <<<"$out" && pass "support: a missing statement is refused by name" || fail "support missing" "rc=$rc" "$out"
+support_policy '    supported_set: "the digests each definition'"'"'s current tags: reference"
+    superseded: ""'
+out=$(q support); rc=$?
+[ "$rc" -eq 2 ] && grep -q "support.superseded is empty" <<<"$out" && pass "support: an empty sentence is refused by name" || fail "support empty" "rc=$rc" "$out"
+support_policy '    supported_set: [a, list]
+    superseded: "x"'
+out=$(q support); rc=$?
+[ "$rc" -eq 2 ] && grep -q "support.supported_set is not a string" <<<"$out" && pass "support: a non-string sentence is refused by name" || fail "support non-string" "rc=$rc" "$out"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all triage-policy tests passed"

@@ -125,6 +125,18 @@ type StatusData struct {
 	Findings      []FindingClock   `json:"findings"`
 	Aggregates    StatusAggregates `json:"aggregates"`
 	Revocations   []Revocation     `json:"revocations"`
+	// Support is the support statement as declared in catalogue-policy.yaml
+	// (triage.support, Req 6.49), read through scripts/triage-policy.sh and
+	// published here so the statement and the clocks it scopes cannot
+	// disagree (review D7). nil when the tool was not given one.
+	Support *SupportStatement `json:"support,omitempty"`
+}
+
+// SupportStatement names the supported set and what a superseded digest
+// keeps; both sentences are the policy file's, verbatim.
+type SupportStatement struct {
+	SupportedSet string `json:"supported_set"`
+	Superseded   string `json:"superseded"`
 }
 type StatusPolicy struct {
 	Aperture   []string       `json:"aperture"`
@@ -545,6 +557,9 @@ func RenderStatusIssue(s StatusData) string {
 	b.WriteString("The clocks over the supported set (Req 6.46, 6.47), read from the attested OpenVEX statements and today's attested scan reports: ")
 	b.WriteString("first seen is the statement's timestamp, decided its decision time, fixed the first day a finding was absent, reported and suppressed alike, from every supported digest of its repository. ")
 	b.WriteString("Ages of undecided findings are measured against the policy file's ceilings. Maintained by the daily rescan; the JSON block below is the same data as the `catalogue-status` artifact.\n\n")
+	if s.Support != nil {
+		fmt.Fprintf(&b, "The supported set is %s; a superseded tag-referenced digest is %s (the support statement, `catalogue-policy.yaml` `triage.support`, Req 6.49).\n\n", s.Support.SupportedSet, s.Support.Superseded)
+	}
 
 	ag := s.Aggregates
 	run := s.GeneratedAt

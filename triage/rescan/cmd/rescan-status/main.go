@@ -8,9 +8,12 @@
 //
 //	rescan-status --enumeration <tsv> --reattest <dir> --reports <dir> \
 //	  --aperture CRITICAL,HIGH --ceilings CRITICAL=30,HIGH=90 --kev-ceiling 14 \
+//	  --support '{"supported_set": "...", "superseded": "..."}' \
 //	  [--kev f] [--previous metrics.json | --previous-body issue.md] [--today YYYY-MM-DD] [--run url] \
 //	  --out-json metrics.json --out-body issue.md
 //
+// --support is the support statement as scripts/triage-policy.sh prints it
+// (Req 6.49); the issue publishes it beside the clocks it scopes (review D7).
 // --enumeration is the rescan's enumeration.tsv (repository, tag, digest,
 // platform, manifest, supported|superseded); only supported rows count.
 // --reattest is the re-attest work directory: <name>__<12 hex>/out/*.openvex.json
@@ -47,6 +50,7 @@ func main() {
 	todayFlag := flag.String("today", "", "YYYY-MM-DD; default: the latest report's date, else now (UTC)")
 	runURL := flag.String("run", "", "the run's URL, recorded in the data (optional)")
 	revocationsFile := flag.String("revocations", "", "the revocation record as JSON, scripts/check-revocations.sh's output; its revocations list is carried into the status (optional)")
+	supportFlag := flag.String("support", "", "the support statement as JSON {supported_set, superseded}, scripts/triage-policy.sh's support output; published in the issue (required)")
 	outJSON := flag.String("out-json", "", "where to write metrics.json (required)")
 	outBody := flag.String("out-body", "", "where to write the issue body (required)")
 	flag.Parse()
@@ -59,6 +63,16 @@ func main() {
 	}
 	if *kevCeiling <= 0 {
 		fatal("--kev-ceiling <days> is required: the ceilings are declared, never assumed (Req 6.49)")
+	}
+	var support rescan.SupportStatement
+	if *supportFlag == "" {
+		fatal("--support is required: the support statement is declared, never assumed (Req 6.49)")
+	}
+	if err := json.Unmarshal([]byte(*supportFlag), &support); err != nil {
+		fatal("--support: not the JSON scripts/triage-policy.sh prints: " + err.Error())
+	}
+	if support.SupportedSet == "" || support.Superseded == "" {
+		fatal("--support: both supported_set and superseded are required (Req 6.49)")
 	}
 	ceilings := map[string]int{}
 	for _, kv := range strings.Split(*ceilingsFlag, ",") {
@@ -127,6 +141,7 @@ func main() {
 	}
 
 	status := rescan.BuildStatus(in)
+	status.Support = &support
 	if *revocationsFile != "" {
 		data, err := os.ReadFile(*revocationsFile)
 		if err != nil {

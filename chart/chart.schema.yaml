@@ -4,7 +4,10 @@
 # every chart directory's chart.yaml. The dates are validated as dates here; whether the
 # review-by date has passed is scripts/lint-compat.sh's question (Req 4.8),
 # because a yamale day() constraint is a static literal with no notion of
-# today (measured; independent review 1.5).
+# today (measured; independent review 1.5). `compat` is optional in the
+# schema because most charts deploy no compat variant; whether a chart that
+# does carries the block, and whether the block names a compat variant the
+# chart deploys, is lint-compat.sh's question too (Req 4.5; review D7).
 #
 # `deploys` (task 14.2, Req 1.14, 5.2) names the definition directories the
 # chart deploys; every chart directory declares it, the owned chart included,

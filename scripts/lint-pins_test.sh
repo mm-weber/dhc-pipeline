@@ -601,7 +601,13 @@ sed -i 's|https://dhi.io/apk/alpine/v3.23/main|https://dhi.io/apk/alpine/main|' 
 run_case "dhi.io: an apk line without a release fails" 1 "Req 1.12"
 fresh; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # authenticity: signed-tag" > "$SB/image/app/image.yaml"
 sed -i 's|https://dl-cdn.alpinelinux.org/alpine/v3.23/main|https://dhi.io/keyring/x.rsa.pub|' "$SB/image/app/image.yaml"
-run_case "dhi.io: a non-repository dhi.io url outside repositories: is not judged" 1 "Req 1.12"
+run_case "dhi.io: a non-package dhi.io url listed under repositories: fails (a keyring is not a package line)" 1 "Req 1.12"
+# 76: the same keyring url under keyring:, where apko expects it, is outside
+# repositories: and is not judged (review D7: the case above was mislabelled
+# as this one and this behaviour had no test)
+fresh; auth_def "url: git+https://github.com/mm-weber/app.git#v1.0.0" "            # authenticity: signed-tag" > "$SB/image/app/image.yaml"
+sed -i 's|^  builds:|  keyring:\n    - https://dhi.io/keyring/dhi-apk@docker-0F81AD7700D99184.rsa.pub\n  builds:|' "$SB/image/app/image.yaml"
+run_case "dhi.io: a keyring url under keyring: is outside repositories: and is not judged" 0
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

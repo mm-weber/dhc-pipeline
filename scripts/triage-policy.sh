@@ -16,6 +16,9 @@
 #   kev-feed           the KEV catalogue URL both arms fetch
 #   resolved-labels    the closing labels per evidence grade, as JSON
 #                      {grade: {name, color, description}} (task 10.6, Req 6.56)
+#   support            the support statement as JSON {supported_set,
+#                      superseded}, both sentences required (Req 6.49); the
+#                      status issue publishes it (review D7)
 #   consumers          the VEX consumers, "<name>\t<authoritative>" per line
 #                      in declared order (task 13.4, Req 9.11)
 #   authoritative-consumer   the one consumer marked authoritative
@@ -34,7 +37,7 @@ set -euo pipefail
 
 err() { printf '::error::triage-policy: %s\n' "$1" >&2; }
 if [ "$#" -lt 2 ]; then
-  err "usage: triage-policy.sh <root> <aperture|ceiling <SEV>|largest-ceiling|kev-ceiling|expiry-warning|kev-feed|resolved-labels|consumers|authoritative-consumer|other-consumers|consumer-gating>"
+  err "usage: triage-policy.sh <root> <aperture|ceiling <SEV>|largest-ceiling|kev-ceiling|expiry-warning|kev-feed|resolved-labels|support|consumers|authoritative-consumer|other-consumers|consumer-gating>"
   exit 2
 fi
 ROOT="$1"; QUERY="$2"; ARG="${3:-}"
@@ -88,6 +91,17 @@ elif query == "resolved-labels":
             refuse(f"resolved_labels.{grade} has no name")
     print(json.dumps({g: {"name": str(e["name"]), "color": str(e.get("color", "")), "description": str(e.get("description", ""))}
                       for g, e in labels.items()}, sort_keys=True))
+elif query == "support":
+    import json
+    support = t.get("support")
+    if not isinstance(support, dict) or not all(k in support for k in ("supported_set", "superseded")):
+        refuse("support statement is missing: triage.support needs supported_set and superseded")
+    for key in ("supported_set", "superseded"):
+        if not isinstance(support[key], str):
+            refuse(f"support.{key} is not a string")
+        if not support[key].strip():
+            refuse(f"support.{key} is empty")
+    print(json.dumps({k: support[k].strip() for k in ("supported_set", "superseded")}, sort_keys=True))
 elif query in ("consumers", "authoritative-consumer", "other-consumers", "consumer-gating"):
     def refuse_c(msg):
         print(f"::error::triage-policy: {msg} (catalogue-policy.yaml consumers section, Req 9.11)", file=sys.stderr)

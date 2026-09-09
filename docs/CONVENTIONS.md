@@ -211,6 +211,9 @@ and from that moment:
   nightly does not rebuild it, a dispatch naming it is refused, Renovate
   opens no bump for it or for a chart deploying only it, and a pull request
   changing a file under its directory fails validation by name (Req 1.16).
+  The rescan asserts the outcome daily, whatever the path: each of its
+  declared tags references the digest the last published status recorded,
+  and none appeared since (`scripts/check-inactive-digests.sh`; review D7).
 - Its already-published tags keep every tag-driven plane until retention
   retires them, and retention deletes nothing (SECURITY.md): the daily
   enumeration, the scans of every platform manifest, the re-attested
