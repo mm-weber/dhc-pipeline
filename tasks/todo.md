@@ -700,3 +700,35 @@ reviewed line by line, with CI's go job and the four-component e2e run as
 the verdict. Every validate step in CI's order passes locally; the local
 runner now sets the push-shape env so the active-set step stops reading as
 a failure.
+
+## Task 14.4: builder contract documented; truth pass (2026-09-09)
+
+Branch: `task-14.4-builder-contract`. Goal: the docs say what the pipeline
+now does. concepts.md states the per-archetype builder contract (Req 1.17)
+and the trust-boundary table links to it; CONVENTIONS and the manual
+describe the active set, the reference set and deactivation; the retired
+criteria the docs still cite are re-anchored with the retirement stated;
+the namespace literals a fork edits by hand become register rows (Req 9.14).
+
+- [x] 1. concepts.md: "The builder contract per archetype" section (input, outputs,
+      what differs per archetype, what consumes only outputs); table row links to it
+- [x] 2. CONVENTIONS: Req 8.2 parenthetical re-anchored; the second-opinion sentence
+      states 6.6's retirement; Req 1.5 citations re-anchored to 7.2; new section on the
+      active set, reference set and deactivation; register rows M21, M22
+- [x] 3. Manual: retired citations re-anchored (8.1, 8.2, 2.6, 1.5, 6.6, 6.2); a
+      "Deactivate a definition" how-to; glossary entries; the 14.2 present tense
+- [x] 4. Truth pass on comments: chart.schema.yaml, catalogue-policy.yaml; design
+      as-built; tasks tick (14.4 and parent 14); em-dash sweep; validate chain locally
+
+**Review (2026-09-09).** Documentation only, so the verification is a
+reading one: every claim in the contract section was checked against
+build.yml (the SBOM pair per platform manifest, the CycloneDX pull checksum
+the comparator reads, provenance as attestation manifests at the push) and
+against the definitions (valkey builds from toolchain packages, not a `-dev`
+image, so the table says so). The retired numbers were mapped from the
+primitives review's own dispositions (1.5 into 7.2, 2.6 into 2.8, 6.2 into
+2.22, 6.6 removed for 9.11 to 9.13, group 8 removed), each citation now
+naming its successor and the retirement date. Internal anchors checked by
+script; the validate chain passes; the two em-dash hits in the diff are
+pre-existing phrases carried through. Task group 14 is complete; 12.1 is
+the last unticked task.

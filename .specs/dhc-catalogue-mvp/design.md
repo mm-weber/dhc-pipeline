@@ -673,6 +673,22 @@ graph TB
      Req 5.5). No placeholder exists anywhere in the chain: the schema keeps
      `probe` optional, the lint refuses an active definition without one, and
      the resolver errors on a missing or unregistered name rather than skipping.
+   - **As built** (task 14.4, 2026-09-09): documentation only, as decided.
+     concepts.md carries the builder contract per archetype (one definition
+     directory in; an image pushed by digest and per-platform SPDX plus
+     CycloneDX SBOMs carrying apk pull checksums out; the source stanza the only
+     per-archetype difference; every downstream plane reading outputs alone),
+     linked from the trust-boundary table's two backend rows (Req 1.17).
+     CONVENTIONS gained the active-set section (reference set, active set, what
+     deactivation changes the same day and what it leaves running, the avoid
+     treatment writ large), the manual a "Deactivate a definition" how-to, a
+     cross-reference from the four treatments, glossary entries and a forking
+     note. The retired criteria the two documents still cited (1.5, 2.6, 6.2,
+     6.6, 8.1, 8.2) are re-anchored to their absorbing criteria with the
+     retirement stated; the Grype second opinion stays as a convention under
+     Req 9.11 to 9.13. The namespace literals Renovate cannot take from the
+     policy file, and the Kyverno fixture's, are register rows M21 and M22.
+     README's positioning sentence waits for task 12.1, as the task says.
 
 ## System Flows
 

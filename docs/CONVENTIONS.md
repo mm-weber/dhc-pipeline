@@ -125,7 +125,7 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
     with the difference in the run summary (Req 2.15, 2.16; a fork sets the
     publish policy to `always` to publish every rebuild, Req 2.17).
 
-## Definitions (Req 1.5, ADR 0001)
+## Definitions (Req 1.7, 7.2, ADR 0001)
 
 Definitions are native DHI syntax, built by the real `dhi.io/build` frontend.
 One file per component at `image/<name>/image.yaml`. Rules, all enforced by
@@ -160,7 +160,8 @@ One file per component at `image/<name>/image.yaml`. Rules, all enforced by
 - Runtime `accounts:` declare `nonroot` 65532 with `run-as` (Req 1.4).
 - Alpine variants only for now; the deb path is unverified (ADR 0001).
 - The linter is the fast gate; the **frontend itself is the authoritative
-  validator** — it compiles every definition on each PR build (Req 1.5).
+  validator** — it compiles every definition on each PR build (Req 7.2, which
+  absorbed the retired Req 1.5 on 2026-08-26).
 
 - **A definition copied or adapted from the DHI catalog carries a
   modification notice.** No definition here is one: each was authored in
@@ -173,6 +174,46 @@ One file per component at `image/<name>/image.yaml`. Rules, all enforced by
   notice the source carried (section 4(c)). `NOTICE` names the substrate's
   copyright and licence; `LICENSES/Apache-2.0.txt` is the licence text
   (Req 9.16).
+
+## Active set, reference set, deactivation (Req 1.13 to 1.16)
+
+The **reference set** is every definition directory under `image/`: the
+seven this repository ships as worked examples (Req 1.1). The **active set**
+is the list in `catalogue-policy.yaml` naming the ones the catalogue builds,
+tracks, tests and publishes (Req 1.13). The reference instance activates all
+seven; a fork lists what it stands behind. One reader,
+`scripts/definition-lib.sh`'s `active_definitions`, feeds every plane that
+scopes to it (Req 1.14): the build matrix on merges, the nightly and a
+dispatch; the e2e matrix through each chart's `deploys:` list; Renovate's
+tracking scope, rendered into `renovate.json5` (task 14.2); the daily
+authenticity re-check; the probe lint (Req 5.8).
+
+**Deactivating a definition means removing its line, and only that.** The
+directory stays (the reference demonstrates the switch; a fork may delete),
+and from that moment:
+
+- No new digest is pushed and no new tag applied for it (Req 1.15); the
+  nightly does not rebuild it, a dispatch naming it is refused, Renovate
+  opens no bump for it or for a chart deploying only it, and a pull request
+  changing a file under its directory fails validation by name (Req 1.16).
+- Its already-published tags keep every tag-driven plane until retention
+  retires them, and retention deletes nothing (SECURITY.md): the daily
+  enumeration, the scans of every platform manifest, the re-attested
+  OpenVEX, the admission proof, the visibility invariant. Its supported
+  digests, the ones its `tags:` still reference, keep their issues, clocks
+  and public counts, and its findings keep every status lane (a statement
+  re-attested, an exception recorded and expiring, an issue closed on
+  evidence, a KEV tier) except the fix bump: no release will ever move its
+  tags again.
+- The coherence rules still hold over it: a byte-equal pair or a
+  source-grouped monorepo activates or deactivates whole (Req 1.18), every
+  chart still names existing definitions, and the chart gate still renders
+  its chart, so the reference tree cannot rot.
+
+Deactivation is the **avoid** treatment writ large: the catalogue stops
+standing behind new builds of the image while the record of what it did
+publish stays complete and verifiable. Reactivation is adding the line back
+(in the same pull request as any change to the directory).
 
 ## Runtime accounts (Req 1.4)
 
@@ -307,7 +348,9 @@ policy (Req 7.8, 7.9; task 14.1), so a fork's gate admits the fork's
 namespace by editing one line; `policies/tests/resources.yaml` names the
 reference namespace literally and is the one fixture that edit touches.
 Policy fixtures live in `policies/tests/` and run via `kyverno test` in CI
-(no kyverno binary in the devcontainer — Req 8.2).
+(no kyverno binary in the devcontainer: an operating convention, recorded in
+the repository's CLAUDE.md and the design document's Development Process
+section since Req 8 was retired on 2026-08-26).
 
 ## Scanning & triage (Req 6)
 
@@ -315,7 +358,10 @@ Every image a PR builds is scanned by Trivy for `HIGH,CRITICAL` in
 `build.yml`; the gate fails on any finding **not** excused by an OpenVEX
 statement in `triage/vex/` or a time-boxed exception in
 `triage/accepted-risk/<image>.yaml`, and a Grype second opinion runs on any
-surviving `CRITICAL`. Red gates are cleared by a recorded decision — drop the
+surviving `CRITICAL` (the criterion behind that step, Req 6.6, was retired in
+the 2026-08-26 primitives pass in favour of the declared-consumer machinery,
+Req 9.11 to 9.13, which runs Grype on every scan as the second consumer; the
+step stays as a convention, not a promise). Red gates are cleared by a recorded decision — drop the
 component, a fix-bump PR, an OpenVEX statement (`vexctl`, `cosign attest`), or an
 accepted-risk entry — plus a `triage/LOG.md` entry, never by silencing the
 scanner.
@@ -398,6 +444,8 @@ the step altogether.
 | M18 | Decide what a supply-chain signal means (the rescan's `supply-chain` issue: a tag that moved, a rotated key, a compromise, a changed origin; Req 3.10) | deliberate | The rescan can measure a mismatch, not its cause; it fails daily and keeps the issue open until someone decides | none | none |
 | M19 | Read the VEX portability block and decide whether a divergence matters (Req 9.12) | deliberate | Matcher semantics differ across scanners; a divergence is information about portability, not a defect in the statement, until someone says otherwise | `consumers.gating: true` in `catalogue-policy.yaml` fails a run on a divergence | none |
 | M20 | Review chart image-pin tag bumps (a new image release reaching a chart; digest-only bumps automerge, Req 3.12) | deliberate | A tag move is a release reaching the deployed chart; the upgrade e2e runs, a human reads its result | `matchUpdateTypes` on the digest automerge rule | none |
+| M21 | When forking, edit the registry-namespace literals in `renovate.json5` by hand: the two chart-pin managers' `matchStrings`, the cert-manager chart-pins group's `matchDepNames`, the digest-automerge rule's `matchPackageNames` (four sites), plus the expectations in `test/renovate/managers.test.mjs` that name them | deliberate | Renovate reads no policy file and a regex manager's match strings take no value from one; the tracking block covers what can be rendered (task 14.2), the namespace cannot be (review 4.7) | `verification.registry` in `catalogue-policy.yaml` is the value; the literals follow it once, and the fixtures fail when a manager stops matching the catalogue's own images | none |
+| M22 | When forking, edit the reference namespace in the Kyverno fixture `policies/tests/resources.yaml` | deliberate | A fixture states its expected values as literals; one that read the value under test would prove nothing. The policy itself renders from the policy file (task 14.1) | `verification.registry`; the fixture follows it once | none |
 | P1 | Track the cosign pin with Renovate: no manager matches a `cosign-release:` line, so M5's bumps are not offered (found 2026-09-08 while moving the install step; ADR 0003 promised the manager) | pending automation | A pin nothing bumps is a stale scanner's failure mode with a signing tool in its place | none: the intended mechanism is a `matchStrings` entry on the workflow manager plus a fixture, and M5 stays the completion step | none |
 | P2 | Re-scope version-scoped VEX statements on a grafana bump: the product lint demands re-scoped statements (Req 6.20), and today a person re-stamps each one in a triage session (2026-09-03 for 13.1.5) | pending automation | The mechanical half is scriptable: a statement whose module version is unchanged by the bump is carried forward under the new product; only a changed module version needs a person | none: the intended mechanism is a postUpgradeTask beside `refresh-grafana.sh` | none |
 

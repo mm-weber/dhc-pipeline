@@ -31,9 +31,10 @@ release:
 # Req 1.13 (task 14.1): the active set, each definition directory under
 # image/ this catalogue builds, tracks, tests and publishes. It is the sole
 # source of candidates for the build and test matrices and the tracking
-# scope (Req 1.14; the matrices read it from task 14.2 on, the probe lint
-# from 14.3), and scripts/definition-lib.sh's active_definitions is the one
-# reader: an entry naming no image/<name>/image.yaml, a duplicate, or an
+# scope (Req 1.14: the build and e2e matrices, Renovate's rendered ignore
+# block, the daily authenticity re-check and the probe lint all read it),
+# and scripts/definition-lib.sh's active_definitions is the one reader: an
+# entry naming no image/<name>/image.yaml, a duplicate, or an
 # empty list is refused by name rather than read as "nothing to do".
 # Deactivating a definition means removing its line, and only that: no new
 # digest is pushed and no new tag applied for it (Req 1.15), a bump PR
@@ -58,7 +59,7 @@ verification:
   # check-visibility.sh probes under it, and the two Kyverno policies
   # (verify-catalogue-images, restrict-registries) render their image globs
   # from it. Placed inside this section because the rendering needs it for
-  # the imageReferences glob (review 4.7; task 14.1 records the placement).
+  # the imageReferences glob (review 4.7; placed here by task 14.1).
   # policies/tests/resources.yaml names the reference namespace literally,
   # the one fixture a fork edits together with this value.
   registry: ghcr.io/mm-weber/dhc

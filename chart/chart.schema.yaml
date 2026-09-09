@@ -1,7 +1,7 @@
 # yamale schema for chart/<name>/chart.yaml, the pinned upstream chart and,
 # where a chart needs one, the compat-variant decision (Req 4.1, 4.5;
-# task 11.4). validate.yml runs `yamale -s chart/chart.schema.yaml` over the
-# three upstream pins. The dates are validated as dates here; whether the
+# task 11.4). validate.yml runs `yamale -s chart/chart.schema.yaml` over
+# every chart directory's chart.yaml. The dates are validated as dates here; whether the
 # review-by date has passed is scripts/lint-compat.sh's question (Req 4.8),
 # because a yamale day() constraint is a static literal with no notion of
 # today (measured; independent review 1.5).
