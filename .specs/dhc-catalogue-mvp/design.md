@@ -841,6 +841,26 @@ graph TB
      Platforms and the admission verdict join the status JSON per digest (additive,
      schema version unchanged). The page shows supported digests only, superseded tags
      as a count: the support statement's scope, printed beside it.
+   - **The decision beside the clock (task 15.9, 2026-09-09)**: a row that says "decided
+     (affected)" answers when, not what or why, and the answer was already in the
+     attested statement the clock was read from: an action statement ("transfer: waiting
+     on a grafana release that bundles zipkin v12.4.7+. Upstream issue: ... Expires:
+     2026-11-02."), an impact statement with the reasoning behind a `fixed` or
+     `not_affected`, a justification, and notes naming the LOG entry, the exception file
+     or the tracking issue. The status tool keeps those fields from the statement it
+     took the decision from (the latest across the supported digests, or the
+     under_investigation statement of an undecided finding), carries them in the JSON as
+     `attested`, and prints a short form beside every clock, in the page's table and the
+     issue's: the treatment and expiry of an accepted risk, the justification of a
+     not_affected, the first clause of a fixed statement's reasoning, "awaiting a triage
+     decision" for the undecided, each with the links the statement carries (the
+     upstream issue, the tracking issue) and links into the repository for the files
+     the notes name (the LOG, the exception file, the hand-written statement). The
+     page opens the full statement under the row without a script. Only the attested
+     document is read: what the page says is what the signed document says. The
+     compiler is unchanged; the exception file's LOG anchor and "why not avoid" note
+     stay out of the statement until a separate decision puts them there, since that
+     re-attests every accepted-risk statement once.
 
 ## System Flows
 
