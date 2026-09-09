@@ -398,6 +398,10 @@
     - `scripts/release-policy.sh`, the one reader of the `release` section, accepts exactly the tokens the criteria name and refuses the rest; build.yml's meta step and check-visibility.sh read through it, validate runs its `check`. The fail-closed release gate names each uncovered finding per platform manifest. The govulncheck step fails by name when the tool did not install or produced no output for a binary, non-gating as before. `lint-workflow-policy.sh` fails a declared schedule absent from its workflow and reads `.yaml` too
     - As built (2026-09-09): findings 6.1, 2.1, 2.10, 2.13 and 5.13 of the review; the reader's suite (22 cases), two new lint cases; the meta step, the gate and the govulncheck step rehearsed locally with stubs (a misspelt switch refuses with exit 2; the gate names findings per manifest; install failure and empty output fail by name)
     - _Requirements: Req 2.13, Req 2.14, Req 2.17, Req 6.13, Req 7.7, Req 7.10_
+  - [x] 15.4 D4: the pin surface
+    - cosign installed through `scripts/install-tool.sh` with a version and sha256 (second source: the release's keyless signature verified by hand against the Fulcio root from sigstore/root-signing), replacing the installer action in both workflows and closing register row P1; the built-in `github-actions` manager on, its bumps reviewed by a rule ordered after the github-tags automerge; the probe image pinned by digest (the curl project's multi-arch image on GHCR), pulled by digest and loaded by tag, with a regex manager; `gomod` on with `gomodTidy` for both Go modules; a fixture sweeps every `# renovate:` marker in a file some manager reads; CONVENTIONS' Req 7.5 paragraph and the manual's tables say so
+    - As built (2026-09-09): findings 5.2 to 5.5, 5.9 and 5.12 of the review; the installer's suite gains cosign (a real install verified locally), the manager suite eleven checks; the marker sweep named cosign on the tree as it was
+    - _Requirements: Req 7.5, Req 7.6_
 
 ## Requirements Coverage
 

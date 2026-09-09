@@ -1179,7 +1179,8 @@ docker buildx build -f image/hardened-app/image.yaml image/hardened-app/
 - **Renovate self-hosting notes:** postUpgradeTask commands must be
   allowlisted (`RENOVATE_ALLOWED_POST_UPGRADE_COMMANDS` already lists the two
   refresh scripts); the cron runs under a concurrency group so runs never
-  overlap.
+  overlap; the action runs the full Renovate image, which installs the Go
+  version `go.mod` names for the `gomod` manager's tidy (review D4).
 - **Forking:** the declared values live in `catalogue-policy.yaml` (the
   registry namespace, the active set, the verification identities, the
   clocks, the consumers); the rendered artifacts follow them by re-running
@@ -1208,7 +1209,7 @@ documentation — each states what it enforces and why it exists.
 | `refresh-grafana.sh` | `<dir>` | postUpgradeTask, repackage archetype: three-source build-id resolution, per-arch sha re-pin, existence-gated (ADR 0002) |
 | `verify-arch-pins.sh` | `<dir>` | Fetch + verify every per-arch pin against upstream's actual bytes (Req 1.3) |
 | `install-scanners.sh` | `[destdir]` | trivy + grype, exact version + recorded sha256, both verified before either installs (Req 7.5) |
-| `install-tool.sh` | `<kind\|kyverno\|helm\|ct\|syft\|crane> [destdir]` | One pinned, verified tool per call (deliberate sibling, not a generalisation) |
+| `install-tool.sh` | `<kind\|kyverno\|helm\|ct\|syft\|crane\|vexctl\|cosign> [destdir]` | One pinned, verified tool per call (deliberate sibling, not a generalisation) |
 | `scan-image.sh` | `<ref> <definition> <vex-dir> <out.json> [--remote] [--platform P]` | The one Trivy invocation both arms call: compiled VEX + accepted-risk file, `--show-suppressed`, refuses on a failed scan or a missing report (Req 2.8, 2.26) |
 | `package-set-diff.sh` | `<definition> <published-ref> <local-index-digest\|-> <verdict-out> <platform>=<cdx.json>…` | Publish-on-change comparator: canonical package set (purl + pull checksum) of the local build vs the attested CycloneDX; `equal` or `different` with a named reason, never raw bytes (Req 2.15–2.17) |
 | `enumerate-catalogue.sh` | `<root> <out.tsv>` | Every catalogue tag in every repository via crane, resolved to platform manifests, classified supported or superseded; refuses a partial world (Req 2.22) |
@@ -1230,8 +1231,11 @@ pin surface; every one is fixture-tested in both directions:
 | Build layer | `syntax=` / `uses:` / `GOLANG_REFERENCE` tag@digest | docker (dhi.io, authenticated) | none — reviewed by hand |
 | Chart image pins | digest-keyed values (cert-manager ×3, hardened-app) and tag@digest values (grafana, valkey), capturing tag *and* digest so same-tag rebuilds propagate | docker (ghcr.io) | none; digest-only bumps automerge (Req 3.12) |
 | Chart versions | `upstream:` block in `chart/<name>/chart.yaml` (name, repository, version) | helm (the chart repository) | none; never automerged (Req 3.11) |
-| Tool pins | `*_VERSION=` blocks in the two install scripts | github-releases | none — sha256 refresh is human |
+| Tool pins | `*_VERSION=` blocks in the two install scripts (trivy, grype; kind, kyverno, helm, ct, syft, crane, vexctl, cosign) | github-releases | none — sha256 refresh is human |
 | Workflow env pins | `# renovate:`-marked `*_VERSION:` (govulncheck, renovate, json5) | go / npm | none |
+| Probe image | `PROBE_IMAGE:` tag@digest in `e2e.yml` (test scaffolding) | docker (ghcr.io) | none; reviewed |
+| GitHub Actions | every `uses: owner/repo@<sha> # vX.Y.Z` (built-in `github-actions` manager) | github-tags | none; reviewed, never automerged |
+| Go modules | `test/go.mod`, `triage/rescan/go.mod` (built-in `gomod`, `gomodTidy`) | go | none; reviewed |
 | Python CI deps | `.github/requirements-ci.txt` | pypi | none — hash refresh is human |
 
 Scope: the active set (`catalogue-policy.yaml` `active_set`, Req 1.14) is

@@ -66,16 +66,17 @@ func probeFor(c harness.Component) (probeFunc, error) {
 
 func ptr[T any](v T) *T { return &v }
 
-// probeImage is the HTTP-probe container. It defaults to a curl tag but is
-// overridden by DHC_PROBE_IMAGE, which the e2e workflow (task 6.5) sets to a
-// digest-pinned reference it has already loaded into kind — same pattern as
-// KIND_NODE_IMAGE. Kept out of the catalogue's pinned surface: it is test
-// scaffolding, not a shipped image.
+// probeImage is the HTTP-probe container. It defaults to a curl tag for local
+// runs but is overridden by DHC_PROBE_IMAGE, which the e2e workflow (task
+// 6.5) sets to the tag it pulled by digest and loaded into kind: the pin
+// lives in the workflow, the pod references the loaded name, because a
+// loaded image cannot match an index digest (review D4). Test scaffolding,
+// not a shipped image; tracked by its own Renovate manager.
 func probeImage() string {
 	if img := os.Getenv("DHC_PROBE_IMAGE"); img != "" {
 		return img
 	}
-	return "curlimages/curl:8.11.1"
+	return "ghcr.io/curl/curl-container/curl-multi:8.11.1"
 }
 
 // httpProbe returns a probe that runs an in-cluster curl Job against the

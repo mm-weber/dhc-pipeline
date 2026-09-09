@@ -74,6 +74,16 @@ VEXCTL_URLDIR="openvex/vexctl/releases/download/v${VEXCTL_VER}"
 VEXCTL_PIN=d315e2778af88b999ad4bba30a08aa2677ed701638e16c341b6d57b43c1e064d
 VEXCTL_DEP=openvex/vexctl
 
+# cosign signs, attests and verifies every release and re-attestation; a
+# bare binary like kind (review D4, 2026-09-09: it arrived through the
+# sigstore/cosign-installer action with a version and no checksum recorded
+# here, and no manager matched its pin, register row P1).
+COSIGN_VER=2.6.0
+COSIGN_ASSET="cosign-linux-amd64"
+COSIGN_URLDIR="sigstore/cosign/releases/download/v${COSIGN_VER}"
+COSIGN_PIN=ea5c65f99425d6cfbb5c4b5de5dac035f14d09131c1a0ea7c7fc32eab39364f9
+COSIGN_DEP=sigstore/cosign
+
 DEFAULT_ARCH=x86_64
 ARCH="$DEFAULT_ARCH"
 
@@ -84,6 +94,7 @@ CT_MARKER="ct v${CT_VER} (dhc-test-fixture)"
 SYFT_MARKER="syft v${SYFT_VER} (dhc-test-fixture)"
 CRANE_MARKER="crane v${CRANE_VER} (dhc-test-fixture)"
 VEXCTL_MARKER="vexctl v${VEXCTL_VER} (dhc-test-fixture)"
+COSIGN_MARKER="cosign v${COSIGN_VER} (dhc-test-fixture)"
 
 list_real_bin() { find /usr/local/bin -maxdepth 1 -printf '%f\n' 2>/dev/null | sort; }
 BIN_BEFORE=$(list_real_bin)
@@ -192,6 +203,10 @@ assert_source() { # name, present|absent, extended-regex — non-comment lines o
 # kind's asset is the bare binary; kyverno's is a tarball that also carries a
 # licence file, so extracting the whole archive into a PATH directory is
 # visible (same trick as install-scanners_test.sh).
+make_cosign_asset() { # marker
+  mkdir -p "$UP/$COSIGN_URLDIR"
+  printf '#!/bin/sh\necho "%s"\n' "$1" > "$UP/$COSIGN_URLDIR/$COSIGN_ASSET"
+}
 make_vexctl_asset() { # marker
   mkdir -p "$UP/$VEXCTL_URLDIR"
   printf '#!/bin/sh\necho "%s"\n' "$1" > "$UP/$VEXCTL_URLDIR/$VEXCTL_ASSET"
@@ -276,6 +291,7 @@ setup() { # fresh sandbox: all assets served, empty destdir, shipped pins in for
   make_syft_asset "$SYFT_MARKER"
   make_crane_asset "$CRANE_MARKER"
   make_vexctl_asset "$VEXCTL_MARKER"
+  make_cosign_asset "$COSIGN_MARKER"
 }
 
 write_pins() { # record the fixtures' real digests — the offline success path
@@ -288,6 +304,7 @@ write_pins() { # record the fixtures' real digests — the offline success path
   (cd "$UP/$SYFT_URLDIR" && sha256sum "$SYFT_ASSET") >> "$PINS"
   (cd "$UP/$CRANE_URLDIR" && sha256sum "$CRANE_ASSET") >> "$PINS"
   (cd "$UP/$VEXCTL_URLDIR" && sha256sum "$VEXCTL_ASSET") >> "$PINS"
+  (cd "$UP/$COSIGN_URLDIR" && sha256sum "$COSIGN_ASSET") >> "$PINS"
 }
 
 asset_sha() { sha256sum "$1" | cut -d' ' -f1; }
@@ -456,6 +473,15 @@ assert_rc        "vexctl: matching checksum installs cleanly" 0
 assert_installed "vexctl is installed and executable" vexctl
 assert_payload   "installed vexctl is the artifact that was verified" vexctl "$VEXCTL_MARKER"
 
+setup; invoke cosign
+assert_absent "nothing is installed when the shipped pin does not match (cosign)" cosign
+assert_out    "the shipped cosign pin is the documented digest" "$COSIGN_PIN"
+
+setup; write_pins; invoke cosign
+assert_rc        "cosign: matching checksum installs cleanly" 0
+assert_installed "cosign is installed and executable" cosign
+assert_payload   "installed cosign is the artifact that was verified" cosign "$COSIGN_MARKER"
+
 # --- 6: an asset with no recorded pin ---------------------------------------
 
 setup; write_pins
@@ -498,6 +524,7 @@ assert_pin_block kind KIND "$KIND_DEP" "$KIND_VER" "$KIND_PIN"
 assert_pin_block kyverno KYVERNO "$KYVERNO_DEP" "$KYVERNO_VER" "$KYVERNO_PIN"
 assert_pin_block helm HELM "$HELM_DEP" "$HELM_VER" "$HELM_PIN"
 assert_pin_block vexctl VEXCTL "$VEXCTL_DEP" "$VEXCTL_VER" "$VEXCTL_PIN"
+assert_pin_block cosign COSIGN "$COSIGN_DEP" "$COSIGN_VER" "$COSIGN_PIN"
 assert_pin_block ct CT "$CT_DEP" "$CT_VER" "$CT_PIN"
 assert_pin_block syft SYFT "$SYFT_DEP" "$SYFT_VER" "$SYFT_PIN"
 

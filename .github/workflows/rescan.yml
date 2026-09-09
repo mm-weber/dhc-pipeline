@@ -71,17 +71,17 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # cosign stays on the v2 line: --replace exists there and its bundles are
-      # what Trivy and Kyverno read (ADR 0003, ADR 0004). Same pin as build.yml.
-      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
-        with:
-          cosign-release: v2.6.0
-      - name: install trivy + grype + crane + kyverno + vexctl
+      # what Trivy and Kyverno read (ADR 0003, ADR 0004). Same pin as
+      # build.yml, through the same installer (review D4): version and sha256
+      # recorded in scripts/install-tool.sh, tracked by Renovate.
+      - name: install cosign + trivy + grype + crane + kyverno + vexctl
         run: |
           set -euo pipefail
           # As the runner user into a temp dir on PATH — see build.yml. crane
           # lists the registry's tags for the enumeration (task 9.3); kyverno
           # applies the admission policy in the daily proof (task 9.6).
           mkdir -p "${RUNNER_TEMP}/bin"
+          scripts/install-tool.sh cosign "${RUNNER_TEMP}/bin"
           scripts/install-scanners.sh "${RUNNER_TEMP}/bin"
           scripts/install-tool.sh crane "${RUNNER_TEMP}/bin"
           scripts/install-tool.sh kyverno "${RUNNER_TEMP}/bin"
