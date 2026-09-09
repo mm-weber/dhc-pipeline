@@ -355,7 +355,8 @@ graph TB
      the status issue is the publication), Pages later. Issues and clocks run
      over the **supported set**, the digests each definition's current `tags:` reference:
      the industry scopes its promises to version streams because a frozen digest's report
-     never changes and its findings accrue by design
+     never changes and its findings accrue by design. "Pages later" became Decision 12
+     on 2026-09-09 (review D8), once the data had existed daily for three days
      (`data/cve-finding-lifecycle-vs-immutable-tags-2026-08-24.md`: Chainguard states EOL
      images "start to accrue CVEs", Bitnami moved its back catalogue to a no-updates
      namespace); superseded tag-referenced digests keep every knowledge artifact, daily
@@ -794,6 +795,52 @@ graph TB
      Req 9.11 to 9.13. The namespace literals Renovate cannot take from the
      policy file, and the Kyverno fixture's, are register rows M21 and M22.
      README's positioning sentence waits for task 12.1, as the task says.
+
+12. **The catalogue page: one picture, rendered from the day's outputs, deployed as an artifact (Req 6.61, 6.62; review D8, 2026-09-09)**
+   - **Context**: the review's deferred ledger traced the question "where is the
+     visualisation of the catalogue state" to two refusals, both right at their time:
+     README badges over a third-party view path (retired with Req 6.48) and a Pages
+     dashboard before the data existed (Decision 7). Since task 10.7 the data has existed
+     daily: the status issue's fenced JSON, the enumeration, the admission proof and the
+     exception report. What a reader lacked was a page that shows the catalogue at a
+     glance without reading an issue's table.
+   - **Options**: the status issue as a page (the clocks and nothing more); one card per
+     definition drawn from the day's outputs, with the clocks beneath; badges beside
+     either; building it here or in the successor.
+   - **Decision**: one card per definition (the owner's choice, 2026-09-09): its declared
+     tags, each digest they reference with its platforms, whether the digest was scanned,
+     attested and admitted by the verification policy that day, its findings within the
+     aperture by severity with the undecided and over-ceiling counts, its lapsing
+     exceptions; beneath, the clocks, the revocation record and the support statement,
+     and the status JSON itself. The status tool renders it, the same data through a
+     second template (`html/template`, stdlib, tested like the Markdown), from a
+     definitions list the workflow derives through `definition-lib.sh`, the admission
+     proof's per-digest verdicts and the exception lint's report. Publication is a
+     GitHub Pages deployment from a workflow artifact (`upload-pages-artifact`,
+     `deploy-pages`): no commit, so "everything enters as a pull request" holds, and no
+     third party in the view path. The rescan's own job stays without `pages: write`; a
+     second job carries it with `id-token: write`, under GitHub's `github-pages`
+     environment because the deployment API requires it. That environment is the one
+     `environment:` key in the repository: it is GitHub's, created with the setting,
+     carries no reviewers, and a reviewer added to it would show as a rescan waiting for
+     approval, not as silence. After deploying, the job reads the served status data back
+     and fails by name unless its generation date is the run's (Req 6.62). The page is a
+     fork switch, `release.page` in the policy file read through `release-policy.sh`: a
+     fork without Pages turns it off and the rescan stays green. Enabling Pages (source:
+     GitHub Actions) is an owner setting, register row M23. No arithmetic happens in the
+     page: every number it shows is the JSON's or a count over it.
+   - **Rejected**: badges (a third-party view path, retired once already); a bot commit
+     of the site (Decision 7's reason stands); a client-side page fetching the JSON
+     (presentation that runs code in the reader's browser for numbers a template can
+     print); a static site generator (a framework for one page of one data set); building
+     it in the successor first (the page is workflow and template, which the seed carries;
+     the picture is useful for the weeks this repository still runs).
+   - **Trade-offs**: one more job, two more pinned actions (Renovate's github-actions
+     manager tracks them), one more owner setting asserted by a failing deploy rather
+     than a read (the Pages API needs a permission the rescan does not otherwise hold).
+     Platforms and the admission verdict join the status JSON per digest (additive,
+     schema version unchanged). The page shows supported digests only, superseded tags
+     as a count: the support statement's scope, printed beside it.
 
 ## System Flows
 
