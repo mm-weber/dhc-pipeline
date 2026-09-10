@@ -1303,7 +1303,7 @@ surface; every regex manager is fixture-tested in both directions:
 | Surface | Shape | Datasource | postUpgradeTask |
 |---------|-------|------------|-----------------|
 | From-source definitions | `url: git+https://…#vX.Y.Z` | github-tags | `refresh-definition.sh` |
-| grafana repackage | versioned tarball URL (custom `versioningTemplate` — semver build metadata ordered as a 4th component, so `+security-NN` releases rank) | github-releases | `refresh-grafana.sh` |
+| grafana repackage | versioned tarball URL (custom `versioningTemplate` — semver build metadata ordered as a 4th component, so `+security-NN` releases rank); patches on the adopted line flow, minors wait in the dashboard, one PR per minor stream: the definition rides Grafana's stable maintenance track (register row M24) | github-releases | `refresh-grafana.sh` |
 | Build layer | `syntax=` / `uses:` / `GOLANG_REFERENCE` tag@digest | docker (dhi.io, authenticated) | none — reviewed by hand |
 | Chart image pins | digest-keyed values (cert-manager ×3, hardened-app) and tag@digest values (grafana, valkey), capturing tag *and* digest so same-tag rebuilds propagate | docker (ghcr.io) | none; digest-only bumps automerge (Req 3.12) |
 | Chart versions | `upstream:` block in `chart/<name>/chart.yaml` (name, repository, version) | helm (the chart repository) | none; never automerged (Req 3.11) |

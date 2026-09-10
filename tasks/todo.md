@@ -1003,3 +1003,16 @@ outputs, deployed as an artifact, off by a switch (design Decision 12).
   The tidy step now names the cause on the checks tab.
 - Not verifiable here: whether main's test module is tidy today (the proxy's
   zip host is outside the firewall snapshot); this PR's own go job proves it.
+
+## grafana rides the stable maintenance track (2026-09-10, PR #89)
+
+- [x] evidence: both release trees scanned locally at the gate's aperture; 3 vs 14 binaries, 14 vs 32 CVEs; toolchains per binary; tempo ancestry broken on 13.2.1
+- [x] Renovate: one PR per minor stream, minors behind dashboard approval, patches flow (tests through the rule matcher)
+- [x] LOG entry, register row M24, manual, design note; #89 closed with the entry as its reason
+
+### Review
+
+- Nothing under image/ or triage/accepted-risk/ touched: a comment change there
+  rebuilds grafana through the gate, which #186 keeps red until decided.
+- The decision is the owner's, stated as the track rule; the mechanism makes
+  it hold without anyone remembering it.

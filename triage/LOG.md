@@ -1435,3 +1435,45 @@ instead of returning a verdict; the suite gained the case. The 28 digests
 stay, superseded, under the no-deletion rule; nothing about them is wrong
 except that they were unnecessary. First proof: the next nightly should
 discard all seven and log the reproducibility measurement instead.
+
+## 2026-09-10: grafana 13.2.1 declined; the definition rides the stable maintenance track (PR #89)
+
+Renovate's minor PR (#89) had been red for a week on two gates: three
+hand-written statements pinned to the 13.1.5 tag, and the scan gate naming
+162 uncovered pairs on the 13.2.1 image, against 14 findings on 13.1.5. The
+gate's message is cut at 4,000 characters, so the two releases were fetched
+as GitHub release packages, their `usr/share/grafana` trees (the same tree
+the image ships) scanned with the gate's scanner and aperture, and every Go
+binary read with `go version -m`.
+
+What 13.2 changed: eleven core datasources (Prometheus, Loki, Tempo, Jaeger,
+InfluxDB, MySQL, MSSQL, PostgreSQL, OpenTSDB, Pyroscope, Cloud Monitoring)
+left the server for bundled plugin binaries. 13.1.5 ships 3 Go binaries
+(server, elasticsearch, zipkin); 13.2.1 ships 14. Each plugin is built on
+its own, with toolchains from go1.25.7 (OpenTSDB, with x/net 0.51.0) to
+go1.26.7 and library pins behind the server's: 32 CVEs over 174 binary and
+finding pairs, one CRITICAL (CVE-2026-56854, golang.org/x/crypto below
+0.55.0, in the Loki, MSSQL and Cloud Monitoring plugins). The server binary
+itself improved (thrift and the two grpc findings, all known; the tempo pair
+left it). The tempo pair moved into the tempo plugin, which pins a tempo
+commit from 2025-05-29, before the 2026-02-20 fix commit the 13.1.5 `fixed`
+statement rests on (that server pins a commit from 2026-04-27): on 13.2.1
+those two are real, not a scanner artefact. Zipkin is the same stale 12.4.6
+build in both, so its eleven transfers carry unchanged.
+
+Grafana keeps two tracks: the newest minor with features, the previous minor
+with fixes, and both ship patches on the same days (13.1.3, 13.1.4 and
+13.1.5 beside 13.2.0 and 13.2.1). The decision: this definition rides the
+stable maintenance track. 13.2.1 is declined, not deferred: a minor is not an
+update to apply but a decision to take when its stream becomes the stable
+one, that is, when 13.3 ships. Avoidance was not available (dropping the
+bundled binaries removes the core datasources), and taking 13.2.1 would have
+meant about thirty transfers with a 30-day clock on the CRITICAL for a
+release whose server is no safer than the one published.
+
+Mechanism, so the decision does not depend on remembering it: Renovate keeps
+patches on the adopted line flowing as their own PRs, opens one PR per minor
+stream (so 13.2.x stays offered after 13.3 exists), and holds every grafana
+minor behind Dependency Dashboard approval (register row M24). #89 is closed
+with this entry as its reason. Open on the stable line: CVE-2026-84445 in
+grpc 1.83.1 (issue #186), the next decision.

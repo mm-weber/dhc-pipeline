@@ -809,6 +809,21 @@ check(
     check("kubernetes: a k8s.io name in another manager is untouched", (await dep("k8s.io/api", "custom.regex", "github-tags")) !== false);
   }
 
+  // The grafana definition rides Grafana's stable maintenance track (register
+  // row M24, 2026-09-10): patches on the line flow as their own PRs through
+  // the gate; a minor is a decision, staged behind dashboard approval, taken
+  // when the next minor ships and the stream becomes the stable one; and
+  // each minor stream is its own PR, so the 13.2.x stream is still offered
+  // once 13.3 exists.
+  {
+    const { applyPackageRules } = require("renovate/dist/util/package-rules/index.js");
+    const grafana = async (updateType) => applyPackageRules({ packageRules: config.packageRules, depName: "grafana/grafana", packageName: "grafana/grafana", manager: "custom.regex", datasource: "github-releases", updateType });
+    const minor = await grafana("minor"), patch = await grafana("patch");
+    check("grafana track: a minor waits for dashboard approval", minor.dependencyDashboardApproval === true);
+    check("grafana track: every minor stream is its own PR", minor.separateMultipleMinor === true && minor.separateMinorPatch === true);
+    check("grafana track: a patch on the line is not held back", patch.dependencyDashboardApproval !== true);
+  }
+
   // Every `# renovate:` marker in a file some manager reads resolves to a
   // dependency of a manager reading that file: the miss class D4 closed
   // (cosign's marker sat in build.yml, a file the workflow manager reads,
