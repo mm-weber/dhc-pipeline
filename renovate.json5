@@ -434,6 +434,23 @@
       automerge: false,
     },
     {
+      // The e2e harness's Kubernetes client libraries follow
+      // sigs.k8s.io/e2e-framework, not the other way round. Measured
+      // 2026-09-10 (PR #200): k8s.io/api alone moved to 0.37 and dropped
+      // packages that k8s.io/client-go 0.35 still imports, client-go being
+      // held at 0.35 by the framework's own requirement; Renovate's artifact
+      // step failed (`go get -t ./...`) and said so in a PR comment while
+      // the PR still opened, red on the go job. The k8s.io modules move as
+      // one and only when the framework moves, so the gomod manager offers
+      // none of them on its own: a framework bump carries them through the
+      // artifact step's `go get`, listed in that PR as extra deps. A
+      // hand-bump of the framework is the fix lane if a client library
+      // needs a fix before the framework releases.
+      matchManagers: ["gomod"],
+      matchPackageNames: ["k8s.io/**"],
+      enabled: false,
+    },
+    {
       // The build layer is our own stricter pin surface — a frontend/builder
       // change alters build behavior, so it is always reviewed, never merged
       // automatically. Grouped for a tidy dashboard.

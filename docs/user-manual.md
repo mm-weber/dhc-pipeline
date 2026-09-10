@@ -1311,7 +1311,7 @@ surface; every regex manager is fixture-tested in both directions:
 | Workflow env pins | `# renovate:`-marked `*_VERSION:` (govulncheck, renovate, json5) | go / npm | none |
 | Probe image | `PROBE_IMAGE:` tag@digest in `e2e.yml` (test scaffolding) | docker (ghcr.io) | none; reviewed |
 | GitHub Actions | every `uses: owner/repo@<sha> # vX.Y.Z` (built-in `github-actions` manager) | github-tags | none; reviewed, never automerged |
-| Go modules | `test/go.mod`, `triage/rescan/go.mod` (built-in `gomod`, `gomodTidy`) | go | none; reviewed |
+| Go modules | `test/go.mod`, `triage/rescan/go.mod` (built-in `gomod`, `gomodTidy`); `k8s.io/**` not offered on its own, the harness's client libraries follow `sigs.k8s.io/e2e-framework` (PR #200, 2026-09-10) | go | none; reviewed |
 | Python CI deps | `.github/requirements-ci.txt` | pypi | none — hash refresh is human |
 
 Scope: the active set (`catalogue-policy.yaml` `active_set`, Req 1.14) is

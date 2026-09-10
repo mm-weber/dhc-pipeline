@@ -792,6 +792,23 @@ check(
     return ok;
   })());
 
+  // The harness's Kubernetes client libraries follow sigs.k8s.io/e2e-framework
+  // (PR #200, 2026-09-10: k8s.io/api alone at 0.37 dropped packages that
+  // client-go 0.35, held there by the framework, still imports; Renovate's
+  // own artifact step failed and said so in a PR comment). So the gomod
+  // manager offers no bump of k8s.io/** on its own: the framework's bump
+  // carries them through `go get` in the artifact step, as extra deps.
+  {
+    const { applyPackageRules } = require("renovate/dist/util/package-rules/index.js");
+    const rules = config.packageRules;
+    const dep = async (depName, manager = "gomod", datasource = "go") => (await applyPackageRules({ packageRules: rules, depName, packageName: depName, manager, datasource, updateType: "minor" })).enabled;
+    check("kubernetes: k8s.io/api is not offered on its own", (await dep("k8s.io/api")) === false);
+    check("kubernetes: k8s.io/apimachinery is not offered on its own", (await dep("k8s.io/apimachinery")) === false);
+    check("kubernetes: k8s.io/client-go is not offered on its own", (await dep("k8s.io/client-go")) === false);
+    check("kubernetes: the framework itself is offered", (await dep("sigs.k8s.io/e2e-framework")) !== false);
+    check("kubernetes: a k8s.io name in another manager is untouched", (await dep("k8s.io/api", "custom.regex", "github-tags")) !== false);
+  }
+
   // Every `# renovate:` marker in a file some manager reads resolves to a
   // dependency of a manager reading that file: the miss class D4 closed
   // (cosign's marker sat in build.yml, a file the workflow manager reads,

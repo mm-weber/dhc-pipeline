@@ -989,3 +989,17 @@ outputs, deployed as an artifact, off by a switch (design Decision 12).
 - The first rehearsal missed the "statement" link: `go -C` runs the tool from
   its module directory, so a relative statements path found nothing. Passed
   absolute, with the case in the task note.
+
+## Renovate: the Kubernetes client libraries follow the framework (2026-09-10)
+
+- [x] root cause from Renovate's own comment on #200: `go get -t ./...` failed, k8s.io/api 0.37 dropped packages client-go 0.35 imports, client-go held by e2e-framework
+- [x] rule: `k8s.io/**` not offered by the gomod manager on its own (tests through Renovate's own rule matcher)
+- [x] validate: `go mod tidy -diff` before vet in both modules, the diff or module error carried in the annotation
+
+### Review
+
+- The CI failure was the consequence, the cause sat in a PR comment posted by
+  Renovate (as the owner's identity: one more reason for the GitHub App).
+  The tidy step now names the cause on the checks tab.
+- Not verifiable here: whether main's test module is tidy today (the proxy's
+  zip host is outside the firewall snapshot); this PR's own go job proves it.

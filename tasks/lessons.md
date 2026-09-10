@@ -155,3 +155,13 @@ file). A script that shells out guards its tools up front and refuses when
 one is missing; a missing tool is an environment failure, never a data
 verdict. And when a nightly publishes without a reason you can name, that is
 a finding, not a line in the log.
+
+## 2026-09-10: a manager that bumps modules one at a time breaks module families
+
+Enabling Renovate's gomod manager (D4) offered `k8s.io/api` alone; the
+Kubernetes client libraries only work at one version together, and here they
+are pinned by the e2e framework. Rule: when a manager is switched on, ask which
+of its dependencies form a family that must move as one, and either group them
+or let the one that pins them carry the rest. Renovate reports an artifact
+failure as a PR comment, not in the PR body or the CI log; read the comments
+before the log.
