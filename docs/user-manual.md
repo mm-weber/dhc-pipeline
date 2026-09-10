@@ -701,10 +701,19 @@ was first seen (the attested statement's timestamp), when it was decided
 for `not_affected` and `fixed`), and when it was fixed (the first day it was
 absent, reported and suppressed alike, from every supported digest of its
 repository). An undecided finding shows its age against the policy file's
-ceiling for its severity, the KEV ceiling when CISA lists it. The table is
+ceiling for its severity, the KEV ceiling when CISA lists it. Beside each
+clock stands the decision as attested (Req 6.47): the short form of the
+statement the clock was read from ("transfer, accepted risk until
+2026-11-02", "not affected: vulnerable code not in execute path", "fixed:
+Grafana 13.1.5 pins tempo at ...", "undecided, awaiting a triage decision")
+with the links it carries, the upstream issue and the tracking issue, and
+links into the repository for the records its notes name (the LOG, the
+exception file, a hand-written statement). Only the attested document is
+read, so the column says what the signed statement says. The table is
 for reading; the fenced JSON block under it is the same data as the run's
-`catalogue-status` artifact, and the next rescan reads it back, so a fix
-date survives the reports being replaced. Superseded digests hold no clocks:
+`catalogue-status` artifact (each finding's `attested` record included),
+and the next rescan reads it back, so a fix date survives the reports being
+replaced. Superseded digests hold no clocks:
 the support statement in `catalogue-policy.yaml` says so, and the issue's
 opening paragraph quotes it verbatim from there, so the statement and the
 status cannot disagree. A Pages dashboard, if one is ever wanted, is
@@ -727,8 +736,9 @@ within the aperture by severity with the undecided and over-ceiling counts,
 its lapsing exceptions; an inactive definition shows as inactive with its
 frozen tags, and a declared tag no digest carries today is listed as such.
 Beneath the cards: the support statement with the day's superseded count,
-the clocks table, the revocation record, and `metrics.json`, the data the
-page was drawn from. Every number is that JSON's or a count over it; the
+the clocks table with the decision beside each clock (the full attested
+statement opens under the row, no script needed), the revocation record,
+and `metrics.json`, the data the page was drawn from. Every number is that JSON's or a count over it; the
 page loads nothing from anywhere and runs no code.
 
 Publication is a Pages deployment from a workflow artifact, never a commit:

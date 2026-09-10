@@ -28,6 +28,12 @@ type VEXStatement struct {
 	Timestamp                string           `json:"timestamp"`
 	LastUpdated              string           `json:"last_updated,omitempty"`
 	ActionStatementTimestamp string           `json:"action_statement_timestamp,omitempty"`
+	// The decision in the statement's own words (task 15.9): what the
+	// published status carries beside the clock.
+	Justification   string `json:"justification,omitempty"`
+	ImpactStatement string `json:"impact_statement,omitempty"`
+	ActionStatement string `json:"action_statement,omitempty"`
+	StatusNotes     string `json:"status_notes,omitempty"`
 }
 type VEXVulnerability struct {
 	Name string `json:"name"`
@@ -85,14 +91,22 @@ type SupportedDigest struct {
 }
 
 type StatusInputs struct {
-	Today      string // YYYY-MM-DD, UTC
-	Run        string // the run's URL, informational
-	Aperture   []string
-	Ceilings   map[string]int // severity -> days (catalogue-policy.yaml triage.ceilings)
-	KEVCeiling int            // days (triage.kev_ceiling)
-	KEV        map[string]bool
-	Digests    []SupportedDigest
-	Previous   *StatusData // the previously published status data, nil on the first run
+	Today string // YYYY-MM-DD, UTC
+	Run   string // the run's URL, informational
+	// SourceURL is the base under which the repository's files are served
+	// ("<server>/<owner>/<repo>/blob/<ref>"); with it, the files a
+	// statement's notes name become links (task 15.9). Empty: no file links.
+	SourceURL string
+	// HandStatements names the CVEs with a hand-written statement under
+	// triage/vex/, so the page can link the source of a fixed or
+	// not_affected decision; nil: none linked.
+	HandStatements map[string]bool
+	Aperture       []string
+	Ceilings       map[string]int // severity -> days (catalogue-policy.yaml triage.ceilings)
+	KEVCeiling     int            // days (triage.kev_ceiling)
+	KEV            map[string]bool
+	Digests        []SupportedDigest
+	Previous       *StatusData // the previously published status data, nil on the first run
 }
 
 // ---- the published data (metrics.json) ----
@@ -198,6 +212,11 @@ type FindingClock struct {
 	Decided    string   `json:"decided,omitempty"`  // action_statement_timestamp (affected) or the statement timestamp
 	Fixed      string   `json:"fixed,omitempty"`    // YYYY-MM-DD: the first day absent from every supported digest of the repository
 
+	// Attested is the decision as the statement the clock was read from
+	// states it (Req 6.47 as amended; task 15.9); carried forward for a
+	// finding absent today, absent for one that never had a statement.
+	Attested *AttestedDecision `json:"attested,omitempty"`
+
 	AgeDays        *int `json:"age_days,omitempty"`     // undecided only: today minus first seen
 	CeilingDays    *int `json:"ceiling_days,omitempty"` // undecided only: the KEV ceiling if listed, else the severity's
 	OverCeiling    bool `json:"over_ceiling"`
@@ -265,6 +284,7 @@ type digestClock struct {
 	undecided bool
 	decided   string // the earliest decision on this digest
 	decision  string
+	statement *VEXStatement // the statement the decision (or the under_investigation) was read from
 }
 
 // readDigest reads one finding's statements from the digest's own document
@@ -302,10 +322,13 @@ func readDigest(d *VEXDocument, cve, reportStamp string) digestClock {
 		default: // under_investigation, or anything this compiler does not write
 			c.undecided = true
 			c.decided, c.decision = "", ""
+			st := st
+			c.statement = &st
 			return c
 		}
 		if c.decided == "" || earlier(c.decided, at) == at && at != c.decided {
-			c.decided, c.decision = at, st.Status
+			st := st
+			c.decided, c.decision, c.statement = at, st.Status, &st
 		}
 	}
 	if !found {
@@ -348,6 +371,7 @@ func BuildStatus(in StatusInputs) StatusData {
 		undecided bool
 		decided   string // the latest decision across the digests carrying it
 		decision  string
+		statement *VEXStatement
 		firstSeen string
 	}
 	accs := map[findingKey]*acc{}
@@ -417,10 +441,13 @@ func BuildStatus(in StatusInputs) StatusData {
 			}
 			if dc.undecided {
 				a.undecided = true
+				if a.statement == nil || a.statement.Status != "under_investigation" {
+					a.statement = dc.statement
+				}
 				continue
 			}
 			if a.decided == "" || earlier(a.decided, dc.decided) == a.decided && dc.decided != a.decided {
-				a.decided, a.decision = dc.decided, dc.decision
+				a.decided, a.decision, a.statement = dc.decided, dc.decision, dc.statement
 			}
 		}
 	}
@@ -442,6 +469,7 @@ func BuildStatus(in StatusInputs) StatusData {
 		} else {
 			f.Status, f.Decided, f.Decision = "decided", a.decided, a.decision
 		}
+		f.Attested = attestedDecision(a.statement, k.cve, in.SourceURL, in.HandStatements)
 		rows = append(rows, f)
 		seen[k] = true
 	}
@@ -451,7 +479,7 @@ func BuildStatus(in StatusInputs) StatusData {
 		}
 		p := previous[k]
 		f := FindingClock{Repository: k.repo, ID: k.cve, Severity: p.Severity, KEV: in.KEV[k.cve] || p.KEV,
-			Status: p.Status, Decision: p.Decision, FirstSeen: p.FirstSeen, Decided: p.Decided, Fixed: p.Fixed}
+			Status: p.Status, Decision: p.Decision, FirstSeen: p.FirstSeen, Decided: p.Decided, Fixed: p.Fixed, Attested: p.Attested}
 		if repoScanned[k.repo] {
 			// absent from every supported digest of a repository that was
 			// looked at today: fixed, on the first such day (Req 6.46)
@@ -654,7 +682,7 @@ func RenderStatusIssue(s StatusData) string {
 		return a.ID < c.ID
 	})
 
-	b.WriteString("| Repository | Finding | Severity | KEV | Status | First seen | Decided | Age / ceiling | Fixed |\n")
+	b.WriteString("| Repository | Finding | Severity | KEV | Status | First seen | Decided | Age / ceiling | Decision |\n")
 	b.WriteString("|---|---|---|---|---|---|---|---|---|\n")
 	if len(open) == 0 {
 		b.WriteString("| n/a | nothing undecided or decided-and-present today | | | | | | | |\n")
@@ -676,17 +704,17 @@ func RenderStatusIssue(s StatusData) string {
 			}
 		}
 		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
-			shortName(f.Repository), f.ID, f.Severity, yesNo(f.KEV), status, day(f.FirstSeen), day(f.Decided), ageCell, orNA(f.Fixed))
+			shortName(f.Repository), f.ID, f.Severity, yesNo(f.KEV), status, day(f.FirstSeen), day(f.Decided), ageCell, decisionCell(f.Attested))
 	}
 	b.WriteString("\n")
 
 	fmt.Fprintf(&b, "<details><summary>fixed (%d)</summary>\n\n", len(fixed))
 	if len(fixed) > 0 {
-		b.WriteString("| Repository | Finding | Severity | First seen | Decided | Fixed | Days to fix |\n")
-		b.WriteString("|---|---|---|---|---|---|---|\n")
+		b.WriteString("| Repository | Finding | Severity | First seen | Decided | Fixed | Days to fix | Last decision |\n")
+		b.WriteString("|---|---|---|---|---|---|---|---|\n")
 		for _, f := range fixed {
-			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s | %s |\n",
-				shortName(f.Repository), f.ID, f.Severity, day(f.FirstSeen), day(f.Decided), orNA(f.Fixed), intOrNA(f.DaysToFix))
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s | %s | %s |\n",
+				shortName(f.Repository), f.ID, f.Severity, day(f.FirstSeen), day(f.Decided), orNA(f.Fixed), intOrNA(f.DaysToFix), decisionCell(f.Attested))
 		}
 		b.WriteString("\n")
 	}
@@ -764,4 +792,22 @@ func num(f *float64) string {
 		return "n/a"
 	}
 	return fmt.Sprintf("%g", *f)
+}
+
+// decisionCell is the Decision column of the issue's tables: the short form
+// and the statement's links as Markdown; "n/a" for a finding that never had
+// a statement. The full statement stays on the page (task 15.9).
+func decisionCell(d *AttestedDecision) string {
+	if d == nil {
+		return "n/a"
+	}
+	cell := strings.ReplaceAll(d.Summary, "|", "\\|")
+	if len(d.Links) > 0 {
+		parts := make([]string, 0, len(d.Links))
+		for _, l := range d.Links {
+			parts = append(parts, fmt.Sprintf("[%s](%s)", l.Label, l.URL))
+		}
+		cell += " (" + strings.Join(parts, ", ") + ")"
+	}
+	return cell
 }

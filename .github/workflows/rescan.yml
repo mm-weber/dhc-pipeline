@@ -755,6 +755,7 @@ jobs:
             --previous-body "$OUT/status/previous.md" --revocations "$OUT/revocations.json" \
             --run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             --definitions "$OUT/status/definitions.tsv" --admission "$OUT/verify-catalogue.json" --expiries "$OUT/accepted-risk.txt" \
+            --source-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}" --statements "${GITHUB_WORKSPACE}/triage/vex" \
             --out-json "$OUT/status/metrics.json" --out-body "$OUT/status/issue.md" --out-html "$OUT/site/index.html"
           # The site is the page and the data it was drawn from, nothing else.
           cp "$OUT/status/metrics.json" "$OUT/site/metrics.json"

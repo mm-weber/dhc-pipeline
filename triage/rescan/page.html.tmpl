@@ -25,6 +25,11 @@
   th { background: #f1f1ec; }
   tr.over td { background: #fff1f1; }
   footer { margin-top: 2rem; font-size: .85rem; color: #555; }
+  td.decision { min-width: 16rem; }
+  td.decision details { margin-top: .25rem; }
+  td.decision summary { cursor: pointer; color: #555; font-size: .85rem; }
+  td.decision p { margin: .3rem 0; font-size: .85rem; }
+  td.decision .notes { color: #666; }
 </style>
 </head>
 <body>
@@ -60,18 +65,18 @@ Findings {{.Aggregates.Findings}}, undecided {{.Aggregates.Undecided}} (over cei
 </div>
 
 <h3>Clocks over the supported set</h3>
-<p class="lead">First seen is the statement's timestamp, decided its decision time, fixed the first day a finding was absent from every supported digest of its repository. Ages of undecided findings are measured against the ceilings above.</p>
+<p class="lead">First seen is the statement's timestamp, decided its decision time, fixed the first day a finding was absent from every supported digest of its repository. Ages of undecided findings are measured against the ceilings above. The decision column is the attested statement's own words, shortened; open "the statement" under a row for all of them, and follow its links to the upstream issue, the tracking issue and the records in the repository.</p>
 <table>
-<tr><th>Repository</th><th>Finding</th><th>Severity</th><th>KEV</th><th>Status</th><th>First seen</th><th>Decided</th><th>Age / ceiling</th></tr>
-{{if not .Open}}<tr><td colspan="8">nothing undecided or decided-and-present today</td></tr>{{end}}
-{{range .Open}}<tr{{if .OverCeiling}} class="over"{{end}}><td>{{shortName .Repository}}</td><td>{{.ID}}</td><td>{{.Severity}}</td><td>{{yesNo .KEV}}</td><td>{{.Status}}{{if .Decision}} ({{.Decision}}){{end}}</td><td>{{day .FirstSeen}}</td><td>{{day .Decided}}</td><td>{{if .AgeDays}}{{ptr .AgeDays}} / {{ptr .CeilingDays}}{{else}}n/a{{end}}</td></tr>
+<tr><th>Repository</th><th>Finding</th><th>Severity</th><th>KEV</th><th>Status</th><th>First seen</th><th>Decided</th><th>Age / ceiling</th><th>Decision</th></tr>
+{{if not .Open}}<tr><td colspan="9">nothing undecided or decided-and-present today</td></tr>{{end}}
+{{range .Open}}<tr{{if .OverCeiling}} class="over"{{end}}><td>{{shortName .Repository}}</td><td>{{.ID}}</td><td>{{.Severity}}</td><td>{{yesNo .KEV}}</td><td>{{.Status}}{{if .Decision}} ({{.Decision}}){{end}}</td><td>{{day .FirstSeen}}</td><td>{{day .Decided}}</td><td>{{if .AgeDays}}{{ptr .AgeDays}} / {{ptr .CeilingDays}}{{else}}n/a{{end}}</td><td class="decision">{{template "decision" .Attested}}</td></tr>
 {{end}}
 </table>
 {{if .Fixed}}
 <details><summary>fixed ({{len .Fixed}})</summary>
 <table>
-<tr><th>Repository</th><th>Finding</th><th>Severity</th><th>First seen</th><th>Decided</th><th>Fixed</th><th>Days to fix</th></tr>
-{{range .Fixed}}<tr><td>{{shortName .Repository}}</td><td>{{.ID}}</td><td>{{.Severity}}</td><td>{{day .FirstSeen}}</td><td>{{day .Decided}}</td><td>{{.Fixed}}</td><td>{{ptr .DaysToFix}}</td></tr>
+<tr><th>Repository</th><th>Finding</th><th>Severity</th><th>First seen</th><th>Decided</th><th>Fixed</th><th>Days to fix</th><th>Last decision</th></tr>
+{{range .Fixed}}<tr><td>{{shortName .Repository}}</td><td>{{.ID}}</td><td>{{.Severity}}</td><td>{{day .FirstSeen}}</td><td>{{day .Decided}}</td><td>{{.Fixed}}</td><td>{{ptr .DaysToFix}}</td><td class="decision">{{template "decision" .Attested}}</td></tr>
 {{end}}
 </table>
 </details>
@@ -89,3 +94,5 @@ Findings {{.Aggregates.Findings}}, undecided {{.Aggregates.Undecided}} (over cei
 <footer>Rendered by the daily rescan from its own outputs and deployed as a workflow artifact; nothing here was written by hand. The verification recipe, the policies and the records live in the repository.</footer>
 </body>
 </html>
+{{define "decision"}}{{if .}}{{.Summary}}{{if .Links}} ({{range $i, $l := .Links}}{{if $i}}, {{end}}<a href="{{$l.URL}}">{{$l.Label}}</a>{{end}}){{end}}{{if or .Statement .Notes}}
+<details><summary>the statement</summary>{{if .Statement}}<p>{{.Statement}}</p>{{end}}{{if .Notes}}<p class="notes">{{.Notes}}</p>{{end}}</details>{{end}}{{else}}n/a{{end}}{{end}}
