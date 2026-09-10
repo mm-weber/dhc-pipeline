@@ -298,6 +298,23 @@ jobs:
         working-directory: test
         run: test -z "$(gofmt -l .)" || { echo 'gofmt needed:'; gofmt -l .; exit 1; }
 
+      # Named before vet reports the consequence line by line: a go.mod or
+      # go.sum that tidy would rewrite (a bump without its sums, a module
+      # graph that no longer resolves) fails here with the cause. On a
+      # Renovate pull request the cause is its "Artifact update problem"
+      # comment (PR #200, 2026-09-10: k8s.io/api moved alone).
+      - name: go.mod and go.sum are what go mod tidy would write
+        working-directory: test
+        run: |
+          set -euo pipefail
+          # The diff rides in the annotation (newlines as %0A), so the cause
+          # is readable from the checks tab without opening the log.
+          if ! out=$(go mod tidy -diff 2>&1); then
+            printf '%s\n' "$out"
+            echo "::error file=test/go.mod::test/go.mod or go.sum is not what go mod tidy would write; on a Renovate pull request read its 'Artifact update problem' comment for the cause%0A$(printf '%s' "$out" | grep -v '^go: downloading' | head -c 3000 | sed ':a;N;$!ba;s/\n/%0A/g')"
+            exit 1
+          fi
+
       - name: go vet
         working-directory: test
         run: go vet ./...
@@ -323,6 +340,16 @@ jobs:
       - name: rescan tool gofmt
         working-directory: triage/rescan
         run: test -z "$(gofmt -l .)" || { echo 'gofmt needed:'; gofmt -l .; exit 1; }
+
+      - name: rescan tool go.mod is what go mod tidy would write
+        working-directory: triage/rescan
+        run: |
+          set -euo pipefail
+          if ! out=$(go mod tidy -diff 2>&1); then
+            printf '%s\n' "$out"
+            echo "::error file=triage/rescan/go.mod::triage/rescan/go.mod is not what go mod tidy would write%0A$(printf '%s' "$out" | grep -v '^go: downloading' | head -c 3000 | sed ':a;N;$!ba;s/\n/%0A/g')"
+            exit 1
+          fi
 
       - name: rescan tool go vet
         working-directory: triage/rescan
