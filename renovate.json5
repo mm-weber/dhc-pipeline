@@ -327,10 +327,31 @@
       // finding (Req 6.5). Without this, one branch per major carried every
       // 13.x update, so the open 13.2.0 minor PR swallowed the 13.1.5
       // security patch and no PR ever offered it (measured 2026-09-02, the
-      // day grafana shipped 13.1.5 / 13.2.1 together). Patch and minor now
-      // travel as separate PRs; the minor still stages behind the gate.
+      // day grafana shipped 13.1.5 / 13.2.1 together). Patch and minor
+      // travel as separate PRs, and since 2026-09-10 each minor stream is
+      // its own PR too (13.2.x and, once it exists, 13.3.x), because the
+      // line this definition adopts is not the newest one, below.
       matchDepNames: ["grafana/grafana"],
       separateMinorPatch: true,
+      separateMultipleMinor: true,
+    },
+    {
+      // Grafana keeps two tracks in parallel: the newest minor gets features
+      // ("full support"), the previous minor gets bug and security fixes
+      // ("patch support"), and both ship patches on the same days (13.1.3,
+      // 13.1.4, 13.1.5 beside 13.2.0 and 13.2.1). This definition rides the
+      // stable maintenance track, so a minor is not an update to apply but a
+      // decision to take when the stream becomes the stable one, that is,
+      // when the next minor ships. Measured 2026-09-10 on 13.2.1 (PR #89,
+      // triage/LOG.md): the feature track had moved eleven core datasources
+      // into bundled plugin binaries built with older toolchains, 32 CVEs
+      // against the stable line's 14, with the server binary itself no
+      // better. A minor therefore waits in the Dependency Dashboard until
+      // the owner approves the stream (register row M24); patches on the
+      // adopted line keep flowing as their own PRs through the gate.
+      matchDepNames: ["grafana/grafana"],
+      matchUpdateTypes: ["minor"],
+      dependencyDashboardApproval: true,
     },
     {
       // Req 3.7 (task 11.1; design decision 8): quarantine. A third-party

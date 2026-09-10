@@ -111,6 +111,12 @@ graph TB
      datasource; `refresh-grafana.sh` resolves the opaque build id from three cross-checked
      indexes, re-pins both per-arch SHA-256s from the `dl.grafana.com` sidecars, and an explicit
      `versioningTemplate` ranks `+security-NN` builds semver would silently equate — **ADR 0002**).
+     Since 2026-09-10 the grafana definition rides Grafana's stable maintenance track:
+     patches on the adopted line flow as their own PRs, each minor stream is its own PR,
+     and a minor waits behind Dependency Dashboard approval until it has become the stable
+     stream, that is, until the next minor ships (register row M24; triage/LOG.md
+     2026-09-10, where 13.2.1's eleven newly bundled plugin binaries and 32 CVEs are
+     measured against the stable line's 14).
      Further surfaces: the dhi.io build layer (docker datasource), chart image pins and the
      pinned toolchain (both below). Monorepo grouping, Dependency Dashboard for majors (Req 3.4);
      automerge covers digest **and patch** updates on the github-tags datasource, gated on CI,
