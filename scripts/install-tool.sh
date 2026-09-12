@@ -89,7 +89,7 @@ VEXCTL_SHA256="d315e2778af88b999ad4bba30a08aa2677ed701638e16c341b6d57b43c1e064d"
 # chaining to the Fulcio root in sigstore/root-signing with the identity
 # keyless@projectsigstore.iam.gserviceaccount.com, issued 2025-09-12.
 # renovate: datasource=github-releases depName=sigstore/cosign
-COSIGN_VERSION="2.6.0"
+COSIGN_VERSION="2.6.5"
 COSIGN_SHA256="ea5c65f99425d6cfbb5c4b5de5dac035f14d09131c1a0ea7c7fc32eab39364f9"
 
 err() { printf '::error::install-tool: %s\n' "$1" >&2; }
