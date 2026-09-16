@@ -11,7 +11,7 @@
 image:
   registry: ghcr.io
   repository: mm-weber/dhc/grafana
-  tag: 13.1.5-alpine3.23@sha256:f5f2c45c32a3ac8a19b8a6e78acd36ba0b9186bc9b6c141977fe82d606c04cde
+  tag: 13.1.5-alpine3.23@sha256:5d462662494b94f1e84d07241c6e84b577378ad7c3e9ad99520fa3d124cf4be2
 
 # Our runtime image runs as 65532; the chart defaults to grafana's UID 472
 # (Req 4.3). runAsNonRoot + seccomp are already chart defaults.
