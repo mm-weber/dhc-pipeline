@@ -1477,3 +1477,31 @@ stream (so 13.2.x stays offered after 13.3 exists), and holds every grafana
 minor behind Dependency Dashboard approval (register row M24). #89 is closed
 with this entry as its reason. Open on the stable line: CVE-2026-84445 in
 grpc 1.83.1 (issue #186), the next decision.
+
+## 2026-09-17: six supply-chain issues from a rate-limited read (task 11.6, Req 3.13)
+
+Found while checking the state of the repository on 2026-09-16: the daily
+rescan (run 35091969642) had failed its authenticity step and filed six
+`supply-chain` issues, #212 to #217, one for every git-sourced definition
+(cert-manager's three, hardened-app, valkey and valkey-compat), each saying
+GitHub's verification statement "could not be read". Cause: the step handed
+the workflow token to the shell as `GH_TOKEN`, the name gh reads, while
+`github_verification` in `scripts/definition-lib.sh` read `GITHUB_TOKEN`, so
+every statement was requested anonymously, on the sixty-an-hour budget of a
+hosted runner's shared address. On the previous six days that budget held;
+on 2026-09-16 it was gone (the governance step, later in the same job,
+recorded "HTTP Error 403: rate limit exceeded" from its own reads, which are
+anonymous by design and were reported unreadable rather than filed). The
+check read "could not ask" as "the answer was bad". Re-run locally the same
+day with a token, all seven signals verify: the pinned content moved nowhere
+and no key changed.
+
+Fix: the helper reads `GH_TOKEN` too, and the check gains a third outcome
+beside verified and mismatch. An origin it cannot read (the tag listing,
+GitHub's statement, grafana's version statement, a checksum sidecar) is
+recorded as not measured, named with the origin and the HTTP status or
+transport error, and fails the run without filing an issue; a mismatch is
+reserved for an origin that answered (Req 3.13). The six issues are closed
+with a comment pointing here once the fix is on main: the mismatch they
+claim was never measured. First proof: the next scheduled rescan should
+report seven verified and none not measured, and file nothing.

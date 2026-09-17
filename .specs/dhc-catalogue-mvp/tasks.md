@@ -318,6 +318,11 @@
     - design.md Decision 8 marked as-built when implemented
     - As built 2026-09-07: the alias handler's test became a refusal test (a definition on the alias is refused by its url line, not migrated); the chart READMEs also record what stays with the deployer (auth, TLS, replication, persistence, metrics) and the valkey version note no longer claims exact appVersion agreement
     - _Requirements: Req 7.1_
+  - [ ] 11.6 Unreadable origins are not verdicts (Req 3.13)
+    - The daily re-verification gains a third outcome beside verified and mismatch: an origin it cannot read (`git ls-remote` exiting non-zero, GitHub's verification statement answering anything but 200, the publisher's version statement or a checksum sidecar not served) is recorded as not measured, `ok: null` in `authenticity.jsonl`, named with the origin and the HTTP status or transport error, counted in the summary line; the run fails (exit 2, or exit 1 when a real mismatch is also present) and the workflow files a `supply-chain` issue only for `ok == false` records (Req 3.13). `github_verification` reads the token from `GITHUB_TOKEN`, then `GH_TOKEN` (the name the rescan step sets for gh), then `RENOVATE_TOKEN`, and reads the statement without `curl -f`, so the status and GitHub's message survive into the refusal
+    - Tests first, in `check-authenticity_test.sh` over a localhost HTTP stub (the `check-governance_test.sh` shape): a 403 rate-limit body is not measured with no `ok == false` record; the stub sees `Authorization: Bearer` with `GH_TOKEN` set; a failing `ls-remote` is not measured while an empty listing stays a mismatch; a mismatch and a not-measured in one run exit 1 naming both; case 4c's missing version statement becomes not measured, not a mismatch; an unreadable sidecar likewise
+    - Records: `triage/LOG.md` 2026-09-17, design Decision 8's as-built correction and the error-handling row, `tasks/lessons.md`; issues #212 to #217 are closed with a comment naming the run and the cause once the fix is on main; the next scheduled rescan is the first proof (seven verified, none not measured)
+    - _Requirements: Req 3.10, Req 3.13_
 
 - [ ] 12. Greenfield successor (owner decided 2026-08-25, F9 re-decision revised on PR #102's independent review; executes after every implementation task in this repository completes)
   - [ ] 12.1 Cut the successor, archive this repository
@@ -428,7 +433,7 @@
 |-------------|------------------|
 | Req 1: Image Definition Catalogue | 2.1, 2.2, 3.1, 3.2, 5.1, 5.2, 1.2, 8.1, 8.4, 9.7, 11.2, 14.1, 14.2, 14.4 |
 | Req 2: Image Build and Release | 3.3, 8.2, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 10.1, 14.1, 14.2 |
-| Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2, 11.1, 11.2, 11.3, 11.4, 14.2 |
+| Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2, 11.1, 11.2, 11.3, 11.4, 11.6, 14.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4, 8.7, 11.3, 11.4, 14.4 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7, 14.3 |
 | Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5, 9.1, 9.3, 10.1, 10.2, 10.3, 10.4, 10.6, 10.7 |
