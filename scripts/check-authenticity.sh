@@ -25,7 +25,9 @@
 #
 # An origin that could not be read at all (a tag listing git cannot fetch, a
 # statement GitHub answers with anything but 200, a version statement or a
-# sidecar not served) is a third outcome, not measured (task 11.6, Req 3.13):
+# sidecar not served, each after three retries resting 10s, 30s and 90s, a
+# primary rate limit excepted: definition-lib.sh) is a third outcome, not
+# measured (task 11.6, Req 3.13):
 # reported by name with the origin and the HTTP status or transport error,
 # recorded as `ok: null`, and a failure of the run (exit 2; a real mismatch
 # in the same run keeps exit 1), never an issue. The 2026-09-16 rescan read a
@@ -71,12 +73,18 @@ pass() { # definition class ref detail
 }
 # tag_listing <repo url> <ref> -> the sha the origin lists for <ref>, empty when
 # it lists none (exit 0); exit 1 with git's error on stdout when the listing
-# itself could not be read.
+# could not be read after the retries (definition-lib.sh, retry_rest).
 tag_listing() {
-  local out err
-  err=$(mktemp)
-  if ! out=$(git ls-remote "$1" "$2" 2>"$err"); then printf '%s' "$(tr -d '\n' < "$err")"; rm -f "$err"; return 1; fi
-  rm -f "$err"; printf '%s' "$out" | awk '{print $1; exit}'
+  local out err attempt=1 total rest reason
+  err=$(mktemp); total=$(retry_total)
+  while :; do
+    if out=$(git ls-remote "$1" "$2" 2>"$err"); then rm -f "$err"; printf '%s' "$out" | awk '{print $1; exit}'; return 0; fi
+    reason=$(tr -d '\n' < "$err")
+    if ! rest=$(retry_rest "$attempt"); then rm -f "$err"; printf '%s, after %s attempts' "$reason" "$attempt"; return 1; fi
+    attempt=$((attempt + 1))
+    echo "retrying git ls-remote ${1} ${2} in ${rest%%|*}s (attempt ${attempt} of ${total}): ${reason}" >&2
+    sleep "${rest%%|*}"
+  done
 }
 
 for f in "$ROOT"/image/*/image.yaml; do

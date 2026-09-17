@@ -198,28 +198,70 @@ authenticity_stamp() { # definition path, text -> the first marker line becomes 
     { print }' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
 }
 
+# --- reading an origin, with retries (task 11.6, Req 3.13) -------------------
+# A read that fails is tried again three times, resting 10s, 30s and 90s
+# between attempts (DHC_RETRY_RESTS, one rest per retry; the tests set it to
+# "0 0 0"). Two exceptions, because waiting cannot help or the origin says how
+# long to wait: a GitHub primary rate limit (x-ratelimit-remaining: 0) is not
+# retried, its budget resets on the hour and the message names when; a
+# Retry-After header (GitHub's secondary limit) sets the rest instead, capped
+# at 120s (DHC_RETRY_AFTER_CAP). Every retry is one line on stderr naming the
+# url, the rest, the attempt and the reason. Worst case, an origin down for
+# the whole run: about 130s per read.
+retry_total() { local -a rests; read -r -a rests <<<"${DHC_RETRY_RESTS:-10 30 90}"; echo $((${#rests[@]} + 1)); }
+retry_rest() { # <attempt that just failed> [Retry-After seconds] -> "<seconds>|<note>" on stdout; exit 1 when no retry is left
+  local -a rests; read -r -a rests <<<"${DHC_RETRY_RESTS:-10 30 90}"
+  local n="$1" after="${2:-}" cap="${DHC_RETRY_AFTER_CAP:-120}"
+  [ "$n" -le "${#rests[@]}" ] || return 1
+  if [[ "$after" =~ ^[0-9]+$ ]]; then
+    if [ "$after" -gt "$cap" ]; then printf '%s|, Retry-After asked %ss' "$cap" "$after"; else printf '%s|, as Retry-After asks' "$after"; fi
+  else
+    printf '%s|' "${rests[$((n - 1))]}"
+  fi
+}
+header_value() { # <name> <headers file> -> the last response's value for that header, empty when absent
+  grep -i "^${1}:" "$2" | tail -n 1 | cut -d: -f2- | tr -d ' \r\n'
+}
+
 # read_origin <url> [curl args...] -> the body on stdout, exit 0, when the
 # origin answered 200 (or a file:// url, the tests' seam, could be opened);
-# otherwise exit 1 with one line on stdout naming the url and what happened:
-# "<url>: HTTP <status>: <message>" (the body's JSON `message`, first
-# sentence, when it carries one) or "<url>: curl: (<n>) <error>" for a
-# transport failure. Not `curl -f`: that reduces a 403 to silence, and on
-# 2026-09-16 that silence was recorded as six mismatches (task 11.6, Req 3.13).
+# otherwise exit 1 with one line on stdout naming the url and what happened,
+# after the retries above: "<url>: HTTP <status>: <message>, after N attempts"
+# (the body's JSON `message`, first sentence, when it carries one), "<url>:
+# curl: (<n>) <error>, after N attempts" for a transport failure, or "<url>:
+# HTTP 403: <message>; hourly budget resets at HH:MMZ, not retried" for a
+# primary rate limit. Not `curl -f`: that reduces a 403 to silence, and on
+# 2026-09-16 that silence was recorded as six mismatches.
 read_origin() {
   local url="$1"; shift
-  local body err code rc
-  body=$(mktemp); err=$(mktemp)
-  code=$(curl -sSL --max-time 60 -o "$body" -w '%{http_code}' "$@" "$url" 2>"$err"); rc=$?
-  if [ "$rc" -ne 0 ]; then
-    printf '%s: %s\n' "$url" "$(tr -d '\n' < "$err")"
-    rm -f "$body" "$err"; return 1
-  fi
-  # file:// reports no status; http(s) reports one, and only 200 is an answer
-  if [ "$code" != 000 ] && [ "$code" != 200 ]; then
-    printf '%s: HTTP %s: %s\n' "$url" "$code" "$(origin_message "$body")"
-    rm -f "$body" "$err"; return 1
-  fi
-  cat "$body"; rm -f "$body" "$err"
+  local body err hdr code rc attempt=1 total reason msg after rest reset at
+  body=$(mktemp); err=$(mktemp); hdr=$(mktemp); total=$(retry_total)
+  while :; do
+    after=""
+    code=$(curl -sSL --max-time 60 -o "$body" -D "$hdr" -w '%{http_code}' "$@" "$url" 2>"$err"); rc=$?
+    if [ "$rc" -ne 0 ]; then
+      reason=$(tr -d '\n' < "$err")
+    elif [ "$code" = 000 ] || [ "$code" = 200 ]; then
+      # file:// reports no status; http(s) reports one, and only 200 is an answer
+      cat "$body"; rm -f "$body" "$err" "$hdr"; return 0
+    else
+      reason="HTTP ${code}"; msg=$(origin_message "$body"); [ -n "$msg" ] && reason="${reason}: ${msg}"
+      after=$(header_value retry-after "$hdr")
+      if { [ "$code" = 403 ] || [ "$code" = 429 ]; } && [ "$(header_value x-ratelimit-remaining "$hdr")" = 0 ]; then
+        reset=$(header_value x-ratelimit-reset "$hdr"); at=""
+        [[ "$reset" =~ ^[0-9]+$ ]] && at=" at $(date -u -d "@${reset}" +%H:%MZ)"
+        printf '%s: %s; hourly budget resets%s, not retried\n' "$url" "$reason" "$at"
+        rm -f "$body" "$err" "$hdr"; return 1
+      fi
+    fi
+    if ! rest=$(retry_rest "$attempt" "$after"); then
+      printf '%s: %s, after %s attempts\n' "$url" "$reason" "$attempt"
+      rm -f "$body" "$err" "$hdr"; return 1
+    fi
+    attempt=$((attempt + 1))
+    echo "retrying ${url} in ${rest%%|*}s${rest#*|} (attempt ${attempt} of ${total}): ${reason}" >&2
+    sleep "${rest%%|*}"
+  done
 }
 # origin_message <body file> -> the first sentence of a JSON body's `message`;
 # empty when the body is not JSON or carries none.

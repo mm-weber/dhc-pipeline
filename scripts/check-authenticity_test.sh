@@ -33,7 +33,7 @@ exit 0
 STUB
   chmod +x "$SB/bin/git"
   : > "$SB/refs"
-  export STUB_DIR="$SB" DHC_GITHUB_API="file://$SB/api" DHC_VERSIONS_API="file://$SB/versions" DHC_TODAY="2026-09-06"
+  export STUB_DIR="$SB" DHC_GITHUB_API="file://$SB/api" DHC_VERSIONS_API="file://$SB/versions" DHC_TODAY="2026-09-06" DHC_RETRY_RESTS="0 0 0" DHC_RETRY_AFTER_CAP="2"
 }
 git_def() { # name class repo tag checksum
   mkdir -p "$SB/root/image/$1"
@@ -184,21 +184,29 @@ serve_api() {
 import http.server, os, sys
 port, root, log = int(sys.argv[1]), sys.argv[2], sys.argv[3]
 class H(http.server.BaseHTTPRequestHandler):
+    served = {}
     def do_GET(self):
         with open(log, "a") as f:
             f.write(self.path + " " + self.headers.get("Authorization", "-") + "\n")
         p = os.path.join(root, self.path.lstrip("/"))
+        headers = []
         if os.path.isfile(p):
-            status = int(open(p + ".status").read()) if os.path.isfile(p + ".status") else 200
+            # `<file>.status` lists one status per request, the last repeating;
+            # `<file>.headers` adds "Name: value" lines to every answer
+            seq = open(p + ".status").read().split() if os.path.isfile(p + ".status") else ["200"]
+            n = H.served.get(self.path, 0); H.served[self.path] = n + 1
+            status = int(seq[min(n, len(seq) - 1)])
             body = open(p, "rb").read()
+            if os.path.isfile(p + ".headers"):
+                headers = [l.split(":", 1) for l in open(p + ".headers").read().splitlines() if ":" in l]
         else:
             status, body = 404, b'{"message":"Not Found"}'
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
+        for k, v in headers:
+            self.send_header(k.strip(), v.strip())
         self.end_headers()
         self.wfile.write(body)
-    def log_message(self, *_):
-        pass
 http.server.HTTPServer(("127.0.0.1", port), H).serve_forever()
 PY
   SERVER_PID=$!
@@ -213,10 +221,13 @@ rate_limited() { # tag|commit owner/repo sha: GitHub's primary rate-limit answer
   mkdir -p "$(dirname "$f")"
   printf '{"message":"API rate limit exceeded for 1.2.3.4. (But here'"'"'s the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)","documentation_url":"https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting"}\n' > "$f"
   printf '403' > "$f.status"
+  printf 'x-ratelimit-remaining: 0\nx-ratelimit-reset: %s\n' "$RESET" > "$f.headers"
 }
+RESET=1789000000; RESET_HM=$(date -u -d "@$RESET" +%H:%MZ)
 git_unreachable() { # the stub git fails the way ls-remote does without a network
   cat > "$SB/bin/git" <<'STUB'
 #!/usr/bin/env bash
+printf 'git %s\n' "$*" >> "${STUB_DIR}/git.log"
 echo "fatal: unable to access 'https://github.com/cert-manager/cert-manager.git/': Could not resolve host: github.com" >&2
 exit 128
 STUB
@@ -232,10 +243,11 @@ fresh; serve_api
 git_def valkey signed-commit valkey-io/valkey 9.1.2 "$COMMIT"; refs "refs/tags/9.1.2^{}|" "refs/tags/9.1.2|$COMMIT"; rate_limited commit valkey-io/valkey "$COMMIT"
 out=$(run); rc=$?
 [ "$rc" -eq 2 ] && pass "an unreadable statement fails the run with the refusal code, not the mismatch code" || fail "rc=$rc" "$out"
-grep -q "::error::check-authenticity: valkey (signed-commit, 9.1.2): not measured: GitHub's verification statement for commit 4a12e725a55a at http://127.0.0.1:$PORT/repos/valkey-io/valkey/commits/$COMMIT: HTTP 403: API rate limit exceeded for 1.2.3.4 (Req 3.13)" <<<"$out" && pass "named with the origin, the status and GitHub's message" || fail "not measured message" "$out"
+grep -q "::error::check-authenticity: valkey (signed-commit, 9.1.2): not measured: GitHub's verification statement for commit 4a12e725a55a at http://127.0.0.1:$PORT/repos/valkey-io/valkey/commits/$COMMIT: HTTP 403: API rate limit exceeded for 1.2.3.4; hourly budget resets at ${RESET_HM}, not retried (Req 3.13)" <<<"$out" && pass "named with the origin, the status, GitHub's message and the reset" || fail "not measured message" "$out"
 [ "$(rec 'select(.ok == null) | .definition')" = "valkey" ] && pass "the record is ok: null, a third state" || fail "record" "$(cat "$SB/out.jsonl")"
 [ -z "$(rec 'select(.ok == false) | .definition')" ] && pass "no record says mismatch" || fail "a mismatch record was written" "$(cat "$SB/out.jsonl")"
 grep -q "0 signal(s) verified, 0 mismatch(es), 1 not measured" <<<"$out" && pass "the summary line counts it apart" || fail "summary" "$out"
+[ "$(grep -c "^/repos/valkey-io/valkey/commits/$COMMIT " "$SB/auth.log")" -eq 1 ] && pass "a primary rate limit is asked once, not retried" || fail "rate-limit requests" "$(cat "$SB/auth.log")"
 # and the token the workflow sets reaches the request (GH_TOKEN, gh's name, beside GITHUB_TOKEN)
 out=$(GH_TOKEN=t0k3n run)
 grep -q "/repos/valkey-io/valkey/commits/$COMMIT Bearer t0k3n" "$SB/auth.log" && pass "GH_TOKEN is sent as the bearer token" || fail "token" "$(cat "$SB/auth.log")"
@@ -245,13 +257,14 @@ fresh
 git_def valkey signed-commit valkey-io/valkey 9.1.2 "$COMMIT"; refs "refs/tags/9.1.2^{}|" "refs/tags/9.1.2|$COMMIT"
 export DHC_GITHUB_API="http://127.0.0.1:9"
 out=$(run); rc=$?
-[ "$rc" -eq 2 ] && grep -q "valkey (signed-commit, 9.1.2): not measured: GitHub's verification statement for commit 4a12e725a55a at http://127.0.0.1:9/repos/valkey-io/valkey/commits/$COMMIT: curl: (7)" <<<"$out" && pass "a connection failure is not measured, with curl's error" || fail "transport" "rc=$rc" "$out"
+[ "$rc" -eq 2 ] && grep -q "valkey (signed-commit, 9.1.2): not measured: GitHub's verification statement for commit 4a12e725a55a at http://127.0.0.1:9/repos/valkey-io/valkey/commits/$COMMIT: curl: (7)" <<<"$out" && grep -q ", after 4 attempts (Req 3.13)" <<<"$out" && pass "a connection failure is retried, then not measured with curl's error and the count" || fail "transport" "rc=$rc" "$out"
 
 # 9: a tag listing that cannot be read is not measured; an empty listing stays a mismatch (case 3, "gone")
 fresh; git_unreachable
 git_def cm signed-tag cert-manager/cert-manager v1.21.1 "$COMMIT"
 out=$(run); rc=$?
-[ "$rc" -eq 2 ] && grep -q "cm (signed-tag, v1.21.1): not measured: tag listing at https://github.com/cert-manager/cert-manager.git: fatal: unable to access" <<<"$out" && pass "a failing ls-remote is not measured, with git's error" || fail "ls-remote" "rc=$rc" "$out"
+[ "$rc" -eq 2 ] && grep -q "cm (signed-tag, v1.21.1): not measured: tag listing at https://github.com/cert-manager/cert-manager.git: fatal: unable to access" <<<"$out" && grep -q "cert-manager.git: fatal: unable to access .*, after 4 attempts (Req 3.13)" <<<"$out" && pass "a failing ls-remote is retried, then not measured with git's error and the count" || fail "ls-remote" "rc=$rc" "$out"
+[ "$(grep -c "ls-remote" "$SB/git.log")" -eq 4 ] && pass "four listings were attempted" || fail "ls-remote count" "$(cat "$SB/git.log")"
 
 # 10: a mismatch and a not-measured in one run: the mismatch code wins, both are named, and only the mismatch is a verdict
 fresh; serve_api
@@ -262,6 +275,40 @@ out=$(run); rc=$?
 grep -q "cm (signed-tag, v1.21.1): tag v1.21.1 now points at" <<<"$out" && grep -q "valkey (signed-commit, 9.1.2): not measured" <<<"$out" && pass "both are named" || fail "names" "$out"
 [ "$(rec 'select(.ok == false) | .definition')" = "cm" ] && [ "$(rec 'select(.ok == null) | .definition')" = "valkey" ] && pass "one verdict, one non-measurement" || fail "records" "$(cat "$SB/out.jsonl")"
 grep -q "0 signal(s) verified, 1 mismatch(es), 1 not measured" <<<"$out" && pass "the summary counts both" || fail "summary" "$out"
+stop_api
+
+# 11: retries (task 11.6, the same day): a read that fails is tried again three
+#     times, resting between attempts (10s, 30s, 90s in production; the
+#     DHC_RETRY_RESTS seam makes them 0 here). A primary rate limit is not
+#     retried (case 8 above). A Retry-After header sets the rest instead,
+#     capped (DHC_RETRY_AFTER_CAP, 2s here, 120s in production).
+fresh; serve_api
+git_def valkey signed-commit valkey-io/valkey 9.1.2 "$COMMIT"; refs "refs/tags/9.1.2^{}|" "refs/tags/9.1.2|$COMMIT"; verification commit valkey-io/valkey "$COMMIT" true valid
+printf '404 200' > "$SB/api/repos/valkey-io/valkey/commits/$COMMIT.status"
+out=$(run); rc=$?
+[ "$rc" -eq 0 ] && grep -q "valkey (signed-commit, 9.1.2): commit 4a12e725a55a, GitHub verification: valid" <<<"$out" && pass "a 404 answered 200 on the second attempt verifies" || fail "404 then 200" "rc=$rc" "$out"
+grep -q "retrying http://127.0.0.1:$PORT/repos/valkey-io/valkey/commits/$COMMIT in 0s (attempt 2 of 4): HTTP 404" <<<"$out" && pass "the retry is logged with the rest, the attempt and the reason" || fail "retry log" "$out"
+[ "$(grep -c "^/repos/valkey-io/valkey/commits/$COMMIT " "$SB/auth.log")" -eq 2 ] && pass "two requests were made, no more" || fail "request count" "$(cat "$SB/auth.log")"
+stop_api
+# four 502s: not measured after the last attempt, the count named, three retries logged
+fresh; serve_api
+git_def valkey signed-commit valkey-io/valkey 9.1.2 "$COMMIT"; refs "refs/tags/9.1.2^{}|" "refs/tags/9.1.2|$COMMIT"
+mkdir -p "$SB/api/repos/valkey-io/valkey/commits"; printf '{"message":"Server Error"}\n' > "$SB/api/repos/valkey-io/valkey/commits/$COMMIT"; printf '502' > "$SB/api/repos/valkey-io/valkey/commits/$COMMIT.status"
+out=$(run); rc=$?
+[ "$rc" -eq 2 ] && grep -q "valkey (signed-commit, 9.1.2): not measured: GitHub's verification statement for commit 4a12e725a55a at http://127.0.0.1:$PORT/repos/valkey-io/valkey/commits/$COMMIT: HTTP 502: Server Error, after 4 attempts (Req 3.13)" <<<"$out" && pass "a persistent 502 is not measured after four attempts" || fail "502" "rc=$rc" "$out"
+[ "$(grep -c "^/repos/valkey-io/valkey/commits/$COMMIT " "$SB/auth.log")" -eq 4 ] && pass "four requests, no more" || fail "request count" "$(cat "$SB/auth.log")"
+[ "$(grep -c "^retrying " <<<"$out")" -eq 3 ] && pass "three retries logged" || fail "retry lines" "$out"
+stop_api
+# Retry-After sets the rest (1s here, observed in the log), and is capped by DHC_RETRY_AFTER_CAP
+fresh; serve_api
+git_def valkey signed-commit valkey-io/valkey 9.1.2 "$COMMIT"; refs "refs/tags/9.1.2^{}|" "refs/tags/9.1.2|$COMMIT"; verification commit valkey-io/valkey "$COMMIT" true valid
+printf '429 200' > "$SB/api/repos/valkey-io/valkey/commits/$COMMIT.status"; printf 'Retry-After: 1\n' > "$SB/api/repos/valkey-io/valkey/commits/$COMMIT.headers"
+out=$(run); rc=$?
+[ "$rc" -eq 0 ] && grep -q "retrying http://127.0.0.1:$PORT/repos/valkey-io/valkey/commits/$COMMIT in 1s, as Retry-After asks (attempt 2 of 4): HTTP 429" <<<"$out" && pass "a Retry-After header sets the rest" || fail "retry-after" "rc=$rc" "$out"
+printf 'Retry-After: 500\n' > "$SB/api/repos/valkey-io/valkey/commits/$COMMIT.headers"; printf '429 200' > "$SB/api/repos/valkey-io/valkey/commits/$COMMIT.status"
+stop_api; serve_api # a fresh server, so the status sequence starts over
+out=$(run); rc=$?
+[ "$rc" -eq 0 ] && grep -q "in 2s, Retry-After asked 500s (attempt 2 of 4): HTTP 429" <<<"$out" && pass "a long Retry-After is capped, both numbers named" || fail "retry-after cap" "rc=$rc" "$out"
 stop_api
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi

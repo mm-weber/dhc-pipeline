@@ -1505,3 +1505,10 @@ reserved for an origin that answered (Req 3.13). The six issues are closed
 with a comment pointing here once the fix is on main: the mismatch they
 claim was never measured. First proof: the next scheduled rescan should
 report seven verified and none not measured, and file nothing.
+
+Retries, added the same day: a read that fails is tried again three times,
+resting 10, 30 and 90 seconds (a Retry-After header sets the rest, capped
+at two minutes), so a blip costs seconds, not a red day. A primary rate
+limit is the one thing not retried: its budget resets on the hour, so three
+tries over two minutes would only have added two minutes per definition to
+the 09-16 run; the message names the reset time instead.

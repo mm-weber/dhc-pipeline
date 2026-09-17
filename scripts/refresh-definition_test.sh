@@ -5,6 +5,7 @@
 # (Req 3.2). Self-contained: SHA resolution is stubbed via REFRESH_SHA_OVERRIDE
 # so no network is needed.
 set -u
+export DHC_RETRY_RESTS="0 0 0" # read_origin retries (definition-lib.sh); a suite does not rest
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$HERE/refresh-definition.sh"
 FAILURES=0

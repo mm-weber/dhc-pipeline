@@ -564,7 +564,12 @@ graph TB
      status or transport error, failing the run without filing an issue (Req 3.13); a
      mismatch is reserved for an origin that answered. The earlier rule "a missing
      statement is a mismatch, not a pass" (suite case 4c) was half right: not a pass,
-     and not a verdict either, the class of the 2026-09-08 correction above.
+     and not a verdict either, the class of the 2026-09-08 correction above. Retries,
+     the same day, on the owner's ask: every read is tried up to four times, resting
+     10s, 30s and 90s (a Retry-After header sets the rest instead, capped at 120s); a
+     primary rate limit (`x-ratelimit-remaining: 0`) is asked once, since its budget
+     resets on the hour, and the message names when; each retry is one logged line.
+     Worst case, every origin down for a whole run: about 130s per read, 21 reads.
 
 9. **Greenfield successor: the catalogue restarts as a new repository, and this one is archived intact (review F9 re-decision, revised on PR #102's independent review; F13, cluster D retention; 2026-08-25)**
    - **Context**: clusters A to C were specified against a registry carrying ten
