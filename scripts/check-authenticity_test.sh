@@ -4,6 +4,8 @@
 # lapsed compat review-by report (Req 4.9). git ls-remote is stubbed, GitHub's
 # verification statement and the publisher's version statement are served
 # from file:// trees, the sidecars are files beside the "tarballs".
+# The reads that fail (Req 3.13; task 11.6) run against a localhost HTTP
+# server, so a 403 and the arriving token can be observed.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CHECK="$HERE/check-authenticity.sh"
@@ -127,7 +129,13 @@ out=$(run); rc=$?
 fresh
 tarball_def grafana "$A" "$B" 13.1.5; sidecars "$A" "$B"
 out=$(run); rc=$?
-[ "$rc" -eq 1 ] && grep -q "could not read the version statement" <<<"$out" && pass "a missing statement is a mismatch, not a pass" || fail "missing statement" "rc=$rc" "$out"
+[ "$rc" -eq 2 ] && grep -q "::error::check-authenticity: grafana (cross-origin-checksum, 13.1.5): not measured: version statement at file://$SB/versions/13.1.5: curl: (37)" <<<"$out" && grep -q "(Req 3.13)" <<<"$out" && pass "a missing statement is not measured: neither a pass nor a mismatch (Req 3.13)" || fail "missing statement" "rc=$rc" "$out"
+[ "$(rec 'select(.ok == null) | .definition')" = "grafana" ] && [ -z "$(rec 'select(.ok == false) | .definition')" ] && pass "the record carries no verdict" || fail "record" "$(cat "$SB/out.jsonl")"
+# 4d: a sidecar that cannot be read is not measured either; the other architecture agreeing does not make it a pass
+fresh
+tarball_def grafana "$A" "$B" 13.1.5; statement 13.1.5 "$A" "$B"; sidecars "$A" "$B"; rm "$SB/dist/app_arm64.tar.gz.sha256"
+out=$(run); rc=$?
+[ "$rc" -eq 2 ] && grep -q "grafana (cross-origin-checksum, 13.1.5): not measured: checksum sidecar for arm64 at file://$SB/dist/app_arm64.tar.gz.sha256: curl: (37)" <<<"$out" && pass "an unreadable sidecar is not measured, by architecture and url" || fail "sidecar unreadable" "rc=$rc" "$out"
 
 # 5: a definition without a verifiable class fails by name
 fresh
@@ -163,6 +171,98 @@ grep -q "old" <<<"$(rec '.definition')" && fail "inactive not recorded" || pass 
 policy cm typo
 out=$(run); rc=$?
 [ "$rc" -eq 2 ] && grep -q "typo" <<<"$out" && pass "a malformed active set refuses naming the entry" || fail "malformed" "rc=$rc" "$out"
+
+# A localhost GitHub API for the reads that fail (Req 3.13; task 11.6): a
+# file:// tree cannot answer 403, and the token has to be seen arriving. It
+# serves the same $SB/api tree the file:// cases write; a sibling
+# `<file>.status` sets the status, a missing file answers 404 with GitHub's
+# body, and every request appends its path and Authorization header to
+# $SB/auth.log (the check-governance_test.sh shape).
+serve_api() {
+  PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
+  python3 - "$PORT" "$SB/api" "$SB/auth.log" <<'PY' >"$SB/server.log" 2>&1 &
+import http.server, os, sys
+port, root, log = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        with open(log, "a") as f:
+            f.write(self.path + " " + self.headers.get("Authorization", "-") + "\n")
+        p = os.path.join(root, self.path.lstrip("/"))
+        if os.path.isfile(p):
+            status = int(open(p + ".status").read()) if os.path.isfile(p + ".status") else 200
+            body = open(p, "rb").read()
+        else:
+            status, body = 404, b'{"message":"Not Found"}'
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *_):
+        pass
+http.server.HTTPServer(("127.0.0.1", port), H).serve_forever()
+PY
+  SERVER_PID=$!
+  for _ in $(seq 50); do curl -sS -o /dev/null "http://127.0.0.1:$PORT/" 2>/dev/null && break; sleep 0.1; done
+  export DHC_GITHUB_API="http://127.0.0.1:$PORT"
+}
+stop_api() { if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null; wait "$SERVER_PID" 2>/dev/null; SERVER_PID=""; fi; }
+trap stop_api EXIT
+rate_limited() { # tag|commit owner/repo sha: GitHub's primary rate-limit answer for that statement
+  local f
+  if [ "$1" = tag ]; then f="$SB/api/repos/$2/git/tags/$3"; else f="$SB/api/repos/$2/commits/$3"; fi
+  mkdir -p "$(dirname "$f")"
+  printf '{"message":"API rate limit exceeded for 1.2.3.4. (But here'"'"'s the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)","documentation_url":"https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting"}\n' > "$f"
+  printf '403' > "$f.status"
+}
+git_unreachable() { # the stub git fails the way ls-remote does without a network
+  cat > "$SB/bin/git" <<'STUB'
+#!/usr/bin/env bash
+echo "fatal: unable to access 'https://github.com/cert-manager/cert-manager.git/': Could not resolve host: github.com" >&2
+exit 128
+STUB
+  chmod +x "$SB/bin/git"
+}
+
+# 8: Req 3.13 (task 11.6): a statement GitHub will not serve is not measured:
+#    the run fails naming the origin and the status, the record carries no
+#    verdict (ok: null), and nothing is written that the workflow would file
+#    an issue from. The 2026-09-16 rescan read a rate-limited API as six
+#    mismatches, so the answer here is GitHub's own.
+fresh; serve_api
+git_def valkey signed-commit valkey-io/valkey 9.1.2 "$COMMIT"; refs "refs/tags/9.1.2^{}|" "refs/tags/9.1.2|$COMMIT"; rate_limited commit valkey-io/valkey "$COMMIT"
+out=$(run); rc=$?
+[ "$rc" -eq 2 ] && pass "an unreadable statement fails the run with the refusal code, not the mismatch code" || fail "rc=$rc" "$out"
+grep -q "::error::check-authenticity: valkey (signed-commit, 9.1.2): not measured: GitHub's verification statement for commit 4a12e725a55a at http://127.0.0.1:$PORT/repos/valkey-io/valkey/commits/$COMMIT: HTTP 403: API rate limit exceeded for 1.2.3.4 (Req 3.13)" <<<"$out" && pass "named with the origin, the status and GitHub's message" || fail "not measured message" "$out"
+[ "$(rec 'select(.ok == null) | .definition')" = "valkey" ] && pass "the record is ok: null, a third state" || fail "record" "$(cat "$SB/out.jsonl")"
+[ -z "$(rec 'select(.ok == false) | .definition')" ] && pass "no record says mismatch" || fail "a mismatch record was written" "$(cat "$SB/out.jsonl")"
+grep -q "0 signal(s) verified, 0 mismatch(es), 1 not measured" <<<"$out" && pass "the summary line counts it apart" || fail "summary" "$out"
+# and the token the workflow sets reaches the request (GH_TOKEN, gh's name, beside GITHUB_TOKEN)
+out=$(GH_TOKEN=t0k3n run)
+grep -q "/repos/valkey-io/valkey/commits/$COMMIT Bearer t0k3n" "$SB/auth.log" && pass "GH_TOKEN is sent as the bearer token" || fail "token" "$(cat "$SB/auth.log")"
+stop_api
+# a server that does not answer at all is a transport error, named the same way
+fresh
+git_def valkey signed-commit valkey-io/valkey 9.1.2 "$COMMIT"; refs "refs/tags/9.1.2^{}|" "refs/tags/9.1.2|$COMMIT"
+export DHC_GITHUB_API="http://127.0.0.1:9"
+out=$(run); rc=$?
+[ "$rc" -eq 2 ] && grep -q "valkey (signed-commit, 9.1.2): not measured: GitHub's verification statement for commit 4a12e725a55a at http://127.0.0.1:9/repos/valkey-io/valkey/commits/$COMMIT: curl: (7)" <<<"$out" && pass "a connection failure is not measured, with curl's error" || fail "transport" "rc=$rc" "$out"
+
+# 9: a tag listing that cannot be read is not measured; an empty listing stays a mismatch (case 3, "gone")
+fresh; git_unreachable
+git_def cm signed-tag cert-manager/cert-manager v1.21.1 "$COMMIT"
+out=$(run); rc=$?
+[ "$rc" -eq 2 ] && grep -q "cm (signed-tag, v1.21.1): not measured: tag listing at https://github.com/cert-manager/cert-manager.git: fatal: unable to access" <<<"$out" && pass "a failing ls-remote is not measured, with git's error" || fail "ls-remote" "rc=$rc" "$out"
+
+# 10: a mismatch and a not-measured in one run: the mismatch code wins, both are named, and only the mismatch is a verdict
+fresh; serve_api
+git_def cm signed-tag cert-manager/cert-manager v1.21.1 "$COMMIT"; refs "refs/tags/v1.21.1^{}|$OTHER" "refs/tags/v1.21.1|$TAGOBJ"
+git_def valkey signed-commit valkey-io/valkey 9.1.2 "$COMMIT"; refs "refs/tags/9.1.2^{}|" "refs/tags/9.1.2|$COMMIT"; rate_limited commit valkey-io/valkey "$COMMIT"
+out=$(run); rc=$?
+[ "$rc" -eq 1 ] && pass "a real mismatch beside a not-measured fails with the mismatch code" || fail "rc=$rc" "$out"
+grep -q "cm (signed-tag, v1.21.1): tag v1.21.1 now points at" <<<"$out" && grep -q "valkey (signed-commit, 9.1.2): not measured" <<<"$out" && pass "both are named" || fail "names" "$out"
+[ "$(rec 'select(.ok == false) | .definition')" = "cm" ] && [ "$(rec 'select(.ok == null) | .definition')" = "valkey" ] && pass "one verdict, one non-measurement" || fail "records" "$(cat "$SB/out.jsonl")"
+grep -q "0 signal(s) verified, 1 mismatch(es), 1 not measured" <<<"$out" && pass "the summary counts both" || fail "summary" "$out"
+stop_api
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all check-authenticity tests passed"

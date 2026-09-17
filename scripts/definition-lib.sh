@@ -198,21 +198,59 @@ authenticity_stamp() { # definition path, text -> the first marker line becomes 
     { print }' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
 }
 
+# read_origin <url> [curl args...] -> the body on stdout, exit 0, when the
+# origin answered 200 (or a file:// url, the tests' seam, could be opened);
+# otherwise exit 1 with one line on stdout naming the url and what happened:
+# "<url>: HTTP <status>: <message>" (the body's JSON `message`, first
+# sentence, when it carries one) or "<url>: curl: (<n>) <error>" for a
+# transport failure. Not `curl -f`: that reduces a 403 to silence, and on
+# 2026-09-16 that silence was recorded as six mismatches (task 11.6, Req 3.13).
+read_origin() {
+  local url="$1"; shift
+  local body err code rc
+  body=$(mktemp); err=$(mktemp)
+  code=$(curl -sSL --max-time 60 -o "$body" -w '%{http_code}' "$@" "$url" 2>"$err"); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    printf '%s: %s\n' "$url" "$(tr -d '\n' < "$err")"
+    rm -f "$body" "$err"; return 1
+  fi
+  # file:// reports no status; http(s) reports one, and only 200 is an answer
+  if [ "$code" != 000 ] && [ "$code" != 200 ]; then
+    printf '%s: HTTP %s: %s\n' "$url" "$code" "$(origin_message "$body")"
+    rm -f "$body" "$err"; return 1
+  fi
+  cat "$body"; rm -f "$body" "$err"
+}
+# origin_message <body file> -> the first sentence of a JSON body's `message`;
+# empty when the body is not JSON or carries none.
+origin_message() {
+  # shellcheck disable=SC2016  # a JavaScript template literal, not shell expansion
+  node -e '
+    let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      let m = ""; try { m = String(JSON.parse(s).message || ""); } catch {}
+      process.stdout.write(m.split(/\.\s/)[0].replace(/\.$/, ""));
+    });' < "$1" 2>/dev/null || true
+}
+
 # github_verification <tag|commit> <owner/repo> <sha> -> "true valid" or
-# "false <reason>" on stdout; exit 1 when the statement could not be read.
+# "false <reason>" on stdout, exit 0; exit 1 when the statement could not be
+# read, the reason on stdout as read_origin names it, for the caller to record.
 # GitHub's verification statement is the signal: it checks the signature
 # against the keys the signer registered. DHC_GITHUB_API overrides the API
-# base (the tests hand it a file:// tree); a token is used when one is set.
+# base (the tests hand it a file:// tree or a localhost server). The token is
+# GITHUB_TOKEN, else GH_TOKEN (gh's name, the one the rescan step sets), else
+# RENOVATE_TOKEN; until 2026-09-17 GH_TOKEN was not read, so the daily check
+# ran on the anonymous budget of a hosted runner's shared address (Req 3.13).
 github_verification() {
   local kind="$1" repo="$2" sha="$3" api="${DHC_GITHUB_API:-https://api.github.com}" url body
-  local auth=() token="${GITHUB_TOKEN:-${RENOVATE_TOKEN:-}}"
+  local auth=() token="${GITHUB_TOKEN:-${GH_TOKEN:-${RENOVATE_TOKEN:-}}}"
   case "$kind" in
     tag) url="$api/repos/$repo/git/tags/$sha" ;;
     commit) url="$api/repos/$repo/commits/$sha" ;;
     *) return 2 ;;
   esac
   [ -n "$token" ] && auth=(-H "Authorization: Bearer ${token}")
-  body=$(curl -fsSL --max-time 60 -H 'Accept: application/vnd.github+json' "${auth[@]}" "$url") || return 1
+  body=$(read_origin "$url" -H 'Accept: application/vnd.github+json' "${auth[@]}") || { printf '%s\n' "$body"; return 1; }
   # shellcheck disable=SC2016  # a JavaScript template literal, not shell expansion
   printf '%s' "$body" | node -e '
     let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {

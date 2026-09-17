@@ -407,8 +407,13 @@ jobs:
       # moved, a signature that no longer verifies, two checksum origins that
       # stopped agreeing) fails the run and files one issue naming it as a
       # supply-chain signal; the record is the evidence, the issue is where a
-      # human decides. Lapsed compat review-by dates are reported here too.
-      - name: authenticity signals (Req 3.10, 4.9)
+      # human decides. An origin the check could not read is not measured
+      # (`ok: null`, Req 3.13, task 11.6): it fails the run by name and files
+      # nothing, because a mismatch is a verdict about an origin that
+      # answered, and on 2026-09-16 a rate-limited API filed six of them. The
+      # token travels as GH_TOKEN, which the check's reader takes beside
+      # GITHUB_TOKEN. Lapsed compat review-by dates are reported here too.
+      - name: authenticity signals (Req 3.10, 3.13, 4.9)
         id: authenticity
         if: always() # reads the definitions and their origins, nothing from this run
         env:
@@ -417,13 +422,15 @@ jobs:
           set -uo pipefail
           scripts/check-authenticity.sh . "$OUT/authenticity.jsonl"; rc=$?
           {
-            echo "verified=$(jq -s '[.[] | select(.class != "compat" and .ok)] | length' "$OUT/authenticity.jsonl")"
-            echo "mismatched=$(jq -s '[.[] | select(.class != "compat" and (.ok | not))] | length' "$OUT/authenticity.jsonl")"
-            echo "lapsed=$(jq -s '[.[] | select(.class == "compat" and (.ok | not))] | length' "$OUT/authenticity.jsonl")"
+            echo "verified=$(jq -s '[.[] | select(.class != "compat" and .ok == true)] | length' "$OUT/authenticity.jsonl")"
+            echo "mismatched=$(jq -s '[.[] | select(.class != "compat" and .ok == false)] | length' "$OUT/authenticity.jsonl")"
+            echo "unmeasured=$(jq -s '[.[] | select(.ok == null)] | length' "$OUT/authenticity.jsonl")"
+            echo "lapsed=$(jq -s '[.[] | select(.class == "compat" and .ok == false)] | length' "$OUT/authenticity.jsonl")"
           } >> "$GITHUB_OUTPUT"
-          # One open issue per definition with a mismatch, found by its marker
-          # (the cve issues' convention): a signal that persists is one issue
-          # that stays open, not one issue per day.
+          # One open issue per definition with a mismatch (`ok == false`, never
+          # a not-measured `ok == null`), found by its marker (the cve issues'
+          # convention): a signal that persists is one issue that stays open,
+          # not one issue per day.
           gh label create supply-chain --color B60205 --description "An upstream authenticity signal failed re-verification (Req 3.10)" 2>/dev/null || true
           existing=$(gh issue list --state open --label supply-chain --limit 200 --json body --jq '.[].body' | grep -oE 'rescan-signal: [^ >]+' | sed 's/^rescan-signal: //' | sort -u || true)
           while read -r record; do
@@ -437,7 +444,7 @@ jobs:
             body=$(jq -r '"<!-- rescan-signal: \(.definition) -->\n\nThe daily rescan re-verified this definition'"'"'s declared authenticity signal against its upstream origin and it did not hold (Req 3.10).\n\n| Field | Value |\n|---|---|\n| Definition | `\(.definition)` |\n| Declared class | `\(.class)` |\n| Pinned ref | `\(.ref)` |\n| Finding | \(.detail) |\n\nThis is evidence, not a decision: the pinned content is unchanged and every published image still verifies against its own signature. Someone decides what the mismatch means: an upstream that moved a tag or rotated a key, a compromise, or an origin that changed its publishing. Until then the rescan fails daily and this issue stays open."' <<<"$record")
             echo "filing supply-chain issue for ${definition}"
             gh issue create --title "$title" --label supply-chain --body "$body"
-          done < <(jq -c 'select(.class != "compat" and (.ok | not))' "$OUT/authenticity.jsonl")
+          done < <(jq -c 'select(.class != "compat" and .ok == false)' "$OUT/authenticity.jsonl")
           exit "$rc"
 
       # Task 13.4 (Req 9.12): the VEX portability block over the supported
@@ -848,7 +855,7 @@ jobs:
             fi
             echo "- platform manifests scanned: ${{ steps.scan.outputs.scanned || 0 }} (failed: ${{ steps.scan.outputs.failed || 0 }})"
             echo "- new CVE issues filed: ${{ steps.report.outputs.count || 0 }}"
-            echo "- authenticity signals: ${{ steps.authenticity.outputs.verified || 0 }} verified, ${{ steps.authenticity.outputs.mismatched || 0 }} mismatched, ${{ steps.authenticity.outputs.lapsed || 0 }} lapsed compat review-by date(s)"
+            echo "- authenticity signals: ${{ steps.authenticity.outputs.verified || 0 }} verified, ${{ steps.authenticity.outputs.mismatched || 0 }} mismatched, ${{ steps.authenticity.outputs.unmeasured || 0 }} not measured, ${{ steps.authenticity.outputs.lapsed || 0 }} lapsed compat review-by date(s)"
             echo "- governance: private vulnerability reporting ${{ steps.governance.outputs.reporting || 'not checked' }}, ${{ steps.governance.outputs.compared || 0 }} committed ruleset(s) compared, ${{ steps.governance.outputs.differences || 0 }} difference(s), ${{ steps.governance.outputs.live_only || 0 }} live-only ruleset(s)"
             echo "- revocations: ${{ steps.governance.outputs.revoked || 0 }} recorded, ${{ steps.governance.outputs.revoked_referenced || 0 }} still referenced by a catalogue tag"
             echo "- consumer smoke test: ${{ steps.smoke.outputs.ref || 'not run' }}, ${{ steps.smoke.outputs.failed_steps || 0 }} failed step(s); statements: ${{ steps.smoke.outputs.suppressed || 0 }} suppressed a reported finding, ${{ steps.smoke.outputs.unneeded || 0 }} had nothing to suppress, ${{ steps.smoke.outputs.missing || 0 }} missing in the authoritative consumer"
