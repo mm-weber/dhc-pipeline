@@ -6,19 +6,19 @@ variant: runtime
 tags:
   - 1-alpine3.23
   - 1.21-alpine3.23
-  - 1.21.1-alpine3.23
+  - 1.21.2-alpine3.23
 platforms:
   - linux/amd64
   - linux/arm64
 dates:
   release: "2026-06-25"
 vars:
-  COMMIT_SHA: 24e33194fb39488eff2bbf10c6dc640f407cad44
+  COMMIT_SHA: 922a06aa49ee4bb802db268ef72a174af70edd32
   GOLANG_REFERENCE: dhi.io/golang:1.27.1-alpine3.23-dev@sha256:8f3f672b0410db5404bb36922863b688e682a6048606c81c2eb0f2796a8ba79f
   SEMVER_MAJOR_MINOR_VERSION: "1.21"
   SEMVER_MAJOR_VERSION: "1"
-  SEMVER_VERSION: 1.21.1
-  VERSION: 1.21.1
+  SEMVER_VERSION: 1.21.2
+  VERSION: 1.21.2
 contents:
   repositories:
     - https://dhi.io/apk/alpine/v3.23/main
@@ -40,22 +40,22 @@ contents:
         packages:
           - ca-certificates-bundle
         files:
-          - url: git+https://github.com/cert-manager/cert-manager.git#v1.21.1
-            # authenticity: signed-tag
-            checksum: 24e33194fb39488eff2bbf10c6dc640f407cad44
+          - url: git+https://github.com/cert-manager/cert-manager.git#v1.21.2
+            # authenticity: signed-tag, verified v1.21.2 (GitHub verification: valid), 2026-09-18
+            checksum: 922a06aa49ee4bb802db268ef72a174af70edd32
             path: /go/src/github.com/cert-manager/cert-manager
             spdx:
               name: cert-manager-cainjector
-              version: 1.21.1
+              version: 1.21.2
               packages:
                 - name: cert-manager-cainjector
-                  purl: pkg:golang/github.com/cert-manager/cert-manager@1.21.1
+                  purl: pkg:golang/github.com/cert-manager/cert-manager@1.21.2
                   license: Apache-2.0
             uid: 0
             gid: 0
       pipeline:
         # CVE-2026-56854: golang.org/x/crypto below 0.55.0 (GO-2026-6303).
-        # Upstream 1.21.1 pins 0.53.0 and no release carries the fix, so the
+        # Upstream 1.21.2 pins 0.53.0 and no release carries the fix, so the
         # module is bumped in the frontend's FETCH phase — the only phase with
         # egress: a `runs:` go get was tried on 2026-07-26 and the sandbox
         # refused it, by design (triage/LOG.md, GHSA-hrxh-6v49-42gf). Schema
@@ -84,8 +84,8 @@ contents:
             ldflags:
               - -w
               - -s
-              - -X github.com/cert-manager/cert-manager/pkg/util.AppVersion=v1.21.1
-              - -X github.com/cert-manager/cert-manager/pkg/util.AppGitCommit=24e33194fb39488eff2bbf10c6dc640f407cad44
+              - -X github.com/cert-manager/cert-manager/pkg/util.AppVersion=v1.21.2
+              - -X github.com/cert-manager/cert-manager/pkg/util.AppGitCommit=922a06aa49ee4bb802db268ef72a174af70edd32
             output: ${target.dir}/usr/local/bin/cert-manager-cainjector
             packages: .
       outputs:
