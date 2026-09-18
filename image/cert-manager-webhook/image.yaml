@@ -54,31 +54,12 @@ contents:
             uid: 0
             gid: 0
       pipeline:
-        # CVE-2026-56854: golang.org/x/crypto below 0.55.0 (GO-2026-6303).
-        # Upstream 1.21.2 pins 0.53.0 and no release carries the fix, so the
-        # module is bumped in the frontend's FETCH phase — the only phase with
-        # egress: a `runs:` go get was tried on 2026-07-26 and the sandbox
-        # refused it, by design (triage/LOG.md, GHSA-hrxh-6v49-42gf). Schema
-        # primary-verified against docker-hardened-images/catalog, where etcd
-        # bumps x/crypto and grpc the same way. Bumped in the cmd submodule
-        # because the binary resolves through ITS go.mod, and MVS makes this a
-        # floor, not a ceiling: a later upstream requirement wins. DROP this
-        # step when upstream's go.mod reaches 0.55.0+ (triage/LOG.md
-        # 2026-09-02).
-        - name: bump x/crypto (CVE-2026-56854)
-          uses: go/bump@v2
-          work-dir: /go/src/github.com/cert-manager/cert-manager/cmd/webhook
-          with:
-            deps:
-              # renovate: datasource=go depName=golang.org/x/crypto
-              - golang.org/x/crypto@v0.57.0
-              # CVE-2026-84304, fixed in 1.83.1; upstream pins 1.82.1 and no
-              # release carries the fix. Same lane, same exit condition
-              # (triage/LOG.md 2026-09-02). cainjector carries no grpc.
-              # renovate: datasource=go depName=google.golang.org/grpc
-              - google.golang.org/grpc@v1.83.2
-            download: true
-            tidy: true
+        # Until 1.21.2 a `go/bump@v2` step here bumped golang.org/x/crypto
+        # (CVE-2026-56854) and, in controller and webhook, google.golang.org/grpc
+        # (CVE-2026-84304) in the fetch phase, upstream having no release with
+        # the fixes. v1.21.2's go.mod pins x/crypto v0.56.0 and grpc v1.83.2, so
+        # the step went on 2026-09-18 per its exit condition (triage/LOG.md
+        # 2026-09-02 and 2026-09-18); the lane stays (docs/CONVENTIONS.md M10).
         # No test step: cmd/* submodules share the monorepo's suite, which
         # needs upstream's make tooling; functional verification is the e2e
         # suite's job (Req 5.5). Upstream ldflags recipe: make/00_mod.mk.
