@@ -9,7 +9,7 @@
 upstream:
   name: cert-manager
   repository: https://charts.jetstack.io
-  version: v1.21.1
+  version: v1.21.2
 
 # The definitions this chart deploys (task 14.2, Req 1.14, 5.2): the e2e
 # matrix maps a changed definition to its chart-backed component through this
