@@ -1539,3 +1539,64 @@ controller job failed inside the `go/bump` action's own package step
 (`grep sed yq`), a failure mode that belonged to the step, not to the
 definition. The proof is the PR's scan gate: three 1.21.2 builds, the
 statements applied to the tag they name, nothing uncovered.
+
+## 2026-09-18: not affected: CVE-2026-84445, no binary in the grafana image builds an xDS server (#186, #225)
+
+Grafana 13.1.6 (Renovate's #225, released 2026-09-15) was the fix-forward
+hoped for in #186, and it does half of it: the server binary moves
+`google.golang.org/grpc` from v1.82.1 to v1.83.2 and the bundled
+elasticsearch datasource's v1.83.1 copy is gone too. One copy remains, the
+bundled zipkin datasource at v1.82.1: the same stale v12.4.6 build that
+already carries nine transfers to grafana-zipkin-datasource#94, and whose
+upstream fixed this very thing on 2026-09-10 (v12.4.8 links grpc v1.83.2)
+without a grafana release bundling it yet. So the finding is not closed by
+the bump, and the PR's scan gate said so: CVE-2026-84445 uncovered, beside
+the two tempo statements it dropped for being scoped to 13.1.5.
+
+**What the vulnerability is.** GHSA-2v4p-qf9q-27wj: a server built with
+`xds.NewGRPCServer()` installs an xDS routing interceptor on every RPC; on a
+request carrying neither `:authority` nor `Host`, that interceptor indexes
+an empty authority list and the process panics. The vulnerable code is the
+interceptor, and only an xDS server installs it.
+
+**Decision: not affected, vulnerable code not in the execute path,
+version-independent.** No binary in this image builds an xDS server, and
+that is a property of what the image runs, not of which grpc it vendors.
+Measured on the published 13.1.5 binaries (index digest 9228cff90ec4,
+linux/amd64), pulled from ghcr.io and read in place:
+
+| binary | grpc | method | `grpc/internal/transport` (control) | `grpc/xds*` | `NewGRPCServer` | xDS server package |
+|---|---|---|---|---|---|---|
+| `bin/grafana` | v1.82.1 | `go tool nm`, 497,941 symbols | 459 | 77: `xds/googledirectpath` 36, `xds/bootstrap` 23, `xds/csds` 9, `xds` 9 | 0 | 0 |
+| `plugins-bundled/zipkin/gpx_…_linux_amd64` | v1.82.1 | package paths (`strings`; the binary is stripped) | 444 | 0 | 0 | 0 |
+| `plugins-bundled/elasticsearch/gpx_…_linux_amd64` | v1.83.1 | package paths (stripped) | 447 | 0 | 0 | 0 |
+
+The server's `grpc/xds` linkage is the client-side google-c2p resolver the
+Google Cloud SDKs bring in (`cloud.google.com/go/storage` and `monitoring`
+in 13.1.6's go.mod); it references the plain `grpc.NewServer` once and
+`NewGRPCServer` never. The plugins serve the host through the plugin SDK's
+plain gRPC server and link no `grpc/xds` package. GitHub code search finds
+no import of `google.golang.org/grpc/xds` and no `xds.NewGRPCServer` in
+grafana/grafana, the zipkin and elasticsearch datasource repositories or
+grafana-plugin-sdk-go. The zipkin binary downloaded from its own v12.4.6
+release (sha1 as published) is byte-identical to the bundled one, so the
+measurement does not depend on this image's packaging. No positive control
+for an xDS server was buildable here (the devcontainer cannot reach the Go
+proxy); the control is the same method finding the sibling packages in every
+binary, and the symbol table of the server naming the one plain server
+constructor it does use.
+
+**Machine-readable form:** `triage/vex/CVE-2026-84445.openvex.json`, a
+versionless `not_affected` statement with the `version-independent:` note
+(the README's structural case), subcomponent `pkg:golang/google.golang.org/grpc`,
+so it covers every copy in every build, the superseded 13.1.5 digests
+included, each of which was measured. The two tempo `fixed` statements move
+to `13.1.6-alpine3.23`: the pin is byte-identical to 13.1.5's
+(`v1.5.1-0.20260427112133-525d1bab07e0`), so the commit-ancestry argument of
+2026-08-05 carries unchanged. The CVE-2026-42151 `fixed` statement moves too: 13.1.6
+requires prometheus/prometheus v0.312.0 with no replace directive, as 13.1.1
+through 13.1.5 did, past the 0.311.3 fix; its note now says so. The 2026-09-03 transfer of CVE-2026-84304 on
+the server binary becomes moot with 13.1.6 (grpc v1.83.2) and is left to
+expire with its siblings; the zipkin transfers stand until a grafana release
+bundles v12.4.8 or newer. #186 closes on evidence once the rescan reads the
+statement from the attested 13.1.6 digest; #203 unblocks with it.
