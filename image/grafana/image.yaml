@@ -6,7 +6,7 @@ variant: runtime
 tags:
   - 13-alpine3.23
   - 13.1-alpine3.23
-  - 13.1.5-alpine3.23
+  - 13.1.6-alpine3.23
 platforms:
   - linux/amd64
   - linux/arm64
@@ -30,11 +30,11 @@ vars:
   # The build-id path has not been touched since it was written on release day,
   # and a re-cut lands at a new URL instead of overwriting this one.
   # See triage/LOG.md 2026-07-26.
-  GRAFANA_SHA256: '#{ target.arch == "amd64" ? "35d3f3b93777564a95b6f2f9380340ac07b0f238e2df6ba46a106fde785d61f7" : "6d6f9a434803fcbc55a3adb344e4f6c821db70791ab47449d6d7cfc5fd60e41e" }'
+  GRAFANA_SHA256: '#{ target.arch == "amd64" ? "c6fadb0a4efe53f6a360c962a5c8f8d962be05b1c4657b667c66d5dc69c8215a" : "367fbae8d5dcf9b8bb61c0934ab94659cda2d855ebaa6e8c429613e4970d89b6" }'
   SEMVER_MAJOR_MINOR_VERSION: "13.1"
   SEMVER_MAJOR_VERSION: "13"
-  SEMVER_VERSION: 13.1.5
-  VERSION: 13.1.5
+  SEMVER_VERSION: 13.1.6
+  VERSION: 13.1.6
 contents:
   repositories:
     - https://dhi.io/apk/alpine/v3.23/main
@@ -56,15 +56,15 @@ contents:
           - tar
           - ca-certificates-bundle
         files:
-          - url: https://dl.grafana.com/grafana/release/13.1.5/grafana_13.1.5_33098073184_linux_${target.arch}.tar.gz
-            # authenticity: cross-origin-checksum
+          - url: https://dl.grafana.com/grafana/release/13.1.6/grafana_13.1.6_34846748635_linux_${target.arch}.tar.gz
+            # authenticity: cross-origin-checksum, verified 13.1.6 (grafana.com versions API and dl.grafana.com sidecars agree, amd64 c6fadb0a4efe…, arm64 367fbae8d5dc…), 2026-09-18
             path: ${source.dir}/grafana.tar.gz
             spdx:
               name: grafana
-              version: 13.1.5
+              version: 13.1.6
               packages:
                 - name: grafana
-                  purl: pkg:generic/grafana@13.1.5
+                  purl: pkg:generic/grafana@13.1.6
                   license: AGPL-3.0
             uid: 0
             gid: 0
@@ -118,7 +118,7 @@ os-release:
   bug-report-url: https://github.com/mm-weber/dhc-pipeline/issues
 work-dir: /var/lib/grafana
 environment:
-  GRAFANA_VERSION: 13.1.5
+  GRAFANA_VERSION: 13.1.6
   PATH: /usr/share/grafana/bin:/usr/sbin:/sbin:/usr/bin:/bin:/usr/local/bin
 # Writable-path inventory (Req 4.4 chart work): every path the runtime writes
 # to gets an emptyDir mount in the chart. Owned by nonroot 65532.
