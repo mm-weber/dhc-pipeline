@@ -1512,3 +1512,30 @@ at two minutes), so a blip costs seconds, not a red day. A primary rate
 limit is the one thing not retried: its budget resets on the hour, so three
 tries over two minutes would only have added two minutes per definition to
 the 09-16 run; the message names the reset time instead.
+
+## 2026-09-18: the fetch-phase bumps retired with cert-manager 1.21.2 (#208; CVE-2026-56854, CVE-2026-84304)
+
+The 2026-09-02 entry set the exit condition for the `go/bump@v2` step in the
+three cert-manager definitions: drop it when an upstream release pins
+`golang.org/x/crypto` at v0.55.0 or newer and `google.golang.org/grpc` at
+v1.83.1 or newer, the release PR being the reminder. v1.21.2 (released
+2026-09-11, Renovate's #208) is that release: its go.mod moves x/crypto
+v0.53.0 to v0.56.0 and grpc v1.82.1 to v1.83.2, and the release notes name
+both as security bumps (#9265; #9255, #9317). Both halves of the condition
+hold, so the step goes from all three definitions in the same PR, and #204's
+bump of the pin to v0.57.0 earlier today is moot the moment it lands.
+
+The two `fixed` statements move with the release, as the grafana 13.1.x
+statements did: product version `1.21.2-alpine3.23`, the notes and impact
+statements now saying fixed upstream rather than fixed by the catalogue's
+bump, document version 2, the first-seen timestamps kept. The 1.21.1 digests
+keep the OpenVEX attested to them, so the record of how those builds were
+fixed travels with the artifacts it describes. The Renovate manager test that
+asserted the markers in the live definitions now proves the capture on a
+fixture in the definition's shape and holds the live definitions pin-free.
+
+One more thing the retirement takes with it: on #208's first build the
+controller job failed inside the `go/bump` action's own package step
+(`grep sed yq`), a failure mode that belonged to the step, not to the
+definition. The proof is the PR's scan gate: three 1.21.2 builds, the
+statements applied to the tag they name, nothing uncovered.

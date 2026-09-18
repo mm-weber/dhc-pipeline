@@ -660,34 +660,48 @@ check(
 // --- go/bump security pins inside definitions (Req 7.6; LOG 2026-09-02) ----
 // The between-releases CVE patch lane: a module bumped in the frontend fetch
 // phase is a real pin, and a pin the manager does not see is a pin nobody
-// retires when upstream catches up.
+// retires when upstream catches up. The cert-manager instance was retired
+// with 1.21.2 (LOG 2026-09-18), so the capture is proven on a fixture in the
+// definition's own shape, and the live definitions are held pin-free: a step
+// that comes back has to come back with its marker.
 {
-  for (const role of ["controller", "webhook", "cainjector"]) {
-    const deps = extract(goBumpMgr, read(`image/cert-manager-${role}/image.yaml`));
-    check(
-      `go-bump pins: cert-manager-${role} tracks golang.org/x/crypto via go datasource`,
-      has(deps, { depName: "golang.org/x/crypto", datasource: "go" }),
-      JSON.stringify(deps),
-    );
-    const d = dep(deps, { depName: "golang.org/x/crypto" });
-    check(
-      `go-bump pins: cert-manager-${role} pin is v-prefixed semver`,
-      /^v\d+\.\d+\.\d+$/.test(d?.currentValue ?? ""),
-      d?.currentValue,
-    );
-  }
-  for (const role of ["controller", "webhook"]) {
-    const deps = extract(goBumpMgr, read(`image/cert-manager-${role}/image.yaml`));
-    check(
-      `go-bump pins: cert-manager-${role} tracks google.golang.org/grpc`,
-      has(deps, { depName: "google.golang.org/grpc", datasource: "go" }),
-      JSON.stringify(deps),
-    );
-  }
+  const fixture = [
+    "      pipeline:",
+    "        - name: bump x/crypto (CVE-0000-0000)",
+    "          uses: go/bump@v2",
+    "          with:",
+    "            deps:",
+    "              # renovate: datasource=go depName=golang.org/x/crypto",
+    "              - golang.org/x/crypto@v0.57.0",
+    "              # renovate: datasource=go depName=google.golang.org/grpc",
+    "              - google.golang.org/grpc@v1.83.2",
+    "            download: true",
+    "",
+  ].join("\n");
+  const deps = extract(goBumpMgr, fixture);
   check(
-    "go-bump pins: cainjector carries no grpc pin (no grpc in its module)",
-    !has(extract(goBumpMgr, read("image/cert-manager-cainjector/image.yaml")), { depName: "google.golang.org/grpc" }),
+    "go-bump pins: a marked module in a go/bump deps list is tracked via the go datasource",
+    has(deps, { depName: "golang.org/x/crypto", datasource: "go" }),
+    JSON.stringify(deps),
   );
+  check(
+    "go-bump pins: the captured value is the v-prefixed module version",
+    dep(deps, { depName: "golang.org/x/crypto" })?.currentValue === "v0.57.0",
+    JSON.stringify(deps),
+  );
+  check(
+    "go-bump pins: every marked module in the list is captured",
+    has(deps, { depName: "google.golang.org/grpc", datasource: "go" }),
+    JSON.stringify(deps),
+  );
+  for (const role of ["controller", "webhook", "cainjector"]) {
+    const live = extract(goBumpMgr, read(`image/cert-manager-${role}/image.yaml`));
+    check(
+      `go-bump pins: cert-manager-${role} carries no fetch-phase pin since 1.21.2 (LOG 2026-09-18)`,
+      live.length === 0,
+      JSON.stringify(live),
+    );
+  }
   check(
     "go-bump pins: manager reads definition files",
     filePatternMatches(goBumpMgr, "image/cert-manager-controller/image.yaml"),
