@@ -78,10 +78,10 @@ VEXCTL_DEP=openvex/vexctl
 # bare binary like kind (review D4, 2026-09-09: it arrived through the
 # sigstore/cosign-installer action with a version and no checksum recorded
 # here, and no manager matched its pin, register row P1).
-COSIGN_VER=2.6.0
+COSIGN_VER=2.6.5
 COSIGN_ASSET="cosign-linux-amd64"
 COSIGN_URLDIR="sigstore/cosign/releases/download/v${COSIGN_VER}"
-COSIGN_PIN=ea5c65f99425d6cfbb5c4b5de5dac035f14d09131c1a0ea7c7fc32eab39364f9
+COSIGN_PIN=c3b4f5410e608af03a5eb0aaac84a4313d8da131248e08ff1759ac70c79d1644
 COSIGN_DEP=sigstore/cosign
 
 DEFAULT_ARCH=x86_64

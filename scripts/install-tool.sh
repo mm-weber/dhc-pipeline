@@ -83,14 +83,15 @@ VEXCTL_SHA256="d315e2778af88b999ad4bba30a08aa2677ed701638e16c341b6d57b43c1e064d"
 
 # cosign v2: the line with `attest --replace` and the bundle layout Kyverno
 # 1.18.2 and Trivy 0.72.0 read (ADR 0003, task 9.1); v3 changes the bundle
-# and stays behind the major gate. Pin verified 2026-09-09 (review D4):
-# cosign_checksums.txt agrees, and the release's keyless signature over the
-# binary verifies with its certificate's key (openssl), the certificate
-# chaining to the Fulcio root in sigstore/root-signing with the identity
-# keyless@projectsigstore.iam.gserviceaccount.com, issued 2025-09-12.
+# and stays behind the major gate. Pin verified 2026-09-18 for 2.6.5, the
+# way 2.6.0 was on 2026-09-09 (review D4): cosign_checksums.txt agrees, and
+# the release's keyless signature over the binary verifies with its
+# certificate's key (openssl), the certificate chaining to the Fulcio root in
+# sigstore/root-signing with the identity
+# keyless@projectsigstore.iam.gserviceaccount.com, issued 2026-08-06.
 # renovate: datasource=github-releases depName=sigstore/cosign
-COSIGN_VERSION="2.6.0"
-COSIGN_SHA256="ea5c65f99425d6cfbb5c4b5de5dac035f14d09131c1a0ea7c7fc32eab39364f9"
+COSIGN_VERSION="2.6.5"
+COSIGN_SHA256="c3b4f5410e608af03a5eb0aaac84a4313d8da131248e08ff1759ac70c79d1644"
 
 err() { printf '::error::install-tool: %s\n' "$1" >&2; }
 
