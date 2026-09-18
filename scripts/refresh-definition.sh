@@ -78,11 +78,11 @@ class=$(authenticity_class "$f")
 case "$class" in
   signed-tag)
     [ -n "$tag_obj" ] || refuse "authenticity signed-tag declared, but ${new_tag} is a lightweight tag with no tag object to verify"
-    v=$(github_verification tag "$owner_repo" "$tag_obj") || refuse "authenticity signed-tag declared, but GitHub's verification statement for tag ${new_tag} (${tag_obj:0:12}) could not be read"
+    v=$(github_verification tag "$owner_repo" "$tag_obj") || refuse "authenticity signed-tag declared, but GitHub's verification statement for tag ${new_tag} (${tag_obj:0:12}) could not be read: ${v}"
     [ "${v%% *}" = "true" ] || refuse "authenticity signed-tag declared, but GitHub reports tag ${new_tag} as not verified (${v#* })"
     stamp="signed-tag, verified ${new_tag} (GitHub verification: ${v#* }), ${today}" ;;
   signed-commit)
-    v=$(github_verification commit "$owner_repo" "$new_sha") || refuse "authenticity signed-commit declared, but GitHub's verification statement for commit ${new_sha:0:12} (${new_tag}) could not be read"
+    v=$(github_verification commit "$owner_repo" "$new_sha") || refuse "authenticity signed-commit declared, but GitHub's verification statement for commit ${new_sha:0:12} (${new_tag}) could not be read: ${v}"
     [ "${v%% *}" = "true" ] || refuse "authenticity signed-commit declared, but GitHub reports commit ${new_sha:0:12} (${new_tag}) as not verified (${v#* })"
     stamp="signed-commit, verified ${new_tag} at ${new_sha:0:12} (GitHub verification: ${v#* }), ${today}" ;;
   cross-origin-checksum)

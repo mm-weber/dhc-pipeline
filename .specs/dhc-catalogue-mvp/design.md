@@ -548,6 +548,28 @@ graph TB
      digest-only automerge rule is scoped to `ghcr.io/mm-weber/dhc/**` and ordered before
      the build-layer rule (11.4). The grafana legacy alias handler, dead since every
      definition migrated, went with the truth pass, refusal replacing migration (11.5).
+   - **As built, corrected 2026-09-17 (task 11.6)**: the 2026-09-16 rescan filed six
+     `supply-chain` issues (#212 to #217), one per git-sourced definition. Not a signal:
+     the step exported the workflow token as `GH_TOKEN` (gh's name) while
+     `github_verification` read `GITHUB_TOKEN`, so every statement was read anonymously,
+     sixty an hour per address, shared with every tenant of the hosted runners. That day
+     the budget was gone and the API was answering 403 to that address (the governance
+     step, later in the same job, recorded "HTTP Error 403: rate limit exceeded" from its
+     own reads, anonymous by design, and reported unreadable rather than filing
+     anything); `curl -f` reduced the 403 to "could not be read", which the check
+     recorded as a mismatch. Re-run with a token the same day, all seven signals verify.
+     Two changes: the helper reads `GH_TOKEN` too, and every origin the check reads (the
+     tag listing, the statement, the version statement, the sidecars) has a third
+     outcome, not measured, recorded as `ok: null`, named with the origin and the HTTP
+     status or transport error, failing the run without filing an issue (Req 3.13); a
+     mismatch is reserved for an origin that answered. The earlier rule "a missing
+     statement is a mismatch, not a pass" (suite case 4c) was half right: not a pass,
+     and not a verdict either, the class of the 2026-09-08 correction above. Retries,
+     the same day, on the owner's ask: every read is tried up to four times, resting
+     10s, 30s and 90s (a Retry-After header sets the rest instead, capped at 120s); a
+     primary rate limit (`x-ratelimit-remaining: 0`) is asked once, since its budget
+     resets on the hour, and the message names when; each retry is one logged line.
+     Worst case, every origin down for a whole run: about 130s per read, 21 reads.
 
 9. **Greenfield successor: the catalogue restarts as a new repository, and this one is archived intact (review F9 re-decision, revised on PR #102's independent review; F13, cluster D retention; 2026-08-25)**
    - **Context**: clusters A to C were specified against a registry carrying ten
@@ -1406,6 +1428,7 @@ ports: [3000/tcp]
 | Authenticity signal fails at bump time | refresh task writes no field and names the signal; Renovate may still open its own one-line edit, which the version-coherence lint turns red | 3.8, 7.4 |
 | Pinned checksum, served bytes and API statement disagree at PR time | verify-arch-pins fails naming all three values per architecture | 3.9 |
 | Daily authenticity re-verification mismatch | rescan run fails; issue filed labelled as a supply-chain signal | 3.10 |
+| Daily authenticity re-verification cannot read an origin | rescan run fails naming the definition, the origin and the HTTP status or transport error; the record says not measured (`ok: null`); no issue filed | 3.13 |
 | Compat review-by date passes | validate.yml fails on any PR until re-decided; rescan reports it daily | 4.8, 4.9 |
 | Definition names a dhi.io repository off the /main path | validate.yml fails naming the repository | 1.12 |
 | Private vulnerability reporting found disabled | daily invariants step fails the rescan run naming it | 9.3 |

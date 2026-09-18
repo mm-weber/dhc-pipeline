@@ -19,16 +19,27 @@
 #
 # A tag that moved, a signature that no longer verifies, an origin that
 # stopped agreeing: each is a mismatch, reported by name as a failure of the
-# run (exit 1), and the record written to <out.jsonl> is what the workflow
-# files a supply-chain issue from. There is no grandfather state: every
-# definition is asserted from day one (independent review 1.1).
+# run (exit 1), and the record written to <out.jsonl> (`ok: false`) is what
+# the workflow files a supply-chain issue from. There is no grandfather
+# state: every definition is asserted from day one (independent review 1.1).
+#
+# An origin that could not be read at all (a tag listing git cannot fetch, a
+# statement GitHub answers with anything but 200, a version statement or a
+# sidecar not served, each after three retries resting 10s, 30s and 90s, a
+# primary rate limit excepted: definition-lib.sh) is a third outcome, not
+# measured (task 11.6, Req 3.13):
+# reported by name with the origin and the HTTP status or transport error,
+# recorded as `ok: null`, and a failure of the run (exit 2; a real mismatch
+# in the same run keeps exit 1), never an issue. The 2026-09-16 rescan read a
+# rate-limited API as six mismatches; a mismatch is a verdict about an origin
+# that answered.
 #
 # Req 4.9 rides along: a compat decision (chart/<name>/chart.yaml, `compat:`
 # with `review_by`) whose review-by date has passed is reported here daily,
 # as a warning; the validate gate is what fails it (Req 4.8, task 11.4).
 #
-# Seams for the tests: DHC_GITHUB_API (a file:// tree), DHC_VERSIONS_API, a
-# `git` on PATH answering ls-remote, DHC_TODAY.
+# Seams for the tests: DHC_GITHUB_API (a file:// tree or a localhost server),
+# DHC_VERSIONS_API, a `git` on PATH answering ls-remote, DHC_TODAY.
 set -uo pipefail
 
 # shellcheck source=scripts/definition-lib.sh
@@ -38,10 +49,10 @@ ROOT="${1:?usage: check-authenticity.sh <root> <out.jsonl>}"
 OUT="${2:?usage: check-authenticity.sh <root> <out.jsonl>}"
 today="${DHC_TODAY:-$(date -u +%F)}"
 : > "$OUT"
-failures=0; verified=0; lapsed=0; inactive=0
+failures=0; verified=0; unmeasured=0; lapsed=0; inactive=0
 active=$(active_definitions "$ROOT") || exit $? # the reader's refusal, with its own message
 
-record() { # definition class ref ok detail
+record() { # definition class ref ok(true|false|null) detail
   jq -cn --arg d "$1" --arg class "$2" --arg ref "$3" --argjson ok "$4" --arg detail "$5" \
     '{definition:$d, class:$class, ref:$ref, ok:$ok, detail:$detail}' >> "$OUT"
 }
@@ -50,10 +61,30 @@ fail() { # definition class ref detail
   record "$1" "$2" "$3" false "$4"
   failures=$((failures + 1))
 }
+unmeasured() { # definition class ref detail: an origin that could not be read, so no verdict
+  echo "::error::check-authenticity: ${1} (${2}, ${3}): not measured: ${4} (Req 3.13)"
+  record "$1" "$2" "$3" null "$4"
+  unmeasured=$((unmeasured + 1))
+}
 pass() { # definition class ref detail
   echo "check-authenticity: ${1} (${2}, ${3}): ${4}"
   record "$1" "$2" "$3" true "$4"
   verified=$((verified + 1))
+}
+# tag_listing <repo url> <ref> -> the sha the origin lists for <ref>, empty when
+# it lists none (exit 0); exit 1 with git's error on stdout when the listing
+# could not be read after the retries (definition-lib.sh, retry_rest).
+tag_listing() {
+  local out err attempt=1 total rest reason
+  err=$(mktemp); total=$(retry_total)
+  while :; do
+    if out=$(git ls-remote "$1" "$2" 2>"$err"); then rm -f "$err"; printf '%s' "$out" | awk '{print $1; exit}'; return 0; fi
+    reason=$(tr -d '\n' < "$err")
+    if ! rest=$(retry_rest "$attempt"); then rm -f "$err"; printf '%s, after %s attempts' "$reason" "$attempt"; return 1; fi
+    attempt=$((attempt + 1))
+    echo "retrying git ls-remote ${1} ${2} in ${rest%%|*}s (attempt ${attempt} of ${total}): ${reason}" >&2
+    sleep "${rest%%|*}"
+  done
 }
 
 for f in "$ROOT"/image/*/image.yaml; do
@@ -68,18 +99,18 @@ for f in "$ROOT"/image/*/image.yaml; do
       repo_url="${ref_line%#*}"; repo_url="${repo_url#git+}"; tag="${ref_line#*#}"
       owner_repo=$(printf '%s' "$repo_url" | sed -E 's#^https://github\.com/##; s#\.git$##')
       pinned=$(awk -F': *' '/^[[:space:]]*checksum:/{print $2; exit}' "$f" | tr -d '"[:space:]')
-      peeled=$(git ls-remote "$repo_url" "refs/tags/${tag}^{}" 2>/dev/null | awk '{print $1; exit}' || true)
-      unpeeled=$(git ls-remote "$repo_url" "refs/tags/${tag}" 2>/dev/null | awk '{print $1; exit}' || true)
+      if ! peeled=$(tag_listing "$repo_url" "refs/tags/${tag}^{}"); then unmeasured "$name" "$class" "$tag" "tag listing at ${repo_url}: ${peeled}"; continue; fi
+      if ! unpeeled=$(tag_listing "$repo_url" "refs/tags/${tag}"); then unmeasured "$name" "$class" "$tag" "tag listing at ${repo_url}: ${unpeeled}"; continue; fi
       commit="${peeled:-$unpeeled}"
       if [ -z "$commit" ]; then fail "$name" "$class" "$tag" "tag ${tag} no longer exists at ${repo_url}"; continue; fi
       if [ "$commit" != "$pinned" ]; then fail "$name" "$class" "$tag" "tag ${tag} now points at ${commit:0:12}, the definition pins ${pinned:0:12}: the tag moved"; continue; fi
       if [ "$class" = signed-tag ]; then
         if [ -z "$peeled" ] || [ "$unpeeled" = "$peeled" ]; then fail "$name" "$class" "$tag" "declared signed-tag, but ${tag} is a lightweight tag with no tag object to verify"; continue; fi
-        if ! v=$(github_verification tag "$owner_repo" "$unpeeled"); then fail "$name" "$class" "$tag" "GitHub's verification statement for tag ${tag} (${unpeeled:0:12}) could not be read"; continue; fi
+        if ! v=$(github_verification tag "$owner_repo" "$unpeeled"); then unmeasured "$name" "$class" "$tag" "GitHub's verification statement for tag ${tag} (${unpeeled:0:12}) at ${v}"; continue; fi
         if [ "${v%% *}" != "true" ]; then fail "$name" "$class" "$tag" "GitHub reports tag ${tag} as not verified (${v#* })"; continue; fi
         pass "$name" "$class" "$tag" "tag object ${unpeeled:0:12} on commit ${pinned:0:12}, GitHub verification: ${v#* }"
       else
-        if ! v=$(github_verification commit "$owner_repo" "$pinned"); then fail "$name" "$class" "$tag" "GitHub's verification statement for commit ${pinned:0:12} could not be read"; continue; fi
+        if ! v=$(github_verification commit "$owner_repo" "$pinned"); then unmeasured "$name" "$class" "$tag" "GitHub's verification statement for commit ${pinned:0:12} at ${v}"; continue; fi
         if [ "${v%% *}" != "true" ]; then fail "$name" "$class" "$tag" "GitHub reports commit ${pinned:0:12} (${tag}) as not verified (${v#* })"; continue; fi
         pass "$name" "$class" "$tag" "commit ${pinned:0:12}, GitHub verification: ${v#* }"
       fi ;;
@@ -92,12 +123,13 @@ for f in "$ROOT"/image/*/image.yaml; do
       host=$(printf '%s' "$url_tmpl" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://([^/]*)/.*#\1#')
       stmt_url=$(version_statement_url "$host" "$version")
       if [ -z "$stmt_url" ]; then fail "$name" "$class" "$version" "no version statement origin is known for ${host}"; continue; fi
-      if ! statement=$(curl -fsSL --max-time 60 "$stmt_url"); then fail "$name" "$class" "$version" "could not read the version statement at ${stmt_url}"; continue; fi
-      ok=true; detail=""
+      if ! statement=$(read_origin "$stmt_url"); then unmeasured "$name" "$class" "$version" "version statement at ${statement}"; continue; fi
+      ok=true; detail=""; unread=""
       for arch in amd64 arm64; do
         if [ "$arch" = amd64 ]; then pinned="${pins%% *}"; else pinned="${pins##* }"; fi
         url="${url_tmpl//\$\{target.arch\}/$arch}"
-        sidecar=$(curl -fsSL --max-time 60 "${url}.sha256" 2>/dev/null | tr -d '[:space:]' | cut -c1-64 || true)
+        if ! sidecar=$(read_origin "${url}.sha256"); then unread="${unread:+${unread}; }checksum sidecar for ${arch} at ${sidecar}"; continue; fi
+        sidecar=$(printf '%s' "$sidecar" | tr -d '[:space:]' | cut -c1-64)
         stated=$(versions_api_sha "$statement" "$arch")
         if msg=$(shas_agree "${arch}" "pinned=${pinned}" "${host:-origin} sidecar=${sidecar}" "version statement=${stated}"); then
           detail="${detail:+${detail}; }${arch} ${pinned:0:12}… agreed by the ${host:-origin} sidecar and the version statement"
@@ -105,7 +137,11 @@ for f in "$ROOT"/image/*/image.yaml; do
           ok=false; detail="${detail:+${detail}; }${msg}"
         fi
       done
-      if [ "$ok" = true ]; then pass "$name" "$class" "$version" "$detail"; else fail "$name" "$class" "$version" "$detail"; fi ;;
+      # A measured disagreement is the verdict even beside an unread sidecar;
+      # with nothing disagreeing, an unread sidecar leaves the signal not measured.
+      if [ "$ok" != true ]; then fail "$name" "$class" "$version" "${detail}${unread:+; ${unread}}"
+      elif [ -n "$unread" ]; then unmeasured "$name" "$class" "$version" "$unread"
+      else pass "$name" "$class" "$version" "$detail"; fi ;;
     *)
       fail "$name" "${class:-none}" "?" "no verifiable authenticity class declared" ;;
   esac
@@ -131,5 +167,6 @@ print(v if v else "")' "$c")
   fi
 done
 
-echo "check-authenticity: ${verified} signal(s) verified, ${failures} mismatch(es), ${lapsed} lapsed compat review-by date(s), ${inactive} inactive definition(s) not re-verified"
+echo "check-authenticity: ${verified} signal(s) verified, ${failures} mismatch(es), ${unmeasured} not measured, ${lapsed} lapsed compat review-by date(s), ${inactive} inactive definition(s) not re-verified"
 [ "$failures" -eq 0 ] || exit 1
+[ "$unmeasured" -eq 0 ] || exit 2

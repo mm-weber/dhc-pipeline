@@ -165,3 +165,28 @@ of its dependencies form a family that must move as one, and either group them
 or let the one that pins them carry the rest. Renovate reports an artifact
 failure as a PR comment, not in the PR body or the CI log; read the comments
 before the log.
+
+## 2026-09-17: an unreadable origin was recorded as a mismatch (the 2026-09-08 rule, second instance)
+
+**What happened.** The daily authenticity check read GitHub's verification
+statements anonymously, because the rescan step exported the token as
+`GH_TOKEN` (what gh reads) and the helper read `GITHUB_TOKEN`. A hosted
+runner's shared address had spent its sixty anonymous requests that hour,
+the API answered 403, and `curl -f` turned that into an empty "could not be
+read", which the check recorded as a mismatch: six false supply-chain issues
+in one run. The suite could not see it: its case 4c asserted the opposite
+rule ("a missing statement is a mismatch, not a pass"), so the defect was
+tested in.
+
+**Rules.**
+1. Every read from an origin has three outcomes, agreed, disagreed, could
+   not read, and only the first two are verdicts. A script that compares
+   what an origin says carries the third outcome as its own state (here
+   `ok: null`, exit 2, no issue) and names the status or transport error;
+   "not a pass" is not the same as "a failure". The suite needs a case for
+   the third outcome of every read, not only for the first two.
+2. When a step hands a secret to a script, grep the name the script reads
+   against the name the step sets (`GH_TOKEN` vs `GITHUB_TOKEN`), and have
+   a test observe the credential arriving (a stub that records the
+   `Authorization` header), the way the 2026-09-08 rule checks a step's
+   tools against its install order.
