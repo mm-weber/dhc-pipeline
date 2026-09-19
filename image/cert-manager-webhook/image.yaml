@@ -1,4 +1,4 @@
-# syntax=dhi.io/build:2-alpine3.23@sha256:cad805b6ab48f2cbdf337ba43e7d35b24bdc840c7cafd6a5c23cd5615b6c9bad
+# syntax=dhi.io/build:2-alpine3.23@sha256:ea3462ca4da9c04a16cc76ae56634b3b83ae62a6d70ae5f48ad4b8c72b6157b5
 
 name: cert-manager webhook 1.21.x
 image: ghcr.io/mm-weber/dhc/cert-manager-webhook
@@ -14,7 +14,7 @@ dates:
   release: "2026-06-25"
 vars:
   COMMIT_SHA: 922a06aa49ee4bb802db268ef72a174af70edd32
-  GOLANG_REFERENCE: dhi.io/golang:1.27.1-alpine3.23-dev@sha256:8f3f672b0410db5404bb36922863b688e682a6048606c81c2eb0f2796a8ba79f
+  GOLANG_REFERENCE: dhi.io/golang:1.27.1-alpine3.23-dev@sha256:0d95d4f9889abcf60c182228d28fa83fde3e0dc2330bb1365e5960273b43ed57
   SEMVER_MAJOR_MINOR_VERSION: "1.21"
   SEMVER_MAJOR_VERSION: "1"
   SEMVER_VERSION: 1.21.2
@@ -32,7 +32,7 @@ contents:
     - tzdata
   builds:
     - name: cert-manager-webhook
-      uses: dhi.io/golang:1.27.1-alpine3.23-dev@sha256:8f3f672b0410db5404bb36922863b688e682a6048606c81c2eb0f2796a8ba79f
+      uses: dhi.io/golang:1.27.1-alpine3.23-dev@sha256:0d95d4f9889abcf60c182228d28fa83fde3e0dc2330bb1365e5960273b43ed57
       work-dir: /go/src/github.com/cert-manager/cert-manager
       caches:
         - path: /go/pkg/mod
