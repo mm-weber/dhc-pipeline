@@ -29,6 +29,23 @@
   // tracked grafana minor. Measured 2026-09-02: at exactly ten, the 13.1.5
   // security patch was skipped silently on every run ("Reached branch limit").
   prConcurrentLimit: 20,
+  // GitHub's Dependabot alerts on the repository's own dependencies (the
+  // test harness, the rescan tool, the CI pins) are a Renovate input since
+  // 2026-09-19, when RENOVATE_TOKEN gained "Dependabot alerts: read". A
+  // reported vulnerability opens a fix PR to its lowest fixed version,
+  // marked [SECURITY], outside the hourly and concurrent limits, and, with
+  // `enabled: true`, for a dependency Renovate is otherwise told to leave
+  // alone: indirect Go modules (off by default in gomod) and the k8s.io
+  // family (the rule below). Measured 2026-09-19: with access proven and
+  // this key absent, the two open alerts (spdystream and otel, both indirect
+  // in test/go.mod) produced no PR; Renovate applies this object with
+  // `force` to the vulnerable dependency, which is what re-enables it.
+  // Declining a fix is a dismissal of the alert in GitHub with its reason,
+  // the not-affected record for repository dependencies, and Renovate skips
+  // a dismissed alert (docs/CONVENTIONS.md register M25; Req 3.14, 3.15).
+  vulnerabilityAlerts: {
+    enabled: true,
+  },
 
   // The tracking scope (Req 1.14, 3.2, 3.11; task 14.2). Renovate cannot read
   // catalogue-policy.yaml, so scripts/render-tracking.sh renders its active

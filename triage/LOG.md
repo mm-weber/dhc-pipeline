@@ -1600,3 +1600,38 @@ the server binary becomes moot with 13.1.6 (grpc v1.83.2) and is left to
 expire with its siblings; the zipkin transfers stand until a grafana release
 bundles v12.4.8 or newer. #186 closes on evidence once the rescan reads the
 statement from the attested 13.1.6 digest; #203 unblocks with it.
+
+## 2026-09-20: the repository's own dependencies join the loop: Dependabot alerts as a Renovate input (CVE-2026-35469, CVE-2026-29181)
+
+GitHub had two high alerts open on `test/go.mod`, the e2e harness:
+`github.com/moby/spdystream` v0.5.0 (CVE-2026-35469, an unvalidated frame
+parser, fixed 0.5.1) and `go.opentelemetry.io/otel` v1.36.0 (CVE-2026-29181,
+baggage-header amplification, fixed 1.41.0), both indirect, through
+client-go's SPDY transport and the framework's featuregate package. Nothing
+read them: Renovate's dashboard had warned "Cannot access vulnerability
+alerts" since July, and a token that can read them still leaves indirect Go
+modules disabled in the gomod manager. Reconstructed here from the manifests
+against GitHub's advisory database because the maintainer's own PAT cannot
+read alerts either; the count matched GitHub's.
+
+Exposure: none to anything published. Both live only in the harness, which
+never calls exec or port-forward (the SPDY parser never runs) and never
+serves HTTP (the baggage propagator never runs), measured over `test/`. A
+hygiene gap, not a security one, but a channel nobody reads is how the next
+real one hides.
+
+Decision, the owner's on 2026-09-19 and 2026-09-20: the channel becomes an
+input to the loop rather than a page someone remembers to open. The Renovate
+PAT gained "Dependabot alerts: read" (the 22:14Z run rewrote the dashboard
+without the WARN, and raised nothing: the indirect rule), and
+`renovate.json5` gains `vulnerabilityAlerts: { enabled: true }`, the setting
+Renovate's own `security:only-security-updates` preset rests on: applied
+with `force` to the vulnerable dependency, so a reported alert opens a fix
+PR to the lowest fixed version, `[SECURITY]`, outside the limits, whatever
+the dependency's scope. Declining a fix is a dismissal in GitHub with its
+reason, the not-affected record for repository dependencies (register M25);
+a dismissed alert opens nothing. For these two the fixes are taken, a
+CI-proven bump costing less than a defended analysis: spdystream's is a
+parser hardening; otel's may need its sibling modules to move with it, and
+the Go job will say. A `k8s.io` alert would likewise arrive as a PR, red if
+the family must move together, visible where it used to be silent.

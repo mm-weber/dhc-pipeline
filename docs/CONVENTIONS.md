@@ -91,7 +91,9 @@ the rest. Requirement references point at `.specs/dhc-catalogue-mvp/requirements
   rather than a shipped image, is pinned by digest in `e2e.yml`. Every one of
   these pins carries a Renovate manager (Req 7.6), the Action pins through
   the built-in `github-actions` manager (bumps reviewed, never automerged)
-  and the two Go modules through `gomod`; a fixture sweeps every
+  and the two Go modules through `gomod`, and a GitHub vulnerability alert
+  on any of them opens a fix PR whatever that dependency's scope
+  (`vulnerabilityAlerts`, since 2026-09-19; Req 3.14); a fixture sweeps every
   `# renovate:` marker in a file some manager reads and fails when one
   resolves to no dependency. `curl … | sh` from a branch is a
   floating tag with a shell attached: the tag can be repointed and the script
@@ -466,6 +468,7 @@ the step altogether.
 | M22 | When forking, edit the reference namespace in the Kyverno fixture `policies/tests/resources.yaml` | deliberate | A fixture states its expected values as literals; one that read the value under test would prove nothing. The policy itself renders from the policy file (task 14.1) | `verification.registry`; the fixture follows it once | none |
 | M23 | Keep GitHub Pages enabled with source "GitHub Actions" and its `github-pages` environment without reviewers or wait timers (Req 6.61, 6.62) | deliberate | GitHub exposes Pages as a setting; the rescan's page job fails by name when the deployment is refused or the served data is not the run's, and a reviewer on the environment shows as a rescan waiting for approval. `release.page: false` turns the page off for a fork without Pages | `release.page` | none |
 | M24 | Approve a grafana minor stream in the Dependency Dashboard when it has become the stable maintenance track, that is, when the next minor has shipped (triage/LOG.md 2026-09-10) | deliberate | Grafana runs a feature track and a maintenance track in parallel and patches both; the definition rides the maintenance track, so a minor is a decision, not an update. 13.2.1 measured 32 CVEs across eleven newly bundled plugin binaries against the stable line's 14 | the two `grafana/grafana` rules in `renovate.json5` (`separateMultipleMinor`, `dependencyDashboardApproval` on minors) | none |
+| M25 | Dismiss a Dependabot alert on a repository dependency, with its reason, when its fix PR is declined (Req 3.15) | deliberate | The repository's own dependencies (the test harness, the rescan tool, the CI pins) have no VEX lane and need none: a reported alert opens a fix PR by default (Req 3.14), and declining it is a dismissal that carries name, reason and date, which Renovate honours by opening nothing. Measured 2026-09-20: the harness never executes the code the two open alerts name, and the fixes were still taken, a CI-proven bump costing less than a defended analysis | none: the fix PR is the default | per alert |
 | P2 | Re-scope version-scoped VEX statements on a grafana bump: the product lint demands re-scoped statements (Req 6.20), and today a person re-stamps each one in a triage session (2026-09-03 for 13.1.5) | pending automation | The mechanical half is scriptable: a statement whose module version is unchanged by the bump is carried forward under the new product; only a changed module version needs a person | none: the intended mechanism is a postUpgradeTask beside `refresh-grafana.sh` | none |
 
 **Automated since the register was decided** (F13's three automations and
@@ -478,7 +481,8 @@ Req 3.10); discarding an unchanged nightly rebuild (task 9.2, Req 2.15);
 asserting the repository's governance and its revocation record daily
 (tasks 13.2, 13.3, Req 9.3, 9.7, 9.9); tracking the cosign pin, the Action
 pins, the Go modules and the probe image (review D4, 2026-09-09; the row
-that was P1).
+that was P1); opening a fix pull request for every vulnerability alert on
+a repository dependency (task 11.7, Req 3.14, 2026-09-20).
 
 ## Pull requests (Req 7)
 
