@@ -9,7 +9,11 @@ name: renovate
 # OPERATOR secrets:
 #   RENOVATE_TOKEN  — a PAT Renovate acts as. Needs contents + pull-requests
 #                     write AND issues write (the Dependency Dashboard is an
-#                     issue; without it major-staging and the dashboard break).
+#                     issue; without it major-staging and the dashboard break)
+#                     AND Dependabot alerts read (since 2026-09-19: a reported
+#                     vulnerability opens a fix PR, renovate.json5
+#                     `vulnerabilityAlerts`; without it the dashboard warns
+#                     "Cannot access vulnerability alerts").
 #   DHI_USERNAME/DHI_TOKEN — let the docker datasource resolve the dhi.io
 #                     frontend/builder digests (reused from build.yml).
 
