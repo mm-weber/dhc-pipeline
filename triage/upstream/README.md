@@ -3,8 +3,9 @@
 Issues we intend to file **on someone else's tracker**, drafted here first and
 reviewed before anything is posted.
 
-Nothing in this directory has been sent. A draft becomes a filed issue only by a
-deliberate act, and the entry in `../LOG.md` records the resulting issue number.
+A draft becomes a filed issue only by a deliberate act of the owner; the table
+below and each draft's header say which ones were sent, and the entry in
+`../LOG.md` records the resulting issue number.
 
 ## Why drafts live in the repo
 
@@ -43,7 +44,9 @@ deliberate act, and the entry in `../LOG.md` records the resulting issue number.
 | Draft | Target | Status |
 |---|---|---|
 | [2026-07-26, `/oss/release/` tarballs overwritten](2026-07-26-grafana-oss-release-alias-overwritten.md) | `grafana/grafana` | not filed |
-| [2026-08-04, zipkin datasource: unreleased Go bump](2026-08-04-grafana-zipkin-datasource-unreleased-go-bump.md) | `grafana/grafana-zipkin-datasource` | draft, under review |
+| [2026-08-04, zipkin datasource: unreleased Go bump](2026-08-04-grafana-zipkin-datasource-unreleased-go-bump.md) | `grafana/grafana-zipkin-datasource` | **filed** as [#94](https://github.com/grafana/grafana-zipkin-datasource/issues/94) |
 | [2026-08-04, elasticsearch datasource: `go.mod` pins 1.26.3](2026-08-04-grafana-elasticsearch-datasource-go-mod-pins-1263.md) | `grafana/grafana-elasticsearch-datasource` | **filed** as [#410](https://github.com/grafana/grafana-elasticsearch-datasource/issues/410) |
 | [2026-08-23, `--vex oci` picks one of several OpenVEX attestations at random](2026-08-23-trivy-vex-oci-multiple-attestations.md) | `aquasecurity/trivy` | draft, under review (ADR 0004) |
 | [2026-08-25, the init container always runs from the main image](2026-08-25-valkey-helm-init-container-image.md) | `valkey-io/valkey-helm` | **filed** as [#247](https://github.com/valkey-io/valkey-helm/issues/247) |
+| [2026-09-03, 13.1.5 links thrift and grpc-go below their fixed versions](2026-09-03-grafana-server-thrift-and-grpc-below-fixed.md) | `grafana/grafana` | **filed** as [#131921](https://github.com/grafana/grafana/issues/131921) |
+| [2026-09-30, `main`: the standalone Deployment cannot start since #234](2026-09-30-valkey-helm-standalone-config-path.md) | `valkey-io/valkey-helm` | draft, approved for filing |
