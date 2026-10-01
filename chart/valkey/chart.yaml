@@ -4,6 +4,10 @@ upstream:
   name: valkey
   repository: https://valkey-io.github.io/valkey-helm
   version: 0.12.0
+# The next release (0.13.x, carrying their Sentinel change) must include the
+# fix for valkey-io/valkey-helm#264 before its bump merges: on their main the
+# standalone Deployment's init container cannot start, and the e2e installs
+# this chart standalone (triage/LOG.md, 2026-10-01). Reviewed anyway (Req 3.11).
 
 # The definitions this chart deploys (task 14.2, Req 1.14, 5.2). The chart
 # runs the `-compat` tag, built from image/valkey-compat/; the runtime
