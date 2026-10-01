@@ -432,6 +432,62 @@
     - As built (2026-09-09): `triage/rescan/decision.go`; the issue's open table trades its always-empty Fixed column for Decision, its fixed table gains Last decision; a finding absent today carries yesterday's attested record forward; rendered from grafana's live attested document (fourteen rows, every link resolving to a real page); the statements directory is passed as an absolute path since the tool runs from its module directory
     - _Requirements: Req 6.47, Req 6.61_
 
+- [ ] 16. Live drills: every mechanism exercised once on the real catalogue, evidence recorded (Req 7.11; design Decision 13; owner's call of 2026-10-01 after the 2026-09-27 audit). One drill per pull request, in this order unless a natural event supplies one first; each drill ends with its LOG entry and its ledger row, and nothing a drill does is hidden from consumers
+  - [ ] 16.1 The live-evidence ledger, `docs/live-evidence.md`
+    - One row per mechanism the criteria name: criterion, mechanism in one line, first live exercise (date), evidence (run id, issue, pull request or registry state), how it was induced (nature, drill definition, switch, drill input)
+    - Seeded from the 2026-09-27 audit: the per-step tallies over 1,028 workflow runs, the issue and pull request history, the offline verification of the supported set; every row without evidence is a drill below, and a row no drill reaches without harming consumers names its reason (2.4's disabled branch: exercised in the private era of July and August, not to be repeated on a public catalogue)
+    - A validate check that every criterion number in requirements.md has a row, so a new criterion arrives with its evidence obligation
+    - _Requirements: Req 7.11_
+  - [ ] 16.2 The drill definition, `image/drill-app/`, and its first findings
+    - [OPERATOR: create `mm-weber/drill-app`, a copy of hardened-app whose go.mod pins a module with a reachable KEV-listed HIGH and one with a CRITICAL, chosen from the advisory database at drill time and verified with Trivy locally before the first push; signed tags and commits as hardened-app has]
+    - The definition in native DHI syntax, authenticity class declared, named a drill in its README row and in the status page (the definition's `name:`); joins the active set and every matrix with it (1.13, 1.14); the chart gate and e2e get no chart for it (no probe, Req 5.5 keeps it out of the e2e matrix by design, stated in the definition)
+    - Observed live: the pull request scan gate blocks it on the uncovered findings by name (6.1); the decisions follow the reach order, mitigate to not_affected to transfer to accept, one finding at a time, with govulncheck evidence (6.13): the CRITICAL covered by a time-boxed exception, the KEV-listed HIGH left undecided for 16.3; publish; the rescan files the issues (6.3) and the Grype second opinion on CRITICAL step runs for the first time under its current name
+    - _Requirements: Req 1.13, Req 1.14, Req 6.1, Req 6.3, Req 6.13, Req 9.11, Req 7.11_
+  - [ ] 16.3 A KEV-listed finding under an exception (6.50, 6.51), and the status's KEV column
+    - An exception for the KEV-listed HIGH whose expiry exceeds its decision date plus the 14-day KEV ceiling: the pull request gate fails naming that exception (6.50, first time live); corrected to within the ceiling and merged; the rescan evaluates it against today's KEV (6.51), the status issue and the page show KEV: yes
+    - If Trivy does not attribute the chosen CVE to a KEV entry, the `drill` input of 16.8 substitutes a synthetic feed naming it for one run, recorded as such
+    - _Requirements: Req 6.50, Req 6.51, Req 6.46, Req 7.11_
+  - [ ] 16.4 Expiry warning, then lapse (6.10, 6.41, 6.35)
+    - The drill's exception re-decided with an expiry four days out: the rescan's expiries step warns inside the 14-day window and the page lists it as lapsing (first time live); on the day after expiry the compiler emits under_investigation with the first-seen time carried and a note naming the lapse, the rescan re-attests the changed document (6.43), the pull request gate no longer counts the exception as coverage (6.35), the status shows the finding undecided again
+    - _Requirements: Req 6.10, Req 6.35, Req 6.41, Req 6.43, Req 7.11_
+  - [ ] 16.5 An undecided finding past its ceiling (6.46, 6.49)
+    - With the drill finding undecided since 16.4, the HIGH ceiling lowered to one day in the policy file for one rescan through a pull request (the only policy value a drill changes, reverted the next day): the status issue and the page report over ceiling: 1 with its age; reverted, the alarm clears
+    - _Requirements: Req 6.46, Req 6.47, Req 6.49, Req 7.11_
+  - [ ] 16.6 The fix, and the fix clock (6.46, 6.52, 6.56)
+    - drill-app bumps the vulnerable modules to their fixed versions (a Renovate bump if it offers one, a hand bump otherwise): the findings leave the supported digest, the rescan closes the issues as resolved:fixed on the attested SBOMs (6.52, 6.56), and the status publishes a fix time and a median days to fix for the first time
+    - _Requirements: Req 6.46, Req 6.52, Req 6.56, Req 7.11_
+  - [ ] 16.7 The regression, and the reopen (6.57)
+    - drill-app pins the vulnerable module again, published as a new release: the findings reappear as reported findings in the supported digest's attested report and the rescan reopens the closed issues (first time live), the clocks carrying the original first-seen time
+    - _Requirements: Req 6.57, Req 6.46, Req 7.11_
+  - [ ] 16.8 A KEV feed outage fails closed (6.59, 6.60)
+    - A `drill` input on rescan.yml's `workflow_dispatch` (`kev-outage`) that substitutes an unreachable URL for the policy file's KEV feed for that run only, printed in the summary: the invariants step fails by name, the issue set and the status are withheld by name, the run is red, the next scheduled run is green and publishes; the same substitution on a pull request's `exception tiers against KEV` step (a drill branch, never merged) fails that gate closed (6.59)
+    - The input is a declared value substituted, never a different code path; lint-workflow-policy.sh learns the input's name and its allowed values
+    - _Requirements: Req 6.59, Req 6.60, Req 7.10, Req 7.11_
+  - [ ] 16.9 The fail-closed release gate (2.13)
+    - `release.fail_closed` set to true through a pull request; the drill's exception allowed to expire; build.yml dispatched for drill-app (a dispatch never runs the comparator, Req 2.14): the release-time scan finds the uncovered finding, the gate names it per platform manifest, the digest stays frozen, unsigned, unattested and untagged, pullable by digest (2.11); one of the four ways out taken and recorded; the switch flipped back, or kept, the owner's call recorded
+    - _Requirements: Req 2.11, Req 2.13, Req 2.8, Req 7.11_
+  - [ ] 16.10 A true authenticity mismatch (3.10, 3.13, M18)
+    - [OPERATOR: in drill-app, move the tag the definition pins to a commit signed by no key, or re-sign it with another key]: the daily re-verification files a supply-chain issue naming the definition, the class and the origin (first true mismatch; the 2026-09-16 six were unreadable reads, 3.13); the owner decides what it means (M18) and restores the tag; the issue closes with the reason
+    - _Requirements: Req 3.10, Req 3.13, Req 7.11_
+  - [ ] 16.11 Deactivation (1.13 to 1.16, 1.19), and the detective check with something to check
+    - drill-app leaves the active set: the build and e2e matrices and Renovate's rendered ignorePaths exclude it (1.14), no new digest or tag appears (1.15) and the rescan's inactive-digest check passes with a non-empty inactive set for the first time; a pull request bumping the inactive definition fails validation naming it (1.16, a drill branch, never merged); a pull request removing the directory but not the policy entry fails validation naming the entry (1.19, never merged)
+    - _Requirements: Req 1.13, Req 1.14, Req 1.15, Req 1.16, Req 1.19, Req 7.11_
+  - [ ] 16.12 A revocation, its advisory and the runbook (9.4, 9.5, 9.7, M14)
+    - The drill digest recorded in triage/revocations.yaml with reason "drill" while a tag still references it: the posture step fails naming the tag (9.7, first time live); docs/revocation-runbook.md executed as written (the tag re-pointed or the version deleted, the advisory, the record completed); the status issue and the page show revocations: 1; the advisory is a GitHub repository security advisory marked a drill in its title, draft or published as the owner decides, and the ledger says which
+    - _Requirements: Req 9.4, Req 9.5, Req 9.7, Req 7.11_
+  - [ ] 16.13 The switches, one run each (2.17, 6.61, 6.62)
+    - `release.page` false for one rescan: the page job skips by the switch, the served page keeps the previous day's data and says so; back to true, the next run deploys. `release.publish_policy` always for one nightly: every active definition publishes and the chart digest pulls follow (3.12); back to on-change. Costs stated in the ledger (one night's digests). `release.public` stays true: its disabled branch harms consumers and is recorded as exercised in the private era
+    - _Requirements: Req 2.17, Req 3.12, Req 6.61, Req 6.62, Req 7.11_
+  - [ ] 16.14 The private report channel (9.2, 9.3, SECURITY.md)
+    - [OPERATOR: open a private vulnerability report on the repository, or a draft advisory, titled as a drill; handle it as SECURITY.md promises; close it]: the ledger records the advisory id and the elapsed time against the stated response window
+    - _Requirements: Req 9.2, Req 9.3, Req 7.11_
+  - [ ] 16.15 Deliberate violations, one pull request, never merged
+    - One commit per rule, each observed failing by name on the pull request: a chart overlay with a tag pin instead of a digest (chart gate), a root securityContext (require-nonroot), a registry outside the declared namespace (restrict-registries), a definition with a missing checksum (lint-pins), an exception without a LOG anchor (13.6), a rendered artifact edited by hand (7.9), a cron edited in the workflow but not the policy file (7.10), an EARS-invalid criterion (the validator); the pull request closed with the evidence linked
+    - _Requirements: Req 4.2, Req 4.3, Req 7.2, Req 7.4, Req 7.9, Req 7.10, Req 9.18, Req 7.11_
+  - [ ] 16.16 Retirement of the drill definition, and the ledger complete
+    - drill-app removed from the active set and from image/ in one pull request (1.19 satisfied); its published tags keep their daily scans and attestations until retention, outside issue scope (the support statement, 6.49); the upstream repository archived; the ledger's every row carries evidence or its reason, and the LOG's drill entries name what each one found
+    - _Requirements: Req 1.19, Req 6.49, Req 7.11_
+
 ## Requirements Coverage
 
 | Requirement | Covered By Tasks |
@@ -442,11 +498,13 @@
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4, 8.7, 11.3, 11.4, 14.4 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7, 14.3 |
 | Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5, 9.1, 9.3, 10.1, 10.2, 10.3, 10.4, 10.6, 10.7 |
-| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5, 14.1 |
+| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5, 14.1, 16.1 to 16.16 |
 | Req 9: Catalogue Posture | 13.1, 13.2, 13.3, 13.4, 13.5, 13.6 |
 
 Requirement 8 was retired whole on 2026-08-26 (primitives pass, finding 5.8): its guidance
 lives in CLAUDE.md, design.md and CONVENTIONS.md, and its coverage row went with it.
+
+Task group 16 (live drills) adds one criterion, 7.11; its other tasks exercise mechanisms earlier groups built, so they appear only in the Req 7 row.
 
 Task group 12 (greenfield successor) adds no new criterion: it executes the dated F9
 re-decision of 2026-08-25 (revised the same day to the successor mechanism) rather than
