@@ -49,4 +49,4 @@ below and each draft's header say which ones were sent, and the entry in
 | [2026-08-23, `--vex oci` picks one of several OpenVEX attestations at random](2026-08-23-trivy-vex-oci-multiple-attestations.md) | `aquasecurity/trivy` | draft, under review (ADR 0004) |
 | [2026-08-25, the init container always runs from the main image](2026-08-25-valkey-helm-init-container-image.md) | `valkey-io/valkey-helm` | **filed** as [#247](https://github.com/valkey-io/valkey-helm/issues/247) |
 | [2026-09-03, 13.1.5 links thrift and grpc-go below their fixed versions](2026-09-03-grafana-server-thrift-and-grpc-below-fixed.md) | `grafana/grafana` | **filed** as [#131921](https://github.com/grafana/grafana/issues/131921) |
-| [2026-09-30, `main`: the standalone Deployment cannot start since #234](2026-09-30-valkey-helm-standalone-config-path.md) | `valkey-io/valkey-helm` | draft, approved for filing |
+| [2026-09-30, `main`: the standalone Deployment cannot start since #234](2026-09-30-valkey-helm-standalone-config-path.md) | `valkey-io/valkey-helm` | **filed** as [#264](https://github.com/valkey-io/valkey-helm/issues/264) |

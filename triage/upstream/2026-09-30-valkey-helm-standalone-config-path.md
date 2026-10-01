@@ -1,6 +1,6 @@
 # valkey: standalone Deployment cannot start on `main` since #234 (`init.sh` writes `/valkey-conf`, only the StatefulSet mounts it)
 
-Target: `valkey-io/valkey-helm` · Status: **draft**, approved for filing by the owner on 2026-09-30 · Drafted 2026-09-30, adversarially reviewed the same day
+Target: `valkey-io/valkey-helm` · Status: **filed** as [#264](https://github.com/valkey-io/valkey-helm/issues/264) on 2026-10-01 · Drafted 2026-09-30, adversarially reviewed the same day
 
 The issue body is this file from `## Summary` down, unmodified. The render
 facts reproduce with
@@ -10,7 +10,7 @@ third argument it also runs the rendered `init.sh` in a container the way
 the pod runs it). The cluster transcript below was taken on 2026-09-30 on
 k3s v1.37.0 with the chart at 8d30231. Found while testing the change behind
 #263; that change does not touch any of this. The number is recorded in
-`../LOG.md` once filed.
+`../LOG.md`.
 
 ---
 

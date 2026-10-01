@@ -1635,3 +1635,34 @@ CI-proven bump costing less than a defended analysis: spdystream's is a
 parser hardening; otel's may need its sibling modules to move with it, and
 the Go job will say. A `k8s.io` alert would likewise arrive as a PR, red if
 the family must move together, visible where it used to be silent.
+
+## 2026-10-01: the valkey chart's standalone breakage is filed (#264), found on the way to #247's fix
+
+The owner filed
+[valkey-io/valkey-helm#264](https://github.com/valkey-io/valkey-helm/issues/264), open, body the draft
+`upstream/2026-09-30-valkey-helm-standalone-config-path.md` from `## Summary`
+down. Their Sentinel change (upstream PR 234, merged 2026-09-24, unreleased)
+moved `init.sh`'s configuration to `/valkey-conf` and gave only the
+StatefulSet the volume; the standalone Deployment's init container dies on
+`mkdir` under the default read-only root filesystem and its server still
+reads `/data/conf/valkey.conf`. Released 0.12.0, the chart this catalogue
+pins, agrees with itself; the bug ships with their next version bump.
+
+Measured, never inferred: `upstream/checks/valkey-helm-standalone-conf-path.sh`
+renders the chart at 8d30231 and 0.12.0 from a fresh clone (Deployment:
+MISMATCH; StatefulSet and 0.12.0: AGREES) and, given an image, runs the
+rendered script as the pod does; a k3s v1.37.0 cluster showed the pod in
+`Init:Error` on 2026-09-30. A second review briefed to argue against filing
+corrected two sentences before it went out (as uid 1000 a writable root
+filesystem gives `Permission denied`, not a stray write; the transcript now
+names the Alpine image behind busybox's wording of the error) and found no
+duplicate, no fix in flight and no documented step that makes it intended.
+
+Why it matters here: the owner's fix for #247 is upstream PR 263
+(`initContainer.image`, defaulting to the Valkey image). Its standalone
+e2e cannot pass on their `main` until #264 is fixed, so the PR's cluster
+evidence is replica mode. Held back for a day at the owner's call, then
+filed once a reviewer testing standalone mode would have hit it.
+
+Next check: an answer on #264 or #263; the compat `review_by` date stays
+2026-11-24.
