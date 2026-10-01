@@ -890,6 +890,43 @@ graph TB
      stay out of the statement until a separate decision puts them there, since that
      re-attests every accepted-risk statement once.
 
+13. **Live drills: every mechanism exercised once on the real catalogue, with its evidence recorded (Req 7.11; audit of 2026-09-27, decided 2026-10-01)**
+    - **Context**: the 2026-09-27 audit counted every step of 1,028 workflow runs and
+      re-verified the registry: the daily and per-pull-request paths run on real images
+      and real findings, but eleven mechanisms had only ever run in unit tests or local
+      rehearsals: the fail-closed release gate (2.13), a KEV feed outage (6.59, 6.60), an
+      exception's expiry warning and its lapse (6.10, 6.41), an undecided finding past its
+      ceiling (6.46, 6.51), the fix clock (6.46), the automatic reopen (6.57), a revocation
+      with its advisory (9.4, 9.5, 9.7), an inactive definition (1.13 to 1.16, 1.19), a true
+      authenticity mismatch (3.10), a KEV-listed finding under an exception (6.50), and the
+      Grype second opinion on a new CRITICAL. A unit test proves a mechanism works in
+      isolation; only a live run proves the wiring around it does: the cosign install
+      order and the GH_TOKEN name, both of September, were green in every suite.
+    - **Options**: (A) wait for nature to supply each event; (B) induce each event on the
+      real catalogue through a throwaway definition and one-run switch flips, recorded like
+      any other decision; (C) a parallel drill fork with its own registry.
+    - **Decision**: **B**, with rules, the owner's call of 2026-10-01 ("hit everything this
+      repo offers live at least once"). A drill definition, `drill-app`, sourced from a
+      repository the owner controls, built and published like every other definition and
+      named a drill in its definition, its README row and the status page, deliberately
+      carrying reachable findings chosen at drill time from the advisory database (one
+      KEV-listed HIGH, one CRITICAL), driven through the whole lifecycle: gate, decision,
+      expiry, lapse, fix, regression, deactivation, revocation, retirement. Switches
+      (`fail_closed`, `page`, `publish_policy`) flip for one run each through a normal pull
+      request and flip back. Synthetic inputs only where nature cannot be induced, and only
+      as a `drill` input on `workflow_dispatch` that substitutes one declared value (the KEV
+      feed URL) for that run, printed in the run's summary and recorded in the LOG; a drill
+      never adds a code path production does not take. Three things a drill never does:
+      dispatch the rescan from a branch other than main (its re-attestations would carry an
+      identity the policy does not admit), touch a real definition's decisions, or make the
+      catalogue private (2.4's disabled branch stays unexercised, with that reason, as its
+      private era of July and August already exercised it). Evidence per drill, in
+      `docs/live-evidence.md` and `triage/LOG.md`: the run id, the issue or pull request,
+      the registry state. The ledger is seeded from the audit, so "everything" is a measured
+      list rather than a memory, and the rows no drill reaches are named with their reason.
+      Option C was rejected because a fork proves the fork; option A because the owner's
+      successor cut (task 12.1) waits on nobody's bad day.
+
 ## System Flows
 
 ### Release flow (Req 2.7 to 2.17, 2.26; as specified 2026-08-22, implementation task 9)
@@ -1452,6 +1489,9 @@ ports: [3000/tcp]
 
 ### E2E / Pipeline
 - kyverno CLI over every chart's rendered manifests (digest, registry, nonroot) on each PR, `ct lint` on owned charts only — install-level verification lives in the kind e2e suite, not `ct install`; trivy gate with compiled VEX; full bump-flow rehearsal via one deliberately stale pin per component.
+
+### Live drills (Req 7.11, Decision 13)
+- `docs/live-evidence.md`: one row per mechanism the criteria name, its first live exercise and the evidence (run, issue, pull request, registry state). Task group 16 fills the empty rows through the drill definition and one-run switch flips; a row no drill reaches without harming consumers names its reason instead.
 
 ## Security Considerations
 
