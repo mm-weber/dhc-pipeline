@@ -1,4 +1,4 @@
-# syntax=dhi.io/build:2-alpine3.23@sha256:ea3462ca4da9c04a16cc76ae56634b3b83ae62a6d70ae5f48ad4b8c72b6157b5
+# syntax=dhi.io/build:2-alpine3.23@sha256:5cc60e295a3aa59b63d70ca52a20fe4fa9bb8809d331d1cebeeebb053ceed3d2
 
 # The `-compat` variant of the valkey runtime (docs/CONVENTIONS.md "Naming",
 # docs/concepts.md "The variant taxonomy"): byte-identical to image/valkey/
