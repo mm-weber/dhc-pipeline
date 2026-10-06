@@ -58,7 +58,7 @@ TRIVY_SHA256="c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f"
 
 # renovate: datasource=github-releases depName=anchore/grype
 GRYPE_VERSION="0.120.0"
-GRYPE_SHA256="3fa2dc4b924621ab65404cf08d0b8438d896d80ab949c9d5a4ca283c36004c9b"
+GRYPE_SHA256="a5a1218dce63acdac152a6b3b5bb366e7267e36f4069848cf455543b3fa5700e"
 
 err() { printf '::error::install-scanners: %s\n' "$1" >&2; }
 
