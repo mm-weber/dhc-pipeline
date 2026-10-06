@@ -51,10 +51,10 @@ CT_DEP=helm/chart-testing
 
 # syft generates the SBOMs the release arm attests per platform manifest
 # (Req 2.9); its archive is a github tarball with the binary at the root.
-SYFT_VER=1.52.0
+SYFT_VER=1.54.0
 SYFT_ASSET="syft_${SYFT_VER}_linux_amd64.tar.gz"
 SYFT_URLDIR="anchore/syft/releases/download/v${SYFT_VER}"
-SYFT_PIN=caeedb81fb0491615f1ebd1761e4145d41ee86dd2cc7bf80669f9f5ad9d6133d
+SYFT_PIN=54a87372498168b2d033e876fd41fa4e8035b872699e525a57046e1f2f09c860
 SYFT_DEP=anchore/syft
 
 # crane lists registry tags for the rescan enumeration (Req 2.22, task 9.3);
