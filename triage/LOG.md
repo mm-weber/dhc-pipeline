@@ -1666,3 +1666,36 @@ filed once a reviewer testing standalone mode would have hit it.
 
 Next check: an answer on #264 or #263; the compat `review_by` date stays
 2026-11-24.
+
+## 2026-10-05: grafana 13.1.7, the three tag-scoped statements move with the release (#246)
+
+Grafana 13.1.7 (Renovate's #246, released 2026-09-29) is a security
+release: its changelog names CVE-2026-13719, CVE-2026-13720 and
+CVE-2026-81841 as fixed. None of the three ever appeared in a scan of this
+image (no mention anywhere under `triage/`), so there is nothing to close
+here. Renovate's post-upgrade check re-verified the tarball checksums across
+the two origins and dated the authenticity comment in `image/grafana/image.yaml`
+2026-10-05.
+
+The bump PR went red for the reason the 13.1.6 bump did (2026-09-18): the
+two tempo `fixed` statements and the CVE-2026-42151 `fixed` statement are
+scoped to the published tag, `13.1.6-alpine3.23`, which the bump stops
+publishing. The VEX product lint refused the three files, and the PR's scan
+gate on the 13.1.7 build listed exactly two uncovered findings, CVE-2026-21728
+and CVE-2026-28377 on `github.com/grafana/tempo`, the pair those statements
+cover. Nothing else was uncovered within the aperture, so 13.1.7 brings no
+new finding to decide on.
+
+Measured before moving them: `go.mod` at tag v13.1.7 pins
+`github.com/grafana/tempo` at `v1.5.1-0.20260427112133-525d1bab07e0` (line
+123) and `github.com/prometheus/prometheus` at `v0.312.0` (line 169), with
+no `replace` directive for either; both lines are byte-identical to v13.1.6's.
+So the commit-ancestry argument of 2026-08-05 carries unchanged, and the
+prometheus fix statement of 2026-08-03 holds as it did for 13.1.1 through
+13.1.6. The three statements now name `13.1.7-alpine3.23`, and the
+CVE-2026-42151 note says so. The twelve exceptions of 2026-09-03 are not tied
+to a tag and stand untouched until their 2026-11-02 review; whether 13.1.7
+bundles a newer zipkin datasource was not measured here.
+
+Next check: the gate on the rebuilt 13.1.7 reads the moved statements; the
+first nightly after the merge attests them against the new digest.
