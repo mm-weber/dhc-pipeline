@@ -6,8 +6,9 @@ hardened through overrides, automated upstream tracking, Go integration tests
 on real Kubernetes, and CVE triage recorded as portable OpenVEX.
 
 This manual integrates the deeper documents — [CONVENTIONS.md](CONVENTIONS.md),
-[concepts.md](concepts.md), [operating-loop.md](operating-loop.md), the ADRs in
-[decisions/](decisions/), and [triage/README.md](../triage/README.md) — it does
+[concepts.md](concepts.md), [operating-loop.md](operating-loop.md),
+[live-evidence.md](live-evidence.md) (every criterion's first live exercise, Req 7.11),
+the ADRs in [decisions/](decisions/), and [triage/README.md](../triage/README.md) — it does
 not replace them. Requirement references like `(Req 6.20)` point at
 [`.specs/dhc-catalogue-mvp/requirements.md`](../.specs/dhc-catalogue-mvp/requirements.md),
 so every rule here traces to the criterion that demands it. Where this manual
@@ -1277,6 +1278,7 @@ documentation — each states what it enforces and why it exists.
 | `lint-probes.sh` | `[root]` | Every active definition is deployed by a chart declaring a functional probe (Req 5.8) |
 | `lint-compat.sh` | `[root]` | A chart deploying a compat variant records the decision for it, and every decision's review-by date is in the future (Req 4.5, 4.8) |
 | `lint-log-anchors.sh` | `[refs\|statements\|all] [root]` | Every exception ref and statement citation resolves to a `triage/LOG.md` heading (Req 9.18) |
+| `lint-live-evidence.sh` | `[root]` | Every criterion in `requirements.md` has exactly one row in `docs/live-evidence.md`, no row names a retired number, every row carries a status, a mechanism and evidence or a reason (Req 7.11, task 16.1) |
 | `lint-workflow-policy.sh` | `[root]` | Every workflow's cron and permissions equal the policy file's declarations, both directions (Req 7.10) |
 | `lint-rescan-steps.sh` | `[workflow]` | Every rescan step after the scan runs regardless of earlier failures (review D1) |
 | `release-policy.sh` | `<root> <query>` | The one reader of the policy's `release` section, the page switch included; a misspelt switch is a refusal (Req 2.13, 2.14, 2.17, 6.61, 7.7) |

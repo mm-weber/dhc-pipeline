@@ -165,9 +165,17 @@ jobs:
       # lint-accepted-risk.sh above).
       - name: VEX statement LOG citations (Req 9.18)
         run: scripts/lint-log-anchors.sh statements
+      # Req 7.11 (task 16.1): every criterion in requirements.md has exactly
+      # one row in docs/live-evidence.md, so a new criterion arrives with its
+      # evidence obligation and a retired number cannot keep a row.
+      - name: live-evidence ledger covers every criterion (Req 7.11)
+        run: scripts/lint-live-evidence.sh
 
       - name: VEX product identity lint unit tests
         run: scripts/lint-vex-product_test.sh
+
+      - name: live-evidence ledger lint unit tests (Req 7.11)
+        run: scripts/lint-live-evidence_test.sh
 
       - name: VEX compiler unit tests (Req 6.28-6.30)
         run: scripts/compile-vex_test.sh
