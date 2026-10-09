@@ -66,7 +66,7 @@ HELM_VERSION="4.3.0"
 HELM_SHA256="86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb"
 
 # renovate: datasource=github-releases depName=helm/chart-testing
-CT_VERSION="3.14.0"
+CT_VERSION="3.15.0"
 CT_SHA256="d16f0583616885423826241164ce1f6589c6fe5332fa74f374ebd2bd3cb3fe1f"
 
 # renovate: datasource=github-releases depName=anchore/syft
