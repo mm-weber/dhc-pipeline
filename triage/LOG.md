@@ -1804,3 +1804,14 @@ with subcomponent `pkg:golang/golang.org/x/net`, per the CVE-2026-56854
 precedent, added once this pull request's gate shows the finding gone from
 the three builds (the run is recorded here when it does); digests published
 before the bump genuinely carry v0.58.0 and are outside its scope.
+
+**Measured, 2026-10-12:** on the pull request's run 38277598545 (head
+85a6d32) the scan gate passed on all three cert-manager builds with nothing
+uncovered within the aperture, where run 38059338277 had named the x/net
+finding on each; hardened-app passed as before and grafana failed on its
+twelve, which are the next decision. validate, chart and e2e were green,
+the Renovate suite holding the three new markers (20 in all). The `fixed`
+statement `triage/vex/CVE-2026-78669.openvex.json` is in the same pull
+request. Next check: the first nightly after the merge attests SBOMs that
+list golang.org/x/net v0.60.0, and the rescan's status rows for the three
+repositories flip to fixed while #263 stays open for grafana.
