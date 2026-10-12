@@ -9,8 +9,8 @@ The older plans below it stay as history.
 ## State
 
 - [x] 16.1 The ledger `docs/live-evidence.md` and its validate check
-      `scripts/lint-live-evidence.sh`: PR #257 (branch `live-evidence-ledger`,
-      green at 2e0abcb, open, awaiting the owner's merge). 153 rows: 114
+      `scripts/lint-live-evidence.sh`: PR #257, merged 2026-10-12 as 2ba7ad0
+      on main. 153 rows: 114
       exercised, 32 waiting for a drill, 6 unexercised with a reason (1.18,
       2.26, 3.13, 3.15, 4.8, 4.9), 1 defect (6.55, see below). LOG entry
       2026-10-08. Seed data (step tallies, citation index, run and issue
@@ -29,8 +29,30 @@ The older plans below it stay as history.
       scratchpad trusted_root.json, as #247, #248, #249 did): #260
       chart-testing 3.15.0 (`install-tool.sh`), #261 syft 1.54.1
       (`install-tool.sh`), #262 grype 0.120.1 (`install-scanners.sh`).
-      Mechanical, merge when green: #254 (grafana chart overlay to 13.1.7),
-      #256 (dhi.io build layer, register row M2: review and merge).
+      #254 (grafana chart overlay to 13.1.7) merged 2026-10-12. #256 (dhi.io
+      build layer, golang 1.27.1 to 1.27.2, register row M2) stopped being
+      mechanical on 2026-10-09: see the next bullet.
+- [ ] Nature's second event, 2026-10-09/10: three Go HTTP/2 HIGH findings
+      (CVE-2026-78667, CVE-2026-97031, CVE-2026-78669; issues #258, #259,
+      #263) on all five Go-based images, none in KEV, 90-day ceiling. The
+      pull request gate blocks every grafana and cert-manager rebuild until
+      each is decided, #256 included. hardened-app: fixed by #256's
+      toolchain alone (its gate passes). cert-manager: decided 2026-10-12,
+      fix by the `go/bump@v2` x/net v0.60.0 step on #256's branch (85a6d32
+      plus the fixed statement; LOG 2026-10-12; gate green on run
+      38277598545; exit condition: drop the step at the first upstream
+      release pinning x/net v0.60.0, which release-1.21 already does).
+      OPEN, the owner's call: grafana's twelve, three prebuilt binaries
+      (`usr/share/grafana/bin/grafana` at go 1.26.6, the bundled
+      elasticsearch and zipkin datasources at go 1.26.7), each carrying the
+      three CVEs in stdlib plus x/net v0.58.0, measured locally on the
+      published 13.1.7 digest (trivy 0.72.0 with `--db-repository
+      ghcr.io/aquasecurity/trivy-db:2`, the default mirror being blocked
+      here). Transfer under per-binary exceptions in
+      `triage/accepted-risk/grafana.yaml` is the honest shape (stripped
+      binaries, the fix owned by Grafana's next build); once covered, #256
+      goes green and merges, and the first nightly after it rebuilds the
+      compiled images on Go 1.27.2.
 
 ## The drills, in order (one pull request each; each ends with a LOG entry and its ledger rows)
 
