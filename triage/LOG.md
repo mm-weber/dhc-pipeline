@@ -1699,3 +1699,44 @@ bundles a newer zipkin datasource was not measured here.
 
 Next check: the gate on the rebuilt 13.1.7 reads the moved statements; the
 first nightly after the merge attests them against the new digest.
+
+## 2026-10-08: the live-evidence ledger, seeded from the audit (task 16.1, Req 7.11)
+
+`docs/live-evidence.md` now carries one row per criterion, 153 rows, each
+naming the mechanism, its first live exercise, the evidence and how it was
+induced. The seed is the audit of 2026-09-27 (the per-step tallies over
+1,028 `build.yml` and `rescan.yml` runs, the offline re-verification of the
+supported set) extended by what that audit's job data did not cover: the
+pull-request histories of `validate.yml`, `chart.yml` and `e2e.yml`, read
+back to July for the first time each gate refused something, the issue and
+pull request history, and the events since the audit.
+
+What the seed measured, beyond the eleven mechanisms Decision 13 already
+named: 114 criteria are exercised, 32 wait for a drill (tasks 16.3 to 16.15),
+6 are unexercised with a reason no drill removes (1.18, 2.26, 3.13, 3.15,
+4.8, 4.9), and 1 is a defect: 6.55's attested scan reports carry empty
+database fields, measured on 2026-09-27 over fourteen manifests and again on
+2026-10-08 on the 13.1.7 attestation written by trivy 0.75.0. The ledger
+keeps that row as `defect` until an attestation shows the fields filled.
+
+Nature supplied one drill before the drills began: grafana 13.1.7 (#246,
+published 2026-10-06 by the scheduled build, run 37457046807) bundled the
+zipkin datasource at v12.4.8 and apache/thrift 0.24.0, so twelve findings
+left the supported digest and the rescan of 2026-10-06 (run 37470485195)
+published the first fix clock: twelve fixed, median 30 days to fix. 16.6's
+fix clock is therefore exercised; its issue-closure half is not, those
+issues having closed at decision time in September.
+
+Two live exercises were found only by placing timestamps side by side: the
+automerges. #111 (valkey 9.1.2) merged at 13:19:42 UTC inside Renovate run
+33512615078, #252 and #253 inside runs 37575287810 and 37643271339; the
+merge record names the token's owner either way, so the run window is the
+evidence (3.5, 3.12). The lint-refusal criteria the ledger found never
+exercised live (1.11, 1.12, 5.8, 6.19, 9.6, beside those task 16.15 already
+lists) join that task's one pull request.
+
+The check: `scripts/lint-live-evidence.sh` in validate.yml holds one row per
+criterion, no row for a retired number, a status among the four, a mechanism
+and evidence or a reason (thirteen cases in its suite, the last over the real
+ledger). Next: task 16.2, the drill definition, which needs the owner's
+`drill-app` repository first.
