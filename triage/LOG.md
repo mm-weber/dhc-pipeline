@@ -1740,3 +1740,67 @@ criterion, no row for a retired number, a status among the four, a mechanism
 and evidence or a reason (thirteen cases in its suite, the last over the real
 ledger). Next: task 16.2, the drill definition, which needs the owner's
 `drill-app` repository first.
+
+## 2026-10-12: fix by fetch-phase module bump, CVE-2026-78669, golang.org/x/net v0.58.0 (#263, the cert-manager half, on #256)
+
+*Images: cert-manager-controller, cert-manager-webhook, cert-manager-cainjector.
+hardened-app's half of #263 is fixed by the toolchain alone (its gate job on
+#256 passes); grafana's half is a repackaged upstream binary and is decided
+separately; #263 stays open until every repository on it is fixed or
+covered.*
+
+GO-2026-6611, created by the Go security team on 2026-10-08: a malicious
+HTTP/2 peer opens many streams and sends many small SETTINGS frames carrying
+SETTINGS_INITIAL_WINDOW_SIZE, and the client or server spends its CPU
+reprocessing them. Fixed in Go 1.26.9 and 1.27.2 and in golang.org/x/net
+v0.60.0. HIGH, EPSS 0.0023 (12th percentile), not in CISA KEV. First seen by
+the rescan on 2026-10-10 and filed as #263, a day after the stdlib pair of
+#258 and #259 (CVE-2026-78667, CVE-2026-97031, same fix versions).
+
+The three cert-manager images carry the vulnerable code twice. The standard
+library's bundled HTTP/2 moves with the toolchain: Renovate's #256 (dhi.io
+build layer, golang 1.27.1 to 1.27.2) clears it, and the gate on that pull
+request's run 38059338277 shows the delta register row M2 asks the reviewer
+to read: hardened-app passes outright, and each cert-manager build names
+exactly one finding left, `golang.org/x/net@v0.58.0, fixed: 0.60.0`. That
+copy is the module v1.21.2's go.mod pins (indirect; each cmd submodule's
+go.mod repeats the pin, at lines 163, 82 and 72), so only a pin move retires
+it. Upstream has made the move: golang.org/x/net v0.60.0 on master (ceb7b0f)
+and on release-1.21 (#9451), both 2026-10-09, beside the Go 1.26.9 toolchain
+bump (#9444); no release carries them, and no release issue for v1.21.3
+exists today (v1.21.2's, #9237, preceded its release by ten days).
+
+**Decision: fix** (owner's call, 2026-10-12: "most prudent", and it "shows
+the usefulness of this product"). The reach order's first rung, through the
+lane the 2026-09-02 entry established and the 2026-09-18 entry retired: a
+`go/bump@v2` step in each definition's fetch phase, work-dir the cmd
+submodule the binary resolves through, `golang.org/x/net@v0.60.0` with its
+`# renovate:` marker (Req 7.6), `download: true`, `tidy: true`. Minimal
+version selection makes the pin a floor: a later upstream requirement wins,
+an accidental downgrade cannot happen. x/net v0.60.0's own go.mod requires
+Go 1.26 and x/crypto v0.57.0, x/sys v0.48.0, x/term v0.46.0, x/text v0.42.0,
+which the bump carries along. The Renovate manager suite now holds each live
+cert-manager definition to exactly that one marked pin, watched red before
+the step went in; the step itself cannot be rehearsed from this environment
+(no module proxy, no dhi.io), so the pull request's scan gate is its test,
+as it was on 2026-09-02.
+
+Why not the other rungs. Not affected: the vulnerable symbols are the HTTP/2
+client and server flow-control paths (GO-2026-6611 lists
+`Transport.newClientConn`, `Server.serveConn` and the `outflow` functions
+among them); nobody measured them unreachable, a reachable symbol forbids
+the statement (Req 6.14) and a module-level result is unmeasured (Req 6.16).
+Transfer under an exception would have been honest but ships the copy until
+v1.21.3. Waiting undecided was within the ceiling (3 of 90 days) and kept
+the gate red on #256 and on every cert-manager rebuild.
+
+**Exit condition:** drop the step from all three definitions when an
+upstream release pins `golang.org/x/net` at v0.60.0 or newer (release-1.21
+already does, so v1.21.3 is the expected release); the Renovate release PR
+for that version is the reminder, this entry is the record.
+
+**Machine-readable form:** a `fixed` statement scoped to `1.21.2-alpine3.23`
+with subcomponent `pkg:golang/golang.org/x/net`, per the CVE-2026-56854
+precedent, added once this pull request's gate shows the finding gone from
+the three builds (the run is recorded here when it does); digests published
+before the bump genuinely carry v0.58.0 and are outside its scope.
