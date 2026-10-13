@@ -40,21 +40,21 @@ KYVERNO_DEP=kyverno/kyverno
 # only), so its fixture sits at the served root; ct is a github tarball whose
 # archive also ships the lint configs ct needs at runtime.
 HELM_VER=4.3.0
-CT_VER=3.14.0
+CT_VER=3.15.0
 HELM_ASSET="helm-v${HELM_VER}-linux-amd64.tar.gz"
 CT_ASSET="chart-testing_${CT_VER}_linux_amd64.tar.gz"
 CT_URLDIR="helm/chart-testing/releases/download/v${CT_VER}"
 HELM_PIN=86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb
-CT_PIN=d16f0583616885423826241164ce1f6589c6fe5332fa74f374ebd2bd3cb3fe1f
+CT_PIN=467561730f25fe09d5e6cd09a3e1f6aa759871c657a57602947c716d9be2c583
 HELM_DEP=helm/helm
 CT_DEP=helm/chart-testing
 
 # syft generates the SBOMs the release arm attests per platform manifest
 # (Req 2.9); its archive is a github tarball with the binary at the root.
-SYFT_VER=1.54.0
+SYFT_VER=1.54.1
 SYFT_ASSET="syft_${SYFT_VER}_linux_amd64.tar.gz"
 SYFT_URLDIR="anchore/syft/releases/download/v${SYFT_VER}"
-SYFT_PIN=54a87372498168b2d033e876fd41fa4e8035b872699e525a57046e1f2f09c860
+SYFT_PIN=c069905b391cc4c20a5ba65ad5c10be2a7ba074f8ea6ad203e24d14e303dad47
 SYFT_DEP=anchore/syft
 
 # crane lists registry tags for the rescan enumeration (Req 2.22, task 9.3);

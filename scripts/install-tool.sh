@@ -66,12 +66,12 @@ HELM_VERSION="4.3.0"
 HELM_SHA256="86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb"
 
 # renovate: datasource=github-releases depName=helm/chart-testing
-CT_VERSION="3.14.0"
-CT_SHA256="d16f0583616885423826241164ce1f6589c6fe5332fa74f374ebd2bd3cb3fe1f"
+CT_VERSION="3.15.0"
+CT_SHA256="467561730f25fe09d5e6cd09a3e1f6aa759871c657a57602947c716d9be2c583"
 
 # renovate: datasource=github-releases depName=anchore/syft
-SYFT_VERSION="1.54.0"
-SYFT_SHA256="54a87372498168b2d033e876fd41fa4e8035b872699e525a57046e1f2f09c860"
+SYFT_VERSION="1.54.1"
+SYFT_SHA256="c069905b391cc4c20a5ba65ad5c10be2a7ba074f8ea6ad203e24d14e303dad47"
 
 # renovate: datasource=github-releases depName=google/go-containerregistry
 CRANE_VERSION="0.22.1"
