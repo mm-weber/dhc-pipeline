@@ -10,7 +10,7 @@
 image:
   repository: ghcr.io/mm-weber/dhc/cert-manager-controller
   tag: 1.21.2-alpine3.23
-  digest: sha256:95d83a342eb03fd71ca950242ec846169cb3254b8e4b57a11b92dcf1086f876a
+  digest: sha256:f038c27aa4494b41b38a95b0ffb6fa1b1e0610ea442c70d80955feb2acab0d36
 securityContext:
   runAsUser: 65532
   runAsGroup: 65532
@@ -21,7 +21,7 @@ webhook:
   image:
     repository: ghcr.io/mm-weber/dhc/cert-manager-webhook
     tag: 1.21.2-alpine3.23
-    digest: sha256:6787259a4e7af05da45cbeafc10441f8aa29af8f66681330af800e13f69d39a7
+    digest: sha256:4dd1673f2d7e21cca280a1b51f6f4df2ff7e4b51bbb1bce17994f283e7af18e7
   securityContext:
     runAsUser: 65532
     runAsGroup: 65532
@@ -32,7 +32,7 @@ cainjector:
   image:
     repository: ghcr.io/mm-weber/dhc/cert-manager-cainjector
     tag: 1.21.2-alpine3.23
-    digest: sha256:a3b969075dd34b3b039e431a72dec9a2c440c82550d5498ff432a2e560b23f8b
+    digest: sha256:cc3c5ded6831befb16693489a6cd706bff6944391bd834f84c0c0e60d426f9c2
   securityContext:
     runAsUser: 65532
     runAsGroup: 65532
