@@ -2050,3 +2050,12 @@ tag-scoped statements if the bundles still lag. Housekeeping for a later
 commit: the twelve zipkin entries and the two server entries of 2026-09-03
 have matched nothing since 13.1.7 (the 2026-10-08 entry's fix clock) and are
 due for the retirement the 2026-09-03 round modelled.
+
+**Measured, 2026-10-13:** on the pull request's run 38380831106 (head 47bb9b0) the
+scan gate passed on grafana with nothing uncovered within the aperture, where
+runs 38278927825 and 38366092741 had named the twelve; cert-manager and
+hardened-app passed as before, and the build gate, the e2e gate, the render
+and policy gate and the lint battery were green. The nine entries suppress
+what they claim and nothing else: the twelve were the only uncovered findings
+on grafana before them.
+
