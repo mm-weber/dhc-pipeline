@@ -1815,3 +1815,238 @@ statement `triage/vex/CVE-2026-78669.openvex.json` is in the same pull
 request. Next check: the first nightly after the merge attests SBOMs that
 list golang.org/x/net v0.60.0, and the rescan's status rows for the three
 repositories flip to fixed while #263 stays open for grafana.
+
+## 2026-10-13: 13.1.7, the twelve findings of the Go 1.26.9 wave (grafana half of #258, #259, #263; on #256)
+
+*Image: grafana. Decisions taken one at a time on 2026-10-13 (owner's calls
+through the session's decision page, then in chat). Every number below was
+measured on the published 13.1.7 amd64 image (tag 13.1.7-alpine3.23, platform
+manifest sha256:6656a754…, the grafana layer sha256:1b5c2431…), pulled by
+digest and read in place: `go version -m` for toolchain and module versions,
+`go tool nm` for the server, which keeps its symbol table (503,143 symbols),
+and the pclntab read with Go's own `debug/gosym` for the two stripped plugins
+(36,903 functions in zipkin, 47,222 in elasticsearch), with `strings` as the
+second reader. The gate on #256 reported the identical twelve on run
+38278927825 (head cff09fa) and again on run 38366092741 (head 375f846).*
+
+**What the three are.** All from the Go security team's 2026-10-08 batch,
+fixed in Go 1.26.9 and 1.27.2, none listed by CISA:
+
+| CVE | Report | Where | Vulnerable symbol | Fixed |
+|---|---|---|---|---|
+| CVE-2026-78667 | GO-2026-6609 | `net/http` | `parseRange`, reached through `ServeContent`, `ServeFile`, `ServeFileFS`, `fileHandler.ServeHTTP`, `fileTransport.RoundTrip`: a Range header with thousands of pieces burns CPU | go1.26.9 |
+| CVE-2026-97031 | GO-2026-6607 | `crypto/tls` | `decodeInnerClientHello`: repeated ECH outer extension references exhaust a TLS server's memory | go1.26.9 |
+| CVE-2026-78669 | GO-2026-6611 | `net/http` and `golang.org/x/net/http2` | seventeen flow-control symbols (`outflow`, `serverConn`, `Transport.newClientConn`, `clientConnReadLoop`, ...): many small SETTINGS frames burn CPU on either side | go1.26.9, x/net v0.60.0 |
+
+HIGH all three; 78667 and 97031 carry CVSS 7.5 (GHSA-f4xw-m386-m277,
+GHSA-hq7w-2xrq-wp2j), no EPSS score yet; 78669 has EPSS 0.0023 (12th
+percentile). Denial of service each, no data access. 78669's cert-manager half
+was fixed by the fetch-phase bump in the 2026-10-12 entry; the lane does not
+exist for grafana, which repackages the official release tarball and compiles
+nothing (`image/grafana/image.yaml`).
+
+**Where they sit.** Three Go binaries, each carrying the three stdlib
+findings and the x/net one, which is the gate's twelve:
+
+| Binary | Built with | x/net | 78667 `parseRange` (+5 callers) | 97031 `decodeInnerClientHello` | 78669 stdlib (17) | 78669 x/net (17) |
+|---|---|---|---|---|---|---|
+| `bin/grafana` (13.1.7) | go1.26.6 | v0.58.0 | present (2, 3, 2, 1) | present | 13 of 17 | 13 of 17 |
+| `plugins-bundled/zipkin/gpx_…` (v12.4.8, built 2026-09-10, stripped) | go1.26.7 | v0.58.0 | absent, all six | present | 17 of 17 | 0 of 17 |
+| `plugins-bundled/elasticsearch/gpx_…` (v12.9.0, built 2026-09-16, stripped) | go1.26.7 | v0.58.0 | absent, all six | present | 17 of 17 | 0 of 17 |
+
+The four flow-control symbols absent from the server (`outflow.available`,
+`outflow.setConnFlow`, `outflow.take`, `ClientConn.addStreamLocked`) are
+small enough to be folded into their callers; the thirteen present settle
+the question. In the plugins the `x/net/http2` package is linked for its
+`Framer` and `hpack` types, which gRPC uses, and for nothing of the server,
+client or flow-control kind: no `serverConn`, `ClientConn`, `Transport` or
+`outflow` receiver appears at all, so inlining cannot hide an absent call
+chain there either.
+
+**The rungs, once for all twelve.** Fix: closed, no build to bump; a
+from-source grafana definition would be a new archetype and is its own
+decision, not a same-day route. Avoid: impossible for the server, available
+and declined for the plugins for the 2026-09-03 reason (a drop-in Grafana
+keeps its datasources). Not affected: decided per binary below. Accept would
+deny that upstream is fixing every one of these; it is, so every entry is a
+transfer. One re-decision date for the round, 2026-12-12, sixty days from
+the decisions, inside the ninety-day HIGH ceiling, as the 2026-09-03 round
+did. The owner's standing rule, stated with the decisions: a transfer is only
+complete with an actionable item upstream, a ticket the owner opens from a
+drafted text; nothing goes upstream without that approval.
+
+### TRANSFER: the server binary, four findings, waiting on 13.1.8
+
+`bin/grafana` carries all three CVEs and the HTTP/2 one twice. Every
+vulnerable symbol is present in its symbol table: `parseRange` with
+`serveContent`, `ServeContent` and `ServeFile` above it; `decodeInnerClientHello`
+beside `(*Conn).processECHClientHello` and the server handshake; thirteen of
+the seventeen flow-control symbols in each copy. Present forbids
+`not_affected` (Req 6.14), and nothing was measured finer than presence.
+
+Upstream has done the work: Grafana merged Go 1.26.9 (#134622) and
+`golang.org/x/net` v0.60.0 (#134613) on `release-13.1.8` on 2026-10-09,
+beside the same bumps on main and the other maintained lines. No 13.1.8 has
+been cut; 13.1.7 is from 2026-09-29, and the two previous patch releases came
+a fortnight apart.
+
+**Decision: transfer** (owner's call, 2026-10-13, expiry 2026-12-12). Three
+entries on path `usr/share/grafana/bin/grafana`: CVE-2026-78667 and
+CVE-2026-97031 on `pkg:golang/stdlib`, CVE-2026-78669 on both
+`pkg:golang/stdlib` and `pkg:golang/golang.org/x/net` (one entry per id and
+path, Req 6.25). Tracker: the merged release-branch pull requests; no timing ticket is
+opened, the cut is the only step left. The bundling half of the same release
+is grafana/grafana#131863, seconded below.
+
+**Exit condition:** the Renovate pull request for grafana 13.1.8 drops the
+three entries; its gate shows the four server findings gone.
+
+### TRANSFER: the two plugins and the Range-header CVE, absent code and no way to say so yet
+
+In both plugin binaries `net/http.parseRange` is absent, and so is every
+function that reaches it: `ServeContent`, `ServeFile`, `ServeFileFS`,
+`(*fileHandler).ServeHTTP`, `(*fileTransport).RoundTrip`, all 0 in the pclntab
+and in `strings`. A datasource backend answers the host over gRPC and serves no
+files; the compiler dropped the whole path. This is the structural case the
+2026-09-18 xDS decision made, one level finer: function names rather than
+package paths.
+
+The statement cannot be written today. A `not_affected` statement scopes by
+package, never by binary: Req 6.19 keeps the subcomponent purl versionless,
+and `compile-vex.sh` merges every decision about one (finding, package) across
+binaries into a single statement. `pkg:golang/stdlib` is also the server's
+package, where `parseRange` is present, so a statement for the plugins would
+silence the server's finding and be false there. Two routes were put to the
+owner: transfer now and a tag-scoped statement once 13.1.8 moves the server
+past the bug and the plugins are the only carriers left, or amend Req 6.19 to
+admit a versioned subcomponent when two binaries carry one package at two
+versions (the plugins' 1.26.7 against the server's 1.26.6), a spec, lint,
+compiler and measurement change.
+
+**Decision: transfer, the first route** (owner's call, 2026-10-13: "Transfer
+as suggested as option 1"; expiry 2026-12-12). Two entries on
+`pkg:golang/stdlib`, paths `usr/share/grafana/data/plugins-bundled/zipkin/*`
+and `…/elasticsearch/*`, each saying in its `blocked` that the code is absent
+and why the statement waits. A transfer of nothing is the honest record the
+lane can hold for it today.
+
+**Exit condition:** at 13.1.8, if the bundled plugins are still built below
+go1.26.9, replace the two entries with one `not_affected` statement scoped to
+the 13.1.8 tag, `vulnerable_code_not_in_execute_path`, subcomponent
+`pkg:golang/stdlib`, citing this entry's measurement; if the bundles have moved
+too, drop them.
+
+### TRANSFER: the two plugins and the x/net copy of CVE-2026-78669, absent flow control
+
+The plugins link `golang.org/x/net` v0.58.0, and Trivy names the module. What
+they link of `x/net/http2` is the frame layer: `(*Framer).ReadFrame`, the
+frame types and `hpack`, which gRPC uses underneath its own transport. None of
+the seventeen symbols GO-2026-6611 names is present, and no method of
+`serverConn`, `ClientConn`, `Transport` or `outflow` appears, so no caller
+could carry an inlined copy.
+
+The same scoping bar applies, with less to lean on: the server carries the
+same module at the same version with thirteen of the seventeen present, so a
+package-scoped statement cannot separate the two, and there is no version
+difference to scope by. The entry for this finding shares the stdlib copy's
+entry on each plugin path (both purls on one entry, Req 6.25), and this
+sub-entry is the record of the x/net half.
+
+**Decision: transfer** (owner's call, 2026-10-13, expiry 2026-12-12), the
+absence on record.
+
+**Exit condition:** at 13.1.8 the server moves to x/net v0.60.0 and the
+plugins become the only carriers of v0.58.0; a `not_affected` statement scoped
+to that tag, subcomponent `pkg:golang/golang.org/x/net`, becomes writable on
+this measurement. The elasticsearch upstream already carries v0.60.0 on main
+(#447, 2026-10-09); a release and a bundle retire its half outright.
+
+### TRANSFER: the two plugins, stdlib HTTP/2 and the ECH parser, four findings
+
+Both plugins carry all seventeen flow-control symbols of the standard
+library's bundled HTTP/2 and `crypto/tls.decodeInnerClientHello`, with
+`(*Conn).serverHandshake` and `hashicorp/go-plugin.generateCert` beside it:
+go-plugin's certificate generation for its automatic mTLS is linked, so a TLS
+server handshake inside the plugin is a live path, not a dead one. Whether
+the HTTP/2 server or client code ever runs in a plugin is not measurable in
+a stripped binary (Req 6.16), and a present symbol forbids the statement
+anyway (Req 6.14). Reachability is not claimed.
+
+Upstream state. zipkin: the shipped v12.4.8 was built 2026-09-10 with
+go1.26.7; the newest release, v12.4.9 (2026-09-28), predates the Go fix;
+`main` still says `go 1.26.7` and pins x/net v0.59.0; #94 is open from the
+first round and #100 (2026-08-31) names the same stale-bundle problem.
+Renovate's #109 (2026-09-25, refreshed 2026-10-13) carries x/net v0.60.0
+with every check green and no review, so the x/net half has a live pull
+request; the Go bump has none.
+elasticsearch: the shipped v12.9.0 was built 2026-09-16 with go1.26.7; the
+newest release, v12.9.2 (2026-10-06), predates the fix; `main` moved x/net to
+v0.60.0 on 2026-10-09 (#447) but still says `go 1.26.7`; the release-please
+pull request #448 (2026-10-09) would ship #447 as 12.9.3; no tracker existed
+for the Go bump. On the Grafana side, grafana/grafana#131863 (2026-08-31,
+labelled security and build-packaging) already names the bundling lag, with
+a maintainer's acknowledgement on 2026-09-23 that bundled versions resolve
+at build time; it is the item to second for the rebundle, not a new ticket. A fix needs two steps nobody here controls: each plugin
+rebuilt with go1.26.9 or newer and released, then a grafana release that
+bundles that build.
+
+**Decision: transfer** (owner's call, 2026-10-13, expiry 2026-12-12). Four
+findings, carried by four entries: CVE-2026-97031 on `pkg:golang/stdlib` and
+CVE-2026-78669 on both purls, per plugin path. Trackers: zipkin stays on #94,
+which the owner extends with this round, #109 carrying the x/net half;
+elasticsearch gets the owner's new issue for the Go bump,
+grafana-elasticsearch-datasource#450 (filed 2026-10-13 from the draft), the
+`issue:` of its three entries, #448 carrying the x/net half.
+
+**Exit condition:** a grafana release whose bundled plugin reports go1.26.9
+or newer in `go version -m`; the Renovate pull request for that release is the
+reminder, this entry the record.
+
+### Measured, and what govulncheck says about a stripped binary
+
+govulncheck was asked for, as the tool of record (Req 6.13), and it could not
+be installed the usual way: `proxy.golang.org`, `golang.org` and the vulnerability
+database host are all outside the devcontainer's allowlist. It was built from
+the module cache instead (`golang.org/x/vuln@v1.4.0`, x/tools v0.45.0 and a
+cached telemetry pseudo-version swapped in by `replace`), and fed a local
+database assembled from the three reports in `golang/vulndb` (`data/osv/`,
+plus the three index files), `-mode=binary -db file://…`.
+
+On the server its symbol results agree with the symbol table: three
+vulnerabilities, every trace a present symbol. On the two plugins it printed
+symbol results that name `net/http.ServeContent`, `ServeFile`, `ServeFileFS`
+and the x/net `ClientConn` methods as found, in binaries whose function tables
+contain none of them. Its own source explains it: when the ELF symbol table is
+missing, `internal/vulncheck/binary.go` substitutes every known vulnerable
+symbol of each affected package ("we report vulnerabilities at the go.mod-level
+precision", golang/go#57764) and renders that under `=== Symbol Results ===`.
+That is the "not measured" row `scripts/govulncheck-report.sh` already
+reserves for a stripped binary, and this round confirms the reading: a
+govulncheck symbol hit on a stripped plugin is silence, not absence, and not
+presence either. The pclntab read is the finer instrument, and it is the Go
+toolchain's own (`debug/gosym` over `.gopclntab`, no symbol table needed).
+Controls: the stdlib HTTP/2 names were found in all three binaries, so the
+reader does find names in the stripped ones; in the plugins the x/net frame
+names were found while the flow-control names were not.
+
+Trivy could not be rerun locally: its database refresh is blocked the same
+way, and the cached database (2026-09-10) predates the three reports. The
+count of twelve is the gate's own, from both runs named above; the split per
+binary is this entry's, from the binaries.
+
+**Downstream record, 2026-10-13:** #258, #259 and #263 carry the
+`transfer-upstream` label and a decision comment each with the per-binary
+table, so every upstream text can point at them; the texts are drafted under
+`triage/upstream/2026-10-13-*` with the measurement script
+`checks/grafana-go-wave-symbols.sh`.
+
+**Posted upstream, 2026-10-13:** the comments on grafana/grafana#131863,
+zipkin #94 and #109 and elasticsearch #448, and the new issue
+grafana-elasticsearch-datasource#450, all from the drafts, each pointing back
+at #258, #259 and #263. With that the nine entries are complete and the round
+is committed on #256, whose gate should then have nothing uncovered on
+grafana; the run is recorded here when it does. At 13.1.8: drop the three server entries, write the two
+tag-scoped statements if the bundles still lag. Housekeeping for a later
+commit: the twelve zipkin entries and the two server entries of 2026-09-03
+have matched nothing since 13.1.7 (the 2026-10-08 entry's fix clock) and are
+due for the retirement the 2026-09-03 round modelled.
