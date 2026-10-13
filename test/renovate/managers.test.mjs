@@ -660,10 +660,12 @@ check(
 // --- go/bump security pins inside definitions (Req 7.6; LOG 2026-09-02) ----
 // The between-releases CVE patch lane: a module bumped in the frontend fetch
 // phase is a real pin, and a pin the manager does not see is a pin nobody
-// retires when upstream catches up. The cert-manager instance was retired
-// with 1.21.2 (LOG 2026-09-18), so the capture is proven on a fixture in the
-// definition's own shape, and the live definitions are held pin-free: a step
-// that comes back has to come back with its marker.
+// retires when upstream catches up. The capture is proven on a fixture in the
+// definition's own shape (the x/crypto and grpc instance, retired with 1.21.2,
+// LOG 2026-09-18), and the live definitions are held to exactly what the LOG
+// says they carry: since 2026-10-12 one marked pin each, golang.org/x/net
+// v0.60.0 (CVE-2026-78669), and nothing else. A step that comes back has to
+// come back with its marker, and a step that is dropped has to take it along.
 {
   const fixture = [
     "      pipeline:",
@@ -697,8 +699,14 @@ check(
   for (const role of ["controller", "webhook", "cainjector"]) {
     const live = extract(goBumpMgr, read(`image/cert-manager-${role}/image.yaml`));
     check(
-      `go-bump pins: cert-manager-${role} carries no fetch-phase pin since 1.21.2 (LOG 2026-09-18)`,
-      live.length === 0,
+      `go-bump pins: cert-manager-${role} carries the x/net pin of 2026-10-12 (CVE-2026-78669), tracked via the go datasource at v0.60.0`,
+      has(live, { depName: "golang.org/x/net", datasource: "go" }) &&
+        dep(live, { depName: "golang.org/x/net" })?.currentValue === "v0.60.0",
+      JSON.stringify(live),
+    );
+    check(
+      `go-bump pins: cert-manager-${role} carries that one pin and no other (x/crypto and grpc went with 1.21.2, LOG 2026-09-18)`,
+      live.length === 1,
       JSON.stringify(live),
     );
   }

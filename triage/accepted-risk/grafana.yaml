@@ -213,3 +213,185 @@ vulnerabilities:
     statement: "transfer: waiting on a grafana release carrying grpc-go 1.83.1 (grafana/grafana#131921)"
     decided_at: 2026-09-03
     expired_at: 2026-11-02
+
+  # ---------------------------------------------------------------------------
+  # 2026-10-13: the Go 1.26.9 wave on 13.1.7 (CVE-2026-78667, CVE-2026-97031,
+  # CVE-2026-78669; #258, #259, #263; decided on #256). Twelve findings in
+  # three binaries, four decisions, all transfer, one re-decision date. Every
+  # claim below was measured on the published amd64 image (sha256:6656a754…)
+  # with go version -m, go tool nm for the server and the pclntab read with
+  # debug/gosym for the two stripped plugins; triage/LOG.md 2026-10-13 holds
+  # the tables and the govulncheck comparison.
+  #
+  # The server binary: go1.26.6, x/net v0.58.0, every vulnerable symbol of the
+  # three reports present. Remediation is closed to us (repackaged release
+  # tarball, no bump lane). Upstream merged Go 1.26.9 (#134622) and x/net
+  # v0.60.0 (#134613) on release-13.1.8 on 2026-10-09; no release yet. Exit:
+  # the 13.1.8 Renovate PR drops these three entries.
+  - id: CVE-2026-78667
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/bin/grafana"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana/pull/134622"
+    ref: "LOG.md#transfer-the-server-binary-four-findings-waiting-on-1318"
+    blocked: "avoidance would remove Grafana from the Grafana image. Remediation
+              is closed to us: the definition repackages the official release
+              tarball, so no fetch-phase bump or toolchain change reaches
+              bin/grafana. net/http.parseRange and its callers are present in
+              the symbol table, which forbids not_affected (Req 6.14). Fixed
+              upstream on release-13.1.8 (Go 1.26.9, #134622), not released"
+    statement: "transfer: waiting on grafana 13.1.8, whose release branch carries Go 1.26.9 (grafana/grafana#134622)"
+    decided_at: 2026-10-13
+    expired_at: 2026-12-12
+
+  - id: CVE-2026-97031
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/bin/grafana"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana/pull/134622"
+    ref: "LOG.md#transfer-the-server-binary-four-findings-waiting-on-1318"
+    blocked: "as CVE-2026-78667: same binary, same closed remediation.
+              crypto/tls.decodeInnerClientHello and the server handshake are
+              present, so not_affected is forbidden (Req 6.14)"
+    statement: "transfer: waiting on grafana 13.1.8, whose release branch carries Go 1.26.9 (grafana/grafana#134622)"
+    decided_at: 2026-10-13
+    expired_at: 2026-12-12
+
+  - id: CVE-2026-78669
+    purls: ["pkg:golang/stdlib", "pkg:golang/golang.org/x/net"]
+    paths: ["usr/share/grafana/bin/grafana"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana/pull/134613"
+    ref: "LOG.md#transfer-the-server-binary-four-findings-waiting-on-1318"
+    blocked: "as CVE-2026-78667: same binary, same closed remediation. Both
+              copies of the HTTP/2 flow control are present, thirteen of the
+              seventeen named symbols in net/http and the same thirteen in
+              golang.org/x/net/http2, so not_affected is forbidden (Req 6.14).
+              release-13.1.8 carries x/net v0.60.0 (#134613) beside Go 1.26.9"
+    statement: "transfer: waiting on grafana 13.1.8, whose release branch carries x/net v0.60.0 and Go 1.26.9 (grafana/grafana#134613, #134622)"
+    decided_at: 2026-10-13
+    expired_at: 2026-12-12
+
+  # The bundled zipkin plugin, fourth round: 13.1.7 bundles v12.4.8 (built
+  # 2026-09-10, go1.26.7, x/net v0.58.0, stripped). Upstream's newest release
+  # v12.4.9 (2026-09-28) predates the Go fix and main still says go 1.26.7,
+  # x/net v0.59.0, so the ask is the same as the three earlier rounds: a
+  # rebuild and a release, then a grafana bundle. #94 stays the tracker,
+  # extended with this round; Renovate's #109 carries the x/net half. Avoidance
+  # is available and declined, as on 2026-09-03: dropping plugins-bundled/zipkin
+  # removes the datasource.
+  #
+  # Two of the three entries cover code this binary does not contain:
+  # net/http.parseRange and all five of its callers are absent, and none of
+  # the seventeen x/net/http2 flow-control symbols is linked (only the Framer
+  # and hpack, which gRPC uses). A not_affected statement would say so, but a
+  # statement scopes by package, never by binary (Req 6.19), and bin/grafana
+  # carries the same packages with the code present. The statements wait for
+  # 13.1.8, when the server has moved past both; transfer carries them until
+  # then. The stdlib HTTP/2 copy and the ECH parser are present and, in a
+  # stripped binary, unmeasured beyond that (Req 6.16).
+  - id: CVE-2026-78667
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer-the-two-plugins-and-the-range-header-cve-absent-code-and-no-way-to-say-so-yet"
+    blocked: "avoidance is available and declined: dropping
+              plugins-bundled/zipkin/ removes the datasource. Remediation is
+              closed to us: a prebuilt plugin inside a repackaged tarball. The
+              vulnerable code is absent from this binary (parseRange and every
+              caller, pclntab), but a statement scopes by package and the same
+              package sits in bin/grafana with the code present (Req 6.19);
+              the statement waits for 13.1.8"
+    statement: "transfer: waiting on a grafana release bundling a zipkin build on Go 1.26.9+ (grafana/grafana-zipkin-datasource#94); the vulnerable code is absent here, statement deferred to 13.1.8"
+    decided_at: 2026-10-13
+    expired_at: 2026-12-12
+
+  - id: CVE-2026-97031
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer-the-two-plugins-stdlib-http2-and-the-ech-parser-four-findings"
+    blocked: "as CVE-2026-78667 for this binary: avoidance declined, remediation
+              closed. crypto/tls.decodeInnerClientHello is present beside
+              go-plugin's certificate generation for its automatic mTLS, so a
+              TLS server handshake is a live path; stripped binary, nothing
+              finer is measurable (Req 6.16)"
+    statement: "transfer: waiting on a grafana release bundling a zipkin build on Go 1.26.9+ (grafana/grafana-zipkin-datasource#94)"
+    decided_at: 2026-10-13
+    expired_at: 2026-12-12
+
+  - id: CVE-2026-78669
+    purls: ["pkg:golang/stdlib", "pkg:golang/golang.org/x/net"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#transfer-the-two-plugins-stdlib-http2-and-the-ech-parser-four-findings"
+    blocked: "as CVE-2026-78667 for this binary: avoidance declined, remediation
+              closed. stdlib copy: all seventeen flow-control symbols present,
+              unmeasured beyond that (Req 6.16). x/net copy: none of the
+              seventeen is linked, only Framer and hpack (LOG 2026-10-13, the
+              x/net sub-entry), but the statement would also cover bin/grafana
+              where they are present, so it waits for 13.1.8"
+    statement: "transfer: waiting on a grafana release bundling a zipkin build on Go 1.26.9+ and x/net v0.60.0 (grafana/grafana-zipkin-datasource#94)"
+    decided_at: 2026-10-13
+    expired_at: 2026-12-12
+
+  # The bundled elasticsearch plugin: 13.1.7 bundles v12.9.0 (built
+  # 2026-09-16, go1.26.7, x/net v0.58.0, stripped), the same symbol profile as
+  # zipkin, measured the same way. Upstream's newest release v12.9.2
+  # (2026-10-06) predates the Go fix; main moved x/net to v0.60.0 on
+  # 2026-10-09 (#447) but still says go 1.26.7; #448 would release it as
+  # 12.9.3. No tracker existed for the Go bump; #450 (filed 2026-10-13) is it. Avoidance available and declined, as
+  # for zipkin; remediation closed.
+  - id: CVE-2026-78667
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/elasticsearch/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-elasticsearch-datasource/issues/450"
+    ref: "LOG.md#transfer-the-two-plugins-and-the-range-header-cve-absent-code-and-no-way-to-say-so-yet"
+    blocked: "as the zipkin entry for this CVE: avoidance declined, remediation
+              closed, the vulnerable code absent from this binary (parseRange
+              and every caller, pclntab), the statement deferred to 13.1.8
+              because it would also cover bin/grafana (Req 6.19)"
+    statement: "transfer: waiting on a grafana release bundling an elasticsearch build on Go 1.26.9+ (grafana/grafana-elasticsearch-datasource#450); the vulnerable code is absent here, statement deferred to 13.1.8"
+    decided_at: 2026-10-13
+    expired_at: 2026-12-12
+
+  - id: CVE-2026-97031
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/elasticsearch/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-elasticsearch-datasource/issues/450"
+    ref: "LOG.md#transfer-the-two-plugins-stdlib-http2-and-the-ech-parser-four-findings"
+    blocked: "as the zipkin entry for this CVE: decodeInnerClientHello present
+              beside go-plugin's certificate generation, a live TLS server
+              path; stripped binary, unmeasured beyond that (Req 6.16)"
+    statement: "transfer: waiting on a grafana release bundling an elasticsearch build on Go 1.26.9+ (grafana/grafana-elasticsearch-datasource#450)"
+    decided_at: 2026-10-13
+    expired_at: 2026-12-12
+
+  - id: CVE-2026-78669
+    purls: ["pkg:golang/stdlib", "pkg:golang/golang.org/x/net"]
+    paths: ["usr/share/grafana/data/plugins-bundled/elasticsearch/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-elasticsearch-datasource/issues/450"
+    ref: "LOG.md#transfer-the-two-plugins-stdlib-http2-and-the-ech-parser-four-findings"
+    blocked: "as the zipkin entry for this CVE: stdlib copy present and
+              unmeasured (Req 6.16); x/net copy not linked beyond Framer and
+              hpack, statement deferred to 13.1.8 because it would also cover
+              bin/grafana. Upstream main already carries x/net v0.60.0 (#447),
+              the Go bump and a release are the ask"
+    statement: "transfer: waiting on a grafana release bundling an elasticsearch build on Go 1.26.9+ and x/net v0.60.0 (grafana/grafana-elasticsearch-datasource#450)"
+    decided_at: 2026-10-13
+    expired_at: 2026-12-12

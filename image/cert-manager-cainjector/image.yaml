@@ -1,4 +1,4 @@
-# syntax=dhi.io/build:2-alpine3.23@sha256:88ef13b60c795f6297a7767415caa30ec6525a877f80e98561ae6081d3742fd4
+# syntax=dhi.io/build:2-alpine3.23@sha256:976eef62e394c4a33e8dfbeebd11dce2fa40f995ad08c21bfd3f77f8b303dc3e
 
 name: cert-manager cainjector 1.21.x
 image: ghcr.io/mm-weber/dhc/cert-manager-cainjector
@@ -14,7 +14,7 @@ dates:
   release: "2026-06-25"
 vars:
   COMMIT_SHA: 922a06aa49ee4bb802db268ef72a174af70edd32
-  GOLANG_REFERENCE: dhi.io/golang:1.27.1-alpine3.23-dev@sha256:8cb55f3251ea01b829c84cdf6dff4ceec6d17395f95bf7901b4992d2b25f4fdb
+  GOLANG_REFERENCE: dhi.io/golang:1.27.2-alpine3.23-dev@sha256:f5fc668f4a043deb67c167af22cf6b09f45d5330c1a9fc30e99ba8385e8acf30
   SEMVER_MAJOR_MINOR_VERSION: "1.21"
   SEMVER_MAJOR_VERSION: "1"
   SEMVER_VERSION: 1.21.2
@@ -32,7 +32,7 @@ contents:
     - tzdata
   builds:
     - name: cert-manager-cainjector
-      uses: dhi.io/golang:1.27.1-alpine3.23-dev@sha256:8cb55f3251ea01b829c84cdf6dff4ceec6d17395f95bf7901b4992d2b25f4fdb
+      uses: dhi.io/golang:1.27.2-alpine3.23-dev@sha256:f5fc668f4a043deb67c167af22cf6b09f45d5330c1a9fc30e99ba8385e8acf30
       work-dir: /go/src/github.com/cert-manager/cert-manager
       caches:
         - path: /go/pkg/mod
@@ -54,12 +54,26 @@ contents:
             uid: 0
             gid: 0
       pipeline:
-        # Until 1.21.2 a `go/bump@v2` step here bumped golang.org/x/crypto
-        # (CVE-2026-56854) and, in controller and webhook, google.golang.org/grpc
-        # (CVE-2026-84304) in the fetch phase, upstream having no release with
-        # the fixes. v1.21.2's go.mod pins x/crypto v0.56.0 and grpc v1.83.2, so
-        # the step went on 2026-09-18 per its exit condition (triage/LOG.md
-        # 2026-09-02 and 2026-09-18); the lane stays (docs/CONVENTIONS.md M10).
+        # The between-releases fix lane (docs/CONVENTIONS.md M10). Its first
+        # use here bumped golang.org/x/crypto (CVE-2026-56854) and, in
+        # controller and webhook, google.golang.org/grpc (CVE-2026-84304) from
+        # 2026-09-02 until v1.21.2 carried both fixes (triage/LOG.md
+        # 2026-09-18). Reopened 2026-10-12 for CVE-2026-78669: v1.21.2's
+        # go.mod pins golang.org/x/net v0.58.0, fixed in v0.60.0, which
+        # upstream merged on master and release-1.21 on 2026-10-09 with no
+        # release carrying it yet. Minimal version selection makes the pin a
+        # floor a later upstream requirement wins over. Exit condition: drop
+        # the step when an upstream release pins x/net v0.60.0 or newer, the
+        # Renovate release PR being the reminder (triage/LOG.md 2026-10-12).
+        - name: bump x/net (CVE-2026-78669)
+          uses: go/bump@v2
+          work-dir: /go/src/github.com/cert-manager/cert-manager/cmd/cainjector
+          with:
+            deps:
+              # renovate: datasource=go depName=golang.org/x/net
+              - golang.org/x/net@v0.60.0
+            download: true
+            tidy: true
         # No test step: cmd/* submodules share the monorepo's suite, which
         # needs upstream's make tooling; functional verification is the e2e
         # suite's job (Req 5.5). Upstream ldflags recipe: make/00_mod.mk.
