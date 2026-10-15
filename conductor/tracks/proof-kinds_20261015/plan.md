@@ -11,7 +11,7 @@ Three phases, one pull request each, matching spec tasks 17.2, 17.3 and 17.4. Ev
 
 | Phase | Pull request | Status | Progress |
 | --- | --- | --- | --- |
-| Phase 1: the declaration and its reader (17.2) | `feat: a per-definition proof declaration and its reader (Req 5.11, 7.7; task 17.2)` | pending | 0% |
+| Phase 1: the declaration and its reader (17.2) | `feat: a per-definition proof declaration and its reader (Req 5.11, 7.7; task 17.2)` | in review (draft pull request opened 2026-10-15, merges after #271 and #272) | 100% |
 | Phase 2: the probe lint honours the declaration (17.3) | `feat: the probe lint honours a declared none proof (Req 5.8 to 5.10; task 17.3)` | pending | 0% |
 | Phase 3: documentation and the walkthrough (17.4) | `docs: onboarding in two pull requests, the proof declaration (task 17.4)` | pending | 0% |
 
@@ -25,31 +25,31 @@ Dependency: pull request #271 (the spec) merged before phase 1 opens its pull re
 
 ### Tasks (one slice each: RED agent, GREEN agent, orchestrator commit)
 
-- [ ] **1.1 No `proofs:` key prints nothing** (FR-2)
+- [x] **1.1 No `proofs:` key prints nothing** (FR-2) (built second, as a guard: eaea528)
   - RED: a sandbox whose policy file has an active set and no `proofs:`; `proof_entries "$SB"` exits 0 with empty output. Fails because the function does not exist.
   - GREEN: the function, reading the policy file through PyYAML, printing nothing for an absent map.
-- [ ] **1.2 `proofs: {}` prints nothing** (FR-2)
-- [ ] **1.3 A none entry prints its line, quoted date** (FR-2)
+- [x] **1.2 `proofs: {}` prints nothing** (FR-2) (in the same guard case: eaea528)
+- [x] **1.3 A none entry prints its line, quoted date** (FR-2) (built first, the tracer bullet: red 9888b5f, green 0e6ffa9)
   - `proofs: {app: {kind: none, reason: "drill fixture", review_by: "2026-11-28"}}` with `app` active; output `app<TAB>none<TAB>drill fixture<TAB>2026-11-28`.
-- [ ] **1.4 A none entry with a bare date prints the same line** (FR-2, the PyYAML date object)
-- [ ] **1.5 A chart entry prints `app<TAB>chart<TAB><TAB>`** (FR-2)
-- [ ] **1.6 An unknown kind is refused** (FR-3): `kind: smoke` exits 2, names `app`, cites `Req 5.11`, prints no entry line
-- [ ] **1.7 A none entry without reason is refused** (FR-3)
-- [ ] **1.8 A none entry without review_by is refused** (FR-3)
-- [ ] **1.9 A review_by that is not a date is refused** (FR-3): `review_by: soon`
-- [ ] **1.10 An entry naming an inactive definition is refused** (FR-3): the directory exists, the active set does not list it
-- [ ] **1.11 `proofs:` that is a list is refused** (FR-3)
-- [ ] **1.12 `proof_of` prints `chart` for an undeclared active definition** (FR-2)
-- [ ] **1.13 `proof_of` prints the declared line and propagates a refusal** (FR-2, FR-3)
-- [ ] **1.14 The policy file gains `proofs: {}` and its comment block** (FR-1; no test: a documentation edit of a YAML file by hand, then yamllint)
+- [x] **1.4 A none entry with a bare date prints the same line** (FR-2, the PyYAML date object) (guard: ccafb46)
+- [x] **1.5 A chart entry prints `app<TAB>chart<TAB><TAB>`** (FR-2) (guard: c75dc71)
+- [x] **1.6 An unknown kind is refused** (FR-3): `kind: smoke` exits 2, names `app`, cites `Req 5.11`, prints no entry line (red 1257c35, green fdafbdb)
+- [x] **1.7 A none entry without reason is refused** (FR-3) (red a090a62, green 9a52eec)
+- [x] **1.8 A none entry without review_by is refused** (FR-3) (red 8be09a6, green 75fe8f5)
+- [x] **1.9 A review_by that is not a date is refused** (FR-3): `review_by: soon` (red 3e4aba3, green 2c527de)
+- [x] **1.10 An entry naming an inactive definition is refused** (FR-3): the directory exists, the active set does not list it (red 43cb259, green 1b8e9ff)
+- [x] **1.11 `proofs:` that is a list is refused** (FR-3), and an entry that is a scalar (red 8319072, green 6bafe93)
+- [x] **1.12 `proof_of` prints `chart` for an undeclared active definition** (FR-2) (red fc78027, green 02b4d40)
+- [x] **1.13 `proof_of` prints the declared line and propagates a refusal** (FR-2, FR-3) (guards against 1.12's implementation: 335dcab, 0ad66df)
+- [x] **1.14 The policy file gains `proofs: {}` and its comment block** (FR-1; no test: a documentation edit of a YAML file by hand, then yamllint) (4c930d0, built before the slices)
 
 ### Verification (orchestrator)
 
-- [ ] `scripts/definition-lib_test.sh` green, every existing case untouched
-- [ ] `yamllint catalogue-policy.yaml`; `scripts/lint-active-set.sh .`; `scripts/release-policy.sh . check`; `scripts/lint-probes.sh .` (unchanged lint, still green)
-- [ ] `source scripts/definition-lib.sh; proof_entries .` prints nothing and exits 0 on this repository
-- [ ] The validate shell steps that read the policy file rehearsed locally (lessons: the whole chain after the last edit)
-- [ ] Pull request opened; the owner merges (checkpoint)
+- [x] `scripts/definition-lib_test.sh` green, every existing case untouched (34 cases; 41 suites under scripts/ green)
+- [x] `yamllint catalogue-policy.yaml`; `scripts/lint-active-set.sh .`; `scripts/release-policy.sh . check`; `scripts/lint-probes.sh .` (unchanged lint, still green)
+- [x] `source scripts/definition-lib.sh; proof_entries .` prints nothing and exits 0 on this repository; `proof_of . hardened-app` prints chart
+- [x] validate's twelve repository-level lint steps rehearsed locally after the refactor commit (7b3bf44)
+- [ ] Pull request opened as a draft 2026-10-15; the owner merges after #271 and #272 (checkpoint)
 
 ## Phase 2: the probe lint honours the declaration (task 17.3)
 
@@ -105,8 +105,13 @@ Dependency: pull request #271 (the spec) merged before phase 1 opens its pull re
 
 | Date | Task | Deviation | Reason | Resolution |
 | --- | --- | --- | --- | --- |
+| 2026-10-15 | 1.1 to 1.5 | Slice order changed: the declared-entry line (1.3) was built first as the tracer bullet; 1.1, 1.2, 1.4 and 1.5 followed as guards that passed against it | A stub that prints nothing satisfies "nothing declared prints nothing", so that test cannot be red first | Guards committed with "passes against GREEN 1" in the message; no green step for them |
+| 2026-10-15 | 1.11 | The wrong-shape case also covers a scalar entry (`app: none`) | One behaviour, two inputs; the second raised a traceback as well | One numbered case, two inputs |
+| 2026-10-15 | 1.13 | The declared-line and refusal-propagation tests passed against 1.12's implementation | The minimal lookup already printed the matching line and used `\|\| return $?` | Committed as guards |
+| 2026-10-15 | 1.9 | `date.fromisoformat` accepts the basic form `"20261128"`; a bare impossible date fails in the YAML loader with a traceback | Python's parser; PyYAML resolves bare dates before the reader runs, as for every reader of the policy file | Noted in the pull request; no guard added |
+| 2026-10-15 | 1.6 to 1.13 | Red tests for slices 12 and 13 were written in parallel with slice 11's green | Tests only, in scratch copies; applied in order after the green commit | None |
 
 ---
 
 **Plan created:** 2026-10-15
-**Last updated:** 2026-10-15
+**Last updated:** 2026-10-15 (phase 1 built)
