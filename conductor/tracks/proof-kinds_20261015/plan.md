@@ -13,7 +13,7 @@ Three phases, one pull request each, matching spec tasks 17.2, 17.3 and 17.4. Ev
 | --- | --- | --- | --- |
 | Phase 1: the declaration and its reader (17.2) | `feat: a per-definition proof declaration and its reader (Req 5.11, 7.7; task 17.2)` | in review (draft pull request opened 2026-10-15, merges after #271 and #272) | 100% |
 | Phase 2: the probe lint honours the declaration (17.3) | `feat: the probe lint honours a declared none proof (Req 5.8 to 5.10; task 17.3)` | built 2026-10-15 on branch proof-lint (on top of phase 1); pull request opens after #273 merges | 100% |
-| Phase 3: documentation and the walkthrough (17.4) | `docs: onboarding in two pull requests, the proof declaration (task 17.4)` | pending | 0% |
+| Phase 3: documentation and the walkthrough (17.4) | `docs: onboarding in two pull requests, the proof declaration (task 17.4)` | built 2026-10-15 on branch proof-docs (on top of phase 2); pull request opens after phase 2 merges | 90% (the tasks.md ticks wait for the spec merge) |
 
 Dependency: pull request #271 (the spec) merged before phase 1 opens its pull request.
 
@@ -84,16 +84,17 @@ Dependency: pull request #271 (the spec) merged before phase 1 opens its pull re
 
 ### Tasks
 
-- [ ] **3.1 `docs/CONVENTIONS.md`**: the active-set section gains the proof declaration; the probe sentence (the one citing Req 5.8) says "or a declared none proof with a reason and a review-by date"
-- [ ] **3.2 `docs/user-manual.md`**: steps 4 to 6 of "Add an image definition" become pull request 1 and pull request 2 as in design.md's onboarding flow; the e2e section's probe paragraph names the declaration; the scripts table's `definition-lib.sh` row (Part VI) names the proof readers beside the mapping
-- [ ] **3.3 `tasks/todo.md`**: 16.2 waits for 17.3; the 16.11 note (remove the entry when deactivating)
-- [ ] **3.4 Cross-check**: every path and criterion cited in the touched text exists; no em-dashes in the added text
+- [x] **3.1 `docs/CONVENTIONS.md`**: the active-set section gains the proof declaration; the probe sentence (the one citing Req 5.8) says "or a declared none proof with a reason and a review-by date" (f5f63f0; the deactivation list also says the entry leaves with the line)
+- [x] **3.2 `docs/user-manual.md`**: steps 4 to 6 of "Add an image definition" become pull request 1 and pull request 2 as in design.md's onboarding flow; the e2e section's probe paragraph names the declaration; the scripts table's `definition-lib.sh` row (Part VI) names the proof readers beside the mapping (f5f63f0; steps 4 to 7 now, the `lint-probes.sh` row too)
+- [x] **3.3 `tasks/todo.md`**: 16.2 waits for 17.3; the 16.11 note (remove the entry when deactivating) (on the plan-live-drills branch, where the live-drills plan lives)
+- [x] **3.4 Cross-check**: every path and criterion cited in the touched text exists; no em-dashes in the added text (checked before the commit)
 
 ### Verification (orchestrator)
 
-- [ ] `scripts/lint-live-evidence.sh .` (unchanged, still green); `scripts/lint-log-anchors.sh .` if the LOG was touched
-- [ ] A read-through of the rendered walkthrough against the flow diagram
-- [ ] Pull request opened; the owner merges (track complete)
+- [x] `scripts/lint-live-evidence.sh .` (unchanged, still green); the LOG was not touched
+- [x] A read-through of the rendered walkthrough against the flow diagram
+- [ ] Pull request opens after phase 2 merges, rebased onto main; the owner merges (track complete)
+- [ ] After #271 merges: tick 17.2 to 17.4 in `.specs/dhc-catalogue-mvp/tasks.md` with their dates (a follow-up commit on the last open phase branch, or its own small pull request)
 
 ## Final verification
 
@@ -115,8 +116,9 @@ Dependency: pull request #271 (the spec) merged before phase 1 opens its pull re
 | 2026-10-15 | 2.8 | The planned `Req 5.9` needle does not match the summary, which cites `Req 5.5, 5.8, 5.9` | A substring match | The case asserts the counts only, as cases 1, 5 and 9 do |
 | 2026-10-15 | 2.9 | The validate step was renamed between slices 2 and 3 | No test depends on it | None |
 | 2026-10-15 | refactor | The lint reads the proofs map once up front and looks definitions up in it; the violations footer cites Req 5.8 to 5.11 | One reader invocation instead of one per definition | Behaviour unchanged, suite green |
+| 2026-10-15 | phase 3 | Built on top of the phase 2 branch; the spec ticks (17.2 to 17.4 in tasks.md) are deferred | The spec amendment (#271) is not merged, so the branch has no task group 17 to tick | A follow-up once #271 merges |
 
 ---
 
 **Plan created:** 2026-10-15
-**Last updated:** 2026-10-15 (phases 1 and 2 built)
+**Last updated:** 2026-10-15 (all three phases built; pull requests queued behind #271, #272 and #273)
