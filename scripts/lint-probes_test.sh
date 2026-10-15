@@ -127,6 +127,10 @@ proofs 'app:' '  kind: smoke'
 out=$("$LINT" "$SB" 2>&1); rc=$?
 expect "a reader refusal surfaces by name and stops the lint" 1 "$rc" "$out" "app" "smoke" "Req 5.11" "nothing checked"
 
+# 15: this repository: every active definition chart-proved, no declared none proof, the lint green (the live state the reference instance ships)
+out=$("$LINT" "$HERE/.." 2>&1); rc=$?
+expect "the repository passes with zero declared none proofs" 0 "$rc" "$out" "7 active definition(s)" "0 declared none"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all lint-probes tests passed"
