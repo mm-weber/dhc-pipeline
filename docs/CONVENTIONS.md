@@ -203,7 +203,23 @@ seven; a fork lists what it stands behind. One reader,
 scopes to it (Req 1.14): the build matrix on merges, the nightly and a
 dispatch; the e2e matrix through each chart's `deploys:` list; Renovate's
 tracking scope, rendered into `renovate.json5` (task 14.2); the daily
-authenticity re-check; the probe lint (Req 5.8).
+authenticity re-check; the probe lint (Req 5.8 to 5.11).
+
+**How an active definition is proved** is declared beside the set. By
+default a chart proves it: the chart names the definition under `deploys:`
+and declares the probe the e2e suite runs once its pods are Ready (Req 5.5,
+5.8). A definition no chart deploys declares a proof of kind `none` in the
+policy file's `proofs:` map, with a reason and a review-by date (Req 5.9):
+validate prints the entry by name on every run and fails the run once the
+date has passed (Req 5.10); a kind the catalogue does not implement, an
+entry naming a definition outside the active set, a none without its reason
+or date, or a none for a definition a chart deploys is refused by name
+(Req 5.11; `scripts/definition-lib.sh`'s `proof_entries` is the one reader,
+`scripts/lint-probes.sh` the one consumer). The reference instance declares
+nothing. The declaration is what makes adding an image two pull requests:
+the definition with its none entry first, the chart after the first
+publish, when a digest exists to pin (design Decision 14; the manual's
+walkthrough).
 
 **Deactivating a definition means removing its line, and only that.** The
 directory stays (the reference demonstrates the switch; a fork may delete),
@@ -229,6 +245,9 @@ and from that moment:
   source-grouped monorepo activates or deactivates whole (Req 1.18), every
   chart still names existing definitions, and the chart gate still renders
   its chart, so the reference tree cannot rot.
+- Its `proofs:` entry, if it had one, leaves in the same pull request: the
+  reader refuses an entry naming a definition outside the active set
+  (Req 5.11), so a declaration for nothing cannot linger.
 
 Deactivation is the **avoid** treatment writ large: the catalogue stops
 standing behind new builds of the image while the record of what it did
@@ -352,10 +371,12 @@ tool pins, workflow and CI dependency pins) carry one manager each:
   the functional probe the e2e suite runs once its pods are Ready (`probe:`,
   a registration name in `test/e2e`'s `probes` map, task 14.3). One probe
   per chart, executed once per install for every definition it deploys
-  (Req 5.5). validate fails an active definition whose chart names no probe
-  (Req 5.8); a Go unit test holds declared names and registrations equal
-  both ways. There is no placeholder: a chart with nothing to prove declares
-  no probe, and its definitions stay inactive.
+  (Req 5.5). validate fails an active definition whose chart names no probe,
+  unless the policy file declares a none proof for it with a reason and a
+  review-by date (Req 5.8 to 5.11; the active-set section above); a Go unit
+  test holds declared names and registrations equal both ways. There is no
+  placeholder: a chart with nothing to prove declares no probe, and its
+  definitions stay inactive or declare their gap.
 
 ## Policy gate (Req 4.6)
 
