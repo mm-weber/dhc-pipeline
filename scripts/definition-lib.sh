@@ -185,7 +185,9 @@ active_components() { # root
 # re-decided. An entry naming a definition outside the active set is refused
 # as well, since a declaration for nothing is a stale record that leaves with
 # the deactivation; the set is read through active_definitions, so a malformed
-# set is that refusal. Every entry is checked before any is printed, so a
+# set is that refusal. A `proofs:` that is not a map, or an entry that is not
+# one (`app: none`), is refused the same way, so a wrong shape is a refusal
+# and never a traceback. Every entry is checked before any is printed, so a
 # refusal prints no entry line (the active_definitions shape).
 proof_entries() { # root -> one tab-separated line per proofs entry, declared order
   local root="${1%/}" active
@@ -193,14 +195,20 @@ proof_entries() { # root -> one tab-separated line per proofs entry, declared or
   python3 - "$root" "$active" <<'PY'
 import datetime, os, sys, yaml
 doc = yaml.safe_load(open(os.path.join(sys.argv[1], "catalogue-policy.yaml"))) or {}
-entries = doc.get("proofs") or {}
+entries = doc.get("proofs")
+if entries is None:
+    entries = {}
 active = set(sys.argv[2].splitlines())
 def refuse(msg):
     print(f"::error file=catalogue-policy.yaml::proof_entries: {msg} (Req 5.11)", file=sys.stderr)
     sys.exit(2)
+if not isinstance(entries, dict):
+    refuse(f"proofs must be a map from definition name to an entry with kind, reason and review_by, not a {type(entries).__name__}")
 for name, entry in entries.items():
     if name not in active:
         refuse(f"proofs entry '{name}' names a definition outside the active set; a declaration for nothing is a stale record, remove it with the deactivation")
+    if not isinstance(entry, dict):
+        refuse(f"proofs entry '{name}' must be a map with kind (and, for none, reason and review_by), got '{entry}'")
     kind = entry.get("kind", "")
     if kind not in ("chart", "none"):
         refuse(f"proofs entry '{name}' declares kind '{kind}', which this catalogue does not implement; the kinds are chart and none (design Decision 14 names smoke as the next)")
