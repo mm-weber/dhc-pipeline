@@ -121,6 +121,12 @@ proofs 'app:' '  kind: none' '  reason: stale record' '  review_by: "2026-11-28"
 out=$("$LINT" "$SB" 2>&1); rc=$?
 expect "a none proof for a chart-deployed definition fails naming both" 1 "$rc" "$out" "app" "chart/app/chart.yaml" "none" "Req 5.9"
 
+# 14: a refusal from the proofs reader is the lint's failure by name, nothing else checked (Req 5.11; the malformed active set precedent)
+fresh
+proofs 'app:' '  kind: smoke'
+out=$("$LINT" "$SB" 2>&1); rc=$?
+expect "a reader refusal surfaces by name and stops the lint" 1 "$rc" "$out" "app" "smoke" "Req 5.11" "nothing checked"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all lint-probes tests passed"
