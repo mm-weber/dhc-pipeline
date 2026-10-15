@@ -182,18 +182,25 @@ active_components() { # root
 # without a reason (absent, or blank) is refused the same way, and so is one
 # without a review_by date, or with one that is not an ISO date (YYYY-MM-DD,
 # bare or quoted): a declared gap says why it is there and when it is
-# re-decided. Every entry is checked before any is printed, so a refusal
-# prints no entry line (the active_definitions shape).
+# re-decided. An entry naming a definition outside the active set is refused
+# as well, since a declaration for nothing is a stale record that leaves with
+# the deactivation; the set is read through active_definitions, so a malformed
+# set is that refusal. Every entry is checked before any is printed, so a
+# refusal prints no entry line (the active_definitions shape).
 proof_entries() { # root -> one tab-separated line per proofs entry, declared order
-  local root="${1%/}"
-  python3 - "$root" <<'PY'
+  local root="${1%/}" active
+  active=$(active_definitions "$root") || return $?
+  python3 - "$root" "$active" <<'PY'
 import datetime, os, sys, yaml
 doc = yaml.safe_load(open(os.path.join(sys.argv[1], "catalogue-policy.yaml"))) or {}
 entries = doc.get("proofs") or {}
+active = set(sys.argv[2].splitlines())
 def refuse(msg):
     print(f"::error file=catalogue-policy.yaml::proof_entries: {msg} (Req 5.11)", file=sys.stderr)
     sys.exit(2)
 for name, entry in entries.items():
+    if name not in active:
+        refuse(f"proofs entry '{name}' names a definition outside the active set; a declaration for nothing is a stale record, remove it with the deactivation")
     kind = entry.get("kind", "")
     if kind not in ("chart", "none"):
         refuse(f"proofs entry '{name}' declares kind '{kind}', which this catalogue does not implement; the kinds are chart and none (design Decision 14 names smoke as the next)")
