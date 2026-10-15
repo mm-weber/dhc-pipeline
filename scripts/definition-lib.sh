@@ -175,13 +175,26 @@ active_components() { # root
 # reason and the review_by date (Req 5.8 to 5.11; task 17.2; design Decision
 # 14). This is its reader: one line per entry, name, kind, reason and
 # review_by, tab-separated, in declared order. Every field is printed as text,
-# so a review_by that YAML reads as a date prints as ISO.
+# so a review_by that YAML reads as a date prints as ISO. A kind other than
+# chart or none is refused by name (exit 2, a ::error naming the entry and the
+# kind; Req 5.11): the catalogue implements those two and no other, and a
+# kind nobody implements would read as a proof that nobody runs. Every entry
+# is checked before any is printed, so a refusal prints no entry line (the
+# active_definitions shape).
 proof_entries() { # root -> one tab-separated line per proofs entry, declared order
   local root="${1%/}"
   python3 - "$root" <<'PY'
 import os, sys, yaml
 doc = yaml.safe_load(open(os.path.join(sys.argv[1], "catalogue-policy.yaml"))) or {}
-for name, entry in (doc.get("proofs") or {}).items():
+entries = doc.get("proofs") or {}
+def refuse(msg):
+    print(f"::error file=catalogue-policy.yaml::proof_entries: {msg} (Req 5.11)", file=sys.stderr)
+    sys.exit(2)
+for name, entry in entries.items():
+    kind = entry.get("kind", "")
+    if kind not in ("chart", "none"):
+        refuse(f"proofs entry '{name}' declares kind '{kind}', which this catalogue does not implement; the kinds are chart and none (design Decision 14 names smoke as the next)")
+for name, entry in entries.items():
     print("\t".join(str(v) for v in (name, entry.get("kind", ""), entry.get("reason", ""), entry.get("review_by", ""))))
 PY
 }
