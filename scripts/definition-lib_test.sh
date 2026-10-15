@@ -275,5 +275,11 @@ def app 'image: ghcr.io/acme/imgs/app'
 policy 'active_set: [app]' 'proofs:' '  app:' '    kind: none' '    reason: drill fixture' '    review_by: 2026-11-28'
 check "proof_entries: a bare date prints as ISO" "$(printf 'app\tnone\tdrill fixture\t2026-11-28')" "$(proof_entries "$SB")"
 
+# 25: an entry of kind chart prints the name and the kind with two empty fields
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: chart'
+check "proof_entries: a chart entry prints name, chart and two empty fields" "$(printf 'app\tchart\t\t')" "$(proof_entries "$SB")"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
