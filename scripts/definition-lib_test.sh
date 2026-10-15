@@ -349,5 +349,13 @@ check "proof_entries: a scalar entry is refused (exit 2)" "2" "$rc"
 case "$out" in *"app"*"Req 5.11"*) check "proof_entries: the refusal names the scalar entry and Req 5.11" "ok" "ok" ;;
   *) check "proof_entries: the refusal names the scalar entry and Req 5.11" "names app and Req 5.11" "$out" ;; esac
 
+# 32: proof_of: an active definition no entry names is proved by a chart, the default
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+def db 'image: ghcr.io/acme/imgs/db'
+policy 'active_set: [app, db]' 'proofs:' '  db:' '    kind: none' '    reason: drill fixture' '    review_by: "2026-11-28"'
+check "proof_of: an undeclared active definition is chart" "chart" "$(proof_of "$SB" app)"
+check "proof_of: exit 0 for an undeclared definition" "0" "$(proof_of "$SB" app >/dev/null 2>&1; echo $?)"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

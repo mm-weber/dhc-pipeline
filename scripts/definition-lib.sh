@@ -227,6 +227,7 @@ for name, entry in entries.items():
     print("\t".join(str(v) for v in (name, entry.get("kind", ""), entry.get("reason", ""), entry.get("review_by", ""))))
 PY
 }
+proof_of() { :; } # stub: RED phase of task 17.2
 
 # --- authenticity (Req 1.10, 1.11, 3.8; task 11.2) ---------------------------
 # Each definition declares, beside its source url, how its upstream's
