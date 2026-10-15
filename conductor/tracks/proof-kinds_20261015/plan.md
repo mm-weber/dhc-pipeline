@@ -12,7 +12,7 @@ Three phases, one pull request each, matching spec tasks 17.2, 17.3 and 17.4. Ev
 | Phase | Pull request | Status | Progress |
 | --- | --- | --- | --- |
 | Phase 1: the declaration and its reader (17.2) | `feat: a per-definition proof declaration and its reader (Req 5.11, 7.7; task 17.2)` | in review (draft pull request opened 2026-10-15, merges after #271 and #272) | 100% |
-| Phase 2: the probe lint honours the declaration (17.3) | `feat: the probe lint honours a declared none proof (Req 5.8 to 5.10; task 17.3)` | pending | 0% |
+| Phase 2: the probe lint honours the declaration (17.3) | `feat: the probe lint honours a declared none proof (Req 5.8 to 5.10; task 17.3)` | built 2026-10-15 on branch proof-lint (on top of phase 1); pull request opens after #273 merges | 100% |
 | Phase 3: documentation and the walkthrough (17.4) | `docs: onboarding in two pull requests, the proof declaration (task 17.4)` | pending | 0% |
 
 Dependency: pull request #271 (the spec) merged before phase 1 opens its pull request.
@@ -59,23 +59,23 @@ Dependency: pull request #271 (the spec) merged before phase 1 opens its pull re
 
 ### Tasks (one slice each: RED agent, GREEN agent, orchestrator commit)
 
-- [ ] **2.1 A none entry covers an active definition with no chart** (FR-4): exit 0 and the line `lonely: proof none, drill fixture, review by 2026-11-28 (Req 5.9)`
-- [ ] **2.2 The summary counts declared nones** (FR-9): `1 declared none`
-- [ ] **2.3 A lapsed date fails by name** (FR-5): `DHC_TODAY=2026-12-01`, exit 1, `lonely`, `2026-11-28`, `Req 5.10`
-- [ ] **2.4 A date equal to today passes** (FR-5): `DHC_TODAY=2026-11-28`, exit 0
-- [ ] **2.5 The undeclared, uncovered message names the none way out** (FR-6): the existing case 4 output also contains `proof of kind none`
-- [ ] **2.6 A none entry for a chart-deployed definition fails naming both** (FR-7): `app` deployed by `chart/app` with a probe and declared none; exit 1, `app`, `chart/app/chart.yaml`
-- [ ] **2.7 A reader refusal surfaces** (FR-8): `kind: smoke`; exit 1, `Req 5.11` in the output, nothing else checked
-- [ ] **2.8 The real repository passes with zero declared nones** (FR-9): a case running the lint on the repository root, asserting `0 declared none` (the suite already runs one such case for the ledger lint; mirror it)
-- [ ] **2.9 validate.yml step renamed** (FR-10; no test beyond `scripts/lint-workflow-policy.sh .` and a yamllint of the workflow)
+- [x] **2.1 A none entry covers an active definition with no chart** (FR-4) (red 018401b, green a1814f3): exit 0 and the line `lonely: proof none, drill fixture, review by 2026-11-28 (Req 5.9)`
+- [x] **2.2 The summary counts declared nones** (FR-9) (red 7adcdc7, green 2c0cb81): `1 declared none`
+- [x] **2.3 A lapsed date fails by name** (FR-5) (red 8a95dae, green c01ab70): `DHC_TODAY=2026-12-01`, exit 1, `lonely`, `2026-11-28`, `Req 5.10`
+- [x] **2.4 A date equal to today passes** (FR-5) (guard against 2.3's green: a3f876a): `DHC_TODAY=2026-11-28`, exit 0
+- [x] **2.5 The undeclared, uncovered message names the none way out** (FR-6) (red f89d604, green 7b735af): the existing case 4 output also contains `proof of kind none`
+- [x] **2.6 A none entry for a chart-deployed definition fails naming both** (FR-7) (red 3970e37, green fc79764): `app` deployed by `chart/app` with a probe and declared none; exit 1, `app`, `chart/app/chart.yaml`
+- [x] **2.7 A reader refusal surfaces** (FR-8) (red e9a7889, green 5b203ed): `kind: smoke`; exit 1, `Req 5.11` in the output, nothing else checked
+- [x] **2.8 The real repository passes with zero declared nones** (FR-9) (guard: f39e99c): a case running the lint on the repository root, asserting `0 declared none` (the suite already runs one such case for the ledger lint; mirror it)
+- [x] **2.9 validate.yml step renamed** (FR-10; no test beyond `scripts/lint-workflow-policy.sh .` and a yamllint of the workflow) (c372d02, done between slices)
 
 ### Verification (orchestrator)
 
-- [ ] `scripts/lint-probes_test.sh` green, the eight pre-existing cases untouched
-- [ ] `scripts/lint-probes.sh .` on this repository: green, `7 active definition(s)`, `0 declared none`
-- [ ] `yamllint .github/workflows/validate.yml`; `scripts/lint-workflow-policy.sh .`
-- [ ] The validate chain rehearsed locally end to end after the last edit
-- [ ] Pull request opened; the owner merges (checkpoint)
+- [x] `scripts/lint-probes_test.sh` green, the seven pre-existing cases untouched (15 cases)
+- [x] `scripts/lint-probes.sh .` on this repository: green, `7 active definition(s)`, `0 declared none`
+- [x] `yamllint .github/workflows/validate.yml`; `scripts/lint-workflow-policy.sh .`
+- [x] The validate chain rehearsed locally end to end after the refactor commit (cf7139e)
+- [ ] Pull request opens after #273 merges (the branch is rebased onto main then); the owner merges (checkpoint)
 
 ## Phase 3: documentation and the walkthrough (task 17.4)
 
@@ -110,8 +110,13 @@ Dependency: pull request #271 (the spec) merged before phase 1 opens its pull re
 | 2026-10-15 | 1.13 | The declared-line and refusal-propagation tests passed against 1.12's implementation | The minimal lookup already printed the matching line and used `\|\| return $?` | Committed as guards |
 | 2026-10-15 | 1.9 | `date.fromisoformat` accepts the basic form `"20261128"`; a bare impossible date fails in the YAML loader with a traceback | Python's parser; PyYAML resolves bare dates before the reader runs, as for every reader of the policy file | Noted in the pull request; no guard added |
 | 2026-10-15 | 1.6 to 1.13 | Red tests for slices 12 and 13 were written in parallel with slice 11's green | Tests only, in scratch copies; applied in order after the green commit | None |
+| 2026-10-15 | phase 2 | Built on top of the phase 1 branch instead of main | Phase 1 was still in review; the lint needs the reader | The pull request opens after #273 merges, rebased onto main so it carries only phase 2 |
+| 2026-10-15 | 2.4, 2.8 | Both passed against the previous green | A boundary guard and a live-state guard | Committed as guards |
+| 2026-10-15 | 2.8 | The planned `Req 5.9` needle does not match the summary, which cites `Req 5.5, 5.8, 5.9` | A substring match | The case asserts the counts only, as cases 1, 5 and 9 do |
+| 2026-10-15 | 2.9 | The validate step was renamed between slices 2 and 3 | No test depends on it | None |
+| 2026-10-15 | refactor | The lint reads the proofs map once up front and looks definitions up in it; the violations footer cites Req 5.8 to 5.11 | One reader invocation instead of one per definition | Behaviour unchanged, suite green |
 
 ---
 
 **Plan created:** 2026-10-15
-**Last updated:** 2026-10-15 (phase 1 built)
+**Last updated:** 2026-10-15 (phases 1 and 2 built)
