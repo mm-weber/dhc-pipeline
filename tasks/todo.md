@@ -66,10 +66,14 @@ The older plans below it stay as history.
       local build), hand the owner the exact go.mod lines; then the definition
       in native DHI syntax (authenticity class signed-commit, named a drill in
       `name:` and the README row), the active-set entry, the policy file's
-      declaration. Watch 5.8: every active definition must be deployed by a
-      chart declaring a probe; the task text keeps drill-app out of the e2e by
-      design, so either a minimal chart with a probe or a stated exemption is
-      needed, decided before the pull request. Expected live: the gate blocks
+      declaration. 5.8 decided 2026-10-15 (design Decision 14, task group 17,
+      PR #271): no chart; the definition is the first declared proof of kind
+      none in the policy file's `proofs:` map, reason "live-drill fixture,
+      never installed by design", review_by at its retirement (16.16); waits
+      for the reader (PR #273) and the lint (the proof-lint branch) to merge.
+      The repository mm-weber/drill-app exists since 2026-10-15 (v0.1.0 at
+      b7868d7, gorilla/handlers v1.2.1 and golang-jwt/jwt/v5 v5.2.1, rulesets
+      as hardened-app). Expected live: the gate blocks
       the pull request naming both findings (6.1), decisions one finding at a
       time in reach order with govulncheck evidence (6.13): the CRITICAL
       under a time-boxed exception, the KEV HIGH left undecided for 16.3; the
@@ -106,7 +110,9 @@ The older plans below it stay as history.
       another key; the daily re-verification files the first true mismatch
       issue; owner decides and restores; the issue closes with the reason.
 - [ ] 16.11 Deactivation (1.13 to 1.16, 1.19): drill-app leaves the active
-      set; matrices and ignorePaths exclude it; no new digest or tag; the
+      set, and its proofs entry leaves in the same pull request (the reader
+      refuses an entry for an inactive name, Req 5.11); matrices and
+      ignorePaths exclude it; no new digest or tag; the
       inactive-digest check passes with something to check; two drill
       branches, never merged: a bump of the inactive definition (1.16), a
       removed directory with the policy entry kept (1.19).
