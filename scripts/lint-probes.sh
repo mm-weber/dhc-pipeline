@@ -23,7 +23,9 @@
 # `proofs:` map, a `none` proof with a reason and a review_by date, read through
 # proof_of (definition-lib.sh). A none proof is printed by name, with its reason
 # and review date, and the definition passes (Req 5.9); the summary counts the
-# none proofs beside the probe registrations.
+# none proofs beside the probe registrations. A none proof whose review_by date
+# is strictly before today has lapsed and is a violation naming the definition
+# and the date (Req 5.10); DHC_TODAY is the clock seam the tests set.
 set -euo pipefail
 
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -31,6 +33,7 @@ ROOT="${ROOT%/}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/definition-lib.sh
 . "$HERE/definition-lib.sh"
+today="${DHC_TODAY:-$(date -u +%F)}"
 
 violations=0
 err() { echo "::error file=$1::lint-probes: $2"; violations=$((violations + 1)); }
@@ -68,6 +71,10 @@ while IFS= read -r n; do
   proof=$(proof_of "$ROOT" "$n" 2>&1) || true
   IFS=$'\t' read -r _ pkind preason preview <<<"$proof"
   if [ "$pkind" = none ]; then
+    if [[ "$preview" < "$today" ]]; then
+      err "catalogue-policy.yaml" "none proof for '${n}' lapsed on ${preview}; re-decide it with a fresh review-by date, or give the definition a chart with a probe (Req 5.10)"
+      continue
+    fi
     echo "lint-probes: ${n}: proof none, ${preason}, review by ${preview} (Req 5.9)"
     nones=$((nones + 1))
     continue
