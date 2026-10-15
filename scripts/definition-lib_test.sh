@@ -364,5 +364,15 @@ def db 'image: ghcr.io/acme/imgs/db'
 policy 'active_set: [app, db]' 'proofs:' '  db:' '    kind: none' '    reason: drill fixture' '    review_by: "2026-11-28"'
 check "proof_of: a declared definition prints its entry line" "$(printf 'db\tnone\tdrill fixture\t2026-11-28')" "$(proof_of "$SB" db)"
 
+# 34: proof_of: a refused map is that refusal, never a default answer
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: smoke'
+out=$(proof_of "$SB" app 2>&1); rc=$?
+check "proof_of: a refused map exits 2" "2" "$rc"
+case "$out" in *"app"*"smoke"*"Req 5.11"*) check "proof_of: the refusal is the reader's, naming the entry" "ok" "ok" ;;
+  *) check "proof_of: the refusal is the reader's, naming the entry" "names app, smoke and Req 5.11" "$out" ;; esac
+check "proof_of: a refused map prints no answer" "" "$(proof_of "$SB" app 2>/dev/null)"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
