@@ -18,6 +18,11 @@
 # never a probe that passes by doing nothing (the task 6.3 lesson: a box
 # ticked for a probe the suite did not have). An inactive definition without
 # a probe is not a violation; nothing installs it.
+#
+# A definition no chart deploys may instead declare, in catalogue-policy.yaml's
+# `proofs:` map, a `none` proof with a reason and a review_by date, read through
+# proof_of (definition-lib.sh). A none proof is printed by name, with its reason
+# and review date, and the definition passes (Req 5.9).
 set -euo pipefail
 
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -59,6 +64,12 @@ declare -A probes_used=()
 while IFS= read -r n; do
   [ -n "$n" ] || continue
   count=$((count + 1))
+  proof=$(proof_of "$ROOT" "$n" 2>&1) || true
+  IFS=$'\t' read -r _ pkind preason preview <<<"$proof"
+  if [ "$pkind" = none ]; then
+    echo "lint-probes: ${n}: proof none, ${preason}, review by ${preview} (Req 5.9)"
+    continue
+  fi
   if [ -z "${charts_of[$n]:-}" ]; then
     err "catalogue-policy.yaml" "active definition '${n}' is deployed by no chart, so no functional probe covers it; give it a chart with a probe or deactivate it (Req 5.8)"
     continue
