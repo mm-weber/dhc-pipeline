@@ -29,6 +29,10 @@
 # proof is only for a definition no chart deploys: declaring one for a
 # chart-deployed definition is a violation reported against that chart, since
 # one proof per definition means the chart's probe is the proof (Req 5.9).
+# The proofs map is read whole, up front, through proof_entries: its refusal
+# (an unknown kind, a none proof without its reason or review_by, an entry
+# naming a definition outside the active set) is the lint's failure by name
+# and nothing is checked, as for a malformed active set (Req 5.11).
 set -euo pipefail
 
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -44,6 +48,11 @@ err() { echo "::error file=$1::lint-probes: $2"; violations=$((violations + 1));
 if ! active=$(active_definitions "$ROOT" 2>&1); then
   printf '%s\n' "$active"
   echo "lint-probes: the active set is malformed; nothing checked (Req 5.8 binds to the active set)"
+  exit 1
+fi
+if ! proofs=$(proof_entries "$ROOT" 2>&1); then
+  printf '%s\n' "$proofs"
+  echo "lint-probes: the proofs declaration is malformed; nothing checked (Req 5.11)"
   exit 1
 fi
 
@@ -71,7 +80,7 @@ declare -A probes_used=()
 while IFS= read -r n; do
   [ -n "$n" ] || continue
   count=$((count + 1))
-  proof=$(proof_of "$ROOT" "$n" 2>&1) || true
+  proof=$(proof_of "$ROOT" "$n" 2>&1)
   IFS=$'\t' read -r _ pkind preason preview <<<"$proof"
   if [ "$pkind" = none ]; then
     if [ -n "${charts_of[$n]:-}" ]; then
