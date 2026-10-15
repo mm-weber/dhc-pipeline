@@ -334,5 +334,20 @@ case "$out" in *"old"*"active"*"Req 5.11"*) check "proof_entries: the refusal na
   *) check "proof_entries: the refusal names the entry, the active set and Req 5.11" "names old, active and Req 5.11" "$out" ;; esac
 check "proof_entries: an inactive entry prints no entry line" "" "$(proof_entries "$SB" 2>/dev/null)"
 
+# 31: a proofs: that is not a map, or an entry that is not a map, is refused by name (Req 5.11), never a traceback
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  - app'
+out=$(proof_entries "$SB" 2>&1); rc=$?
+check "proof_entries: a proofs list is refused (exit 2)" "2" "$rc"
+case "$out" in *"proofs"*"map"*"Req 5.11"*) check "proof_entries: the refusal names proofs, the map shape and Req 5.11" "ok" "ok" ;;
+  *) check "proof_entries: the refusal names proofs, the map shape and Req 5.11" "names proofs, map and Req 5.11" "$out" ;; esac
+check "proof_entries: a proofs list prints no entry line" "" "$(proof_entries "$SB" 2>/dev/null)"
+policy 'active_set: [app]' 'proofs:' '  app: none'
+out=$(proof_entries "$SB" 2>&1); rc=$?
+check "proof_entries: a scalar entry is refused (exit 2)" "2" "$rc"
+case "$out" in *"app"*"Req 5.11"*) check "proof_entries: the refusal names the scalar entry and Req 5.11" "ok" "ok" ;;
+  *) check "proof_entries: the refusal names the scalar entry and Req 5.11" "names app and Req 5.11" "$out" ;; esac
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
