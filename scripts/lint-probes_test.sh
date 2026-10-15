@@ -95,6 +95,13 @@ proofs 'lonely:' '  kind: none' '  reason: drill fixture' '  review_by: "2026-11
 out=$("$LINT" "$SB" 2>&1); rc=$?
 expect "the summary counts declared none proofs" 0 "$rc" "$out" "6 active definition(s)" "1 declared none"
 
+# 10: a none proof whose review_by date has passed fails naming the definition and the date (Req 5.10); DHC_TODAY is the clock seam
+fresh; mkdir -p "$SB/image/lonely"; printf 'image: ghcr.io/acme/imgs/lonely\n' > "$SB/image/lonely/image.yaml"
+policy app cm-a cm-b db db-compat lonely
+proofs 'lonely:' '  kind: none' '  reason: drill fixture' '  review_by: "2026-11-28"'
+out=$(DHC_TODAY=2026-12-01 "$LINT" "$SB" 2>&1); rc=$?
+expect "a lapsed none proof fails by name" 1 "$rc" "$out" "lonely" "2026-11-28" "lapsed" "Req 5.10"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all lint-probes tests passed"
