@@ -291,5 +291,17 @@ case "$out" in *"app"*"smoke"*"Req 5.11"*) check "proof_entries: the refusal nam
   *) check "proof_entries: the refusal names the entry, the kind and Req 5.11" "names app, smoke and Req 5.11" "$out" ;; esac
 check "proof_entries: a refused map prints no entry line" "" "$(proof_entries "$SB" 2>/dev/null)"
 
+# 27: a none entry without a reason is refused by name (Req 5.11): absent, or an empty string
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: none' '    review_by: "2026-11-28"'
+out=$(proof_entries "$SB" 2>&1); rc=$?
+check "proof_entries: a none entry without reason is refused (exit 2)" "2" "$rc"
+case "$out" in *"app"*"reason"*"Req 5.11"*) check "proof_entries: the refusal names the entry, reason and Req 5.11" "ok" "ok" ;;
+  *) check "proof_entries: the refusal names the entry, reason and Req 5.11" "names app, reason and Req 5.11" "$out" ;; esac
+check "proof_entries: a none without reason prints no entry line" "" "$(proof_entries "$SB" 2>/dev/null)"
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: none' '    reason: ""' '    review_by: "2026-11-28"'
+check "proof_entries: an empty reason is refused (exit 2)" "2" "$(proof_entries "$SB" >/dev/null 2>&1; echo $?)"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
