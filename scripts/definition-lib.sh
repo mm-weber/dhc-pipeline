@@ -178,9 +178,10 @@ active_components() { # root
 # so a review_by that YAML reads as a date prints as ISO. A kind other than
 # chart or none is refused by name (exit 2, a ::error naming the entry and the
 # kind; Req 5.11): the catalogue implements those two and no other, and a
-# kind nobody implements would read as a proof that nobody runs. Every entry
-# is checked before any is printed, so a refusal prints no entry line (the
-# active_definitions shape).
+# kind nobody implements would read as a proof that nobody runs. A none entry
+# without a reason (absent, or blank) is refused the same way: a declared gap
+# says why it is there. Every entry is checked before any is printed, so a
+# refusal prints no entry line (the active_definitions shape).
 proof_entries() { # root -> one tab-separated line per proofs entry, declared order
   local root="${1%/}"
   python3 - "$root" <<'PY'
@@ -194,6 +195,9 @@ for name, entry in entries.items():
     kind = entry.get("kind", "")
     if kind not in ("chart", "none"):
         refuse(f"proofs entry '{name}' declares kind '{kind}', which this catalogue does not implement; the kinds are chart and none (design Decision 14 names smoke as the next)")
+    reason = entry.get("reason")
+    if kind == "none" and (reason is None or not str(reason).strip()):
+        refuse(f"proofs entry '{name}' is a none proof without a reason; a declared gap says why it is there")
 for name, entry in entries.items():
     print("\t".join(str(v) for v in (name, entry.get("kind", ""), entry.get("reason", ""), entry.get("review_by", ""))))
 PY
