@@ -115,6 +115,12 @@ policy app cm-a cm-b db db-compat lonely
 out=$("$LINT" "$SB" 2>&1); rc=$?
 expect "the uncovered refusal names the none way out" 1 "$rc" "$out" "lonely" "no chart" "proof of kind none" "Req 5.8"
 
+# 13: a none proof for a definition a chart deploys is a contradiction: one proof per definition, the stale entry must go (Req 5.8, 5.9)
+fresh
+proofs 'app:' '  kind: none' '  reason: stale record' '  review_by: "2026-11-28"'
+out=$("$LINT" "$SB" 2>&1); rc=$?
+expect "a none proof for a chart-deployed definition fails naming both" 1 "$rc" "$out" "app" "chart/app/chart.yaml" "none" "Req 5.9"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all lint-probes tests passed"
