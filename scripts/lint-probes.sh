@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # lint-probes.sh [root]
 #
-# Req 5.8 (task 14.3): every active definition declares a functional probe,
-# or validate fails naming the definition. A definition declares its probe
+# Req 5.8 to 5.11 (tasks 14.3, 17.3): every active definition declares a
+# functional proof, a chart's probe or a declared none, or validate fails
+# naming the definition. A definition declares its probe
 # through the chart that deploys it: chart/<c>/chart.yaml names the
 # definitions it deploys (`deploys:`, task 14.2) and the probe the e2e suite
 # runs once its pods are Ready (`probe:`, a registration name the suite's
@@ -21,7 +22,7 @@
 #
 # A definition no chart deploys may instead declare, in catalogue-policy.yaml's
 # `proofs:` map, a `none` proof with a reason and a review_by date, read through
-# proof_of (definition-lib.sh). A none proof is printed by name, with its reason
+# proof_entries (definition-lib.sh). A none proof is printed by name, with its reason
 # and review date, and the definition passes (Req 5.9); the summary counts the
 # none proofs beside the probe registrations. A none proof whose review_by date
 # is strictly before today has lapsed and is a violation naming the definition
@@ -55,6 +56,13 @@ if ! proofs=$(proof_entries "$ROOT" 2>&1); then
   echo "lint-probes: the proofs declaration is malformed; nothing checked (Req 5.11)"
   exit 1
 fi
+# The declaration per definition, keyed by name, from the one read above;
+# a name with no entry is proved by a chart (the proof_of default).
+declare -A proof_line=()
+while IFS= read -r line; do
+  [ -n "$line" ] || continue
+  proof_line["${line%%$'\t'*}"]="$line"
+done <<<"$proofs"
 
 # Per chart: its probe (or empty) and the definitions it deploys.
 declare -A probe_of=() charts_of=()
@@ -80,7 +88,7 @@ declare -A probes_used=()
 while IFS= read -r n; do
   [ -n "$n" ] || continue
   count=$((count + 1))
-  proof=$(proof_of "$ROOT" "$n" 2>&1)
+  proof="${proof_line[$n]:-chart}"
   IFS=$'\t' read -r _ pkind preason preview <<<"$proof"
   if [ "$pkind" = none ]; then
     if [ -n "${charts_of[$n]:-}" ]; then
@@ -113,7 +121,7 @@ while IFS= read -r n; do
 done <<<"$active"
 
 if [ "$violations" -gt 0 ]; then
-  echo "lint-probes: ${violations} violation(s) (Req 5.8)"
+  echo "lint-probes: ${violations} violation(s) (Req 5.8 to 5.11)"
   exit 1
 fi
 echo "lint-probes: ${count} active definition(s): $((count - nones)) covered by ${#probes_used[@]} probe registration(s), each executed once per install, ${nones} declared none (Req 5.5, 5.8, 5.9)"
