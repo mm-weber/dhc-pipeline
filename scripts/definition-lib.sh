@@ -175,20 +175,21 @@ active_components() { # root
 # reason and the review_by date (Req 5.8 to 5.11; task 17.2; design Decision
 # 14). This is its reader: one line per entry, name, kind, reason and
 # review_by, tab-separated, in declared order. Every field is printed as text,
-# so a review_by that YAML reads as a date prints as ISO. A kind other than
-# chart or none is refused by name (exit 2, a ::error naming the entry and the
-# kind; Req 5.11): the catalogue implements those two and no other, and a
-# kind nobody implements would read as a proof that nobody runs. A none entry
-# without a reason (absent, or blank) is refused the same way, and so is one
-# without a review_by date, or with one that is not an ISO date (YYYY-MM-DD,
-# bare or quoted): a declared gap says why it is there and when it is
-# re-decided. An entry naming a definition outside the active set is refused
-# as well, since a declaration for nothing is a stale record that leaves with
-# the deactivation; the set is read through active_definitions, so a malformed
-# set is that refusal. A `proofs:` that is not a map, or an entry that is not
-# one (`app: none`), is refused the same way, so a wrong shape is a refusal
-# and never a traceback. Every entry is checked before any is printed, so a
-# refusal prints no entry line (the active_definitions shape).
+# so a review_by that YAML reads as a date prints as ISO.
+#
+# Malformed input is a refusal by name (exit 2, a ::error naming the entry;
+# Req 5.11), never an empty answer and never a traceback, in the order the
+# code checks it: a `proofs:` that is not a map, or an entry that is not one
+# (`app: none`); an entry naming a definition outside the active set, since a
+# declaration for nothing is a stale record that leaves with the deactivation
+# (the set is read through active_definitions, so a malformed set is that
+# refusal); a kind other than chart or none, because the catalogue implements
+# those two and no other, and a kind nobody implements would read as a proof
+# that nobody runs; a none entry without a reason (absent, or blank), without
+# a review_by date, or with one that is not an ISO date (YYYY-MM-DD, bare or
+# quoted), because a declared gap says why it is there and when it is
+# re-decided. Every entry is checked before any is printed, so a refusal
+# prints no entry line (the active_definitions shape).
 proof_entries() { # root -> one tab-separated line per proofs entry, declared order
   local root="${1%/}" active
   active=$(active_definitions "$root") || return $?
@@ -212,17 +213,17 @@ for name, entry in entries.items():
     kind = entry.get("kind", "")
     if kind not in ("chart", "none"):
         refuse(f"proofs entry '{name}' declares kind '{kind}', which this catalogue does not implement; the kinds are chart and none (design Decision 14 names smoke as the next)")
-    reason = entry.get("reason")
-    if kind == "none" and (reason is None or not str(reason).strip()):
-        refuse(f"proofs entry '{name}' is a none proof without a reason; a declared gap says why it is there")
-    review_by = entry.get("review_by")
-    if kind == "none" and (review_by is None or not str(review_by).strip()):
-        refuse(f"proofs entry '{name}' is a none proof without a review_by date; a declared gap says when it is re-decided")
-    if kind == "none" and type(review_by) is not datetime.date:
-        try:
-            datetime.date.fromisoformat(review_by)
-        except (TypeError, ValueError):
-            refuse(f"proofs entry '{name}' has review_by '{review_by}', not an ISO date (YYYY-MM-DD)")
+    if kind == "none":
+        reason, review_by = entry.get("reason"), entry.get("review_by")
+        if reason is None or not str(reason).strip():
+            refuse(f"proofs entry '{name}' is a none proof without a reason; a declared gap says why it is there")
+        if review_by is None or not str(review_by).strip():
+            refuse(f"proofs entry '{name}' is a none proof without a review_by date; a declared gap says when it is re-decided")
+        if type(review_by) is not datetime.date:
+            try:
+                datetime.date.fromisoformat(review_by)
+            except (TypeError, ValueError):
+                refuse(f"proofs entry '{name}' has review_by '{review_by}', not an ISO date (YYYY-MM-DD)")
 for name, entry in entries.items():
     print("\t".join(str(v) for v in (name, entry.get("kind", ""), entry.get("reason", ""), entry.get("review_by", ""))))
 PY
