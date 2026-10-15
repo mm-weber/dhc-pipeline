@@ -281,5 +281,15 @@ def app 'image: ghcr.io/acme/imgs/app'
 policy 'active_set: [app]' 'proofs:' '  app:' '    kind: chart'
 check "proof_entries: a chart entry prints name, chart and two empty fields" "$(printf 'app\tchart\t\t')" "$(proof_entries "$SB")"
 
+# 26: a kind the catalogue does not implement is refused by name (Req 5.11): exit 2, the entry named, nothing printed
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: smoke'
+out=$(proof_entries "$SB" 2>&1); rc=$?
+check "proof_entries: an unknown kind is refused (exit 2)" "2" "$rc"
+case "$out" in *"app"*"smoke"*"Req 5.11"*) check "proof_entries: the refusal names the entry, the kind and Req 5.11" "ok" "ok" ;;
+  *) check "proof_entries: the refusal names the entry, the kind and Req 5.11" "names app, smoke and Req 5.11" "$out" ;; esac
+check "proof_entries: a refused map prints no entry line" "" "$(proof_entries "$SB" 2>/dev/null)"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
