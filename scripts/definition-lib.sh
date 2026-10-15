@@ -227,7 +227,21 @@ for name, entry in entries.items():
     print("\t".join(str(v) for v in (name, entry.get("kind", ""), entry.get("reason", ""), entry.get("review_by", ""))))
 PY
 }
-proof_of() { :; } # stub: RED phase of task 17.2
+
+# proof_of <root> <definition> -> the one definition's proof: its proofs entry
+# line, in the proof_entries shape, when the map names it; else the single
+# word chart, because an active definition no entry declares is proved the
+# way Req 5.8 already demands, by the chart that deploys it (Req 5.8 to 5.11;
+# task 17.2). Reads through proof_entries rather than parsing the policy a
+# second time, so a refused map is that reader's refusal and prints nothing.
+proof_of() { # root, definition
+  local entries line
+  entries=$(proof_entries "$1") || return $?
+  while IFS= read -r line; do
+    [ "${line%%$'\t'*}" = "$2" ] && { printf '%s\n' "$line"; return 0; }
+  done <<<"$entries"
+  echo chart
+}
 
 # --- authenticity (Req 1.10, 1.11, 3.8; task 11.2) ---------------------------
 # Each definition declares, beside its source url, how its upstream's
