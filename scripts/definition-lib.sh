@@ -179,9 +179,10 @@ active_components() { # root
 # chart or none is refused by name (exit 2, a ::error naming the entry and the
 # kind; Req 5.11): the catalogue implements those two and no other, and a
 # kind nobody implements would read as a proof that nobody runs. A none entry
-# without a reason (absent, or blank) is refused the same way: a declared gap
-# says why it is there. Every entry is checked before any is printed, so a
-# refusal prints no entry line (the active_definitions shape).
+# without a reason (absent, or blank) is refused the same way, and so is one
+# without a review_by date: a declared gap says why it is there and when it is
+# re-decided. Every entry is checked before any is printed, so a refusal
+# prints no entry line (the active_definitions shape).
 proof_entries() { # root -> one tab-separated line per proofs entry, declared order
   local root="${1%/}"
   python3 - "$root" <<'PY'
@@ -198,6 +199,9 @@ for name, entry in entries.items():
     reason = entry.get("reason")
     if kind == "none" and (reason is None or not str(reason).strip()):
         refuse(f"proofs entry '{name}' is a none proof without a reason; a declared gap says why it is there")
+    review_by = entry.get("review_by")
+    if kind == "none" and (review_by is None or not str(review_by).strip()):
+        refuse(f"proofs entry '{name}' is a none proof without a review_by date; a declared gap says when it is re-decided")
 for name, entry in entries.items():
     print("\t".join(str(v) for v in (name, entry.get("kind", ""), entry.get("reason", ""), entry.get("review_by", ""))))
 PY
