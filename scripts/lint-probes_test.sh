@@ -37,6 +37,8 @@ chart() { # dir probe deploys...
   { [ -n "$p" ] && printf 'probe: %s\n' "$p"; printf 'deploys:\n'; printf '  - %s\n' "$@"; } > "$SB/chart/$d/chart.yaml"
 }
 policy() { { printf 'active_set:\n'; printf '  - %s\n' "$@"; } > "$SB/catalogue-policy.yaml"; }
+# proofs: append a proofs: block to the policy file; each argument is one line, already indented relative to its entry
+proofs() { printf 'proofs:\n' >> "$SB/catalogue-policy.yaml"; printf '  %s\n' "$@" >> "$SB/catalogue-policy.yaml"; }
 
 # 1: every active definition is deployed by a chart with a probe; the
 #    summary counts definitions and the distinct probes covering them
@@ -78,6 +80,13 @@ expect "a non-string probe is refused naming the chart" 1 "$rc" "$out" "chart/ap
 fresh; policy app typo
 out=$("$LINT" "$SB" 2>&1); rc=$?
 expect "a malformed active set fails naming the entry" 1 "$rc" "$out" "typo"
+
+# 8: an active definition no chart deploys passes when the policy file declares a none proof for it, and the declaration is printed by name (Req 5.9)
+fresh; mkdir -p "$SB/image/lonely"; printf 'image: ghcr.io/acme/imgs/lonely\n' > "$SB/image/lonely/image.yaml"
+policy app cm-a cm-b db db-compat lonely
+proofs 'lonely:' '  kind: none' '  reason: drill fixture' '  review_by: "2026-11-28"'
+out=$("$LINT" "$SB" 2>&1); rc=$?
+expect "a declared none proof covers an uncovered active definition and is printed by name" 0 "$rc" "$out" "lonely" "proof none" "drill fixture" "2026-11-28" "Req 5.9"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
