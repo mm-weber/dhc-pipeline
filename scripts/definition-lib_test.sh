@@ -259,5 +259,15 @@ policy 'active_set: [app]' 'proofs:' '  app:' '    kind: none' '    reason: dril
 check "proof_entries: a none entry prints name, kind, reason and review_by" "$(printf 'app\tnone\tdrill fixture\t2026-11-28')" "$(proof_entries "$SB")"
 check "proof_entries: exit 0 on a well-formed map" "0" "$(proof_entries "$SB" >/dev/null 2>&1; echo $?)"
 
+# 23: nothing declared is nothing printed: no proofs: key, or an empty map, both exit 0 with no output
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]'
+check "proof_entries: no proofs key prints nothing" "" "$(proof_entries "$SB" 2>/dev/null)"
+check "proof_entries: no proofs key exits 0" "0" "$(proof_entries "$SB" >/dev/null 2>&1; echo $?)"
+policy 'active_set: [app]' 'proofs: {}'
+check "proof_entries: an empty proofs map prints nothing" "" "$(proof_entries "$SB" 2>/dev/null)"
+check "proof_entries: an empty proofs map exits 0" "0" "$(proof_entries "$SB" >/dev/null 2>&1; echo $?)"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
