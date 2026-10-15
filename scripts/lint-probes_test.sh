@@ -102,6 +102,13 @@ proofs 'lonely:' '  kind: none' '  reason: drill fixture' '  review_by: "2026-11
 out=$(DHC_TODAY=2026-12-01 "$LINT" "$SB" 2>&1); rc=$?
 expect "a lapsed none proof fails by name" 1 "$rc" "$out" "lonely" "2026-11-28" "lapsed" "Req 5.10"
 
+# 11: a review_by equal to today has not passed; the boundary is strictly before today (Req 5.10)
+fresh; mkdir -p "$SB/image/lonely"; printf 'image: ghcr.io/acme/imgs/lonely\n' > "$SB/image/lonely/image.yaml"
+policy app cm-a cm-b db db-compat lonely
+proofs 'lonely:' '  kind: none' '  reason: drill fixture' '  review_by: "2026-11-28"'
+out=$(DHC_TODAY=2026-11-28 "$LINT" "$SB" 2>&1); rc=$?
+expect "a review_by equal to today has not lapsed" 0 "$rc" "$out" "lonely" "proof none" "Req 5.9"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all lint-probes tests passed"
