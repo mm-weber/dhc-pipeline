@@ -25,7 +25,10 @@
 # and review date, and the definition passes (Req 5.9); the summary counts the
 # none proofs beside the probe registrations. A none proof whose review_by date
 # is strictly before today has lapsed and is a violation naming the definition
-# and the date (Req 5.10); DHC_TODAY is the clock seam the tests set.
+# and the date (Req 5.10); DHC_TODAY is the clock seam the tests set. A none
+# proof is only for a definition no chart deploys: declaring one for a
+# chart-deployed definition is a violation reported against that chart, since
+# one proof per definition means the chart's probe is the proof (Req 5.9).
 set -euo pipefail
 
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -71,6 +74,12 @@ while IFS= read -r n; do
   proof=$(proof_of "$ROOT" "$n" 2>&1) || true
   IFS=$'\t' read -r _ pkind preason preview <<<"$proof"
   if [ "$pkind" = none ]; then
+    if [ -n "${charts_of[$n]:-}" ]; then
+      for c in ${charts_of[$n]}; do
+        err "chart/${c}/chart.yaml" "active definition '${n}' declares a proof of kind none, but chart/${c}/ deploys it; one proof per definition: the chart's probe proves it, so remove the stale proofs entry (Req 5.9)"
+      done
+      continue
+    fi
     if [[ "$preview" < "$today" ]]; then
       err "catalogue-policy.yaml" "none proof for '${n}' lapsed on ${preview}; re-decide it with a fresh review-by date, or give the definition a chart with a probe (Req 5.10)"
       continue
