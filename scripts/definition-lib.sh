@@ -169,6 +169,9 @@ active_components() { # root
   return 0
 }
 
+# --- the functional proof per definition (Req 5.8 to 5.11; task 17.2) --------
+proof_entries() { :; } # stub: RED phase of task 17.2
+
 # --- authenticity (Req 1.10, 1.11, 3.8; task 11.2) ---------------------------
 # Each definition declares, beside its source url, how its upstream's
 # authenticity is established:

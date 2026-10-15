@@ -248,5 +248,16 @@ check "definition_tags: no tags key, nothing" "" "$(definition_tags "$SB/image/a
 fresh; def app 'image: ghcr.io/mm-weber/dhc/app' 'tags: [1-alpine3.23, 1.2-alpine3.23]'
 check "definition_tags: flow style reads the same" "1-alpine3.23,1.2-alpine3.23" "$(definition_tags "$SB/image/app/image.yaml" | paste -sd,)"
 
+# --- the functional proof per definition (Req 5.8 to 5.11; task 17.2) --------
+# catalogue-policy.yaml's `proofs:` map names, per definition, how it is proven:
+# kind chart or none; a none entry carries the reason and a review_by date.
+
+# 22: a none entry for an active definition prints its line: name, kind, reason, review_by, tab-separated
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: none' '    reason: drill fixture' '    review_by: "2026-11-28"'
+check "proof_entries: a none entry prints name, kind, reason and review_by" "$(printf 'app\tnone\tdrill fixture\t2026-11-28')" "$(proof_entries "$SB")"
+check "proof_entries: exit 0 on a well-formed map" "0" "$(proof_entries "$SB" >/dev/null 2>&1; echo $?)"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
