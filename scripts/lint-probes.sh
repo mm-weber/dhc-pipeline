@@ -22,7 +22,8 @@
 # A definition no chart deploys may instead declare, in catalogue-policy.yaml's
 # `proofs:` map, a `none` proof with a reason and a review_by date, read through
 # proof_of (definition-lib.sh). A none proof is printed by name, with its reason
-# and review date, and the definition passes (Req 5.9).
+# and review date, and the definition passes (Req 5.9); the summary counts the
+# none proofs beside the probe registrations.
 set -euo pipefail
 
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -59,7 +60,7 @@ for d in "$ROOT"/chart/*/; do
   fi
 done
 
-count=0
+count=0 nones=0
 declare -A probes_used=()
 while IFS= read -r n; do
   [ -n "$n" ] || continue
@@ -68,6 +69,7 @@ while IFS= read -r n; do
   IFS=$'\t' read -r _ pkind preason preview <<<"$proof"
   if [ "$pkind" = none ]; then
     echo "lint-probes: ${n}: proof none, ${preason}, review by ${preview} (Req 5.9)"
+    nones=$((nones + 1))
     continue
   fi
   if [ -z "${charts_of[$n]:-}" ]; then
@@ -89,4 +91,4 @@ if [ "$violations" -gt 0 ]; then
   echo "lint-probes: ${violations} violation(s) (Req 5.8)"
   exit 1
 fi
-echo "lint-probes: ${count} active definition(s) covered by ${#probes_used[@]} probe registration(s), each executed once per install (Req 5.5, 5.8)"
+echo "lint-probes: ${count} active definition(s): $((count - nones)) covered by ${#probes_used[@]} probe registration(s), each executed once per install, ${nones} declared none (Req 5.5, 5.8, 5.9)"
