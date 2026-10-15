@@ -180,13 +180,14 @@ active_components() { # root
 # kind; Req 5.11): the catalogue implements those two and no other, and a
 # kind nobody implements would read as a proof that nobody runs. A none entry
 # without a reason (absent, or blank) is refused the same way, and so is one
-# without a review_by date: a declared gap says why it is there and when it is
+# without a review_by date, or with one that is not an ISO date (YYYY-MM-DD,
+# bare or quoted): a declared gap says why it is there and when it is
 # re-decided. Every entry is checked before any is printed, so a refusal
 # prints no entry line (the active_definitions shape).
 proof_entries() { # root -> one tab-separated line per proofs entry, declared order
   local root="${1%/}"
   python3 - "$root" <<'PY'
-import os, sys, yaml
+import datetime, os, sys, yaml
 doc = yaml.safe_load(open(os.path.join(sys.argv[1], "catalogue-policy.yaml"))) or {}
 entries = doc.get("proofs") or {}
 def refuse(msg):
@@ -202,6 +203,11 @@ for name, entry in entries.items():
     review_by = entry.get("review_by")
     if kind == "none" and (review_by is None or not str(review_by).strip()):
         refuse(f"proofs entry '{name}' is a none proof without a review_by date; a declared gap says when it is re-decided")
+    if kind == "none" and type(review_by) is not datetime.date:
+        try:
+            datetime.date.fromisoformat(review_by)
+        except (TypeError, ValueError):
+            refuse(f"proofs entry '{name}' has review_by '{review_by}', not an ISO date (YYYY-MM-DD)")
 for name, entry in entries.items():
     print("\t".join(str(v) for v in (name, entry.get("kind", ""), entry.get("reason", ""), entry.get("review_by", ""))))
 PY
