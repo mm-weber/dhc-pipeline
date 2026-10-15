@@ -1,0 +1,112 @@
+# Implementation plan: Proof kinds per definition
+
+**Track ID:** proof-kinds_20261015
+**Spec:** [spec.md](./spec.md)
+**Created:** 2026-10-15
+**Status:** pending
+
+## Overview
+
+Three phases, one pull request each, matching spec tasks 17.2, 17.3 and 17.4. Every code slice is one failing test followed by the smallest change that passes it. The orchestrator never implements: for each slice it dispatches a RED agent (writes exactly one test in the suite, runs it, reports the failure reason), then a GREEN agent (the minimum change, the whole suite green), then reviews the diff, runs the suite and the real-repository checks itself, and commits. Work happens in a worktree per phase (`scripts/worktree-create.sh dhc-pipeline <branch>`), branched from main after the previous phase merged.
+
+| Phase | Pull request | Status | Progress |
+| --- | --- | --- | --- |
+| Phase 1: the declaration and its reader (17.2) | `feat: a per-definition proof declaration and its reader (Req 5.11, 7.7; task 17.2)` | pending | 0% |
+| Phase 2: the probe lint honours the declaration (17.3) | `feat: the probe lint honours a declared none proof (Req 5.8 to 5.10; task 17.3)` | pending | 0% |
+| Phase 3: documentation and the walkthrough (17.4) | `docs: onboarding in two pull requests, the proof declaration (task 17.4)` | pending | 0% |
+
+Dependency: pull request #271 (the spec) merged before phase 1 opens its pull request.
+
+## Phase 1: the declaration and its reader (task 17.2)
+
+**Objective:** `proof_entries` and `proof_of` in `scripts/definition-lib.sh`, refusing by name; `proofs: {}` in the policy file.
+**Worktree:** `proof-reader`
+**Suite:** `scripts/definition-lib_test.sh`; its `fresh` and `def` helpers build the sandbox, and slice 1.1 adds a `policy` helper that writes `catalogue-policy.yaml` with an active set and an optional `proofs:` block.
+
+### Tasks (one slice each: RED agent, GREEN agent, orchestrator commit)
+
+- [ ] **1.1 No `proofs:` key prints nothing** (FR-2)
+  - RED: a sandbox whose policy file has an active set and no `proofs:`; `proof_entries "$SB"` exits 0 with empty output. Fails because the function does not exist.
+  - GREEN: the function, reading the policy file through PyYAML, printing nothing for an absent map.
+- [ ] **1.2 `proofs: {}` prints nothing** (FR-2)
+- [ ] **1.3 A none entry prints its line, quoted date** (FR-2)
+  - `proofs: {app: {kind: none, reason: "drill fixture", review_by: "2026-11-28"}}` with `app` active; output `app<TAB>none<TAB>drill fixture<TAB>2026-11-28`.
+- [ ] **1.4 A none entry with a bare date prints the same line** (FR-2, the PyYAML date object)
+- [ ] **1.5 A chart entry prints `app<TAB>chart<TAB><TAB>`** (FR-2)
+- [ ] **1.6 An unknown kind is refused** (FR-3): `kind: smoke` exits 2, names `app`, cites `Req 5.11`, prints no entry line
+- [ ] **1.7 A none entry without reason is refused** (FR-3)
+- [ ] **1.8 A none entry without review_by is refused** (FR-3)
+- [ ] **1.9 A review_by that is not a date is refused** (FR-3): `review_by: soon`
+- [ ] **1.10 An entry naming an inactive definition is refused** (FR-3): the directory exists, the active set does not list it
+- [ ] **1.11 `proofs:` that is a list is refused** (FR-3)
+- [ ] **1.12 `proof_of` prints `chart` for an undeclared active definition** (FR-2)
+- [ ] **1.13 `proof_of` prints the declared line and propagates a refusal** (FR-2, FR-3)
+- [ ] **1.14 The policy file gains `proofs: {}` and its comment block** (FR-1; no test: a documentation edit of a YAML file by hand, then yamllint)
+
+### Verification (orchestrator)
+
+- [ ] `scripts/definition-lib_test.sh` green, every existing case untouched
+- [ ] `yamllint catalogue-policy.yaml`; `scripts/lint-active-set.sh .`; `scripts/release-policy.sh . check`; `scripts/lint-probes.sh .` (unchanged lint, still green)
+- [ ] `source scripts/definition-lib.sh; proof_entries .` prints nothing and exits 0 on this repository
+- [ ] The validate shell steps that read the policy file rehearsed locally (lessons: the whole chain after the last edit)
+- [ ] Pull request opened; the owner merges (checkpoint)
+
+## Phase 2: the probe lint honours the declaration (task 17.3)
+
+**Objective:** `scripts/lint-probes.sh` reads the declaration through the reader, skips and reports a none, fails a lapsed date, refuses a contradiction, surfaces reader refusals, counts declared nones; validate.yml's step name cites 5.8 to 5.11.
+**Worktree:** `proof-lint`
+**Suite:** `scripts/lint-probes_test.sh`; its `fresh`, `chart` and `policy` helpers gain a `proofs` writer.
+
+### Tasks (one slice each: RED agent, GREEN agent, orchestrator commit)
+
+- [ ] **2.1 A none entry covers an active definition with no chart** (FR-4): exit 0 and the line `lonely: proof none, drill fixture, review by 2026-11-28 (Req 5.9)`
+- [ ] **2.2 The summary counts declared nones** (FR-9): `1 declared none`
+- [ ] **2.3 A lapsed date fails by name** (FR-5): `DHC_TODAY=2026-12-01`, exit 1, `lonely`, `2026-11-28`, `Req 5.10`
+- [ ] **2.4 A date equal to today passes** (FR-5): `DHC_TODAY=2026-11-28`, exit 0
+- [ ] **2.5 The undeclared, uncovered message names the none way out** (FR-6): the existing case 4 output also contains `proof of kind none`
+- [ ] **2.6 A none entry for a chart-deployed definition fails naming both** (FR-7): `app` deployed by `chart/app` with a probe and declared none; exit 1, `app`, `chart/app/chart.yaml`
+- [ ] **2.7 A reader refusal surfaces** (FR-8): `kind: smoke`; exit 1, `Req 5.11` in the output, nothing else checked
+- [ ] **2.8 The real repository passes with zero declared nones** (FR-9): a case running the lint on the repository root, asserting `0 declared none` (the suite already runs one such case for the ledger lint; mirror it)
+- [ ] **2.9 validate.yml step renamed** (FR-10; no test beyond `scripts/lint-workflow-policy.sh .` and a yamllint of the workflow)
+
+### Verification (orchestrator)
+
+- [ ] `scripts/lint-probes_test.sh` green, the eight pre-existing cases untouched
+- [ ] `scripts/lint-probes.sh .` on this repository: green, `7 active definition(s)`, `0 declared none`
+- [ ] `yamllint .github/workflows/validate.yml`; `scripts/lint-workflow-policy.sh .`
+- [ ] The validate chain rehearsed locally end to end after the last edit
+- [ ] Pull request opened; the owner merges (checkpoint)
+
+## Phase 3: documentation and the walkthrough (task 17.4)
+
+**Objective:** the docs say what is built; the walkthrough shows two pull requests.
+**Worktree:** `proof-docs`
+
+### Tasks
+
+- [ ] **3.1 `docs/CONVENTIONS.md`**: the active-set section gains the proof declaration; the probe sentence (the one citing Req 5.8) says "or a declared none proof with a reason and a review-by date"
+- [ ] **3.2 `docs/user-manual.md`**: steps 4 to 6 of "Add an image definition" become pull request 1 and pull request 2 as in design.md's onboarding flow; the e2e section's probe paragraph names the declaration; the scripts table's `definition-lib.sh` row (Part VI) names the proof readers beside the mapping
+- [ ] **3.3 `tasks/todo.md`**: 16.2 waits for 17.3; the 16.11 note (remove the entry when deactivating)
+- [ ] **3.4 Cross-check**: every path and criterion cited in the touched text exists; no em-dashes in the added text
+
+### Verification (orchestrator)
+
+- [ ] `scripts/lint-live-evidence.sh .` (unchanged, still green); `scripts/lint-log-anchors.sh .` if the LOG was touched
+- [ ] A read-through of the rendered walkthrough against the flow diagram
+- [ ] Pull request opened; the owner merges (track complete)
+
+## Final verification
+
+- [ ] All three pull requests merged by squash
+- [ ] `conductor/tracks.md` marks the track completed; `.specs/dhc-catalogue-mvp/tasks.md` ticks 17.2 to 17.4 with their dates
+- [ ] 16.2 can proceed: drill-app's entry is the first `none`
+
+## Deviations log
+
+| Date | Task | Deviation | Reason | Resolution |
+| --- | --- | --- | --- | --- |
+
+---
+
+**Plan created:** 2026-10-15
+**Last updated:** 2026-10-15
