@@ -357,5 +357,12 @@ policy 'active_set: [app, db]' 'proofs:' '  db:' '    kind: none' '    reason: d
 check "proof_of: an undeclared active definition is chart" "chart" "$(proof_of "$SB" app)"
 check "proof_of: exit 0 for an undeclared definition" "0" "$(proof_of "$SB" app >/dev/null 2>&1; echo $?)"
 
+# 33: proof_of: a declared definition answers with its entry's line
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+def db 'image: ghcr.io/acme/imgs/db'
+policy 'active_set: [app, db]' 'proofs:' '  db:' '    kind: none' '    reason: drill fixture' '    review_by: "2026-11-28"'
+check "proof_of: a declared definition prints its entry line" "$(printf 'db\tnone\tdrill fixture\t2026-11-28')" "$(proof_of "$SB" db)"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
