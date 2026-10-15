@@ -170,7 +170,21 @@ active_components() { # root
 }
 
 # --- the functional proof per definition (Req 5.8 to 5.11; task 17.2) --------
-proof_entries() { :; } # stub: RED phase of task 17.2
+# catalogue-policy.yaml's `proofs:` map names, per definition, how the
+# catalogue proves it works: the kind of proof and, for a `none` entry, the
+# reason and the review_by date (Req 5.8 to 5.11; task 17.2; design Decision
+# 14). This is its reader: one line per entry, name, kind, reason and
+# review_by, tab-separated, in declared order. Every field is printed as text,
+# so a review_by that YAML reads as a date prints as ISO.
+proof_entries() { # root -> one tab-separated line per proofs entry, declared order
+  local root="${1%/}"
+  python3 - "$root" <<'PY'
+import os, sys, yaml
+doc = yaml.safe_load(open(os.path.join(sys.argv[1], "catalogue-policy.yaml"))) or {}
+for name, entry in (doc.get("proofs") or {}).items():
+    print("\t".join(str(v) for v in (name, entry.get("kind", ""), entry.get("reason", ""), entry.get("review_by", ""))))
+PY
+}
 
 # --- authenticity (Req 1.10, 1.11, 3.8; task 11.2) ---------------------------
 # Each definition declares, beside its source url, how its upstream's
