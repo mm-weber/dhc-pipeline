@@ -269,5 +269,11 @@ policy 'active_set: [app]' 'proofs: {}'
 check "proof_entries: an empty proofs map prints nothing" "" "$(proof_entries "$SB" 2>/dev/null)"
 check "proof_entries: an empty proofs map exits 0" "0" "$(proof_entries "$SB" >/dev/null 2>&1; echo $?)"
 
+# 24: a bare review_by, which YAML reads as a date, prints as the ISO string all the same
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: none' '    reason: drill fixture' '    review_by: 2026-11-28'
+check "proof_entries: a bare date prints as ISO" "$(printf 'app\tnone\tdrill fixture\t2026-11-28')" "$(proof_entries "$SB")"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"
