@@ -80,7 +80,7 @@ while IFS= read -r n; do
     continue
   fi
   if [ -z "${charts_of[$n]:-}" ]; then
-    err "catalogue-policy.yaml" "active definition '${n}' is deployed by no chart, so no functional probe covers it; give it a chart with a probe or deactivate it (Req 5.8)"
+    err "catalogue-policy.yaml" "active definition '${n}' is deployed by no chart, so no functional probe covers it; give it a chart with a probe, declare a proof of kind none for it with a reason and a review-by date, or deactivate it (Req 5.8)"
     continue
   fi
   covered=false
