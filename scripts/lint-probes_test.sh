@@ -88,6 +88,13 @@ proofs 'lonely:' '  kind: none' '  reason: drill fixture' '  review_by: "2026-11
 out=$("$LINT" "$SB" 2>&1); rc=$?
 expect "a declared none proof covers an uncovered active definition and is printed by name" 0 "$rc" "$out" "lonely" "proof none" "drill fixture" "2026-11-28" "Req 5.9"
 
+# 9: the summary counts the declared none proofs beside the probe registrations (Req 5.9)
+fresh; mkdir -p "$SB/image/lonely"; printf 'image: ghcr.io/acme/imgs/lonely\n' > "$SB/image/lonely/image.yaml"
+policy app cm-a cm-b db db-compat lonely
+proofs 'lonely:' '  kind: none' '  reason: drill fixture' '  review_by: "2026-11-28"'
+out=$("$LINT" "$SB" 2>&1); rc=$?
+expect "the summary counts declared none proofs" 0 "$rc" "$out" "6 active definition(s)" "1 declared none"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all lint-probes tests passed"
