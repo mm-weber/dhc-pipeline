@@ -208,3 +208,24 @@ it against the owner's actual workflow, not the precedent's. Take the smallest
 explicit state that keeps the gap visible (a reason, printed by name on every
 run) and add a clock only when the window it guards is real. Put the
 simplification question to the owner before the review has to.
+
+## 2026-10-16: the pull request text is part of the change, and it went stale
+
+**What happened.** The proof-kinds amendment (#271) was re-decided after
+its review: the date left the criteria, the decision, the code and the
+docs on every branch, one deletion commit each, and the report to the
+owner listed the branches and their heads. The titles and bodies of #271,
+#272 and #273 were not touched: #271 still announced "a dated none" under
+Req 5.8 to 5.11 and a lapse that fails validation, #273 still described
+`review_by` and cases 22 to 34. The owner, opening #271 to merge it, found
+nine open review threads and no statement of what the pull request now
+ships, and had to ask.
+
+**Rule.** The pull request title and body are the first thing a reviewer
+reads and the last thing a re-decision updates, so they are part of every
+push that changes what the branch ships. After a review or a re-decision,
+rewrite the body to say what ships now (criteria, decision, files), and
+list every review finding with its disposition in the body, so the open
+threads have one place that answers them. Check the title and body against
+the branch head before reporting a pull request as ready, the way the
+suites are re-run after the last edit (the 2026-08-26 rule).
