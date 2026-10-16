@@ -10,7 +10,7 @@
 
 ### [ ] proof-kinds_20261015: Proof kinds per definition
 
-**Description:** The functional proof declared per definition in the policy file; the chart probe stays the default; a dated `none` is admitted, reported by name, and fails validation when it lapses (spec task group 17: 17.2 reader, 17.3 lint, 17.4 docs).
+**Description:** The functional proof declared per definition in the policy file; the chart probe stays the default; a `none` with a reason is admitted, reported by name on every run and refused when stale (spec task group 17: 17.2 reader, 17.3 lint, 17.4 docs; the review-by date dropped 2026-10-16).
 **Priority:** high (unblocks drill 16.2)
 **Folder:** [./tracks/proof-kinds_20261015/](./tracks/proof-kinds_20261015/)
 
