@@ -17,7 +17,7 @@ No em-dashes anywhere, in prose, comments, commit messages or docs. Use commas, 
 | active set | the list in `catalogue-policy.yaml` naming the definitions the catalogue builds, tracks, tests and publishes |
 | chart adaptation | an upstream chart plus a values overlay under `chart/<name>/`, or the one owned chart |
 | probe | the functional check the e2e suite runs once a chart's pods are Ready, declared in the chart's `chart.yaml` |
-| proof kind | how an active definition is proved functional: `chart` (the probe), `none` (declared, dated), later `smoke` |
+| proof kind | how an active definition is proved functional: `chart` (the probe), `none` (declared, with a reason), later `smoke` |
 | exception | an accepted-risk record with an expiry, never a VEX `not_affected` |
 | supported set | the digests each definition's current tags reference |
 | drill | a deliberate, recorded exercise of a mechanism on the real catalogue (task group 16) |
@@ -27,7 +27,7 @@ No em-dashes anywhere, in prose, comments, commit messages or docs. Use commas, 
 
 - "placeholder": there is no placeholder shape for anything the catalogue checks
 - "temporary fix", "should work": every change has its test and its named check
-- "exempt": a declared `none` proof is a dated record with a reason, not an exemption
+- "exempt": a declared `none` proof is a record with a reason, printed by name on every validation run, not an exemption
 
 ## Error-message shape
 

@@ -29,11 +29,11 @@ Dependency: pull request #271 (the spec) merged before phase 1 opens its pull re
   - RED: a sandbox whose policy file has an active set and no `proofs:`; `proof_entries "$SB"` exits 0 with empty output. Fails because the function does not exist.
   - GREEN: the function, reading the policy file through PyYAML, printing nothing for an absent map.
 - [x] **1.2 `proofs: {}` prints nothing** (FR-2) (in the same guard case: eaea528)
-- [x] **1.3 A none entry prints its line, quoted date** (FR-2) (built first, the tracer bullet: red 9888b5f, green 0e6ffa9)
+- [x] **1.3 A none entry prints its line** (FR-2) (built first, the tracer bullet: red 9888b5f, green 0e6ffa9)
   - `proofs: {app: {kind: none, reason: "drill fixture"}}` with `app` active; output `app<TAB>none<TAB>drill fixture` (since 2026-10-16; the first build carried a `review_by`).
 - [x] **1.4 A none entry with a bare date prints the same line** (FR-2, the PyYAML date object) (guard: ccafb46; removed 2026-10-16 with the date, 4364145)
 - [x] **1.5 A chart entry prints `app<TAB>chart<TAB>`** (FR-2) (guard: c75dc71; one empty field since 2026-10-16)
-- [x] **1.6 An unknown kind is refused** (FR-3): `kind: smoke` exits 2, names `app`, cites `Req 5.11`, prints no entry line (red 1257c35, green fdafbdb)
+- [x] **1.6 An unknown kind is refused** (FR-3): `kind: smoke` exits 2, names `app`, cites `Req 5.10` (5.11 until 2026-10-16), prints no entry line (red 1257c35, green fdafbdb)
 - [x] **1.7 A none entry without reason is refused** (FR-3) (red a090a62, green 9a52eec)
 - [x] **1.8 A none entry without review_by is refused** (FR-3) (red 8be09a6, green 75fe8f5; removed 2026-10-16 with the date, 4364145)
 - [x] **1.9 A review_by that is not a date is refused** (FR-3): `review_by: soon` (red 3e4aba3, green 2c527de; removed 2026-10-16 with the date, 4364145)

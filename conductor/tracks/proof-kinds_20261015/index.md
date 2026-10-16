@@ -1,6 +1,6 @@
 # Track: Proof kinds per definition
 
-- [Specification](./spec.md): eleven EARS requirements mapped to Req 5.8 to 5.11 and 7.7
+- [Specification](./spec.md): eleven EARS requirements (FR-5 withdrawn 2026-10-16) mapped to Req 5.8 to 5.10 and 7.7
 - [Plan](./plan.md): three phases, one pull request each (17.2 reader, 17.3 lint, 17.4 docs), one test per slice
 - [Metadata](./metadata.json)
 
