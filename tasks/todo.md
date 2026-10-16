@@ -69,8 +69,10 @@ The older plans below it stay as history.
       declaration. 5.8 decided 2026-10-15 (design Decision 14, task group 17,
       PR #271): no chart; the definition is the first declared proof of kind
       none in the policy file's `proofs:` map, reason "live-drill fixture,
-      never installed by design", review_by at its retirement (16.16); waits
-      for the reader (PR #273) and the lint (the proof-lint branch) to merge.
+      never installed by design", no date (the review of 2026-10-16 dropped
+      the review-by date, the owner's call; the entry leaves with the
+      active-set line at 16.11); waits for the reader (PR #273) and the lint
+      (the proof-lint branch) to merge.
       The repository mm-weber/drill-app exists since 2026-10-15 (v0.1.0 at
       b7868d7, gorilla/handlers v1.2.1 and golang-jwt/jwt/v5 v5.2.1, rulesets
       as hardened-app). Expected live: the gate blocks
@@ -111,7 +113,7 @@ The older plans below it stay as history.
       issue; owner decides and restores; the issue closes with the reason.
 - [ ] 16.11 Deactivation (1.13 to 1.16, 1.19): drill-app leaves the active
       set, and its proofs entry leaves in the same pull request (the reader
-      refuses an entry for an inactive name, Req 5.11); matrices and
+      refuses an entry for an inactive name, Req 5.10); matrices and
       ignorePaths exclude it; no new digest or tag; the
       inactive-digest check passes with something to check; two drill
       branches, never merged: a bump of the inactive definition (1.16), a
