@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lint-probes.sh [root]
 #
-# Req 5.8 to 5.11 (tasks 14.3, 17.3): every active definition declares a
+# Req 5.8 to 5.10 (tasks 14.3, 17.3): every active definition declares a
 # functional proof, a chart's probe or a declared none, or validate fails
 # naming the definition. A definition declares its probe
 # through the chart that deploys it: chart/<c>/chart.yaml names the
@@ -21,19 +21,19 @@
 # a probe is not a violation; nothing installs it.
 #
 # A definition no chart deploys may instead declare, in catalogue-policy.yaml's
-# `proofs:` map, a `none` proof with a reason and a review_by date, read through
-# proof_entries (definition-lib.sh). A none proof is printed by name, with its reason
-# and review date, and the definition passes (Req 5.9); the summary counts the
-# none proofs beside the probe registrations. A none proof whose review_by date
-# is strictly before today has lapsed and is a violation naming the definition
-# and the date (Req 5.10); DHC_TODAY is the clock seam the tests set. A none
-# proof is only for a definition no chart deploys: declaring one for a
-# chart-deployed definition is a violation reported against that chart, since
-# one proof per definition means the chart's probe is the proof (Req 5.9).
-# The proofs map is read whole, up front, through proof_entries: its refusal
-# (an unknown kind, a none proof without its reason or review_by, an entry
-# naming a definition outside the active set) is the lint's failure by name
-# and nothing is checked, as for a malformed active set (Req 5.11).
+# `proofs:` map, a `none` proof with a reason, read through proof_entries
+# (definition-lib.sh). A none proof is printed by name with its reason on every
+# run, so the gap is never silent, and the definition passes (Req 5.9); the
+# summary counts the none proofs beside the probe registrations. A none proof
+# carries no date (Decision 14, the owner's call of 2026-10-16): the chart pull
+# request that closes the gap follows the first publish. A none proof is only
+# for a definition no chart deploys: declaring one for a chart-deployed
+# definition is a violation reported against that chart, since one proof per
+# definition means the chart's probe is the proof (Req 5.10). The proofs map is
+# read whole, up front, through proof_entries: its refusal (an unknown kind, a
+# none proof without its reason, an entry naming a definition outside the
+# active set) is the lint's failure by name and nothing is checked, as for a
+# malformed active set (Req 5.10).
 set -euo pipefail
 
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -41,7 +41,6 @@ ROOT="${ROOT%/}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/definition-lib.sh
 . "$HERE/definition-lib.sh"
-today="${DHC_TODAY:-$(date -u +%F)}"
 
 violations=0
 err() { echo "::error file=$1::lint-probes: $2"; violations=$((violations + 1)); }
@@ -53,7 +52,7 @@ if ! active=$(active_definitions "$ROOT" 2>&1); then
 fi
 if ! proofs=$(proof_entries "$ROOT" 2>&1); then
   printf '%s\n' "$proofs"
-  echo "lint-probes: the proofs declaration is malformed; nothing checked (Req 5.11)"
+  echo "lint-probes: the proofs declaration is malformed; nothing checked (Req 5.10)"
   exit 1
 fi
 # The declaration per definition, keyed by name, from the one read above;
@@ -89,24 +88,20 @@ while IFS= read -r n; do
   [ -n "$n" ] || continue
   count=$((count + 1))
   proof="${proof_line[$n]:-chart}"
-  IFS=$'\t' read -r _ pkind preason preview <<<"$proof"
+  IFS=$'\t' read -r _ pkind preason <<<"$proof"
   if [ "$pkind" = none ]; then
     if [ -n "${charts_of[$n]:-}" ]; then
       for c in ${charts_of[$n]}; do
-        err "chart/${c}/chart.yaml" "active definition '${n}' declares a proof of kind none, but chart/${c}/ deploys it; one proof per definition: the chart's probe proves it, so remove the stale proofs entry (Req 5.9)"
+        err "chart/${c}/chart.yaml" "active definition '${n}' declares a proof of kind none, but chart/${c}/ deploys it; one proof per definition: the chart's probe proves it, so remove the stale proofs entry (Req 5.10)"
       done
       continue
     fi
-    if [[ "$preview" < "$today" ]]; then
-      err "catalogue-policy.yaml" "none proof for '${n}' lapsed on ${preview}; re-decide it with a fresh review-by date, or give the definition a chart with a probe (Req 5.10)"
-      continue
-    fi
-    echo "lint-probes: ${n}: proof none, ${preason}, review by ${preview} (Req 5.9)"
+    echo "lint-probes: ${n}: proof none, ${preason} (Req 5.9)"
     nones=$((nones + 1))
     continue
   fi
   if [ -z "${charts_of[$n]:-}" ]; then
-    err "catalogue-policy.yaml" "active definition '${n}' is deployed by no chart, so no functional probe covers it; give it a chart with a probe, declare a proof of kind none for it with a reason and a review-by date, or deactivate it (Req 5.8)"
+    err "catalogue-policy.yaml" "active definition '${n}' is deployed by no chart, so no functional probe covers it; give it a chart with a probe, declare a proof of kind none for it with a reason, or deactivate it (Req 5.8)"
     continue
   fi
   covered=false
@@ -121,7 +116,7 @@ while IFS= read -r n; do
 done <<<"$active"
 
 if [ "$violations" -gt 0 ]; then
-  echo "lint-probes: ${violations} violation(s) (Req 5.8 to 5.11)"
+  echo "lint-probes: ${violations} violation(s) (Req 5.8 to 5.10)"
   exit 1
 fi
 echo "lint-probes: ${count} active definition(s): $((count - nones)) covered by ${#probes_used[@]} probe registration(s), each executed once per install, ${nones} declared none (Req 5.5, 5.8, 5.9)"
