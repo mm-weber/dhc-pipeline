@@ -933,7 +933,8 @@ graph TB
       seed of 2026-09-08), and it could not: a pull request that adds a definition must
       activate it (1.16), an active definition must be deployed by a chart with a probe in
       that same pull request (5.8), a chart must pin a published digest, which the e2e pulls
-      from the registry (5.2, the Kyverno digest policy), and a digest is published only from
+      from the registry (5.2; Kyverno's require-image-digest checks only that the reference
+      is a digest, the e2e pull is what demands it exist), and a digest is published only from
       main after the merge (1.15, build.yml). Four rules from four reviews between 2026-08-25
       and 2026-09-09, each right on its own, joined end to end by nobody: the manual's
       one-pull-request walkthrough was written, never run, and the 16.2 sentence of
@@ -963,9 +964,11 @@ graph TB
     - **Decision**: **D**, built as **C** first, the owner's call of 2026-10-15. The
       catalogue policy file gains a `proofs:` map, one entry per definition that no chart
       proves: `kind: none` with `reason` and `review_by`; an absent entry means `chart`,
-      today's rule unchanged (5.5, 5.8). `scripts/definition-lib.sh` is the one reader
-      (`proof_of`), refusing by name a kind it does not implement, a name outside the active
-      set and a `none` without reason or date (5.11), so a kind not yet built is a refusal,
+      today's rule unchanged (5.5, 5.8), and an explicit `kind: chart` means the same.
+      `scripts/definition-lib.sh` is the one reader (`proof_entries`, every entry validated
+      before any prints; `proof_of` the per-name lookup over it), refusing by name a kind it
+      does not implement, a name outside the active set and a `none` without reason or date
+      (5.11), so a kind not yet built is a refusal,
       never a silent pass (the 6.1 precedent for consumers). `scripts/lint-probes.sh` skips a
       `none` definition and prints it with its reason and date on every validation run (5.9),
       fails it by name once the date has passed (5.10, the 4.8 shape), and keeps refusing an
@@ -1106,7 +1109,7 @@ pull request 1: image/<name>/image.yaml + the active_set entry
   ─► merge ─► main builds, scans, signs, attests, tags ─► a published digest exists
 pull request 2: chart/<name>/ (deploys: [<name>], probe: <registration>) + the harness entry
                 + the proofs.<name> entry removed
-  ─► chart gate: render + Kyverno, against a real digest
+  ─► chart gate: render + Kyverno (the reference is a digest; the registry is not consulted)
   ─► e2e: plain install against the published digest (no base state on main) ─► the probe
   ─► merge; from here every change rides the chart-pin bump (5.6)
 a definition no chart will ever deploy keeps its none entry, renewed through a dated
