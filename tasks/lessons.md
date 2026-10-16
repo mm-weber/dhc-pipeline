@@ -228,4 +228,6 @@ rewrite the body to say what ships now (criteria, decision, files), and
 list every review finding with its disposition in the body, so the open
 threads have one place that answers them. Check the title and body against
 the branch head before reporting a pull request as ready, the way the
-suites are re-run after the last edit (the 2026-08-26 rule).
+suites are re-run after the last edit (the 2026-08-26 rule). Repository
+rule since 2026-10-16: every pull request body opens with a `## TL;DR`
+section, updated whenever a review comes in (`docs/CONVENTIONS.md`).
