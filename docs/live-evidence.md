@@ -130,9 +130,8 @@ evidence obligation, and a retired one cannot keep a row.
 | 5.6 | A version bump runs the upgrade path | exercised | 2026-09-02 | e2e run 33692479682 on the grafana bump branch (`test/e2e/upgrade_test.go`). | nature |
 | 5.7 | A failed assertion fails the check and keeps diagnostics | exercised | 2026-07-22 | Run 29926193911 failed and kept the artifact `e2e-diagnostics-hardened-app`. | nature |
 | 5.8 | An active definition with no probe-declaring chart and no declared none proof fails validation | drill 16.15 | | The lint has refused nothing live. A 16.15 commit removes a probe declaration. | pull request |
-| 5.9 | A declared none proof carries a reason and a review-by date and is reported by name on every validation run | drill 16.2 | | Never declared yet; the drill definition's policy entry is the first, printed by the probe lint on its pull request. | drill definition |
-| 5.10 | A none proof past its review-by date fails validation by name | drill 16.15 | | Never lapsed yet; a 16.15 commit backdates the drill definition's review-by date. | pull request |
-| 5.11 | An unknown proof kind, a non-active name, or a none without reason or date is refused by name | drill 16.15 | | Never refused live; a 16.15 commit declares a kind the lint does not implement. | pull request |
+| 5.9 | A declared none proof carries a reason and is reported by name on every validation run | drill 16.2 | | Never declared yet; the drill definition's policy entry is the first, printed by the probe lint on its pull request. | drill definition |
+| 5.10 | An unknown proof kind, a non-active name, a none without a reason, or a none for a chart-deployed definition is refused by name | drill 16.15 | | Never refused live; one 16.15 commit declares a kind the lint does not implement, another a none for hardened-app, which its chart deploys. | pull request |
 
 ## Requirement 6: CVE Triage With Recorded Decisions
 
