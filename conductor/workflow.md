@@ -24,7 +24,7 @@
 A phase is one pull request. At its end:
 
 1. All phase tasks `[x]`; the full suite of every touched script green; the real-repository runs green.
-2. Push the branch, open the pull request with the title in the commit style, the body stating why, what, and how it was verified, ending with the Claude Code attribution line. No session links.
+2. Push the branch, open the pull request with the title in the commit style, the body opening with a `## TL;DR` section (what ships as of the head; updated whenever a review comes in, with each finding's disposition), then why, what, and how it was verified, ending with the Claude Code attribution line. No session links.
 3. The owner reviews and merges (squash). Checkpoint reached when the merge lands; the next phase branches from the new main.
 
 ## Verification commands
@@ -44,6 +44,7 @@ scripts/lint-live-evidence.sh .         # after a requirements change
 - Signed commits (SSH key in the repository's `.keys/`), verified on GitHub.
 - No em-dashes in messages or bodies.
 - A pull request touches one logical change. Spec amendments, scaffolding and code are separate pull requests.
+- Every pull request body opens with a `## TL;DR` section, updated when reviews come in (`docs/CONVENTIONS.md`, rule of 2026-10-16).
 - Renovate's own commits stay unsigned and are not rewritten.
 
 ## Lessons that bind
