@@ -448,10 +448,9 @@ definitions.
   probe per chart, executed once per install however many definitions the
   chart deploys. validate fails an active definition whose chart declares no
   probe, unless the policy file declares a proof of kind none for it with a
-  reason and a review-by date, printed by name on every run and a violation
-  once the date has passed (`scripts/lint-probes.sh`, Req 5.8 to 5.11); a Go
-  unit test holds every declared name to a registration and every
-  registration to a chart.
+  reason, printed by name on every run (`scripts/lint-probes.sh`, Req 5.8 to
+  5.10); a Go unit test holds every declared name to a registration and
+  every registration to a chart.
 - **Upgrade path on bumps** (Req 5.6): two bump shapes are detected — a
   chart-version bump (`chart/<c>/chart.yaml` `upstream.version` changed vs the
   base branch) and an image/values bump (the deployed values file changed; the
@@ -1035,13 +1034,12 @@ The walkthrough:
    before its first publish, and the e2e installs published digests, so the
    first pull request carries no chart: add an entry for the definition to
    the `proofs:` map in `catalogue-policy.yaml`, kind `none`, with the reason
-   (for example "onboarding: the chart follows the first publish") and a
-   review-by date a fortnight out (Req 5.9). validate prints the entry by
-   name on every run and fails once the date has passed (Req 5.10); a
-   definition no chart will ever deploy keeps its entry and renews the date
-   through a dated re-decision. There is no placeholder value: an unknown
-   kind, a missing reason or date, or an entry for an inactive name is
-   refused by name (Req 5.11).
+   (for example "onboarding: the chart follows the first publish"; Req 5.9).
+   validate prints the entry by name on every run, so the gap is never
+   silent; there is no date to renew, because the chart pull request follows
+   the first publish. There is no placeholder value: an unknown kind, a
+   missing reason, an entry for an inactive name, or a none for a definition
+   a chart deploys is refused by name (Req 5.10).
 5. **Activate it**: add the directory name to `active_set:` in
    `catalogue-policy.yaml` (Req 1.13). The active set is the sole source of
    candidates for the build and test matrices and the tracking scope
@@ -1295,7 +1293,7 @@ documentation — each states what it enforces and why it exists.
 | `govulncheck-report.sh` | `label=file …` | Reachability table; module-level collapses to "not measured" (Req 6.16) |
 | `lint-accounts.sh` | `[root]` | Every definition runs as a non-root account with uid 65532 (Req 1.4) |
 | `lint-active-set.sh` | `[--changed <file>] [root]` | The active set is well-formed, splits no group, every chart names existing definitions; on a PR, a change under a frozen definition or chart fails (Req 1.16, 1.18, 1.19) |
-| `lint-probes.sh` | `[root]` | Every active definition is deployed by a chart declaring a functional probe, or declares a dated none proof in the policy file: printed by name, a violation once lapsed or when a chart deploys it too, a refusal when malformed (Req 5.8 to 5.11) |
+| `lint-probes.sh` | `[root]` | Every active definition is deployed by a chart declaring a functional probe, or declares a none proof with a reason in the policy file: printed by name on every run, a violation when a chart deploys it too, a refusal when malformed (Req 5.8 to 5.10) |
 | `lint-compat.sh` | `[root]` | A chart deploying a compat variant records the decision for it, and every decision's review-by date is in the future (Req 4.5, 4.8) |
 | `lint-log-anchors.sh` | `[refs\|statements\|all] [root]` | Every exception ref and statement citation resolves to a `triage/LOG.md` heading (Req 9.18) |
 | `lint-live-evidence.sh` | `[root]` | Every criterion in `requirements.md` has exactly one row in `docs/live-evidence.md`, no row names a retired number, every row carries a status, a mechanism and evidence or a reason (Req 7.11, task 16.1) |
