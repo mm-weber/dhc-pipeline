@@ -42,7 +42,8 @@ release:
 # and scripts/definition-lib.sh's active_definitions is the one reader: an
 # entry naming no image/<name>/image.yaml, a duplicate, or an
 # empty list is refused by name rather than read as "nothing to do".
-# Deactivating a definition means removing its line, and only that: no new
+# Deactivating a definition means removing its line (and its proofs entry
+# below, if it declared one), and only that: no new
 # digest is pushed and no new tag applied for it (Req 1.15), a bump PR
 # touching it fails validation (Req 1.16), while its already-published tags
 # keep every tag-driven plane (enumeration, daily scans, attestations,

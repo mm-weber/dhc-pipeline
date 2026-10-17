@@ -447,8 +447,10 @@ definitions.
   both valkey definitions), `http-200` (hardened-app returns HTTP 200). One
   probe per chart, executed once per install however many definitions the
   chart deploys. validate fails an active definition whose chart declares no
-  probe (`scripts/lint-probes.sh`, Req 5.8), and a Go unit test holds every
-  declared name to a registration and every registration to a chart.
+  probe, unless the policy file declares a proof of kind none for it with a
+  reason, printed by name on every run (`scripts/lint-probes.sh`, Req 5.8 to
+  5.10); a Go unit test holds every declared name to a registration and
+  every registration to a chart.
 - **Upgrade path on bumps** (Req 5.6): two bump shapes are detected — a
   chart-version bump (`chart/<c>/chart.yaml` `upstream.version` changed vs the
   base branch) and an image/values bump (the deployed values file changed; the
@@ -1028,21 +1030,37 @@ The walkthrough:
    captures yours, it does not capture the others (Req 3.2, Req 7.6). A
    postUpgradeTask must leave the definition coherent (see
    `refresh-definition.sh` / `refresh-grafana.sh`).
-4. **Wire e2e** if the image deploys via a chart: register the component in
-   `test/harness`, name the definition in the chart's `deploys:` list and
-   declare its probe there (`probe:`, a registration in `test/e2e`'s
-   `probes` map; add a registration if none proves the right thing, next
-   sections). An active definition with no probe fails validation by name
-   (Req 5.8); there is no placeholder value.
+4. **Declare how it is proved, for now.** A chart cannot pin the image
+   before its first publish, and the e2e installs published digests, so the
+   first pull request carries no chart: add an entry for the definition to
+   the `proofs:` map in `catalogue-policy.yaml`, kind `none`, with the reason
+   (for example "onboarding: the chart follows the first publish"; Req 5.9).
+   validate prints the entry by name on every run, so the gap is never
+   silent; there is no date to renew, because the chart pull request follows
+   the first publish. There is no placeholder value: an unknown kind, a
+   missing reason, an entry for an inactive name, or a none for a definition
+   a chart deploys is refused by name (Req 5.10).
 5. **Activate it**: add the directory name to `active_set:` in
    `catalogue-policy.yaml` (Req 1.13). The active set is the sole source of
    candidates for the build and test matrices and the tracking scope
    (Req 1.14); an unlisted definition is inactive, and an entry naming no
    directory is refused by name. See [Deactivate a definition](#deactivate-a-definition)
    for what the switch does.
-6. **Open the PR** — one logical change. The gates do the rest: lints,
-   frontend compile, scan gate (expect to triage real findings on a new
-   image), chart render, e2e.
+6. **Open pull request 1**: the definition, the active entry and the proofs
+   entry, one logical change. The gates: lints (the probe lint prints the
+   none entry), frontend compile, the scan gate (expect to triage real
+   findings on a new image). No chart, so the chart gate and the e2e have
+   nothing new. On merge, main builds, scans, signs, attests and tags: the
+   digest now exists.
+7. **Open pull request 2, the chart**: register the component in
+   `test/harness`, name the definition in the chart's `deploys:` list and
+   declare its probe there (`probe:`, a registration in `test/e2e`'s
+   `probes` map; add a registration if none proves the right thing, next
+   sections), pin the published digest, and remove the proofs entry (a none
+   proof for a definition a chart deploys is a contradiction the lint
+   refuses). The e2e installs the chart as a plain install, no base state on
+   main, and runs the probe; from here every change rides the chart-pin bump
+   (Req 5.6).
 
 ### Add a variant
 
@@ -1259,7 +1277,7 @@ documentation — each states what it enforces and why it exists.
 | `triage-policy.sh` | `<root> <query>` | The one reader of the policy's `triage` section: aperture, ceilings, KEV ceiling, warning window, feed URL, the support statement; refuses a section with holes (Req 6.49) |
 | `check-exceptions.sh` | `gate <root> <image> <trivy.json> <kev.json>` / `rescan <root> <reports-dir> <kev.json>` | Exception ceilings tiered by the finding's severity and KEV status; no KEV set is a refusal, never a pass (Req 6.50, 6.51, 6.59, 6.60) |
 | `compile-vex.sh` | `<src> <out> <definition> <digest> [tag…]` | Render VEX source per build: stamp digest, drop out-of-scope, record every drop via `COMPILE_VEX_REPORT` (Req 6.28 to 6.30, 6.32) |
-| `definition-lib.sh` | *sourced* | The one directory-↔-published-name mapping; every consumer goes through it |
+| `definition-lib.sh` | *sourced* | The one directory-↔-published-name mapping, the active set, each chart's `deploys:` and `probe:`, and the proofs declaration (`proof_entries`, `proof_of`); every consumer goes through it |
 | `refresh-definition.sh` | `<dir>` | postUpgradeTask, from-source archetype: recompute checksum/vars/tags/ldflags from the bumped ref |
 | `refresh-grafana.sh` | `<dir>` | postUpgradeTask, repackage archetype: three-source build-id resolution, per-arch sha re-pin, existence-gated (ADR 0002) |
 | `verify-arch-pins.sh` | `<dir>` | Fetch + verify every per-arch pin against upstream's actual bytes (Req 1.3) |
@@ -1275,7 +1293,7 @@ documentation — each states what it enforces and why it exists.
 | `govulncheck-report.sh` | `label=file …` | Reachability table; module-level collapses to "not measured" (Req 6.16) |
 | `lint-accounts.sh` | `[root]` | Every definition runs as a non-root account with uid 65532 (Req 1.4) |
 | `lint-active-set.sh` | `[--changed <file>] [root]` | The active set is well-formed, splits no group, every chart names existing definitions; on a PR, a change under a frozen definition or chart fails (Req 1.16, 1.18, 1.19) |
-| `lint-probes.sh` | `[root]` | Every active definition is deployed by a chart declaring a functional probe (Req 5.8) |
+| `lint-probes.sh` | `[root]` | Every active definition is deployed by a chart declaring a functional probe, or declares a none proof with a reason in the policy file: printed by name on every run, a violation when a chart deploys it too, a refusal when malformed (Req 5.8 to 5.10) |
 | `lint-compat.sh` | `[root]` | A chart deploying a compat variant records the decision for it, and every decision's review-by date is in the future (Req 4.5, 4.8) |
 | `lint-log-anchors.sh` | `[refs\|statements\|all] [root]` | Every exception ref and statement citation resolves to a `triage/LOG.md` heading (Req 9.18) |
 | `lint-live-evidence.sh` | `[root]` | Every criterion in `requirements.md` has exactly one row in `docs/live-evidence.md`, no row names a retired number, every row carries a status, a mechanism and evidence or a reason (Req 7.11, task 16.1) |
