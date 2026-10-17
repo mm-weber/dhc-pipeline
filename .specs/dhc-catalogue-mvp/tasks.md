@@ -490,16 +490,16 @@
     - _Requirements: Req 1.19, Req 6.49, Req 7.11_
 
 - [ ] 17. Proof kinds per definition: the functional proof declared in the policy file, the chart probe the default, a `none` with a reason admitted, image-level smoke proofs the next kind (Req 5.8 to 5.10, 7.7; design Decision 14; research `data/image-onboarding-practices-2026-10-15.md`; owner's calls of 2026-10-15 and 2026-10-16). Unblocks 16.2, whose definition is the first declared `none`; one pull request per task
-  - [ ] 17.1 Spec amendment
+  - [x] 17.1 Spec amendment [done 2026-10-17, #271]
     - requirements.md: 5.8 and 7.7 amended, 5.9 and 5.10 added; design.md: Decision 14, the onboarding flow, two error-handling rows; this group; 16.2 and 16.15 amended; the ledger rows for 5.9 and 5.10 (drill 16.2, drill 16.15); the research memo under data/. The 2026-10-16 review of the pull request (nine findings) dropped the first draft's review-by date and lapse criterion before merge, the owner's call
     - _Requirements: Req 5.8, Req 5.9, Req 5.10, Req 7.7_
-  - [ ] 17.2 The declaration and its one reader
+  - [x] 17.2 The declaration and its one reader [done 2026-10-17, #273]
     - `proofs:` in catalogue-policy.yaml, a map from definition name to `kind` and `reason`, absent meaning chart, its comment block naming it a fork switch; `scripts/definition-lib.sh` gains `proof_entries <root>`, the one reader of the map, validating every entry before printing one line per entry (name, kind, reason) in declared order, and `proof_of <root> <definition>`, the per-name lookup over it, `chart` when absent; refusals by name through the library's refusal path, no entry printed: a `proofs:` or an entry that is not a map, a kind other than chart or none, a name outside the active set, a none without a reason (Req 5.10); cases in `definition-lib_test.sh`. TDD, one test per slice
     - _Requirements: Req 5.10, Req 7.7_
-  - [ ] 17.3 The probe lint honours the declaration
+  - [x] 17.3 The probe lint honours the declaration [done 2026-10-17, #281]
     - `scripts/lint-probes.sh`: a none definition passes and is printed by name with its reason (Req 5.9); a none for a definition a probe-declaring chart deploys fails the run naming the chart, one proof per definition (Req 5.10); an uncovered active definition with no declaration still fails, the message naming the three ways out (Req 5.8 as amended); the summary line counts the declared nones; cases in `lint-probes_test.sh`, including a reader refusal surfacing by name up front; validate.yml's step name cites 5.8 to 5.10. TDD, one test per slice
     - _Requirements: Req 5.8, Req 5.9, Req 5.10_
-  - [ ] 17.4 Documentation and the walkthrough
+  - [x] 17.4 Documentation and the walkthrough [done 2026-10-17, #282]
     - docs/CONVENTIONS.md (the active-set section and the probe sentence), docs/user-manual.md (the add-a-definition walkthrough becomes two pull requests: the image with its none entry, then the chart, the harness entry and the entry's removal after the first publish; the e2e section's probe paragraph), the policy file's comment block; the plan's 16.2 order in tasks/todo.md on the plan-live-drills branch, where the live-drills plan lives (main carries no group-16 item)
     - _Requirements: Req 5.9, Req 7.7_
   - [ ] 17.5 The `smoke` kind [deferred, unscheduled: needs its own criterion first]

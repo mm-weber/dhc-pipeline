@@ -49,7 +49,7 @@ Dependency: pull request #271 (the spec) merged before phase 1 opens its pull re
 - [x] `yamllint catalogue-policy.yaml`; `scripts/lint-active-set.sh .`; `scripts/release-policy.sh . check`; `scripts/lint-probes.sh .` (unchanged lint, still green)
 - [x] `source scripts/definition-lib.sh; proof_entries .` prints nothing and exits 0 on this repository; `proof_of . hardened-app` prints chart
 - [x] validate's twelve repository-level lint steps rehearsed locally after the refactor commit (7b3bf44)
-- [ ] Pull request opened as a draft 2026-10-15; the owner merges after #271 and #272 (checkpoint)
+- [x] Pull request opened as a draft 2026-10-15; the owner merges after #271 and #272 (checkpoint reached: #273 merged 2026-10-17, squash 72d78ba)
 
 ## Phase 2: the probe lint honours the declaration (task 17.3)
 
@@ -75,7 +75,7 @@ Dependency: pull request #271 (the spec) merged before phase 1 opens its pull re
 - [x] `scripts/lint-probes.sh .` on this repository: green, `7 active definition(s)`, `0 declared none`
 - [x] `yamllint .github/workflows/validate.yml`; `scripts/lint-workflow-policy.sh .`
 - [x] The validate chain rehearsed locally end to end after the refactor commit (cf7139e)
-- [ ] Pull request opens after #273 merges (the branch is rebased onto main then); the owner merges (checkpoint)
+- [x] Pull request opens after #273 merges (the branch is rebased onto main then); the owner merges (checkpoint reached: #281 merged 2026-10-17, squash 0a57c62)
 
 ## Phase 3: documentation and the walkthrough (task 17.4)
 
@@ -93,14 +93,14 @@ Dependency: pull request #271 (the spec) merged before phase 1 opens its pull re
 
 - [x] `scripts/lint-live-evidence.sh .` (unchanged, still green); the LOG was not touched
 - [x] A read-through of the rendered walkthrough against the flow diagram
-- [ ] Pull request opens after phase 2 merges, rebased onto main; the owner merges (track complete)
-- [ ] After #271 merges: tick 17.2 to 17.4 in `.specs/dhc-catalogue-mvp/tasks.md` with their dates (a follow-up commit on the last open phase branch, or its own small pull request)
+- [x] Pull request opens after phase 2 merges, rebased onto main; the owner merges (track complete: #282 merged 2026-10-17, squash cf337c1)
+- [x] After #271 merges: tick 17.2 to 17.4 in `.specs/dhc-catalogue-mvp/tasks.md` with their dates (a follow-up commit on the last open phase branch, or its own small pull request) (its own pull request, 2026-10-17, with 17.1 ticked alongside)
 
 ## Final verification
 
-- [ ] All three pull requests merged by squash
-- [ ] `conductor/tracks.md` marks the track completed; `.specs/dhc-catalogue-mvp/tasks.md` ticks 17.2 to 17.4 with their dates
-- [ ] 16.2 can proceed: drill-app's entry is the first `none`
+- [x] All three pull requests merged by squash (#273 72d78ba, #281 0a57c62, #282 cf337c1, all on 2026-10-17)
+- [x] `conductor/tracks.md` marks the track completed; `.specs/dhc-catalogue-mvp/tasks.md` ticks 17.2 to 17.4 with their dates (2026-10-17; 17.1 too, #271)
+- [x] 16.2 can proceed: drill-app's entry is the first `none` (unblocked 2026-10-17)
 
 ## Deviations log
 
@@ -118,8 +118,9 @@ Dependency: pull request #271 (the spec) merged before phase 1 opens its pull re
 | 2026-10-15 | refactor | The lint reads the proofs map once up front and looks definitions up in it; the violations footer cites Req 5.8 to 5.11 | One reader invocation instead of one per definition | Behaviour unchanged, suite green |
 | 2026-10-15 | phase 3 | Built on top of the phase 2 branch; the spec ticks (17.2 to 17.4 in tasks.md) are deferred | The spec amendment (#271) is not merged, so the branch has no task group 17 to tick | A follow-up once #271 merges |
 | 2026-10-16 | all phases | The review-by date, its lapse check (FR-5), the `DHC_TODAY` clock seam and their cases (1.4, 1.8, 1.9, 2.3, 2.4) came out of every branch: spec b75486f, reader 4364145, lint 9862e7c, docs 0bd0787; the refusals cite Req 5.10, the criterion the spec now numbers them under | The owner's call on the 2026-10-16 review of #271 (nine findings): the chart pull request follows the first publish within the workflow, so the date guarded a window closed in minutes, and the review showed the shape would have needed a start date, a ceiling and a drill to lapse it | Deletions, one commit per branch, no new slices; 41 suites and the repository lints green on each; phases 2 and 3 rebased onto their predecessors |
+| 2026-10-17 | all phases | The slice commit hashes cited above name the commits as first built; every branch was rebased twice afterwards (2026-10-16 onto its re-decided predecessor, 2026-10-17 onto main after each merge) and force-pushed, so those hashes resolve only in a clone that kept the old objects | Squash merges and a linear history on main; a rebase rewrites every hash | The durable references are the squash commits on main: #271 9d6099d, #272 3d1a336, #273 72d78ba, #281 0a57c62, #282 cf337c1 |
 
 ---
 
 **Plan created:** 2026-10-15
-**Last updated:** 2026-10-16 (the date dropped from all three phases after the review of #271; pull requests queued behind #271, #272 and #273)
+**Last updated:** 2026-10-17 (track complete: the three phase pull requests merged by squash; the spec ticks and the registry closed in their own pull request)
