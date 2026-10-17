@@ -24,10 +24,11 @@ Navigation for the project context and the work tracks. Context first, then spec
 
 | Track | Status | Priority | Spec | Plan |
 | --- | --- | --- | --- | --- |
-| proof-kinds_20261015 | pending | high | [spec](./tracks/proof-kinds_20261015/spec.md) | [plan](./tracks/proof-kinds_20261015/plan.md) |
+| proof-kinds_20261015 | completed | high | [spec](./tracks/proof-kinds_20261015/spec.md) | [plan](./tracks/proof-kinds_20261015/plan.md) |
 
 ## Recent activity
 
 | Date | Track | Action |
 | --- | --- | --- |
 | 2026-10-15 | proof-kinds_20261015 | Track created from spec task group 17 (pull request #271) |
+| 2026-10-17 | proof-kinds_20261015 | Track completed: phases 17.2, 17.3 and 17.4 merged by squash (#273, #281, #282) after the spec (#271) and the context (#272); the spec ticks and the registry closed in their own pull request |
