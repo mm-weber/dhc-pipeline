@@ -116,10 +116,12 @@ jobs:
       - name: tracking scope rendering drift check (Req 1.14)
         run: scripts/render-tracking.sh --check
 
-      # Req 5.8 (task 14.3): every active definition is deployed by a chart
-      # that declares a functional probe; the Go side (TestProbeDeclarations,
-      # below) holds the declared names to the suite's registry.
-      - name: every active definition declares a functional probe (Req 5.8)
+      # Req 5.8 to 5.10 (tasks 14.3, 17.3): every active definition is deployed
+      # by a chart that declares a functional probe, or declares a proof of kind
+      # none in the policy file with a reason, printed by name here on every
+      # run; the Go side (TestProbeDeclarations, below) holds the declared names
+      # to the suite's registry.
+      - name: every active definition declares a functional proof (Req 5.8 to 5.10)
         run: scripts/lint-probes.sh
 
       - name: definition-lib unit tests (directory vs published name)
