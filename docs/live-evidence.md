@@ -129,7 +129,9 @@ evidence obligation, and a retired one cannot keep a row.
 | 5.5 | The declared functional probe executed once | exercised | 2026-10-05 | Every green e2e run since the probes were declared; the e2e gate on #246 (2026-10-05). | nature |
 | 5.6 | A version bump runs the upgrade path | exercised | 2026-09-02 | e2e run 33692479682 on the grafana bump branch (`test/e2e/upgrade_test.go`). | nature |
 | 5.7 | A failed assertion fails the check and keeps diagnostics | exercised | 2026-07-22 | Run 29926193911 failed and kept the artifact `e2e-diagnostics-hardened-app`. | nature |
-| 5.8 | An active definition with no probe-declaring chart fails validation | drill 16.15 | | The lint has refused nothing live. A 16.15 commit removes a probe declaration. | pull request |
+| 5.8 | An active definition with no probe-declaring chart and no declared none proof fails validation | drill 16.15 | | The lint has refused nothing live. A 16.15 commit removes a probe declaration. | pull request |
+| 5.9 | A declared none proof carries a reason and is reported by name on every validation run | drill 16.2 | | Never declared yet; the drill definition's policy entry is the first, printed by the probe lint on its pull request. | drill definition |
+| 5.10 | An unknown proof kind, a non-active name, a none without a reason, or a none for a chart-deployed definition is refused by name | drill 16.15 | | Never refused live; one 16.15 commit declares a kind the lint does not implement, another a none for hardened-app, which its chart deploys. | pull request |
 
 ## Requirement 6: CVE Triage With Recorded Decisions
 

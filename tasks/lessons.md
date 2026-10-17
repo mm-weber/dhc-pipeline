@@ -190,3 +190,44 @@ tested in.
    a test observe the credential arriving (a stub that records the
    `Authorization` header), the way the 2026-09-08 rule checks a step's
    tools against its install order.
+
+## 2026-10-16: a precedent shape was copied whole, and the owner had to ask what the clock was for
+
+**What happened.** The proof-kinds amendment (#271) gave the declared none
+proof a review-by date and a lapse criterion because the compat decision has
+one. The review of the pull request then followed that shape to its end: a
+start date, a ceiling to bound it, a drill to lapse it, a repository-wide red
+run when it lapsed. The owner asked what two pull requests and two dates were
+buying, and the honest answer was a forcing function for a chart pull request
+that, in the owner's workflow, follows the first publish within minutes. The
+date and everything built on it came out before merge.
+
+**Rule.** Before importing a shape from elsewhere in the repository (a dated
+decision, a ceiling, a clock seam), name the failure it prevents here and check
+it against the owner's actual workflow, not the precedent's. Take the smallest
+explicit state that keeps the gap visible (a reason, printed by name on every
+run) and add a clock only when the window it guards is real. Put the
+simplification question to the owner before the review has to.
+
+## 2026-10-16: the pull request text is part of the change, and it went stale
+
+**What happened.** The proof-kinds amendment (#271) was re-decided after
+its review: the date left the criteria, the decision, the code and the
+docs on every branch, one deletion commit each, and the report to the
+owner listed the branches and their heads. The titles and bodies of #271,
+#272 and #273 were not touched: #271 still announced "a dated none" under
+Req 5.8 to 5.11 and a lapse that fails validation, #273 still described
+`review_by` and cases 22 to 34. The owner, opening #271 to merge it, found
+nine open review threads and no statement of what the pull request now
+ships, and had to ask.
+
+**Rule.** The pull request title and body are the first thing a reviewer
+reads and the last thing a re-decision updates, so they are part of every
+push that changes what the branch ships. After a review or a re-decision,
+rewrite the body to say what ships now (criteria, decision, files), and
+list every review finding with its disposition in the body, so the open
+threads have one place that answers them. Check the title and body against
+the branch head before reporting a pull request as ready, the way the
+suites are re-run after the last edit (the 2026-08-26 rule). Repository
+rule since 2026-10-16: every pull request body opens with a `## TL;DR`
+section, updated whenever a review comes in (`docs/CONVENTIONS.md`).
