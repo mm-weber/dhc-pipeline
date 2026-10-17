@@ -248,5 +248,105 @@ check "definition_tags: no tags key, nothing" "" "$(definition_tags "$SB/image/a
 fresh; def app 'image: ghcr.io/mm-weber/dhc/app' 'tags: [1-alpine3.23, 1.2-alpine3.23]'
 check "definition_tags: flow style reads the same" "1-alpine3.23,1.2-alpine3.23" "$(definition_tags "$SB/image/app/image.yaml" | paste -sd,)"
 
+# --- the functional proof per definition (Req 5.8 to 5.10; task 17.2) --------
+# catalogue-policy.yaml's `proofs:` map names, per definition, how it is proven:
+# kind chart or none; a none entry carries its reason and nothing else.
+
+# 22: a none entry for an active definition prints its line: name, kind, reason, tab-separated
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: none' '    reason: drill fixture'
+check "proof_entries: a none entry prints name, kind and reason" "$(printf 'app\tnone\tdrill fixture')" "$(proof_entries "$SB")"
+check "proof_entries: exit 0 on a well-formed map" "0" "$(proof_entries "$SB" >/dev/null 2>&1; echo $?)"
+
+# 23: nothing declared is nothing printed: no proofs: key, or an empty map, both exit 0 with no output
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]'
+check "proof_entries: no proofs key prints nothing" "" "$(proof_entries "$SB" 2>/dev/null)"
+check "proof_entries: no proofs key exits 0" "0" "$(proof_entries "$SB" >/dev/null 2>&1; echo $?)"
+policy 'active_set: [app]' 'proofs: {}'
+check "proof_entries: an empty proofs map prints nothing" "" "$(proof_entries "$SB" 2>/dev/null)"
+check "proof_entries: an empty proofs map exits 0" "0" "$(proof_entries "$SB" >/dev/null 2>&1; echo $?)"
+
+# 24: an entry of kind chart prints the name and the kind with an empty reason
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: chart'
+check "proof_entries: a chart entry prints name, chart and an empty reason" "$(printf 'app\tchart\t')" "$(proof_entries "$SB")"
+
+# 25: a kind the catalogue does not implement is refused by name (Req 5.10): exit 2, the entry named, nothing printed
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: smoke'
+out=$(proof_entries "$SB" 2>&1); rc=$?
+check "proof_entries: an unknown kind is refused (exit 2)" "2" "$rc"
+case "$out" in *"app"*"smoke"*"Req 5.10"*) check "proof_entries: the refusal names the entry, the kind and Req 5.10" "ok" "ok" ;;
+  *) check "proof_entries: the refusal names the entry, the kind and Req 5.10" "names app, smoke and Req 5.10" "$out" ;; esac
+check "proof_entries: a refused map prints no entry line" "" "$(proof_entries "$SB" 2>/dev/null)"
+
+# 26: a none entry without a reason is refused by name (Req 5.10): absent, or an empty string
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: none'
+out=$(proof_entries "$SB" 2>&1); rc=$?
+check "proof_entries: a none entry without reason is refused (exit 2)" "2" "$rc"
+case "$out" in *"app"*"reason"*"Req 5.10"*) check "proof_entries: the refusal names the entry, reason and Req 5.10" "ok" "ok" ;;
+  *) check "proof_entries: the refusal names the entry, reason and Req 5.10" "names app, reason and Req 5.10" "$out" ;; esac
+check "proof_entries: a none without reason prints no entry line" "" "$(proof_entries "$SB" 2>/dev/null)"
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: none' '    reason: ""'
+check "proof_entries: an empty reason is refused (exit 2)" "2" "$(proof_entries "$SB" >/dev/null 2>&1; echo $?)"
+
+# 27: an entry naming a definition outside the active set is refused by name (Req 5.10): a declaration for nothing is a stale record
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+def old 'image: ghcr.io/acme/imgs/old'
+policy 'active_set: [app]' 'proofs:' '  old:' '    kind: none' '    reason: retired fixture'
+out=$(proof_entries "$SB" 2>&1); rc=$?
+check "proof_entries: an entry for an inactive definition is refused (exit 2)" "2" "$rc"
+case "$out" in *"old"*"active"*"Req 5.10"*) check "proof_entries: the refusal names the entry, the active set and Req 5.10" "ok" "ok" ;;
+  *) check "proof_entries: the refusal names the entry, the active set and Req 5.10" "names old, active and Req 5.10" "$out" ;; esac
+check "proof_entries: an inactive entry prints no entry line" "" "$(proof_entries "$SB" 2>/dev/null)"
+
+# 28: a proofs: that is not a map, or an entry that is not a map, is refused by name (Req 5.10), never a traceback
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  - app'
+out=$(proof_entries "$SB" 2>&1); rc=$?
+check "proof_entries: a proofs list is refused (exit 2)" "2" "$rc"
+case "$out" in *"proofs"*"map"*"Req 5.10"*) check "proof_entries: the refusal names proofs, the map shape and Req 5.10" "ok" "ok" ;;
+  *) check "proof_entries: the refusal names proofs, the map shape and Req 5.10" "names proofs, map and Req 5.10" "$out" ;; esac
+check "proof_entries: a proofs list prints no entry line" "" "$(proof_entries "$SB" 2>/dev/null)"
+policy 'active_set: [app]' 'proofs:' '  app: none'
+out=$(proof_entries "$SB" 2>&1); rc=$?
+check "proof_entries: a scalar entry is refused (exit 2)" "2" "$rc"
+case "$out" in *"app"*"Req 5.10"*) check "proof_entries: the refusal names the scalar entry and Req 5.10" "ok" "ok" ;;
+  *) check "proof_entries: the refusal names the scalar entry and Req 5.10" "names app and Req 5.10" "$out" ;; esac
+
+# 29: proof_of: an active definition no entry names is proved by a chart, the default
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+def db 'image: ghcr.io/acme/imgs/db'
+policy 'active_set: [app, db]' 'proofs:' '  db:' '    kind: none' '    reason: drill fixture'
+check "proof_of: an undeclared active definition is chart" "chart" "$(proof_of "$SB" app)"
+check "proof_of: exit 0 for an undeclared definition" "0" "$(proof_of "$SB" app >/dev/null 2>&1; echo $?)"
+
+# 30: proof_of: a declared definition answers with its entry's line
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+def db 'image: ghcr.io/acme/imgs/db'
+policy 'active_set: [app, db]' 'proofs:' '  db:' '    kind: none' '    reason: drill fixture'
+check "proof_of: a declared definition prints its entry line" "$(printf 'db\tnone\tdrill fixture')" "$(proof_of "$SB" db)"
+
+# 31: proof_of: a refused map is that refusal, never a default answer
+fresh
+def app 'image: ghcr.io/acme/imgs/app'
+policy 'active_set: [app]' 'proofs:' '  app:' '    kind: smoke'
+out=$(proof_of "$SB" app 2>&1); rc=$?
+check "proof_of: a refused map exits 2" "2" "$rc"
+case "$out" in *"app"*"smoke"*"Req 5.10"*) check "proof_of: the refusal is the reader's, naming the entry" "ok" "ok" ;;
+  *) check "proof_of: the refusal is the reader's, naming the entry" "names app, smoke and Req 5.10" "$out" ;; esac
+check "proof_of: a refused map prints no answer" "" "$(proof_of "$SB" app 2>/dev/null)"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all tests passed"

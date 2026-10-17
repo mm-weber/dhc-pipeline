@@ -169,6 +169,74 @@ active_components() { # root
   return 0
 }
 
+# --- the functional proof per definition (Req 5.8 to 5.10; task 17.2) --------
+# catalogue-policy.yaml's `proofs:` map names, per definition, how the
+# catalogue proves it works: the kind of proof and, for a `none` entry, the
+# reason (Req 5.8 to 5.10; task 17.2; design Decision 14). This is its
+# reader: one line per entry, name, kind and reason, tab-separated, in
+# declared order. A none entry carries no date on purpose: the gap is printed
+# by name on every validation run instead, and the chart pull request that
+# closes it follows the first publish (Decision 14, the owner's call of
+# 2026-10-16).
+#
+# Malformed input is a refusal by name (exit 2, a ::error naming the entry;
+# Req 5.10), never an empty answer and never a traceback, in the order the
+# code checks it: a `proofs:` that is not a map, or an entry that is not one
+# (`app: none`); an entry naming a definition outside the active set, since a
+# declaration for nothing is a stale record that leaves with the deactivation
+# (the set is read through active_definitions, so a malformed set is that
+# refusal); a kind other than chart or none, because the catalogue implements
+# those two and no other, and a kind nobody implements would read as a proof
+# that nobody runs; a none entry without a reason (absent, or blank), because
+# a declared gap says why it is there. Every entry is checked before any is
+# printed, so a refusal prints no entry line (the active_definitions shape).
+proof_entries() { # root -> one tab-separated line per proofs entry, declared order
+  local root="${1%/}" active
+  active=$(active_definitions "$root") || return $?
+  python3 - "$root" "$active" <<'PY'
+import os, sys, yaml
+doc = yaml.safe_load(open(os.path.join(sys.argv[1], "catalogue-policy.yaml"))) or {}
+entries = doc.get("proofs")
+if entries is None:
+    entries = {}
+active = set(sys.argv[2].splitlines())
+def refuse(msg):
+    print(f"::error file=catalogue-policy.yaml::proof_entries: {msg} (Req 5.10)", file=sys.stderr)
+    sys.exit(2)
+if not isinstance(entries, dict):
+    refuse(f"proofs must be a map from definition name to an entry with kind and reason, not a {type(entries).__name__}")
+for name, entry in entries.items():
+    if name not in active:
+        refuse(f"proofs entry '{name}' names a definition outside the active set; a declaration for nothing is a stale record, remove it with the deactivation")
+    if not isinstance(entry, dict):
+        refuse(f"proofs entry '{name}' must be a map with kind (and, for none, a reason), got '{entry}'")
+    kind = entry.get("kind", "")
+    if kind not in ("chart", "none"):
+        refuse(f"proofs entry '{name}' declares kind '{kind}', which this catalogue does not implement; the kinds are chart and none (design Decision 14 names smoke as the next)")
+    if kind == "none":
+        reason = entry.get("reason")
+        if reason is None or not str(reason).strip():
+            refuse(f"proofs entry '{name}' is a none proof without a reason; a declared gap says why it is there")
+for name, entry in entries.items():
+    print("\t".join(str(v) for v in (name, entry.get("kind", ""), entry.get("reason", ""))))
+PY
+}
+
+# proof_of <root> <definition> -> the one definition's proof: its proofs entry
+# line, in the proof_entries shape, when the map names it; else the single
+# word chart, because an active definition no entry declares is proved the
+# way Req 5.8 already demands, by the chart that deploys it (Req 5.8 to 5.10;
+# task 17.2). Reads through proof_entries rather than parsing the policy a
+# second time, so a refused map is that reader's refusal and prints nothing.
+proof_of() { # root, definition
+  local entries line
+  entries=$(proof_entries "$1") || return $?
+  while IFS= read -r line; do
+    [ "${line%%$'\t'*}" = "$2" ] && { printf '%s\n' "$line"; return 0; }
+  done <<<"$entries"
+  echo chart
+}
+
 # --- authenticity (Req 1.10, 1.11, 3.8; task 11.2) ---------------------------
 # Each definition declares, beside its source url, how its upstream's
 # authenticity is established:

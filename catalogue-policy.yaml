@@ -59,6 +59,22 @@ active_set:
   - valkey
   - valkey-compat
 
+# Req 5.8 to 5.10 (task 17.2; design Decision 14): how each active definition
+# is proved functional. No entry means chart: a chart under chart/ names the
+# definition under deploys: and declares the probe the e2e suite runs once
+# its pods are Ready (Req 5.5). An entry of kind none is a declared gap for a
+# definition no chart deploys yet (an onboarding's first pull request) or
+# ever (a drill fixture): a reason is required, and the probe lint prints the
+# entry by name on every validation run, so the gap is never silent
+# (Req 5.9). A kind the lint does not implement, an entry naming a definition
+# outside the active set, a none without a reason, or a none for a definition
+# a chart deploys is refused by name (Req 5.10); design Decision 14 names
+# smoke as the next kind. scripts/definition-lib.sh's proof_entries is the
+# one reader. The reference instance declares nothing: every active
+# definition is chart-proved. A fork adds entries here; onboarding adds one
+# and removes it with the chart.
+proofs: {}
+
 verification:
   # The registry namespace the four registry criteria bind through (Req 2.2,
   # 2.7, 2.21, 2.23): build.yml refuses a definition publishing outside it,
