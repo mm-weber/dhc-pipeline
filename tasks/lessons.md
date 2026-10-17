@@ -191,6 +191,38 @@ tested in.
    `Authorization` header), the way the 2026-09-08 rule checks a step's
    tools against its install order.
 
+## 2026-10-05: a tool's error wording is not the cause; read the API's answer
+
+**What happened.** `gh run rerun` answered "cannot be rerun; its workflow
+file may be broken" for runs that had lost their hosted runner. The workflow
+file was fine: the REST call behind it returns 403 "Resource not accessible
+by personal access token", because the token holds Actions read only. The
+same message had been taken at face value once before (PR #238).
+
+**Rule.** When a CLI's message names a cause that would be surprising, call
+the underlying API once (`gh api -X POST .../rerun`) and read its status
+and message before repeating the CLI's explanation to the owner. Record the
+permission limit where the next session finds it (memory and this file):
+re-runs are the owner's, from the Actions tab.
+
+## 2026-10-08: describe live behaviour from the data model, not from memory
+
+**What happened.** Asked how the catalogue records a finding fixed by an
+upstream update, the session said that a finding which stops appearing
+"vanishes from the table" of the status page, and built a dashboard
+proposal on that gap. The next day's rescan showed the page keeps the row,
+fills a Fixed date and Days to fix, and counts fixed findings in its header:
+`metrics.json` carries `status: fixed`, `fixed`, `days_to_fix`. The claim
+had been made before the first fix had ever happened live and without
+reading `triage/rescan/page.go` or the status data's shape.
+
+**Rule.** Before describing what a mechanism does live, read the renderer or
+the data it renders (`metrics.json`, the status issue) and cite the field.
+When the event has never happened yet, say "not yet observed" and what the
+data model says will happen, rather than asserting an outcome. A proposal
+built on an unverified gap is withdrawn with the correction, in the same
+message, naming what was wrong.
+
 ## 2026-10-16: a precedent shape was copied whole, and the owner had to ask what the clock was for
 
 **What happened.** The proof-kinds amendment (#271) gave the declared none
