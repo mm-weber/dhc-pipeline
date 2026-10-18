@@ -2059,3 +2059,97 @@ and policy gate and the lint battery were green. The nine entries suppress
 what they claim and nothing else: the twelve were the only uncovered findings
 on grafana before them.
 
+## 2026-10-18: the drill definition joins the catalogue, two findings decided (task 16.2)
+
+*Image: drill-app, the live-drill fixture: `mm-weber/drill-app` v0.1.0 at
+b7868d7a6f41a8dc2181bd874776cf4976d11591, a copy of hardened-app whose go.mod
+pins `github.com/gorilla/handlers v1.2.1` and `github.com/golang-jwt/jwt/v5
+v5.2.1` on purpose. Pull request #286, conductor track
+`drill-definition_20261017`, design Decision 14's pull request 1: the
+definition, the active-set entry and the catalogue's first proof of kind none
+(`catalogue-policy.yaml`, reason "live-drill fixture, never installed by design
+(task 16.2)"), printed by the probe lint on every validation run (Req 5.9; run
+39107650952). No chart deploys it and none ever will; task 16.16 retires it.
+Decisions taken one at a time on 2026-10-18, the owner's calls in chat on the
+evidence below.*
+
+**Two runs.** The first (39106821681, head 7787f95) failed in the frontend's
+test step before any scan: build-stage `runs:` steps have no egress
+(docs/CONVENTIONS.md, measured 2026-07-26), so the archetype's `go test ./...`
+could not fetch the drill's two modules; the step was dropped with a comment,
+the cert-manager precedent (`go/build@v1` fetches the modules itself), commit
+5d6beff. The second (39107650953, job 117616899700) built the image, ran the
+Trivy scan, the VEX portability block, govulncheck, the Grype second opinion and
+the exception tiers against KEV (the feed reachable, no exception yet), and the
+scan gate failed by name:
+
+> drill-app: 2 uncovered within the aperture (1 CRITICAL, 1 HIGH; Req 6.1):
+> CVE-2017-20146 (CRITICAL github.com/gorilla/handlers@v1.2.1, fixed: 1.3.0);
+> CVE-2025-30204 (HIGH github.com/golang-jwt/jwt/v5@v5.2.1, fixed: 5.2.2). Four
+> ways out, strongest first: avoid (drop the component) · fix (version bump,
+> Req 6.5) · prove it does not apply (OpenVEX in triage/vex/, Req 6.4) · accept
+> or transfer for a bounded time (triage/accepted-risk/drill-app.yaml, Req 6.7).
+> An expired exception counts as uncovered.
+
+**Reachability (Req 6.13).** govulncheck v1.6.0 in binary mode on
+`usr/local/bin/drill-app`, whose symbol table the definition keeps (`-w` only,
+no `-s`), from the run's step summary:
+
+| Level | Advisory | Aliases | Module | Version | Package | Symbol |
+| --- | --- | --- | --- | --- | --- | --- |
+| symbol | GO-2020-0020 | CVE-2017-20146, GHSA-jcr6-mmjj-pchw | github.com/gorilla/handlers | v1.2.1 | github.com/gorilla/handlers | ServeHTTP |
+| symbol | GO-2025-3553 | CVE-2025-30204, GHSA-mh63-6h87-95cp | github.com/golang-jwt/jwt/v5 | v5.2.1 | github.com/golang-jwt/jwt/v5 | ParseUnverified |
+
+Both at symbol level, and the source says why: `handlers.CORS(...)` wraps the
+drill's mux, so `ServeHTTP` is on every request's path; `/whoami` calls
+`jwt.Parse`, which reaches `ParseUnverified`. Symbol level forbids a
+`not_affected` statement (Req 6.14).
+
+**The rungs, once for both.** Mitigate: a fixed release exists for each
+module (handlers 1.3.0, jwt 5.2.2) and is declined on purpose; the findings are
+the drill's reason to exist, and their removal is drill 16.6. Avoid: dropping
+the CORS middleware or the token parser is possible and declined for the same
+reason. Not affected: forbidden, see above. Transfer: there is no upstream but
+the owner's own repository. What is left is accept, time-boxed within each
+finding's ceiling (`catalogue-policy.yaml` triage: 30 days for a CRITICAL, 90
+for a HIGH, 14 for anything CISA lists; CISA lists neither on 2026-10-18, the
+gate's tiering step having passed against the live feed).
+
+### ACCEPT: the drill's CRITICAL, gorilla/handlers CORS ServeHTTP, reachable by design
+
+CVE-2017-20146 (GO-2020-0020, GHSA-jcr6-mmjj-pchw; CRITICAL, CVSS 9.8 in the
+advisory database as read on 2026-10-15 when the module was chosen) sits in
+`handlers.CORS`'s `ServeHTTP`, the middleware the drill wraps every request
+in. Reachable, by construction.
+
+**Decision: accept** (owner's call, 2026-10-18, expiry 2026-11-17, the CRITICAL
+ceiling in full). One entry on path `usr/local/bin/drill-app`, purl
+`pkg:golang/github.com/gorilla/handlers` (versionless, as the lane's entries
+are), published in the drill's OpenVEX document as `affected`; the status page
+shows the finding under the exception; nothing installs the image.
+
+**Exit condition:** drill 16.6 bumps the module to 1.3.0 and the finding
+leaves the supported digest. Before that, 16.4 re-decides the expiry to four
+days out and lets it lapse on purpose, and 16.9 lets an exception expire for
+the fail-closed release gate; each re-decision is its own entry here.
+
+### ACCEPT: the drill's HIGH, golang-jwt ParseUnverified, reachable by design
+
+CVE-2025-30204 (GO-2025-3553, GHSA-mh63-6h87-95cp; HIGH, CVSS 7.5 in the
+advisory database as read on 2026-10-15 when the module was chosen) sits in
+`jwt.Parser.ParseUnverified`, which `/whoami` reaches through `jwt.Parse` on
+every bearer token it is handed. Reachable, by construction. CISA does not list
+it on 2026-10-18 (the gate's tiering step passed against the live feed), so its
+ceiling is the HIGH's ninety days; drill 16.3 re-decides this entry against the
+fourteen-day KEV ceiling under the substituted feed of drill 16.8, the
+attribution trivy cannot supply on its own (measured 2026-10-15).
+
+**Decision: accept** (owner's call, 2026-10-18, expiry 2027-01-16, the HIGH
+ceiling in full). One entry on path `usr/local/bin/drill-app`, purl
+`pkg:golang/github.com/golang-jwt/jwt/v5`, published as `affected` beside the
+first; with both entries in place the gate's third run has nothing uncovered
+within the aperture, and the pull request can merge.
+
+**Exit condition:** drill 16.6 bumps the module to 5.2.2 and the finding leaves
+the supported digest; 16.3's re-decision replaces this entry's dates first,
+its own entry here.

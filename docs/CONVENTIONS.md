@@ -218,7 +218,8 @@ deploys is refused by name (Req 5.10; `scripts/definition-lib.sh`'s
 consumer). A none entry carries no date: the chart pull request that
 closes the gap follows the first publish, and an image no chart will ever
 deploy waits for the smoke kind, not a calendar (design Decision 14). The
-reference instance declares nothing. The declaration is what makes adding
+reference instance declares one: the drill definition
+of task 16.2, which no chart will ever deploy. The declaration is what makes adding
 an image two pull requests: the definition with its none entry first, the
 chart after the first publish, when a digest exists to pin (Decision 14;
 the manual's walkthrough).
