@@ -26,7 +26,7 @@ The definition is data; the one behaviour the repository can test is its own liv
 
 - [ ] `scripts/lint-probes_test.sh` green (13 cases); all 41 suites green
 - [ ] The fourteen repository lints green, among them `scripts/lint-probes.sh .` printing the drill's line and `8 active definition(s)`, `scripts/lint-active-set.sh .` printing `8 active, 0 inactive`, `scripts/render-tracking.sh --check` unchanged; `yamllint`; `node test/renovate/managers.test.mjs`
-- [ ] The pull request's first run: validate green with the line (5.9 evidence: run id noted); build gate red naming CVE-2017-20146 and CVE-2025-30204 (6.1); the govulncheck table (6.13); the Grype step ran; the error annotation and the table copied verbatim into the scratchpad for the LOG entry (checkpoint: the evidence is in)
+- [x] The pull request's first run: validate green with the line (5.9 evidence: run 39107650952); build gate red naming CVE-2017-20146 and CVE-2025-30204 (6.1; run 39107650953 after the test-step fix, the first run 39106821681 having failed in the build); the govulncheck table (6.13, both symbol level); the Grype step ran; the annotation and the table pasted by the owner (the log storage is unreachable from the container) and quoted in LOG 2026-10-18 (checkpoint reached 2026-10-18)
 
 ## Phase 2: the decisions (the same pull request)
 
@@ -34,8 +34,8 @@ No behaviour is added, so there is no red test: the lane's lints are the tests. 
 
 ### Tasks
 
-- [ ] **2.1 The spec amendment of the open question** merged, or re-decided by the owner (the HIGH decided in 16.2); the plan's 2.3 follows the decision
-- [ ] **2.2 CVE-2017-20146 (CRITICAL)**: the rungs walked with the evidence (fix 1.3.0 available and declined, avoidance available and declined, not_affected unavailable for a reachable symbol, transfer has no owner but the owner): `accept`, `decided_at` the decision date, `expired_at` within 30 days, `paths: ["usr/local/bin/drill-app"]`, the purl, `issue` the drill-app repository, `ref` the LOG anchor, `blocked` and `statement` one line each
+- [x] **2.1 The spec amendment of the open question** merged, or re-decided by the owner (the HIGH decided in 16.2); the plan's 2.3 follows the decision (merged with #284, 2026-10-18)
+- [x] **2.2 CVE-2017-20146 (CRITICAL)** (decided 2026-10-18, accept to 2026-11-17; LOG 2026-10-18): the rungs walked with the evidence (fix 1.3.0 available and declined, avoidance available and declined, not_affected unavailable for a reachable symbol, transfer has no owner but the owner): `accept`, `decided_at` the decision date, `expired_at` within 30 days, `paths: ["usr/local/bin/drill-app"]`, the purl, `issue` the drill-app repository, `ref` the LOG anchor, `blocked` and `statement` one line each
 - [ ] **2.3 CVE-2025-30204 (HIGH)**: the same rungs; `accept` within 90 days (the entry 16.3 will re-decide), or as the owner re-decides the open question
 - [ ] **2.4 The LOG entry** `## <date>: the drill definition joins the catalogue, two findings decided (task 16.2)`: the definition, the gate's run and annotation, the govulncheck table, the decisions in the LOG's rung format, the ceilings, the exit conditions (16.6 fixes, 16.16 retires); the entries' `ref` anchors point at it
 - [ ] **2.5 The second run**: the exception tiers step green (Req 6.50), the scan gate `nothing uncovered within the aperture`, the VEX portability block listing both as affected; the pull request body's TL;DR rewritten with the decisions; the owner merges (checkpoint)
