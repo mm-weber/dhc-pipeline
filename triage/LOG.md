@@ -2132,3 +2132,24 @@ shows the finding under the exception; nothing installs the image.
 leaves the supported digest. Before that, 16.4 re-decides the expiry to four
 days out and lets it lapse on purpose, and 16.9 lets an exception expire for
 the fail-closed release gate; each re-decision is its own entry here.
+
+### ACCEPT: the drill's HIGH, golang-jwt ParseUnverified, reachable by design
+
+CVE-2025-30204 (GO-2025-3553, GHSA-mh63-6h87-95cp; HIGH, CVSS 7.5 in the
+advisory database as read on 2026-10-15 when the module was chosen) sits in
+`jwt.Parser.ParseUnverified`, which `/whoami` reaches through `jwt.Parse` on
+every bearer token it is handed. Reachable, by construction. CISA does not list
+it on 2026-10-18 (the gate's tiering step passed against the live feed), so its
+ceiling is the HIGH's ninety days; drill 16.3 re-decides this entry against the
+fourteen-day KEV ceiling under the substituted feed of drill 16.8, the
+attribution trivy cannot supply on its own (measured 2026-10-15).
+
+**Decision: accept** (owner's call, 2026-10-18, expiry 2027-01-16, the HIGH
+ceiling in full). One entry on path `usr/local/bin/drill-app`, purl
+`pkg:golang/github.com/golang-jwt/jwt/v5`, published as `affected` beside the
+first; with both entries in place the gate's third run has nothing uncovered
+within the aperture, and the pull request can merge.
+
+**Exit condition:** drill 16.6 bumps the module to 5.2.2 and the finding leaves
+the supported digest; 16.3's re-decision replaces this entry's dates first,
+its own entry here.

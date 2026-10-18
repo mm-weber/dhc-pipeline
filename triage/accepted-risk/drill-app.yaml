@@ -25,3 +25,17 @@ vulnerabilities:
     statement: "accept: live-drill fixture, never installed; the finding is the drill (task 16.2), fixed by drill 16.6"
     decided_at: 2026-10-18
     expired_at: 2026-11-17
+  - id: CVE-2025-30204
+    purls: ["pkg:golang/github.com/golang-jwt/jwt/v5"]
+    paths: ["usr/local/bin/drill-app"]
+    treatment: accept
+    owner: mm-weber
+    ref: "LOG.md#accept-the-drills-high-golang-jwt-parseunverified-reachable-by-design"
+    blocked: "fix (5.2.2) and avoidance (drop the token parser) are available and
+              declined on purpose: the finding is the drill's reason to exist
+              (task 16.2) and its removal is drill 16.6; not_affected is
+              forbidden, govulncheck reaches ParseUnverified in the binary
+              (Req 6.14); transfer has no owner but the owner"
+    statement: "accept: live-drill fixture, never installed; the finding is the drill (task 16.2), re-decided against the KEV ceiling by drill 16.3, fixed by drill 16.6"
+    decided_at: 2026-10-18
+    expired_at: 2027-01-16
