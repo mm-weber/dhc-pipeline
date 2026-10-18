@@ -20,7 +20,7 @@ The definition is data; the one behaviour the repository can test is its own liv
 - [x] **1.1 RED: the live-state guard asserts the drill** (FR-2) (39dd8b8): `scripts/lint-probes_test.sh` case 13 expects `8 active definition(s)`, `1 declared none` and `drill-app: proof none` on this repository; fails on main's seven and zero
 - [x] **1.2 GREEN: the definition, the active-set entry, the proofs entry** (FR-1, FR-2) (7790601): `image/drill-app/image.yaml` copied from hardened-app and adapted as FR-1 lists (name, image, tags, release date, source, checksum, authenticity marker, spdx, `-w` only, outputs, entrypoint, annotation); `drill-app` in `active_set`; the `proofs` entry with its reason; case 13 green, every suite green
 - [x] **1.3 Named a drill in the tables** (FR-3) (the docs commit; docs/CONVENTIONS.md's proofs paragraph updated too): the README's `image/` row and the manual's definitions row (no test; two sentences)
-- [ ] **1.4 The pull request**: title `feat: the drill definition joins the catalogue with the first declared none proof (Req 1.13, 1.14, 5.9; task 16.2)`, body with a TL;DR that says the gate is red by design until the decisions land, and the evidence section filled from the first run
+- [x] **1.4 The pull request**: #286, opened 2026-10-18 (7787f95), its TL;DR saying the gate is red by design until the decisions land; the evidence section filled from the runs
 
 ### Verification (orchestrator)
 
@@ -72,6 +72,7 @@ No behaviour is added, so there is no red test: the lane's lints are the tests. 
 | Date | Task | Deviation | Reason | Resolution |
 | --- | --- | --- | --- | --- |
 | 2026-10-17 | phase 2 | No red test: the decisions are data in the lane | The lane's lints already specify the shape; a test that asserts a decision would decide it | The lints run locally before every push; the gate's second run is the verification |
+| 2026-10-18 | 1.2 | The first run of #286 (39106821681) failed in the frontend's test step before any scan: `/pipeline-test amd64` exit 1; validate was green with the drill's none line (39106821650) | The archetype's `go test ./...` runs in a `runs:` step, and the build sandbox has no egress (docs/CONVENTIONS.md, measured 2026-07-26); hardened-app never needs it, having no module dependencies; the drill's two modules cannot be fetched there (its tests pass outside the sandbox, verified locally at v0.1.0) | The test step dropped with a comment, the cert-manager precedent: `go/build@v1` fetches the modules itself; the drill's unit tests run in its own repository's CI; FR-1's note amended |
 
 ---
 

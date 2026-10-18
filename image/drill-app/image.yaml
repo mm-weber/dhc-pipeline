@@ -53,11 +53,12 @@ contents:
             uid: 0
             gid: 0
       pipeline:
-        - name: test
-          runs: |
-            set -eux -o pipefail
-
-            CGO_ENABLED=0 go test ./...
+        # No test step: the build sandbox has no egress (docs/CONVENTIONS.md,
+        # measured 2026-07-26), so `go test ./...` in a `runs:` step cannot
+        # fetch the drill's two modules, which hardened-app's copy of this step
+        # never needs; `go/build@v1` fetches them itself (the cert-manager
+        # precedent). The drill's unit tests run in its own repository's CI,
+        # and nothing installs this image (task 16.2).
         - name: build
           uses: go/build@v1
           with:
