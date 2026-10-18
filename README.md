@@ -41,7 +41,7 @@ the clocks beneath, the status data itself beside it.
 
 | Path | What |
 |---|---|
-| `image/` | Definitions: hardened-app, cert-manager ×3, grafana, valkey (+`valkey-compat` variant) |
+| `image/` | Definitions: hardened-app, cert-manager ×3, grafana, valkey (+`valkey-compat` variant), drill-app (the live-drill fixture, never installed by design; task 16.2) |
 | `chart/` | Upstream charts pinned + hardened via overrides only; one owned chart |
 | `test/` | Ginkgo/kind e2e: readiness, live securityContext, functional probes, upgrades |
 | `triage/` | OpenVEX source, accepted-risk exceptions, decision log, upstream investigations |

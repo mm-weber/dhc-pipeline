@@ -17,9 +17,9 @@ The definition is data; the one behaviour the repository can test is its own liv
 
 ### Tasks (one slice: RED agent, GREEN agent, orchestrator commit)
 
-- [~] **1.1 RED: the live-state guard asserts the drill** (FR-2): `scripts/lint-probes_test.sh` case 13 expects `8 active definition(s)`, `1 declared none` and `drill-app: proof none` on this repository; fails on main's seven and zero
-- [ ] **1.2 GREEN: the definition, the active-set entry, the proofs entry** (FR-1, FR-2): `image/drill-app/image.yaml` copied from hardened-app and adapted as FR-1 lists (name, image, tags, release date, source, checksum, authenticity marker, spdx, `-w` only, outputs, entrypoint, annotation); `drill-app` in `active_set`; the `proofs` entry with its reason; case 13 green, every suite green
-- [ ] **1.3 Named a drill in the tables** (FR-3): the README's `image/` row and the manual's definitions row (no test; two sentences)
+- [x] **1.1 RED: the live-state guard asserts the drill** (FR-2) (39dd8b8): `scripts/lint-probes_test.sh` case 13 expects `8 active definition(s)`, `1 declared none` and `drill-app: proof none` on this repository; fails on main's seven and zero
+- [x] **1.2 GREEN: the definition, the active-set entry, the proofs entry** (FR-1, FR-2) (7790601): `image/drill-app/image.yaml` copied from hardened-app and adapted as FR-1 lists (name, image, tags, release date, source, checksum, authenticity marker, spdx, `-w` only, outputs, entrypoint, annotation); `drill-app` in `active_set`; the `proofs` entry with its reason; case 13 green, every suite green
+- [x] **1.3 Named a drill in the tables** (FR-3) (the docs commit; docs/CONVENTIONS.md's proofs paragraph updated too): the README's `image/` row and the manual's definitions row (no test; two sentences)
 - [ ] **1.4 The pull request**: title `feat: the drill definition joins the catalogue with the first declared none proof (Req 1.13, 1.14, 5.9; task 16.2)`, body with a TL;DR that says the gate is red by design until the decisions land, and the evidence section filled from the first run
 
 ### Verification (orchestrator)
