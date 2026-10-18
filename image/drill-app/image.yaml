@@ -1,0 +1,103 @@
+# syntax=dhi.io/build:2-alpine3.23@sha256:976eef62e394c4a33e8dfbeebd11dce2fa40f995ad08c21bfd3f77f8b303dc3e
+
+name: Drill App 0.1.x (live-drill fixture)
+image: ghcr.io/mm-weber/dhc/drill-app
+variant: runtime
+tags:
+  - 0-alpine3.23
+  - 0.1-alpine3.23
+  - 0.1.0-alpine3.23
+platforms:
+  - linux/amd64
+  - linux/arm64
+dates:
+  release: "2026-10-15"
+vars:
+  COMMIT_SHA: b7868d7a6f41a8dc2181bd874776cf4976d11591
+  GOLANG_REFERENCE: dhi.io/golang:1.27.2-alpine3.23-dev@sha256:f5fc668f4a043deb67c167af22cf6b09f45d5330c1a9fc30e99ba8385e8acf30
+  SEMVER_MAJOR_MINOR_VERSION: "0.1"
+  SEMVER_MAJOR_VERSION: "0"
+  SEMVER_VERSION: 0.1.0
+  VERSION: 0.1.0
+contents:
+  repositories:
+    - https://dhi.io/apk/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.23/community
+  keyring:
+    - https://dhi.io/keyring/dhi-apk@docker-0F81AD7700D99184.rsa.pub
+  packages:
+    - alpine-baselayout-data
+    - ca-certificates-bundle
+  builds:
+    - name: drill-app
+      uses: dhi.io/golang:1.27.2-alpine3.23-dev@sha256:f5fc668f4a043deb67c167af22cf6b09f45d5330c1a9fc30e99ba8385e8acf30
+      work-dir: /go/src/github.com/mm-weber/drill-app
+      caches:
+        - path: /go/pkg/mod
+      contents:
+        packages:
+          - ca-certificates-bundle
+        files:
+          - url: git+https://github.com/mm-weber/drill-app.git#v0.1.0
+            # authenticity: signed-commit, verified v0.1.0 at b7868d7a6f41 (GitHub verification: valid), 2026-10-17
+            checksum: b7868d7a6f41a8dc2181bd874776cf4976d11591
+            path: /go/src/github.com/mm-weber/drill-app
+            spdx:
+              name: drill-app
+              version: 0.1.0
+              packages:
+                - name: drill-app
+                  purl: pkg:golang/github.com/mm-weber/drill-app@0.1.0
+                  license: MIT
+            uid: 0
+            gid: 0
+      pipeline:
+        - name: test
+          runs: |
+            set -eux -o pipefail
+
+            CGO_ENABLED=0 go test ./...
+        - name: build
+          uses: go/build@v1
+          with:
+            ldflags:
+              - -w
+              - -X main.version=0.1.0
+            output: ${target.dir}/usr/local/bin/drill-app
+            packages: .
+      outputs:
+        - source: ${target.dir}/usr/local/bin/drill-app
+          target: /usr/local/bin/drill-app
+          uid: 0
+          gid: 0
+        - source: /opt/docker/sbom/drill-app
+          target: /opt/docker/sbom/drill-app
+          uid: 0
+          gid: 0
+accounts:
+  run-as: nonroot
+  users:
+    - name: nonroot
+      uid: 65532
+      gid: 65532
+  groups:
+    - name: nonroot
+      gid: 65532
+      members:
+        - nonroot
+os-release:
+  name: dhc hardened images (Alpine)
+  id: alpine
+  version-id: "3.23"
+  pretty-name: dhc hardened images/Alpine Linux v3.23
+  home-url: https://github.com/mm-weber/dhc-pipeline
+  bug-report-url: https://github.com/mm-weber/dhc-pipeline/issues
+annotations:
+  org.opencontainers.image.description: >-
+    Live-drill fixture: a purposely vulnerable copy of hardened-app,
+    never installed by design (task 16.2). DO NOT USE.
+  org.opencontainers.image.source: https://github.com/mm-weber/dhc-pipeline
+  org.opencontainers.image.licenses: MIT
+entrypoint:
+  - drill-app

@@ -59,6 +59,7 @@ active_set:
   - grafana
   - valkey
   - valkey-compat
+  - drill-app
 
 # Req 5.8 to 5.10 (task 17.2; design Decision 14): how each active definition
 # is proved functional. No entry means chart: a chart under chart/ names the
@@ -71,10 +72,14 @@ active_set:
 # outside the active set, a none without a reason, or a none for a definition
 # a chart deploys is refused by name (Req 5.10); design Decision 14 names
 # smoke as the next kind. scripts/definition-lib.sh's proof_entries is the
-# one reader. The reference instance declares nothing: every active
+# one reader. The reference instance declares one: the drill definition
+# (task 16.2), which no chart will ever deploy; every other active
 # definition is chart-proved. A fork adds entries here; onboarding adds one
 # and removes it with the chart.
-proofs: {}
+proofs:
+  drill-app:
+    kind: none
+    reason: "live-drill fixture, never installed by design (task 16.2)"
 
 verification:
   # The registry namespace the four registry criteria bind through (Req 2.2,
