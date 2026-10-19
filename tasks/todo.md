@@ -169,14 +169,24 @@ stay as history.
 
 ## Calendar (owner-side)
 
+- 2026-10-20 07:26Z: `.keys/90d_dhc_classic_readpackages.txt` expires (a
+  classic PAT, read:packages). No script or workflow reads it and every dhc
+  package answers anonymous reads: let it lapse or delete the file.
+  `.keys/90d_hardened-app.txt` (2026-07-19) expired on 2026-10-19; nothing
+  reads it either, the hardened-app clone uses its own key (below). Dates
+  measured 2026-10-19 from the API's expiry header, never from a token.
 - 2026-10-22: register row M5, re-measure cosign v3 with the current kyverno
   and trivy.
 - 2026-10-29: the valkey-helm fork PAT expires (`/workspace/repos/valkey-helm/.keys/fork.pat`).
 - 2026-11-21: register row M6, re-verify the DHI terms memo.
 - 2026-11-24: the valkey compat decision's review-by date (4.8 lapses the day
   after unless renewed).
+- 2026-12-05: the hardened-app clone's PAT expires
+  (`/workspace/repos/hardened-app/.keys/90d_hardened_app.pat`).
 - 2026-12-12: the nine grafana transfers of 2026-10-13 re-decided; grafana
   inactive, no 13.1.8 build will fix them: accept, or level two.
+- 2027-01-13: the drill-app clone's PAT expires
+  (`/workspace/repos/drill-app/.keys/90d_drill_app.pat`).
 - 2027-01-14 and 2027-01-16: the ninety-day clocks of the five kin-openapi
   findings in grafana 13.1.7 run out (#274 to #277, then #287).
 - 2027-01-17: `.keys/90d-pat.txt` expires (extended 2026-10-19; the agent's
