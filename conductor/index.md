@@ -26,6 +26,7 @@ Navigation for the project context and the work tracks. Context first, then spec
 | --- | --- | --- | --- | --- |
 | proof-kinds_20261015 | completed | high | [spec](./tracks/proof-kinds_20261015/spec.md) | [plan](./tracks/proof-kinds_20261015/plan.md) |
 | drill-definition_20261017 | completed | high | [spec](./tracks/drill-definition_20261017/spec.md) | [plan](./tracks/drill-definition_20261017/plan.md) |
+| retire-grafana_20261019 | pending | high | [spec](./tracks/retire-grafana_20261019/spec.md) | [plan](./tracks/retire-grafana_20261019/plan.md) |
 
 ## Recent activity
 
@@ -35,3 +36,4 @@ Navigation for the project context and the work tracks. Context first, then spec
 | 2026-10-17 | proof-kinds_20261015 | Track completed: phases 17.2, 17.3 and 17.4 merged by squash (#273, #281, #282) after the spec (#271) and the context (#272); the spec ticks and the registry closed in their own pull request |
 | 2026-10-17 | drill-definition_20261017 | Track created from spec task 16.2, the first live drill; the live-drills working plan of 2026-10-12 (branch plan-live-drills) folded into `tasks/todo.md`, revisited |
 | 2026-10-19 | drill-definition_20261017 | Track completed: #286 merged 2026-10-18 (the definition, the first declared none proof, the owner's two accept decisions); the first publish and the first rescan observed in the evidence pull request |
+| 2026-10-19 | retire-grafana_20261019 | Track created from the owner's call to deactivate grafana by the documented switch (level 1 of four, kept in the spec); the twelve moot exceptions retired with it |
