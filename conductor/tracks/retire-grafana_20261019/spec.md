@@ -109,7 +109,7 @@ Notes: the error reads `image/grafana/image.yaml: image/grafana/ is not in the a
 **Acceptance criteria:**
 
 - [x] The drill's validate run red with that line (run 39289979209, 2026-10-19 16:57Z; the ledger's 1.16 evidence); its build run leaves grafana out of the matrix by name with the gate green (run 39289978981, Req 1.15's preventive branch, first run live); #291 closed, never merged, once the evidence is merged
-- [ ] Renovate's next successful run closes #279 and the dashboard (#5) stops listing grafana (observed, not assumed)
+- [x] Renovate's next successful run closes #279 and the dashboard (#5) stops listing grafana (observed 2026-10-19 21:19Z: run 39323363043 attempt 2, the first with the regenerated token, autoclosed #279 and rebased the other four bump pull requests; #5 lists nothing of grafana)
 
 ### FR-9: The evidence (Req 7.11)
 

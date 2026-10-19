@@ -45,7 +45,8 @@ stay as history.
       as hardened-app; the README's first line warns.
 - [x] The owner's call of 2026-10-19: grafana deactivated by the documented
       switch, level one of four (track `retire-grafana_20261019`: #289 the
-      track, #290 the switch, #291 the drill bump, never merged). 1.13, 1.14
+      track, #290 the switch, #291 the drill bump, never merged; Renovate
+      autoclosed its own #279 once grafana's paths were ignored). 1.13, 1.14
       and 1.16 exercised by nature; 1.15's detective half waits for the first
       rescan after the merge. The twelve moot exceptions of 2026-09-03
       retired; the nine transfers of 2026-10-13 lose their 13.1.8 exit; five
@@ -179,8 +180,10 @@ stay as history.
 - 2027-01-14 and 2027-01-16: the ninety-day clocks of the five kin-openapi
   findings in grafana 13.1.7 run out (#274 to #277, then #287).
 - 2027-01-17: `.keys/90d-pat.txt` expires (extended 2026-10-19; the agent's
-  git and gh access); rotate and replace the file. RENOVATE_TOKEN and
-  DHI_TOKEN expiries are unknown here (secrets API 403); check them then.
+  git and gh access); rotate and replace the file. RENOVATE_TOKEN was
+  regenerated on 2026-10-19 after expiring that day (Renovate down from
+  04:02Z to 21:17Z, two runs failed at startup); its new expiry and
+  DHI_TOKEN's are unknown here (secrets API 403): note them beside this line.
 
 ## Working rules the owner set (apply in every session)
 
