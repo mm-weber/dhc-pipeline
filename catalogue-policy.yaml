@@ -49,14 +49,14 @@ release:
 # keep every tag-driven plane (enumeration, daily scans, attestations,
 # issues over its current tags) until retention retires them; the directory
 # stays, the reference demonstrates the switch. The reference instance
-# activates everything, grafana's repackaged tarball included (design
-# Decision 11). A fork lists what it stands behind.
+# activates everything but grafana, deactivated on 2026-10-19 by this
+# switch (design Decision 11; triage/LOG.md 2026-10-19). A fork lists what
+# it stands behind.
 active_set:
   - hardened-app
   - cert-manager-controller
   - cert-manager-webhook
   - cert-manager-cainjector
-  - grafana
   - valkey
   - valkey-compat
   - drill-app
