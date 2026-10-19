@@ -514,6 +514,11 @@ a repository dependency (task 11.7, Req 3.14, 2026-09-20).
 - One logical change per PR; definition bumps and chart changes do not mix
   unless a bump forces the chart change (say so).
 - PR description references the requirement IDs it serves.
+- The PR body opens with a `## TL;DR` section: what the pull request ships
+  as of its head, in a few lines a reader can merge from. It is updated
+  whenever a review comes in, naming each finding's disposition (fixed in
+  which commit, accepted, re-decided), so the body, not the threads, says
+  what landed (rule of 2026-10-16).
 - Green checks required; patch and digest bumps of a from-source upstream and
   digest-only bumps of catalogue image pins under `chart/` automerge on green
   required checks, nothing else does (Req 3.5, 3.12); majors
