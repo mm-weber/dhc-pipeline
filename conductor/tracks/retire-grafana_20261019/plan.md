@@ -3,7 +3,7 @@
 **Track ID:** retire-grafana_20261019
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-10-19
-**Status:** [ ] not started
+**Status:** [~] in progress (phase 1 started 2026-10-19)
 
 ## Overview
 
@@ -13,7 +13,7 @@ Two phases. Phase 1 is one pull request: the switch by TDD (the probe lint's liv
 
 ### Tasks (one slice: RED agent, GREEN agent, orchestrator commit)
 
-- [ ] **1.1 RED: the live-state guard asserts seven** (FR-3): `scripts/lint-probes_test.sh` case 13 expects `7 active definition(s)`, `6 covered by 3 probe registration(s)` and `1 declared none`; fails on main's eight
+- [~] **1.1 RED: the live-state guard asserts seven** (FR-3): `scripts/lint-probes_test.sh` case 13 expects `7 active definition(s)`, `6 covered by 3 probe registration(s)` and `1 declared none`; fails on main's eight
 - [ ] **1.2 GREEN: the line and the tracking block** (FR-1, FR-2): `grafana` removed from `active_set`, the policy file's comment amended, `scripts/render-tracking.sh .` re-renders `renovate.json5`; case 13 green, every suite green
 - [ ] **1.3 Named inactive in the tables** (FR-4): the README's `image/` row and the manual's definitions row (orchestrator; no test)
 - [ ] **1.4 The twelve moot exceptions retired** (FR-5): the entries decided 2026-09-03 removed from `triage/accepted-risk/grafana.yaml`, the nine of 2026-10-13 kept (orchestrator; the lane's lints are the test)
