@@ -3,7 +3,7 @@
 **Track ID:** drill-definition_20261017
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-10-17
-**Status:** [~] in progress (phase 1 started 2026-10-18)
+**Status:** [x] completed (phase 1 and 2 in #286, merged 2026-10-18; phase 3 the evidence pull request, 2026-10-19)
 
 ## Overview
 
@@ -54,7 +54,7 @@ No behaviour is added, so there is no red test: the lane's lints are the tests. 
 - [ ] **3.2 The first rescan observed** (FR-7): the enumeration lists the drill's tags, the visibility invariant passes, what happened to the two findings (issues filed and closed with `resolved:accepted`, or the status row under the exceptions) quoted as the run shows it
 - [x] **3.3 The ledger** (FR-8) (row 5.9 exercised, 2026-10-18, run 39107650952): row 5.9 to `exercised` with the validate run id and the date; the induced-by column `drill definition`
 - [ ] **3.4 The LOG addendum**: the publish and rescan facts under the phase 2 entry
-- [ ] **3.5 The ticks**: 16.2 `[done <date>, #<pull request>]` in `tasks.md`; this plan's checkpoints; `conductor/tracks.md` to Completed; `metadata.json`; `conductor/index.md`
+- [x] **3.5 The ticks** (2026-10-19): 16.2 `[done <date>, #<pull request>]` in `tasks.md`; this plan's checkpoints; `conductor/tracks.md` to Completed; `metadata.json`; `conductor/index.md`
 
 ### Verification (orchestrator)
 
@@ -63,9 +63,9 @@ No behaviour is added, so there is no red test: the lane's lints are the tests. 
 
 ## Final verification
 
-- [ ] FR-1 to FR-8 each have their evidence in the LOG entry or the ledger
+- [x] FR-1 to FR-8 each have their evidence in the LOG entry or the ledger (FR-7's rescan paragraph is the last, recorded as observed)
 - [ ] Both pull requests merged by squash
-- [ ] `tasks/todo.md`'s program section says 16.2 is done and names 16.3 as next (16.8's drill input first, since the KEV attribution needs it)
+- [x] `tasks/todo.md`'s program section says 16.2 is done and names 16.8 then 16.3 as next (2026-10-19)
 
 ## Deviations log
 

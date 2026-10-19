@@ -1,10 +1,10 @@
 {
   "id": "drill-definition_20261017",
   "type": "feature",
-  "status": "pending",
+  "status": "completed",
   "created_at": "2026-10-17T21:51:30Z",
-  "updated_at": "2026-10-17T21:51:30Z",
-  "description": "The drill definition and its first findings (spec task 16.2): drill-app joins the catalogue as pull request 1 of the onboarding flow with the first declared none proof; the gate names its two findings, the owner decides them, main publishes, the evidence lands in the ledger and the LOG",
+  "updated_at": "2026-10-19T07:39:44Z",
+  "description": "The drill definition and its first findings (spec task 16.2): drill-app joins the catalogue as pull request 1 of the onboarding flow with the first declared none proof; the gate names its two findings, the owner decides them, main publishes, the evidence lands in the ledger and the LOG (completed 2026-10-19: #286 merged 2026-10-18 as 1b941ea)",
   "spec_path": "conductor/tracks/drill-definition_20261017/spec.md",
   "plan_path": "conductor/tracks/drill-definition_20261017/plan.md"
 }
