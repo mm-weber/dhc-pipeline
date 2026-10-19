@@ -1,0 +1,58 @@
+# Implementation plan: Grafana deactivated, the documented switch exercised live
+
+**Track ID:** retire-grafana_20261019
+**Spec:** [spec.md](./spec.md)
+**Created:** 2026-10-19
+**Status:** [ ] not started
+
+## Overview
+
+Two phases. Phase 1 is one pull request: the switch by TDD (the probe lint's live-state guard turns red at seven active definitions and green when grafana's line is gone and the tracking block re-rendered), the two rows, the twelve moot exceptions retired, the LOG entry. Phase 2 observes the first inactive day (no build, the rescan's inactive check, Renovate's bump refused) and closes the track with the ledger rows. The rules are `conductor/workflow.md`'s: one test per slice, RED and GREEN as separate agents, the orchestrator commits, signed commits, a `## TL;DR` at the top of every pull request body.
+
+## Phase 1: the switch (one pull request)
+
+### Tasks (one slice: RED agent, GREEN agent, orchestrator commit)
+
+- [ ] **1.1 RED: the live-state guard asserts seven** (FR-3): `scripts/lint-probes_test.sh` case 13 expects `7 active definition(s)`, `6 covered by 3 probe registration(s)` and `1 declared none`; fails on main's eight
+- [ ] **1.2 GREEN: the line and the tracking block** (FR-1, FR-2): `grafana` removed from `active_set`, the policy file's comment amended, `scripts/render-tracking.sh .` re-renders `renovate.json5`; case 13 green, every suite green
+- [ ] **1.3 Named inactive in the tables** (FR-4): the README's `image/` row and the manual's definitions row (orchestrator; no test)
+- [ ] **1.4 The twelve moot exceptions retired** (FR-5): the entries decided 2026-09-03 removed from `triage/accepted-risk/grafana.yaml`, the nine of 2026-10-13 kept (orchestrator; the lane's lints are the test)
+- [ ] **1.5 The LOG entry** (FR-6): `## 2026-10-19: grafana deactivated, the switch exercised live; twelve moot exceptions retired`: the reason, the four levels in one paragraph, the measured effects, the twelve by id with their fix date, the nine transfers' new exit condition, the five undecided findings named as the owner's next calls
+- [ ] **1.6 The pull request**: title `chore: grafana leaves the active set, the documented switch exercised live; twelve moot exceptions retired (Req 1.13 to 1.16, 6.11; task 16.11 by nature)`, a TL;DR, the verification section from the runs
+
+### Verification (orchestrator)
+
+- [ ] `scripts/lint-probes_test.sh` green; all 41 suites green
+- [ ] The fourteen repository lints green with the lines FR-1 and FR-2 name; `scripts/lint-accepted-risk.sh .` with no expiry warning; `scripts/lint-log-anchors.sh all .`; `yamllint`; `node test/renovate/managers.test.mjs` unchanged
+- [ ] The pull request's CI green; the e2e's affected-components job without grafana; the owner merges (checkpoint)
+
+## Phase 2: the first inactive day (a small pull request)
+
+### Tasks
+
+- [ ] **2.1 No build, no tag** (FR-7): the first push and nightly builds after the merge carry no grafana job; the registry's grafana tags unchanged (anonymous read)
+- [ ] **2.2 The rescan's inactive check** (FR-7): the first rescan after the merge names one inactive definition and passes; the status issue's grafana rows unchanged (the ledger's 1.15 evidence)
+- [ ] **2.3 The bump refused** (FR-8): Renovate's #279 rebased, its validate run red naming `image/grafana/image.yaml` and Req 1.16 (the ledger's 1.16 evidence); the owner closes #279 (OPERATOR); the dashboard no longer lists grafana
+- [ ] **2.4 The ledger and the spec** (FR-9): rows 1.15 and 1.16 to exercised with their run ids, induced by `switch`; task 16.11's wording amended; the LOG addendum
+- [ ] **2.5 The ticks**: this plan's checkpoints; `conductor/tracks.md` to Completed; `metadata.json`; `conductor/index.md`; `tasks/todo.md`'s open item on the grafana exceptions closed and its 2026-11-02 calendar line removed
+
+### Verification (orchestrator)
+
+- [ ] `scripts/lint-live-evidence.sh .`, `scripts/lint-log-anchors.sh all .` green; the fourteen repository lints green
+- [ ] The pull request merged (track complete)
+
+## Final verification
+
+- [ ] FR-1 to FR-9 each have their evidence in the LOG entry or the ledger
+- [ ] Both pull requests merged by squash
+- [ ] The five undecided findings and the nine transfers are named in `tasks/todo.md` as the owner's open calls, with 2026-12-12 on the calendar
+
+## Deviations log
+
+| Date | Task | Deviation | Reason | Resolution |
+| --- | --- | --- | --- | --- |
+
+---
+
+**Plan created:** 2026-10-19
+**Last updated:** 2026-10-19 (drafted with the track; pending the owner's confirmation)
