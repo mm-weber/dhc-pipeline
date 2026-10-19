@@ -2171,3 +2171,22 @@ v0.1.0` by the next morning (the tracking scope, Req 1.14). The first rescan
 after the publish had not run when this was written; what it does with the two
 findings on the supported digest is recorded below once observed, never
 predicted.
+
+**The first rescan after the publish, 2026-10-19 08:28 to 08:48Z** (run
+39223026946, dispatched by the owner; job 117962583384): the enumeration
+listed the drill's three tags, every platform manifest was scanned, the
+invariants held with the new package public (Req 2.21, 2.24), today's reports
+were attested, the authenticity signals, the VEX portability block and the
+consumer smoke test passed over the supported set, and the posture invariants
+held. No issue was filed for drill-app: both findings arrived already decided,
+and the issue set had nothing new, so the filing step did not run (Req 6.3's
+mechanism stays exercised by nature, not by this drill). The status issue
+(#151) shows two rows for drill-app: CVE-2017-20146, CRITICAL, KEV no,
+`decided (affected)`, first seen 2026-10-18, "accept, accepted risk until
+2026-11-17"; CVE-2025-30204, HIGH, KEV no, `decided (affected)`, first seen
+2026-10-18, "accept, accepted risk until 2027-01-16"; the published status data
+carries each exception's statement with its binary and expiry. The same run
+opened the fourteen-day expiry warnings for the grafana exceptions of
+2026-09-03 (ten annotations, expiring 2026-11-02), as the calendar foresaw;
+nothing to do with the drill. Task 16.2 ends here; 16.4 is the first drill
+that moves these two entries.

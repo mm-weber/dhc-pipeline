@@ -51,9 +51,9 @@ No behaviour is added, so there is no red test: the lane's lints are the tests. 
 ### Tasks
 
 - [x] **3.1 The publish observed** (FR-6) (run 39172583475; index sha256:53e0c498…, amd64 sha256:7d59e3a2…, arm64 sha256:2e19dfd9…; public on the first publish, read anonymously 2026-10-19): main's build run, the three tags and the platform manifest digests; the package's visibility checked anonymously the way `check-visibility.sh` does; the owner sets it public if the first publish left it private (OPERATOR)
-- [ ] **3.2 The first rescan observed** (FR-7): the enumeration lists the drill's tags, the visibility invariant passes, what happened to the two findings (issues filed and closed with `resolved:accepted`, or the status row under the exceptions) quoted as the run shows it
+- [x] **3.2 The first rescan observed** (FR-7) (run 39223026946, dispatched 2026-10-19 08:28Z: no issue filed, both rows `decided (affected)` in #151, the invariants green with the package public): the enumeration lists the drill's tags, the visibility invariant passes, what happened to the two findings (issues filed and closed with `resolved:accepted`, or the status row under the exceptions) quoted as the run shows it
 - [x] **3.3 The ledger** (FR-8) (row 5.9 exercised, 2026-10-18, run 39107650952): row 5.9 to `exercised` with the validate run id and the date; the induced-by column `drill definition`
-- [ ] **3.4 The LOG addendum**: the publish and rescan facts under the phase 2 entry
+- [x] **3.4 The LOG addendum** (2026-10-19, under the 2026-10-18 entry): the publish and rescan facts under the phase 2 entry
 - [x] **3.5 The ticks** (2026-10-19): 16.2 `[done <date>, #<pull request>]` in `tasks.md`; this plan's checkpoints; `conductor/tracks.md` to Completed; `metadata.json`; `conductor/index.md`
 
 ### Verification (orchestrator)
@@ -63,8 +63,8 @@ No behaviour is added, so there is no red test: the lane's lints are the tests. 
 
 ## Final verification
 
-- [x] FR-1 to FR-8 each have their evidence in the LOG entry or the ledger (FR-7's rescan paragraph is the last, recorded as observed)
-- [ ] Both pull requests merged by squash
+- [x] FR-1 to FR-8 each have their evidence in the LOG entry or the ledger (FR-7's rescan paragraph recorded as observed on 2026-10-19)
+- [x] Both pull requests merged by squash (#286 as 1b941ea on 2026-10-18; the evidence pull request #288 closes the track)
 - [x] `tasks/todo.md`'s program section says 16.2 is done and names 16.8 then 16.3 as next (2026-10-19)
 
 ## Deviations log
