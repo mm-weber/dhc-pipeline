@@ -30,9 +30,9 @@ Two phases. Phase 1 is one pull request: the switch by TDD (the probe lint's liv
 
 ### Tasks
 
-- [ ] **2.1 No build, no tag** (FR-7): the first push and nightly builds after the merge carry no grafana job; the registry's grafana tags unchanged (anonymous read)
+- [~] **2.1 No build, no tag** (FR-7) (push build 39288882482 on the squash 04c6eeb, 2026-10-19 16:50Z: the affected-definitions job named nothing, the matrix job skipped, the gate green; the drill's build 39289978981 the same with `image/grafana/image.yaml` changed; the registry's three grafana tags on sha256:89c5680a868b, read anonymously 16:56Z; the nightly of 2026-10-20 pending): the first push and nightly builds after the merge carry no grafana job; the registry's grafana tags unchanged (anonymous read)
 - [ ] **2.2 The rescan's inactive check** (FR-7): the first rescan after the merge names one inactive definition and passes; the status issue's grafana rows unchanged (the ledger's 1.15 evidence)
-- [ ] **2.3 The bump refused** (FR-8): Renovate's #279 rebased, its validate run red naming `image/grafana/image.yaml` and Req 1.16 (the ledger's 1.16 evidence); the owner closes #279 (OPERATOR); the dashboard no longer lists grafana
+- [x] **2.3 The bump refused** (FR-8) (drill #291, head 3e7cb45 = Renovate's f6f89f8 replayed onto main; validate run 39289979209 red at step 14 in twelve seconds with the Req 1.16 line naming `image/grafana/image.yaml`; see the deviations log): the validate run red naming `image/grafana/image.yaml` and Req 1.16 (the ledger's 1.16 evidence); #291 closed after the evidence merges, never merged; Renovate's handling of #279 and the dashboard observed on its next run (pending)
 - [ ] **2.4 The ledger and the spec** (FR-9): rows 1.15 and 1.16 to exercised with their run ids, induced by `switch`; task 16.11's wording amended; the LOG addendum
 - [ ] **2.5 The ticks**: this plan's checkpoints; `conductor/tracks.md` to Completed; `metadata.json`; `conductor/index.md`; `tasks/todo.md`'s open item on the grafana exceptions closed and its 2026-11-02 calendar line removed
 
@@ -51,6 +51,7 @@ Two phases. Phase 1 is one pull request: the switch by TDD (the probe lint's liv
 
 | Date | Task | Deviation | Reason | Resolution |
 | --- | --- | --- | --- | --- |
+| 2026-10-19 | 2.3 | The Req 1.16 case came from drill #291, not from a rebase of Renovate's #279 | FR-2's rendered ignore paths take `image/grafana/**` out of Renovate's extraction, so the bot prunes the 13.1.x branch instead of rebasing it; its 15:23Z run (39277512324) also failed before #290 on a docker exit 1, cause unread (logs unreachable from the agent's network) | The drill task 16.11 words: Renovate's commit f6f89f8 replayed unchanged onto main as draft #291, refused live on 39289979209; FR-8's note and acceptance amended; #279's autoclose by Renovate observed as the tracking-scope evidence instead of a refusal |
 | 2026-10-19 | 1.2 | A second test pinned the live state: `test/renovate/managers.test.mjs`'s tracking-scope checks asserted that the reference ignores no path and built the fork fixture by removing grafana's line | Found by the GREEN agent running the fixture test (166 of 168 checks); the track's spec and plan had called the test unchanged | Slice 2, red first: the checks assert the new block (grafana's two paths) and the fixture deactivates hardened-app, expecting four paths; the spec's FR-2 note corrected |
 
 ---
