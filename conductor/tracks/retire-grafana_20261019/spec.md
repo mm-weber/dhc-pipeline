@@ -104,11 +104,12 @@ WHEN a nightly or a push build runs after that merge THE CI Pipeline SHALL build
 
 IF a pull request changes a file under `image/grafana/` without activating it THEN THE CI Pipeline SHALL fail validation naming that file and Req 1.16.
 
-Notes: Renovate's open #279 (grafana 13.1.8) supplies the case on its next rebase; the error reads `image/grafana/image.yaml: image/grafana/ is not in the active set, so this change cannot be built, tested or published; activate the definition in this pull request (active_set in catalogue-policy.yaml) or leave it frozen (Req 1.16)` (measured in the scratch copy).
+Notes: the error reads `image/grafana/image.yaml: image/grafana/ is not in the active set, so this change cannot be built, tested or published; activate the definition in this pull request (active_set in catalogue-policy.yaml) or leave it frozen (Req 1.16)` (measured in the scratch copy on 2026-10-19). The track first expected Renovate's open #279 (grafana 13.1.8) to supply the case on its next rebase. Amended 2026-10-19 after the merge: FR-2's rendered ignore paths take `image/grafana/**` out of Renovate's extraction, so the bot drops the 13.1.x branch instead of rebasing it (its stale-branch pruning closes #279 and the dashboard stops listing grafana, the tracking-scope evidence of Req 1.14 and 3.2). The case therefore comes the way task 16.11 words it: a drill pull request bumping the inactive definition, never merged. Drill #291 replays Renovate's commit f6f89f8 (the real 13.1.8 bump) unchanged onto main after #290, as a draft.
 
 **Acceptance criteria:**
 
-- [ ] #279's validate run red with that line (the ledger's 1.16 evidence); the owner closes #279
+- [x] The drill's validate run red with that line (run 39289979209, 2026-10-19 16:57Z; the ledger's 1.16 evidence); its build run leaves grafana out of the matrix by name with the gate green (run 39289978981, Req 1.15's preventive branch, first run live); #291 closed, never merged, once the evidence is merged
+- [x] Renovate's next successful run closes #279 and the dashboard (#5) stops listing grafana (observed 2026-10-19 21:19Z: run 39323363043 attempt 2, the first with the regenerated token, autoclosed #279 and rebased the other four bump pull requests; #5 lists nothing of grafana)
 
 ### FR-9: The evidence (Req 7.11)
 

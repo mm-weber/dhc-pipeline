@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-10-17
+# Live drills (task group 16): where we are and what is next, as of 2026-10-19
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -43,6 +43,14 @@ stay as history.
       verified), go.mod pinning gorilla/handlers v1.2.1 (CVE-2017-20146,
       CRITICAL) and golang-jwt/jwt/v5 v5.2.1 (CVE-2025-30204, HIGH); rulesets
       as hardened-app; the README's first line warns.
+- [x] The owner's call of 2026-10-19: grafana deactivated by the documented
+      switch, level one of four (track `retire-grafana_20261019`: #289 the
+      track, #290 the switch, #291 the drill bump, never merged; Renovate
+      autoclosed its own #279 once grafana's paths were ignored). 1.13, 1.14
+      and 1.16 exercised by nature; 1.15's detective half waits for the first
+      rescan after the merge. The twelve moot exceptions of 2026-09-03
+      retired; the nine transfers of 2026-10-13 lose their 13.1.8 exit; five
+      kin-openapi HIGHs in the frozen image are the owner's open calls.
 
 ## The drills, in order (one pull request each; each ends with a LOG entry and its ledger rows)
 
@@ -92,13 +100,13 @@ stay as history.
       pinned tag of drill-app to a commit signed by no key, or re-sign with
       another key; the daily re-verification files the first true mismatch
       issue; owner decides and restores; the issue closes with the reason.
-- [ ] 16.11 Deactivation (1.13 to 1.16, 1.19): drill-app leaves the active
-      set, and its proofs entry leaves in the same pull request (the reader
-      refuses an entry for an inactive name, Req 5.10); matrices and
-      ignorePaths exclude it; no new digest or tag; the inactive-digest check
-      passes with something to check; two drill branches, never merged: a
-      bump of the inactive definition (1.16), a removed directory with the
-      policy entry kept (1.19).
+- [ ] 16.11 Deactivation (1.13 to 1.16, 1.19): 1.13, 1.14 and 1.16 exercised
+      on 2026-10-19 by grafana's deactivation (#290; the bump refused on drill
+      #291; track `retire-grafana_20261019`), 1.15's detective half by the
+      first rescan after it. What the drill keeps: drill-app's proofs entry
+      leaves in the same pull request (the reader refuses an entry for an
+      inactive name, Req 5.10), and a removed directory with the policy entry
+      kept (1.19), a drill branch never merged.
 - [ ] 16.12 Revocation, advisory, runbook (9.4, 9.5, 9.7, M14): the drill
       digest in triage/revocations.yaml with reason "drill" while a tag still
       references it; the posture step fails by name; the runbook executed as
@@ -133,11 +141,15 @@ stay as history.
       `scanner.db.version` (trivy convert leaves them empty; measured
       2026-09-27 and 2026-10-08). A fix in the attestation step, test-first,
       then the ledger row flips from `defect` to `exercised`.
-- [ ] The twelve grafana exceptions of 2026-09-03 are moot since 13.1.7
-      (`triage/accepted-risk/grafana.yaml`, expiring 2026-11-02). Convention
-      so far: leave to expire. Alternative: retire them now with a LOG entry
-      carrying the SBOM evidence. Owner said "hold it off" on 2026-10-08; the
-      expiry warnings start 2026-10-19.
+- [x] The twelve grafana exceptions of 2026-09-03, moot since 13.1.7: retired
+      on 2026-10-19 with grafana's deactivation (#290, LOG 2026-10-19); the
+      expiry warnings stopped with the merge.
+- [ ] Grafana 13.1.7, frozen: five undecided HIGH findings, all in
+      `github.com/getkin/kin-openapi` v0.144.0 (CVE-2026-100351 to
+      CVE-2026-100354, #274 to #277, clocks from 2026-10-16; CVE-2026-100349,
+      #287, from 2026-10-18; fixed upstream in 0.146.0 to 0.149.0). No build
+      will fix a frozen image: accept with an expiry, or level two (removal
+      from the catalogue). One at a time, evidence first, the owner's calls.
 - [ ] Dashboard usability amendment (owner liked the direction, parked on
       2026-10-08): a legend for the four statuses; on fixed rows, the version
       and component change that fixed them; a release line per definition;
@@ -157,18 +169,31 @@ stay as history.
 
 ## Calendar (owner-side)
 
-- 2026-10-19: `.keys/90d-pat.txt` expires (the agent's git and gh access);
-  rotate and replace the file. RENOVATE_TOKEN and DHI_TOKEN expiries are
-  unknown here (secrets API 403); check them at the same time. Also the day
-  the moot exceptions' 14-day expiry warnings begin.
+- 2026-10-20 07:26Z: `.keys/90d_dhc_classic_readpackages.txt` expires (a
+  classic PAT, read:packages). No script or workflow reads it and every dhc
+  package answers anonymous reads: let it lapse or delete the file.
+  `.keys/90d_hardened-app.txt` (2026-07-19) expired on 2026-10-19; nothing
+  reads it either, the hardened-app clone uses its own key (below). Dates
+  measured 2026-10-19 from the API's expiry header, never from a token.
 - 2026-10-22: register row M5, re-measure cosign v3 with the current kyverno
   and trivy.
 - 2026-10-29: the valkey-helm fork PAT expires (`/workspace/repos/valkey-helm/.keys/fork.pat`).
-- 2026-11-02: the twelve grafana exceptions expire (moot since 13.1.7).
 - 2026-11-21: register row M6, re-verify the DHI terms memo.
 - 2026-11-24: the valkey compat decision's review-by date (4.8 lapses the day
   after unless renewed).
-- 2026-12-12: the grafana transfers of 2026-10-13 re-decided.
+- 2026-12-05: the hardened-app clone's PAT expires
+  (`/workspace/repos/hardened-app/.keys/90d_hardened_app.pat`).
+- 2026-12-12: the nine grafana transfers of 2026-10-13 re-decided; grafana
+  inactive, no 13.1.8 build will fix them: accept, or level two.
+- 2027-01-13: the drill-app clone's PAT expires
+  (`/workspace/repos/drill-app/.keys/90d_drill_app.pat`).
+- 2027-01-14 and 2027-01-16: the ninety-day clocks of the five kin-openapi
+  findings in grafana 13.1.7 run out (#274 to #277, then #287).
+- 2027-01-17: `.keys/90d-pat.txt` expires (extended 2026-10-19; the agent's
+  git and gh access); rotate and replace the file. RENOVATE_TOKEN was
+  regenerated on 2026-10-19 after expiring that day (Renovate down from
+  04:02Z to 21:17Z, two runs failed at startup); its new expiry and
+  DHI_TOKEN's are unknown here (secrets API 403): note them beside this line.
 
 ## Working rules the owner set (apply in every session)
 
