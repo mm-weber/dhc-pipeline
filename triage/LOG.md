@@ -2190,3 +2190,70 @@ opened the fourteen-day expiry warnings for the grafana exceptions of
 2026-09-03 (ten annotations, expiring 2026-11-02), as the calendar foresaw;
 nothing to do with the drill. Task 16.2 ends here; 16.4 is the first drill
 that moves these two entries.
+
+## 2026-10-19: grafana deactivated, the switch exercised live; twelve moot exceptions retired
+
+*Image: grafana. The owner's call of 2026-10-19, pull request #290, conductor
+track `retire-grafana_20261019`: the catalogue stops standing behind new grafana
+builds, by the documented switch and nothing more (docs/CONVENTIONS.md,
+"Deactivating a definition means removing its line, and only that"). The
+switch had never been exercised live; a real definition exercises it for the
+ledger's rows 1.15 and 1.16.*
+
+**Four levels, one chosen.** Deactivate: the line leaves the active set, the
+directory and the chart stay, everything published keeps its tags, signatures,
+attestations and daily planes, and the supported digest keeps its issues and
+clocks. Remove from the catalogue (task 16.16's shape): directory and chart
+deleted too, the daily enumeration no longer sees the repository. Revoke: a
+digest that must not be used, the runbook. End of life with deletion: not in
+the spec, SECURITY.md promises that nothing is deleted. Level one, this entry.
+The four are tabled in the track's spec.
+
+**What changed on the merge.** `grafana` left `active_set` in
+`catalogue-policy.yaml`; nothing under `image/grafana/` or `chart/grafana/`
+moved. The tracking block of `renovate.json5` re-rendered to ignore
+`image/grafana/**` and `chart/grafana/**` (`scripts/render-tracking.sh`,
+Req 1.14, 3.2). The lints on the merge: `7 active definition(s), 1 inactive, 4
+chart director(ies) with a deploys list` and `7 active definition(s): 6 covered
+by 3 probe registration(s), each executed once per install, 1 declared none`;
+the e2e components cert-manager, hardened-app and valkey. A change under
+`image/grafana/` without the line back now fails validation by name (Req 1.16,
+measured in a scratch copy on 2026-10-19: `image/grafana/image.yaml:
+image/grafana/ is not in the active set, so this change cannot be built,
+tested or published; activate the definition in this pull request (active_set
+in catalogue-policy.yaml) or leave it frozen (Req 1.16)`).
+
+**What did not change.** The supported digest sha256:89c5680a868b (13.1.7)
+under `13-alpine3.23`, `13.1-alpine3.23` and `13.1.7-alpine3.23` stays
+pullable with its signatures and attestations; the daily enumeration, scans,
+re-attestation, admission proof and visibility invariant keep running over it;
+its findings keep every status lane except the fix, because no release will
+move its tags again. Reactivation is the line added back.
+
+**The twelve moot exceptions, retired.** The 2026-09-03 round's entries
+(zipkin plugin: CVE-2026-39822, CVE-2026-33818, CVE-2026-39821,
+CVE-2026-46600, CVE-2026-56853, CVE-2026-56858, CVE-2026-56859,
+CVE-2026-56860, CVE-2026-56862, CVE-2026-84304; the server binary:
+CVE-2026-43871, CVE-2026-84304) had matched nothing since 13.1.7 (the
+2026-10-08 entry's fix clock; the 2026-10-13 entry's measured paragraph).
+The status issue (#151) records each as fixed on 2026-10-06, thirty days from
+the decision, and they had entered their fourteen-day expiry window on
+2026-10-19 (ten annotations on run 39223026946). Removed from
+`triage/accepted-risk/grafana.yaml` with their comment blocks, the shape the
+2026-09-18 entry set; the file's header says so.
+
+**What stays open, named here so it is not forgotten.** The nine transfers of
+2026-10-13 (CVE-2026-78667, CVE-2026-97031, CVE-2026-78669 across the server
+and the two plugins, expiry 2026-12-12) lose their planned exit, a grafana
+13.1.8 build; on 2026-12-12 the honest re-decision is accept, no build will
+fix this image, or level two. Five undecided HIGH findings in the same digest,
+all in `github.com/getkin/kin-openapi` v0.144.0 (CVE-2026-100351 to
+CVE-2026-100354, #274 to #277, first seen 2026-10-16; CVE-2026-100349, #287,
+first seen 2026-10-18; fixed upstream in 0.146.0 to 0.149.0), on their
+ninety-day clocks: the owner's calls, one at a time, outside this track.
+
+**Exit conditions.** The first inactive day's evidence (no grafana build job,
+the rescan's inactive-digest check naming one definition, Renovate's #279
+refused by the lint and closed) goes into this entry's addendum and the
+ledger's rows 1.15 and 1.16; task 16.11's drill keeps its own twist, the
+proofs entry and the 1.19 branch.

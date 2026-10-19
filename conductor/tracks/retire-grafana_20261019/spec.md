@@ -56,7 +56,7 @@ Notes: the rendered block reads `"image/grafana/**", // inactive definition (cat
 
 **Acceptance criteria:**
 
-- [ ] `scripts/render-tracking.sh --check .` green with two ignored paths; `node test/renovate/managers.test.mjs` unchanged (its grafana fixtures read the definition, which stays)
+- [ ] `scripts/render-tracking.sh --check .` green with two ignored paths; `node test/renovate/managers.test.mjs` green, its tracking-scope checks asserting the new block and its fork fixture deactivating hardened-app (the manager fixtures still read the grafana definition, which stays)
 
 ### FR-3: The live-state guard (Req 1.13)
 

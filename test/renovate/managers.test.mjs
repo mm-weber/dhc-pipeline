@@ -735,17 +735,17 @@ check(
   check("tracking scope: the committed block is an ignorePaths array", Array.isArray(config.ignorePaths), JSON.stringify(config.ignorePaths));
   const chk = spawnSync(join(root, "scripts/render-tracking.sh"), ["--check", root], { encoding: "utf8" });
   check("tracking scope: the committed block matches the active set (render-tracking --check)", chk.status === 0, `${chk.stdout}${chk.stderr}`);
-  // The reference instance activates everything (design Decision 11), so it ignores nothing.
-  check("tracking scope: the reference instance ignores no path", (config.ignorePaths ?? []).length === 0, JSON.stringify(config.ignorePaths));
+  // The reference instance activates everything but grafana, deactivated on 2026-10-19 (design Decision 11; triage/LOG.md 2026-10-19), so it ignores exactly grafana's directory and the chart deploying only it.
+  check("tracking scope: the reference instance ignores grafana's directory and chart, nothing else", JSON.stringify(config.ignorePaths ?? []) === JSON.stringify(["image/grafana/**", "chart/grafana/**"]), JSON.stringify(config.ignorePaths));
 
   const sb = mkdtempSync(join(tmpdir(), "dhc-tracking-"));
   for (const d of ["image", "chart"]) cpSync(join(root, d), join(sb, d), { recursive: true });
   cpSync(join(root, "renovate.json5"), join(sb, "renovate.json5"));
   const policy = read("catalogue-policy.yaml");
-  check("tracking scope: the fixture deactivates a listed definition", policy.includes("  - grafana\n"));
-  writeFileSync(join(sb, "catalogue-policy.yaml"), policy.replace("  - grafana\n", ""));
+  check("tracking scope: the fixture deactivates a listed definition", policy.includes("  - hardened-app\n"));
+  writeFileSync(join(sb, "catalogue-policy.yaml"), policy.replace("  - hardened-app\n", ""));
   const r = spawnSync(join(root, "scripts/render-tracking.sh"), [sb], { encoding: "utf8" });
-  check("tracking scope: rendering with grafana inactive exits 0", r.status === 0, `${r.stdout}${r.stderr}`);
+  check("tracking scope: rendering with hardened-app inactive exits 0", r.status === 0, `${r.stdout}${r.stderr}`);
   let rendered;
   try {
     rendered = JSON5.parse(readFileSync(join(sb, "renovate.json5"), "utf8"));
@@ -753,9 +753,9 @@ check(
   } catch (e) {
     check("tracking scope: the rendered block is JSON5 the config loader reads", false, e.message);
   }
-  const want = ["image/grafana/**", "chart/grafana/**"];
+  const want = ["image/grafana/**", "image/hardened-app/**", "chart/grafana/**", "chart/hardened-app/**"];
   check(
-    "tracking scope: the inactive definition's directory and the chart deploying only it are ignored",
+    "tracking scope: the inactive definitions' directories and the charts deploying only them are ignored (grafana since 2026-10-19, hardened-app in the fixture)",
     !!rendered && JSON.stringify(rendered.ignorePaths) === JSON.stringify(want),
     JSON.stringify(rendered?.ignorePaths),
   );

@@ -3,7 +3,7 @@
 **Track ID:** retire-grafana_20261019
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-10-19
-**Status:** [ ] not started
+**Status:** [~] in progress (phase 1 started 2026-10-19)
 
 ## Overview
 
@@ -13,17 +13,17 @@ Two phases. Phase 1 is one pull request: the switch by TDD (the probe lint's liv
 
 ### Tasks (one slice: RED agent, GREEN agent, orchestrator commit)
 
-- [ ] **1.1 RED: the live-state guard asserts seven** (FR-3): `scripts/lint-probes_test.sh` case 13 expects `7 active definition(s)`, `6 covered by 3 probe registration(s)` and `1 declared none`; fails on main's eight
-- [ ] **1.2 GREEN: the line and the tracking block** (FR-1, FR-2): `grafana` removed from `active_set`, the policy file's comment amended, `scripts/render-tracking.sh .` re-renders `renovate.json5`; case 13 green, every suite green
-- [ ] **1.3 Named inactive in the tables** (FR-4): the README's `image/` row and the manual's definitions row (orchestrator; no test)
-- [ ] **1.4 The twelve moot exceptions retired** (FR-5): the entries decided 2026-09-03 removed from `triage/accepted-risk/grafana.yaml`, the nine of 2026-10-13 kept (orchestrator; the lane's lints are the test)
-- [ ] **1.5 The LOG entry** (FR-6): `## 2026-10-19: grafana deactivated, the switch exercised live; twelve moot exceptions retired`: the reason, the four levels in one paragraph, the measured effects, the twelve by id with their fix date, the nine transfers' new exit condition, the five undecided findings named as the owner's next calls
-- [ ] **1.6 The pull request**: title `chore: grafana leaves the active set, the documented switch exercised live; twelve moot exceptions retired (Req 1.13 to 1.16, 6.11; task 16.11 by nature)`, a TL;DR, the verification section from the runs
+- [x] **1.1 RED: the live-state guard asserts seven** (FR-3) (89af8b5): `scripts/lint-probes_test.sh` case 13 expects `7 active definition(s)`, `6 covered by 3 probe registration(s)` and `1 declared none`; fails on main's eight
+- [x] **1.2 RED 2 and GREEN: the tracking-scope checks, the line and the tracking block** (FR-1, FR-2) (red 1233ab6, green 90d9dc2): `test/renovate/managers.test.mjs`'s tracking-scope checks assert the new block (red first, slice 2); then `grafana` removed from `active_set`, the policy file's comment amended, `scripts/render-tracking.sh .` re-renders `renovate.json5`; case 13 and the fixture test green, every suite green
+- [x] **1.3 Named inactive in the tables** (FR-4) (the data commit): the README's `image/` row and the manual's definitions row (orchestrator; no test)
+- [x] **1.4 The twelve moot exceptions retired** (FR-5) (the data commit): the entries decided 2026-09-03 removed from `triage/accepted-risk/grafana.yaml`, the nine of 2026-10-13 kept (orchestrator; the lane's lints are the test)
+- [x] **1.5 The LOG entry** (FR-6) (2026-10-19, the data commit): `## 2026-10-19: grafana deactivated, the switch exercised live; twelve moot exceptions retired`: the reason, the four levels in one paragraph, the measured effects, the twelve by id with their fix date, the nine transfers' new exit condition, the five undecided findings named as the owner's next calls
+- [x] **1.6 The pull request** (#290, opened 2026-10-19): title `chore: grafana leaves the active set, the documented switch exercised live; twelve moot exceptions retired (Req 1.13 to 1.16, 6.11; task 16.11 by nature)`, a TL;DR, the verification section from the runs
 
 ### Verification (orchestrator)
 
 - [ ] `scripts/lint-probes_test.sh` green; all 41 suites green
-- [ ] The fourteen repository lints green with the lines FR-1 and FR-2 name; `scripts/lint-accepted-risk.sh .` with no expiry warning; `scripts/lint-log-anchors.sh all .`; `yamllint`; `node test/renovate/managers.test.mjs` unchanged
+- [ ] The fourteen repository lints green with the lines FR-1 and FR-2 name; `scripts/lint-accepted-risk.sh .` with no expiry warning; `scripts/lint-log-anchors.sh all .`; `yamllint`; `node test/renovate/managers.test.mjs` green with its tracking-scope checks rewritten (slice 2)
 - [ ] The pull request's CI green; the e2e's affected-components job without grafana; the owner merges (checkpoint)
 
 ## Phase 2: the first inactive day (a small pull request)
@@ -51,6 +51,7 @@ Two phases. Phase 1 is one pull request: the switch by TDD (the probe lint's liv
 
 | Date | Task | Deviation | Reason | Resolution |
 | --- | --- | --- | --- | --- |
+| 2026-10-19 | 1.2 | A second test pinned the live state: `test/renovate/managers.test.mjs`'s tracking-scope checks asserted that the reference ignores no path and built the fork fixture by removing grafana's line | Found by the GREEN agent running the fixture test (166 of 168 checks); the track's spec and plan had called the test unchanged | Slice 2, red first: the checks assert the new block (grafana's two paths) and the fixture deactivates hardened-app, expecting four paths; the spec's FR-2 note corrected |
 
 ---
 
