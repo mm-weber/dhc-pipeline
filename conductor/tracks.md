@@ -8,15 +8,19 @@
 
 ## Active tracks
 
-### [ ] drill-definition_20261017: The drill definition and its first findings (task 16.2)
+<!-- No active track; the next drill is 16.8 (the KEV drill input), then 16.3 -->
+
+
+## Completed tracks
+
+### [x] drill-definition_20261017: The drill definition and its first findings (task 16.2)
 
 **Description:** drill-app, the owner's purposely vulnerable copy of hardened-app, joins the catalogue as pull request 1 of the onboarding flow with the catalogue's first declared none proof; the scan gate names its two findings, the owner decides them one at a time, main publishes the first digest, and the evidence lands in the ledger and the LOG (spec task 16.2; Req 1.13, 1.14, 5.9, 6.1, 6.3, 6.13, 7.11, 9.11). The first track of the live-drill program; one track per drill from here.
 **Priority:** high (the first live drill; unblocked by the proof-kinds track on 2026-10-17)
+**Completed:** 2026-10-19 (#286 merged 2026-10-18 as 1b941ea with the definition and the two decisions; the evidence pull request closes the track)
 **Folder:** [./tracks/drill-definition_20261017/](./tracks/drill-definition_20261017/)
 
 ---
-
-## Completed tracks
 
 ### [x] proof-kinds_20261015: Proof kinds per definition
 

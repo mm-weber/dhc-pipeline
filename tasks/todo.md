@@ -46,8 +46,10 @@ stay as history.
 
 ## The drills, in order (one pull request each; each ends with a LOG entry and its ledger rows)
 
-- [ ] 16.2 The drill definition `image/drill-app/` and its first findings:
-      conductor track `drill-definition_20261017` (spec, plan, open question).
+- [x] 16.2 The drill definition `image/drill-app/` and its first findings:
+      DONE 2026-10-18 (#286, conductor track `drill-definition_20261017`;
+      the evidence pull request of 2026-10-19 closed the track). Next: 16.8,
+      then 16.3. What follows was the plan as written on 2026-10-17.
       Pull request 1 of the onboarding flow: the definition (hardened-app
       archetype, `name:` and annotation say drill, the symbol table kept so
       govulncheck measures at symbol level), the active-set entry, the first
