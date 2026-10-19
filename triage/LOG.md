@@ -2257,27 +2257,3 @@ the rescan's inactive-digest check naming one definition, Renovate's #279
 refused by the lint and closed) goes into this entry's addendum and the
 ledger's rows 1.15 and 1.16; task 16.11's drill keeps its own twist, the
 proofs entry and the 1.19 branch.
-
-**The first inactive day, part one (2026-10-19, 16:50 to 17:00Z).** The squash
-04c6eeb merged at 16:50:10Z. Main's push build (run 39288882482) ran the
-affected-definitions job, named nothing to build, skipped the matrix job and
-passed its gate in nineteen seconds; the chart run (39288882379) and the
-validate run (39288882400, the fourteen lints over the inactive state) green.
-The registry, read anonymously at 16:56Z: `13-alpine3.23`, `13.1-alpine3.23`
-and `13.1.7-alpine3.23` on sha256:89c5680a868b, the digest the status issue's
-baseline lists for them; nine plain tags and 181 attestation planes, none new.
-The bump refused: the rendered ignore paths now take `image/grafana/**` out of
-Renovate's extraction, so the bot will prune #279 rather than rebase it (its
-15:23Z run, 39277512324, had already failed before the merge on a docker exit
-1, cause unread). The case came the way task 16.11 words it: drill #291 (a
-draft, never merged) replayed Renovate's commit f6f89f8, the real 13.1.8 bump,
-unchanged onto main; validate run 39289979209 failed at the active-set step in
-twelve seconds with `lint-active-set: image/grafana/image.yaml: image/grafana/
-is not in the active set, so this change cannot be built, tested or published;
-activate the definition in this pull request (active_set in
-catalogue-policy.yaml) or leave it frozen (Req 1.16)`, and its build run
-39289978981 left grafana out of the matrix by name with the gate green: the
-preventive branch of build.yml's affected-definitions job, never run while
-every definition was active (Req 1.15). Ledger row 1.16 flips to exercised on
-this. Part two, the nightly, the rescan's inactive-digest check and Renovate's
-handling of #279, follows.
