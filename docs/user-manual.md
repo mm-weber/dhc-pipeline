@@ -62,7 +62,7 @@ are this repository's own.
 
 | Path                          | What lives there |
 |-------------------------------|------------------|
-| `image/<name>/image.yaml`     | One definition per emitted image, native DHI syntax: hardened-app, cert-manager-{controller, webhook, cainjector}, grafana, valkey, valkey-compat |
+| `image/<name>/image.yaml`     | One definition per emitted image, native DHI syntax: hardened-app, cert-manager-{controller, webhook, cainjector}, grafana, valkey, valkey-compat, drill-app (the live-drill fixture, never installed by design; task 16.2) |
 | `chart/<name>/`               | Chart adaptations: `chart.yaml` pin manifest + `config/values-hardened.yaml` overlay + README; `hardened-app/` is the one owned chart (real `Chart.yaml`) |
 | `test/`                       | Go module: Ginkgo v2 + Gomega + e2e-framework suite (`e2e/`), reusable assertions (`checks/`), install/harness helpers, Renovate manager fixtures (`renovate/`) |
 | `triage/`                     | The CVE lane: `vex/` (OpenVEX source), `accepted-risk/` (time-boxed exceptions), `LOG.md` (every decision), `upstream/` (drafts for other trackers), `rescan/` (the unit-tested issue-filing Go tool) |
