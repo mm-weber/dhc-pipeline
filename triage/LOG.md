@@ -2153,3 +2153,21 @@ within the aperture, and the pull request can merge.
 **Exit condition:** drill 16.6 bumps the module to 5.2.2 and the finding leaves
 the supported digest; 16.3's re-decision replaces this entry's dates first,
 its own entry here.
+
+**Published, 2026-10-18 22:40Z** (main's run 39172583475 on the squash
+1b941ea, job 117808588141): the release-time scan of the pushed digest passed
+(Req 2.8), the fail-closed gate stayed off by the switch, the platform
+manifests' scan reports were attested, the OpenVEX document compiled with the
+two `affected` statements, everything signed, the three tags applied (Req 2.9,
+2.12). The index sha256:53e0c498140406834754957dd5782279201a5529cda6f00f6cacc5b4685dad83
+under `0-alpine3.23`, `0.1-alpine3.23` and `0.1.0-alpine3.23`; platform
+manifests linux/amd64 sha256:7d59e3a23bfcd915ed4f4f9183b0914c4524bb357be280b88d14e48bb507bc71
+and linux/arm64 sha256:2e19dfd9cdb0e12d2344c85a50717d8ab8ce2da5d7caa85dff8aac6c062352d2,
+each with its `.sig` and `.att` beside the index's. Read anonymously on
+2026-10-19 with a pull token, the visibility invariant's own method: the
+package came out public on its first publish, nothing for the owner to flip.
+Renovate's dashboard listed `image/drill-app/image.yaml` with `mm-weber/drill-app
+v0.1.0` by the next morning (the tracking scope, Req 1.14). The first rescan
+after the publish had not run when this was written; what it does with the two
+findings on the supported digest is recorded below once observed, never
+predicted.

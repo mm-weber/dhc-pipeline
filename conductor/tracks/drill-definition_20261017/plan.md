@@ -38,21 +38,21 @@ No behaviour is added, so there is no red test: the lane's lints are the tests. 
 - [x] **2.2 CVE-2017-20146 (CRITICAL)** (decided 2026-10-18, accept to 2026-11-17; LOG 2026-10-18): the rungs walked with the evidence (fix 1.3.0 available and declined, avoidance available and declined, not_affected unavailable for a reachable symbol, transfer has no owner but the owner): `accept`, `decided_at` the decision date, `expired_at` within 30 days, `paths: ["usr/local/bin/drill-app"]`, the purl, `issue` the drill-app repository, `ref` the LOG anchor, `blocked` and `statement` one line each
 - [x] **2.3 CVE-2025-30204 (HIGH)** (decided 2026-10-18, accept to 2027-01-16; LOG 2026-10-18): the same rungs; `accept` within 90 days (the entry 16.3 will re-decide), or as the owner re-decides the open question
 - [x] **2.4 The LOG entry** (2026-10-18, two ACCEPT headings, the exceptions' refs resolve) `## <date>: the drill definition joins the catalogue, two findings decided (task 16.2)`: the definition, the gate's run and annotation, the govulncheck table, the decisions in the LOG's rung format, the ceilings, the exit conditions (16.6 fixes, 16.16 retires); the entries' `ref` anchors point at it
-- [ ] **2.5 The second run**: the exception tiers step green (Req 6.50), the scan gate `nothing uncovered within the aperture`, the VEX portability block listing both as affected; the pull request body's TL;DR rewritten with the decisions; the owner merges (checkpoint)
+- [x] **2.5 The second run** (the third, after the test-step fix: 39172201030 green at the gate, 2026-10-18; merged as 1b941ea 22:31Z): the exception tiers step green (Req 6.50), the scan gate `nothing uncovered within the aperture`, the VEX portability block listing both as affected; the pull request body's TL;DR rewritten with the decisions; the owner merges (checkpoint)
 
 ### Verification (orchestrator)
 
-- [ ] `scripts/lint-accepted-risk.sh`, `scripts/lint-log-anchors.sh statements`, `scripts/lint-live-evidence.sh` green locally; `yamllint triage/accepted-risk/drill-app.yaml`
-- [ ] `scripts/check-exceptions.sh gate` rehearsed locally against the run's `trivy.json` artifact and a KEV snapshot from `github.com/cisagov/kev-data` (the cisa.gov feed is unreachable from the container), expecting no breach
-- [ ] The run ids of both pull request runs noted for the ledger and the LOG
+- [x] `scripts/lint-accepted-risk.sh`, `scripts/lint-log-anchors.sh statements`, `scripts/lint-live-evidence.sh` green locally; `yamllint triage/accepted-risk/drill-app.yaml` (2026-10-18)
+- [x] `scripts/check-exceptions.sh gate` rehearsed locally against a report shaped from the gate's annotation (the artifact store is unreachable from the container too) and the KEV snapshot of 2026-10-16 from `github.com/cisagov/kev-data`: both entries within their tiers
+- [x] The run ids noted: 39106821681 (build failed in the test step), 39107650953 (red at the gate, the evidence), 39172201030 (green); validate 39107650952
 
 ## Phase 3: the publish, the first rescan, the evidence (a small pull request)
 
 ### Tasks
 
-- [ ] **3.1 The publish observed** (FR-6): main's build run, the three tags and the platform manifest digests; the package's visibility checked anonymously the way `check-visibility.sh` does; the owner sets it public if the first publish left it private (OPERATOR)
+- [x] **3.1 The publish observed** (FR-6) (run 39172583475; index sha256:53e0c498…, amd64 sha256:7d59e3a2…, arm64 sha256:2e19dfd9…; public on the first publish, read anonymously 2026-10-19): main's build run, the three tags and the platform manifest digests; the package's visibility checked anonymously the way `check-visibility.sh` does; the owner sets it public if the first publish left it private (OPERATOR)
 - [ ] **3.2 The first rescan observed** (FR-7): the enumeration lists the drill's tags, the visibility invariant passes, what happened to the two findings (issues filed and closed with `resolved:accepted`, or the status row under the exceptions) quoted as the run shows it
-- [ ] **3.3 The ledger** (FR-8): row 5.9 to `exercised` with the validate run id and the date; the induced-by column `drill definition`
+- [x] **3.3 The ledger** (FR-8) (row 5.9 exercised, 2026-10-18, run 39107650952): row 5.9 to `exercised` with the validate run id and the date; the induced-by column `drill definition`
 - [ ] **3.4 The LOG addendum**: the publish and rescan facts under the phase 2 entry
 - [ ] **3.5 The ticks**: 16.2 `[done <date>, #<pull request>]` in `tasks.md`; this plan's checkpoints; `conductor/tracks.md` to Completed; `metadata.json`; `conductor/index.md`
 
