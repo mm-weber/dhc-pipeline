@@ -263,3 +263,41 @@ the branch head before reporting a pull request as ready, the way the
 suites are re-run after the last edit (the 2026-08-26 rule). Repository
 rule since 2026-10-16: every pull request body opens with a `## TL;DR`
 section, updated whenever a review comes in (`docs/CONVENTIONS.md`).
+
+## 2026-10-19: a pull request that says "more to come before the merge" gets merged
+
+**What happened.** #292, the first half of the retire-grafana evidence,
+carried a TL;DR line saying the nightly and the rescan were still to be
+added before the merge. The owner merged it the same evening, as a green
+pull request deserves; the ledger's row 1.15 and the track's closure then
+needed a second pull request, and a revert branch was cut and abandoned on
+the way.
+
+**Rule.** Evidence that is still arriving goes into a draft pull request,
+which GitHub refuses to merge, or into its own later pull request. A
+sentence in the body holds nothing back, and it should not have to: a green
+pull request is there to be merged. The repository's own device held the
+same day: drill #291 was opened as a draft because it must never merge, and
+it did not.
+
+## 2026-10-20: "just dispatch the nightly" is a release
+
+**What happened.** Asked whether the nightly build could be triggered by
+hand to finish the evidence early, the agent said a blank dispatch builds
+every active definition and that the comparator decides per definition
+whether a rebuild publishes, as every night. The second half was wrong:
+`build.yml`'s publish-on-change comparator runs only on the schedule, and
+the dispatch path is a release by design (register row M17: a human asking
+for a release gets one). The owner dispatched; seven definitions were
+rebuilt and republished at 21:49Z (run 39330433276), 21 tags moved to new
+digests, and Renovate opened the two chart-pin bumps that follow a release
+(#293, #294). Grafana, inactive, was absent from the matrix and kept its
+digest: the evidence held, the side effect was not announced.
+
+**Rule.** Before advising any manual trigger, read that workflow's dispatch
+branch and every `if:` on the path, and say in the answer what the dispatch
+publishes, moves or deletes; where the answer is a release, use the word.
+"The same as the schedule" is a claim to verify against the workflow, never
+to assume from the job list. The register's M17 row had the answer in one
+line.
+
