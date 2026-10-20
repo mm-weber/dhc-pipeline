@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-10-19
+# Live drills (task group 16): where we are and what is next, as of 2026-10-20
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -47,8 +47,9 @@ stay as history.
       switch, level one of four (track `retire-grafana_20261019`: #289 the
       track, #290 the switch, #291 the drill bump, never merged; Renovate
       autoclosed its own #279 once grafana's paths were ignored). 1.13, 1.14
-      and 1.16 exercised by nature; 1.15's detective half waits for the first
-      rescan after the merge. The twelve moot exceptions of 2026-09-03
+      and 1.16 exercised by nature; 1.15 completed by the first rescan after
+      the merge (run 39417467219, 2026-10-20; the track closed with #295).
+      The twelve moot exceptions of 2026-09-03
       retired; the nine transfers of 2026-10-13 lose their 13.1.8 exit; five
       kin-openapi HIGHs in the frozen image are the owner's open calls.
 
@@ -103,7 +104,7 @@ stay as history.
 - [ ] 16.11 Deactivation (1.13 to 1.16, 1.19): 1.13, 1.14 and 1.16 exercised
       on 2026-10-19 by grafana's deactivation (#290; the bump refused on drill
       #291; track `retire-grafana_20261019`), 1.15's detective half by the
-      first rescan after it. What the drill keeps: drill-app's proofs entry
+      first rescan after it (run 39417467219, 2026-10-20). What the drill keeps: drill-app's proofs entry
       leaves in the same pull request (the reader refuses an entry for an
       inactive name, Req 5.10), and a removed directory with the policy entry
       kept (1.19), a drill branch never merged.
@@ -192,8 +193,10 @@ stay as history.
 - 2027-01-17: `.keys/90d-pat.txt` expires (extended 2026-10-19; the agent's
   git and gh access); rotate and replace the file. RENOVATE_TOKEN was
   regenerated on 2026-10-19 after expiring that day (Renovate down from
-  04:02Z to 21:17Z, two runs failed at startup); its new expiry and
-  DHI_TOKEN's are unknown here (secrets API 403): note them beside this line.
+  04:02Z to 21:17Z, two runs failed at startup). DHI_TOKEN stopped being
+  accepted on 2026-10-20 (the nightly 39402331027 failed at every dhi.io
+  login, nothing built) and waits for the owner's rotation. The new expiries
+  are unknown here (secrets API 403): note them beside this line.
 
 ## Working rules the owner set (apply in every session)
 

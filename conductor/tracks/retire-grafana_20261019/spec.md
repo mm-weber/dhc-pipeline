@@ -45,8 +45,8 @@ Notes, measured in a scratch copy on 2026-10-19: `scripts/lint-active-set.sh .` 
 
 **Acceptance criteria:**
 
-- [ ] The lints above print those lines; `scripts/lint-compat.sh`, `scripts/release-policy.sh . check` and `scripts/lint-workflow-policy.sh` are unchanged
-- [ ] `git diff --stat` touches no file under `image/grafana/` or `chart/grafana/`
+- [x] The lints above print those lines; `scripts/lint-compat.sh`, `scripts/release-policy.sh . check` and `scripts/lint-workflow-policy.sh` are unchanged (2026-10-19: the lines quoted in LOG 2026-10-19; validate run 39288882400 on the squash 04c6eeb)
+- [x] `git diff --stat` touches no file under `image/grafana/` or `chart/grafana/` (the squash 04c6eeb touches none)
 
 ### FR-2: The tracking scope (Req 1.14, 3.2)
 
@@ -56,7 +56,7 @@ Notes: the rendered block reads `"image/grafana/**", // inactive definition (cat
 
 **Acceptance criteria:**
 
-- [ ] `scripts/render-tracking.sh --check .` green with two ignored paths; `node test/renovate/managers.test.mjs` green, its tracking-scope checks asserting the new block and its fork fixture deactivating hardened-app (the manager fixtures still read the grafana definition, which stays)
+- [x] `scripts/render-tracking.sh --check .` green with two ignored paths; `node test/renovate/managers.test.mjs` green, its tracking-scope checks asserting the new block and its fork fixture deactivating hardened-app (the manager fixtures still read the grafana definition, which stays) (slice 2, red 1233ab6, green 90d9dc2; `2 ignored path(s)` re-measured 2026-10-20; the manager test on every validate run since)
 
 ### FR-3: The live-state guard (Req 1.13)
 
@@ -64,7 +64,7 @@ THE Repository SHALL assert in `scripts/lint-probes_test.sh` case 13 that this r
 
 **Acceptance criteria:**
 
-- [ ] Case 13 fails on main with `missing '7 active definition(s)'` and passes once FR-1 lands
+- [x] Case 13 fails on main with `missing '7 active definition(s)'` and passes once FR-1 lands (red 89af8b5 on main's eight; green with slice 2)
 
 ### FR-4: Named inactive where a reader meets it (Req 7.11)
 
@@ -72,7 +72,7 @@ THE Repository SHALL mark grafana inactive in `README.md`'s `image/` row and in 
 
 **Acceptance criteria:**
 
-- [ ] Both rows read "grafana (inactive since 2026-10-19, last published 13.1.7)" or equivalent; no other hand-written list of definitions exists (`grep` of 2026-10-19)
+- [x] Both rows read "grafana (inactive since 2026-10-19, last published 13.1.7)" or equivalent; no other hand-written list of definitions exists (`grep` of 2026-10-19) (README.md's `image/` row and docs/user-manual.md's definitions row, #290)
 
 ### FR-5: The moot exceptions retired (Req 6.7, 6.11)
 
@@ -82,7 +82,7 @@ Notes: the evidence is the status issue's rows (fixed 2026-10-06, thirty days) a
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-accepted-risk.sh .` green with no expiry warning; nine entries remain, all `decided_at: 2026-10-13`
+- [x] `scripts/lint-accepted-risk.sh .` green with no expiry warning; nine entries remain, all `decided_at: 2026-10-13` (re-measured 2026-10-20)
 
 ### FR-6: The LOG (Req 7.11)
 
@@ -90,7 +90,7 @@ THE Repository SHALL add one `triage/LOG.md` entry for this deactivation, naming
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-log-anchors.sh all .` green; the entry carries the retired twelve by id with their fix date
+- [x] `scripts/lint-log-anchors.sh all .` green; the entry carries the retired twelve by id with their fix date (LOG 2026-10-19, fixed 2026-10-06; the lint green on 2026-10-20)
 
 ### FR-7: No new digest and no new tag (Req 1.15)
 
@@ -98,7 +98,7 @@ WHEN a nightly or a push build runs after that merge THE CI Pipeline SHALL build
 
 **Acceptance criteria:**
 
-- [ ] The first build run after the merge: no `build grafana` job; the first rescan: the inactive-digest check names one inactive definition and passes (the ledger's 1.15 evidence)
+- [x] The first build run after the merge: no `build grafana` job; the first rescan: the inactive-digest check names one inactive definition and passes (the ledger's 1.15 evidence) (push build 39288882482 named nothing; the dispatch 39330433276 and the nightly 39402331027 carried no grafana job; rescan 39417467219 of 2026-10-20 passed the check with grafana the one inactive definition, its three tags on sha256:89c5680a868b in the re-rendered status)
 
 ### FR-8: A bump of an inactive definition refused (Req 1.16)
 
@@ -117,7 +117,7 @@ THE Repository SHALL flip ledger rows 1.15 and 1.16 to exercised with their run 
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` green; 16.11's text says the mechanism was exercised by grafana's deactivation and keeps its own twist (the proofs entry, 1.19)
+- [x] `scripts/lint-live-evidence.sh .` green; 16.11's text says the mechanism was exercised by grafana's deactivation and keeps its own twist (the proofs entry, 1.19) (2026-10-20; 117 exercised)
 
 ## Non-functional requirements
 
