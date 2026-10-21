@@ -145,23 +145,31 @@ stay as history.
 - [x] The twelve grafana exceptions of 2026-09-03, moot since 13.1.7: retired
       on 2026-10-19 with grafana's deactivation (#290, LOG 2026-10-19); the
       expiry warnings stopped with the merge.
-- [ ] Grafana 13.1.7, frozen: four undecided HIGH findings, all in
-      `github.com/getkin/kin-openapi` v0.144.0 (CVE-2026-100352 to
-      CVE-2026-100354, #275 to #277, clocks from 2026-10-16; CVE-2026-100349,
+- [ ] Grafana 13.1.7, frozen: three undecided HIGH findings in
+      `github.com/getkin/kin-openapi` v0.144.0 (CVE-2026-100352 and
+      CVE-2026-100354, #275 and #277, clocks from 2026-10-16; CVE-2026-100349,
       #287, from 2026-10-18; fixed upstream in 0.146.0 to 0.149.0; Grafana
-      13.1.8 of 2026-10-13 still pins v0.144.0, only main has moved). No
-      build will fix a frozen image: not affected where the measurement
-      allows it, else accept with an expiry, or level two (removal from the
-      catalogue). One at a time, evidence first, the owner's calls.
-      CVE-2026-100351 (#274) decided 2026-10-21: not affected, the server
-      links kin-openapi's `openapi3` schema package only and nothing of
-      `openapi3filter`, where the vulnerable middleware lives (statement in
-      `triage/vex/`, LOG 2026-10-21, the measurement script
-      `triage/upstream/checks/grafana-kin-openapi-symbols.sh`); proven by
-      the first rescan after the merge, which re-attests the document and
-      closes #274 on evidence. The same read places #276 and #287 in the
-      absent package and #275 and #277 in the linked schema code, each
-      awaiting its own measurement.
+      13.1.8 of 2026-10-13 still pins v0.144.0, only main has moved), and
+      one in Go's standard library (CVE-2026-111943, #300, from 2026-10-21,
+      shared with five active images; next item). No build will fix a frozen
+      image: not affected where the measurement allows it, else accept with
+      an expiry, or level two (removal from the catalogue). One at a time,
+      evidence first, the owner's calls.
+      CVE-2026-100351 (#274) and CVE-2026-100353 (#276) decided 2026-10-21:
+      not affected, the server links kin-openapi's `openapi3` schema package
+      only and nothing of `openapi3filter`, where the vulnerable middleware
+      (#274) and request decoder (#276) live (statements in `triage/vex/`,
+      LOG 2026-10-21, the measurement script
+      `triage/upstream/checks/grafana-kin-openapi-symbols.sh`); each proven
+      by the first rescan after its merge, which re-attests the document and
+      closes the issue on evidence. The same read places #287 in the absent
+      package, its decision still its own, and #275 and #277 in the linked
+      schema code, each awaiting a finer measurement.
+- [ ] CVE-2026-111943 (#300, HIGH, Go `crypto/x509`, fixed in Go 1.26.10 and
+      1.27.3): filed by the rescan of 2026-10-21 on twelve digests across the
+      three cert-manager images, drill-app, hardened-app and grafana. The
+      remedy is a build on the fixed toolchain wherever each binary is built;
+      not yet looked at, its own track when the owner opens it.
 - [ ] Dashboard usability amendment (owner liked the direction, parked on
       2026-10-08): a legend for the four statuses; on fixed rows, the version
       and component change that fixed them; a release line per definition;
@@ -199,9 +207,11 @@ stay as history.
   inactive, no 13.1.8 build will fix them: accept, or level two.
 - 2027-01-13: the drill-app clone's PAT expires
   (`/workspace/repos/drill-app/.keys/90d_drill_app.pat`).
-- 2027-01-14 and 2027-01-16: the ninety-day clocks of the four undecided
-  kin-openapi findings in grafana 13.1.7 run out (#275 to #277, then #287;
-  #274 decided not affected on 2026-10-21).
+- 2027-01-14 and 2027-01-16: the ninety-day clocks of the three undecided
+  kin-openapi findings in grafana 13.1.7 run out (#275 and #277, then #287;
+  #274 and #276 decided not affected on 2026-10-21).
+- 2027-01-19: the ninety-day clock of CVE-2026-111943 (#300) runs out on all
+  six images, grafana included.
 - 2027-01-17: `.keys/90d-pat.txt` expires (extended 2026-10-19; the agent's
   git and gh access); rotate and replace the file. RENOVATE_TOKEN was
   regenerated on 2026-10-19 after expiring that day (Renovate down from
