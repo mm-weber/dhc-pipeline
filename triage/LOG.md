@@ -2309,3 +2309,15 @@ digests; its grafana findings as before, five undecided and the transfers to
 decision as history. The registry, read anonymously at 12:17Z: the same three
 tags on the same digest, nine plain tags and 181 planes, none new. Ledger row
 1.15 flips to exercised on this, induced by the switch. The track closes.
+
+**The token, closed (2026-10-20 20:45Z to 21:43Z).** The owner rotated
+`DHI_TOKEN` and re-ran the nightly's failed jobs (run 39402331027, attempt
+2): every dhi.io login green, grafana absent from the matrix as before. The
+re-run kept the schedule event, so the comparator ran, found the package set
+changed in all seven, `ca-certificates-bundle` 20260909-r0 to 20261020-r0
+from the live apk repository, and published all seven (Req 2.16): 21 tags to
+new digests again. Verified here by diffing the attested CycloneDX SBOMs of
+the amd64 manifests: the dispatch of 2026-10-19 had republished package sets
+equal to the digests before it, and the re-run's differ from the dispatch's
+by that one package. The nightlies of 2026-10-11 to 2026-10-19 had all ended
+equal. Renovate followed with the chart digest pins (#296, #297, #298).

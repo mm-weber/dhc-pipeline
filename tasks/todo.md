@@ -195,8 +195,9 @@ stay as history.
   regenerated on 2026-10-19 after expiring that day (Renovate down from
   04:02Z to 21:17Z, two runs failed at startup). DHI_TOKEN stopped being
   accepted on 2026-10-20 (the nightly 39402331027 failed at every dhi.io
-  login, nothing built) and waits for the owner's rotation. The new expiries
-  are unknown here (secrets API 403): note them beside this line.
+  login, nothing built); rotated by the owner the same day, the re-run of
+  20:45Z green. The new expiries are unknown here (secrets API 403): note
+  them beside this line.
 
 ## Working rules the owner set (apply in every session)
 
