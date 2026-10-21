@@ -5,7 +5,7 @@
 image:
   repository: ghcr.io/mm-weber/dhc/hardened-app
   tag: 0.1.1-alpine3.23
-  digest: sha256:3476270a4b77472b8e89a8780dd60768e9e08b776488576b27fb2980bd76b807
+  digest: sha256:b683fcd620a0ee04ae713b6c098055faff9ba4f64c904d73ce6ffb732d45d1c8
 
 replicaCount: 1
 port: 8080
