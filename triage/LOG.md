@@ -2447,3 +2447,120 @@ CVE-2026-100352 (#275, NaN and Inf through the OAS 3.1 validation path) and
 CVE-2026-100354 (#277, recursion on circular `allOf`, `anyOf` and `oneOf`
 schemas) in the linked `openapi3` schema code, where `visitXOFOperations` is
 present. Each gets its own measurement and its own decision, one at a time.
+
+## 2026-10-21: not affected: CVE-2026-100353, the grafana server links no request decoder (#276)
+
+*Image: grafana, inactive since 2026-10-19 and frozen at 13.1.7 (index
+sha256:89c5680a868b, the digest the #256 base bump built on 2026-10-13). The
+second of the five kin-openapi findings, decided on 2026-10-21, the owner's
+call in chat on the evidence below, the same day as #274 and on the same
+binaries: the published linux/amd64 manifest sha256:e4f626e9…, read in place
+with the instrument of the entry above, `go version -m`, the pclntab read with
+Go's own `debug/gosym`, `go tool nm` on the server and `strings`, extended by
+one reader: the pclntab's file table, read directly with `debug/gosym` rather
+than through `strings`. The script is
+`triage/upstream/checks/grafana-kin-openapi-symbols.sh`, which now names the
+functions of this finding and of #287 as well.*
+
+**What the vulnerability is.** GHSA-vrcc-3ch7-hppw, CVSS 7.5 (network, low
+attack complexity, no privileges, availability high), EPSS 0.34 percent (25th
+percentile), not in CISA's KEV (catalogue 2026.10.16); CWE-476. The fix for
+GHSA-p6wj-qrr4-pgh5 (CVE-2026-97394, 0.143.0) guarded three places where
+kin-openapi's request decoder dereferences the `items` schema of an array
+that OpenAPI 3.1 lets a document omit; this advisory names three it missed,
+all in `openapi3filter`: a query parameter declared `type: array` without
+`items`, the same inside a `deepObject` parameter, and a form-encoded body
+whose array sits in an `allOf`, `anyOf` or `oneOf` sub-schema, which walks
+past the guard the earlier fix put on top-level properties. The first and
+third reach `(*urlValuesDecoder).parseArray`, the second `buildResObj`, both
+in `openapi3filter/req_resp_decoder.go`, and both hand a nil schema to code
+that dereferences it. One request from an unauthenticated client, against an
+application that validates requests with `openapi3filter` against such a
+document, panics the validating goroutine; under `net/http` the connection
+drops, elsewhere the process. Fixed in 0.149.0 (commit 9814d1f of
+2026-08-28): a nil guard in each of the two functions, six lines in one file.
+Trivy names the module at v0.144.0 from the server's build info, fix version
+0.149.0, on `usr/share/grafana/bin/grafana` and on no other binary.
+
+**Where it sits, and where it does not.**
+
+| Binary | Built with | kin-openapi | Functions (pclntab) | kin-openapi functions linked | kin-openapi files in the file table | `openapi3filter` | The seventeen named functions |
+|---|---|---|---|---|---|---|---|
+| `bin/grafana` (symbol table kept, 503,143 symbols) | go1.26.6 | v0.144.0 | 418,865 | 1,126 | 51 of 17,747: 50 under `openapi3/`, 1 under `routers/gorillamux/` | 0 functions, 0 symbols of any kind, 0 files, 0 strings | all absent |
+| `plugins-bundled/elasticsearch/gpx_…` (v12.9.0, stripped) | go1.26.7 | none | 47,222 | 0 | 0 of 2,612 | 0 | all absent |
+| `plugins-bundled/zipkin/gpx_…` (v12.4.8, stripped) | go1.26.7 | none | 36,903 | 0 | 0 of 2,087 | 0 | all absent |
+
+The seventeen are the two fix sites, `(*urlValuesDecoder).parseArray` and
+`buildResObj`; the function that dereferences,
+`(*urlValuesDecoder).parseValue`; the chain that reaches them,
+`(*urlValuesDecoder).DecodeArray`, `makeObject`, `decodeProperty`,
+`decodeSchemaConstructs`, `UrlencodedBodyDecoder` and `MultipartBodyDecoder`;
+the standalone `parseArray` and `decodeValue`; and the package's entry points
+`ValidateParameter`, `ValidateRequestBody`, `ValidateRequest`,
+`ValidateResponse`, `validateResponseHeader` and `RegisterBodyDecoder`. Each
+is absent from every binary. The server's symbol table holds no symbol of any
+kind under `kin-openapi/openapi3filter`, and its file table, the pclntab's
+list of every source file the compiler emitted code from, inlined bodies
+included, holds 17,747 files, of which 51 come from kin-openapi: 50 under
+`openapi3/` and one under `routers/gorillamux/`, none under
+`openapi3filter/`, `req_resp_decoder.go` included. The controls hold:
+`openapi3.(*Schema).visitJSONArray`, the schema package's own walk over an
+array value, `VisitJSON` and `Validate` are present in the server, as are its
+50 `openapi3/` files; nothing of the kind appears in the plugins, which link no
+kin-openapi package, as Trivy's report also says. On the file table: the entry
+above read it through `strings`, whose patterns must be spelled as the table
+spells a module's files, with the version in the path
+(`kin-openapi@v0.144.0/openapi3/schema.go`); the direct reader counts the
+same 50 and 1, and `strings` with the spelled-out path agrees.
+
+Why the module is there is as recorded for #274: the schema validation of
+alerting rules (`apps/alerting/rules/pkg/app/validation/openapi.go`,
+`Schema.VisitJSON`), an `openapi2conv` build script that is not shipped, and
+`routers/gorillamux` through grafana-plugin-sdk-go's experimental e2e storage
+package, of which the linker kept the `init` alone. GitHub code search finds
+no import of `openapi3filter` in grafana/grafana.
+
+**What govulncheck could measure: nothing.** The Go vulnerability database
+has no report for this CVE: golang/vulndb#6800, filed 2026-10-16, is open.
+The pull request gate's run (Req 6.13) never fires for an inactive
+definition. The symbol and file tables are the instrument, and the case is
+the strong one again: an absent package.
+
+**The rungs.** Fix: closed. The image is frozen, and no 13.1 release carries
+the fix: Grafana 13.1.8 (2026-10-13) still pins kin-openapi v0.144.0, and
+only `main` has moved, to v0.149.0. Avoid: nothing to drop; the schema
+package is in use. Not affected: writable in the strong direction. Req 6.14
+is satisfied because every named function is absent from the unstripped
+server, and Req 6.15's structural basis holds: the image's entrypoint,
+`bin/grafana`, never decodes a request through kin-openapi, which it does
+not link. Transfer: nothing to wait for. Accept: not needed.
+
+**Decision: not affected, vulnerable code not in the execute path, scoped to
+the release** (owner's call, 2026-10-21).
+`triage/vex/CVE-2026-100353.openvex.json`: product
+`pkg:oci/grafana@13.1.7-alpine3.23`, subcomponent
+`pkg:golang/github.com/getkin/kin-openapi`, tag-scoped for the reason given
+for #274: the claim rests on what this build links, and the tag is the whole
+story for a frozen image. No version-independent note.
+
+**How it is proved.** As for #274: the gate builds nothing for an inactive
+definition (Req 1.15), so the statement was proved locally before the merge,
+compiled for the supported digest with its three tags and both platform
+manifests (`scripts/compile-vex.sh`: seven statements compiled for grafana,
+eight products of other images dropped), then `scripts/scan-image.sh` on the
+pulled linux/amd64 manifest with Trivy 0.72.0 and the vulnerability database
+of 2026-10-21 07:13Z. With the compiled document CVE-2026-100353 is
+suppressed as `not_affected` from `grafana.openvex.json`, next to
+CVE-2026-100351, and the other three kin-openapi findings stay reported; with
+an empty document directory all five are reported. The first rescan after
+the merge compiles it for the supported digest, re-attests the changed
+document (Req 6.43), and closes #276 on evidence with the
+`resolved:not_affected` grade (Req 6.53, 6.56). The run is recorded here
+when it does.
+
+**The other three.** CVE-2026-100349 (#287) names `decodeValue`,
+`validateResponseHeader` and `ValidateResponse`, three of the seventeen
+counted above, in the same absent package: its measurement is this one, its
+decision is still its own. CVE-2026-100352 (#275) and CVE-2026-100354 (#277)
+sit in the linked `openapi3` schema code, where `visitXOFOperations` and
+`visitJSONArray` are present, and each needs a finer read.
