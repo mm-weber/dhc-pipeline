@@ -8,16 +8,19 @@
 
 ## Active tracks
 
-### [ ] retire-grafana_20261019: Grafana deactivated, the documented switch exercised live
-
-**Description:** Grafana's line leaves the active set and nothing else changes under its directory or chart: no new build, tag, bump or e2e install, everything published kept with its attestations and daily planes; the switch, never exercised live, flips the ledger's 1.15 and 1.16 rows by nature; the twelve moot exceptions of 2026-09-03 retired with their evidence in the same pull request (Req 1.13 to 1.16, 3.2, 6.7, 6.11, 7.11). The four levels of retiring an image are kept in the spec.
-**Priority:** high (the owner's call of 2026-10-19)
-**Folder:** [./tracks/retire-grafana_20261019/](./tracks/retire-grafana_20261019/)
-
----
+<!-- No active track; the next drill is 16.8 (the KEV drill input), then 16.3 -->
 
 
 ## Completed tracks
+
+### [x] retire-grafana_20261019: Grafana deactivated, the documented switch exercised live
+
+**Description:** Grafana's line leaves the active set and nothing else changes under its directory or chart: no new build, tag, bump or e2e install, everything published kept with its attestations and daily planes; the switch, never exercised live, flips the ledger's 1.15 and 1.16 rows by nature; the twelve moot exceptions of 2026-09-03 retired with their evidence in the same pull request (Req 1.13 to 1.16, 3.2, 6.7, 6.11, 7.11). The four levels of retiring an image are kept in the spec.
+**Priority:** high (the owner's call of 2026-10-19)
+**Completed:** 2026-10-20 (#290 merged 2026-10-19 as 04c6eeb, the switch and the twelve exceptions retired; the first inactive day observed in #292 and #295: no grafana job in four builds, the rescan's first non-empty inactive check, run 39417467219; rows 1.15 and 1.16 exercised)
+**Folder:** [./tracks/retire-grafana_20261019/](./tracks/retire-grafana_20261019/)
+
+---
 
 ### [x] drill-definition_20261017: The drill definition and its first findings (task 16.2)
 

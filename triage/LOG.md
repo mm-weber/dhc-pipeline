@@ -2281,3 +2281,43 @@ preventive branch of build.yml's affected-definitions job, never run while
 every definition was active (Req 1.15). Ledger row 1.16 flips to exercised on
 this. Part two, the nightly, the rescan's inactive-digest check and Renovate's
 handling of #279, follows.
+
+**The first inactive day, part two (2026-10-19 21:19Z to 2026-10-20 12:17Z).**
+Renovate's two failed runs had one cause, its token: `RENOVATE_TOKEN` had
+expired on 2026-10-19; the owner regenerated it and re-ran 39323363043 at
+21:17Z (attempt 2, green). #279 autoclosed as a stale branch under the
+rendered ignore paths, the dependency dashboard (#5) lists nothing of
+grafana, and the scheduled run of 04:14Z (39368498446) was green again. At
+21:49Z the owner dispatched build.yml blank (run 39330433276): the dispatch
+path never runs the publish-on-change comparator (register row M17), so this
+was a release, seven definitions rebuilt and republished, 21 tags moved to
+new digests, grafana absent from the matrix and its three tags where they
+were. The nightly of 2026-10-20 09:40Z (run 39402331027) named the same seven
+and failed at every definition's dhi.io login, `unauthorized`, before any
+build: the `DHI_TOKEN` secret was no longer accepted where the same step had
+passed at 21:49Z, the registry answering; nothing built, nothing moved. The
+rescan of 11:47Z (run 39417467219, the first after the merge) passed its
+inactive-digest check with grafana the one inactive definition and its three
+tags the comparison against the previous status (the branch for a missing
+previous status annotates the run with a warning; none did), the first run
+of that check with something to check since it began on 2026-09-09. The
+status issue (#151), re-rendered at 12:12Z, carries grafana on
+sha256:89c5680a868b under `13-alpine3.23`, `13.1-alpine3.23` and
+`13.1.7-alpine3.23` while the six other repositories moved to the release's
+digests; its grafana findings as before, five undecided and the transfers to
+2026-12-12; the fixed table keeps the twelve retired exceptions' last
+decision as history. The registry, read anonymously at 12:17Z: the same three
+tags on the same digest, nine plain tags and 181 planes, none new. Ledger row
+1.15 flips to exercised on this, induced by the switch. The track closes.
+
+**The token, closed (2026-10-20 20:45Z to 21:43Z).** The owner rotated
+`DHI_TOKEN` and re-ran the nightly's failed jobs (run 39402331027, attempt
+2): every dhi.io login green, grafana absent from the matrix as before. The
+re-run kept the schedule event, so the comparator ran, found the package set
+changed in all seven, `ca-certificates-bundle` 20260909-r0 to 20261020-r0
+from the live apk repository, and published all seven (Req 2.16): 21 tags to
+new digests again. Verified here by diffing the attested CycloneDX SBOMs of
+the amd64 manifests: the dispatch of 2026-10-19 had republished package sets
+equal to the digests before it, and the re-run's differ from the dispatch's
+by that one package. The nightlies of 2026-10-11 to 2026-10-19 had all ended
+equal. Renovate followed with the chart digest pins (#296, #297, #298).
