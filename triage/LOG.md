@@ -2437,8 +2437,22 @@ statement suppresses what it claims and nothing else. The first rescan after
 the merge then compiles it for the supported digest, scans the two platform
 manifests, re-attests the changed document (Req 6.43), and closes #274 on
 evidence with the `resolved:not_affected` grade (Req 6.53, 6.56); the status
-issue's row moves from undecided to decided. The run is recorded here when
-it does.
+issue's row moves from undecided to decided.
+
+**The run.** Rescan run 39770244509, dispatched by the owner on 2026-10-22 at
+11:23Z on cbf4042 and the first run carrying all three kin-openapi statements,
+compiled eight statements for the supported digest, re-attested the document
+on the index and both platform manifests, and closed the issue at 11:38Z with
+`resolved:not_affected`, naming the statement as the covering artifact on both
+manifests; the status row reads decided (not_affected). One detour on the way:
+the #299 merge had closed the issue by itself on 2026-10-21 at 12:03Z, through
+the word "closes" before the issue number in the pull request description,
+which GitHub reads as a closing keyword, and the rescan of that day (run
+39596066546, checked out before the merge) saw the finding still reported and
+reopened it at 12:19Z (Req 6.57), as specified. Descriptions and commit
+messages in this repository therefore never place a closing keyword before an
+issue number: the rescan closes cve issues on evidence, and a merge must not
+pre-empt it.
 
 **The other four.** By their advisories, CVE-2026-100349 (#287, a nil-pointer
 panic in `openapi3filter.ValidateResponse`) and CVE-2026-100353 (#276, three
@@ -2555,8 +2569,18 @@ CVE-2026-100351, and the other three kin-openapi findings stay reported; with
 an empty document directory all five are reported. The first rescan after
 the merge compiles it for the supported digest, re-attests the changed
 document (Req 6.43), and closes #276 on evidence with the
-`resolved:not_affected` grade (Req 6.53, 6.56). The run is recorded here
-when it does.
+`resolved:not_affected` grade (Req 6.53, 6.56).
+
+**The run.** Rescan run 39770244509 (2026-10-22, 11:23Z, dispatched by the
+owner on cbf4042) re-attested the document on the index and both platform
+manifests and closed the issue at 11:38Z with `resolved:not_affected`, naming
+the statement as the covering artifact on both manifests; the status row reads
+decided (not_affected). The #301 merge had already closed the issue by itself
+on 2026-10-21 at 21:20Z, through the word "closes" before the issue number in
+the pull request description, a GitHub closing keyword that pre-empts the
+rescan; the issue was reopened by hand on 2026-10-22 at 11:21Z, before the
+run, so that the close carries the evidence and the graded label (Req 6.53,
+6.56).
 
 **The other three.** CVE-2026-100349 (#287) names `decodeValue`,
 `validateResponseHeader` and `ValidateResponse`, three of the seventeen
@@ -2676,7 +2700,17 @@ two remaining kin-openapi findings stay reported; with an empty document
 directory all five are reported. The first rescan after the merge compiles
 it for the supported digest, re-attests the changed document (Req 6.43), and
 closes #287 on evidence with the `resolved:not_affected` grade (Req 6.53,
-6.56). The run is recorded here when it does.
+6.56).
+
+**The run.** Rescan run 39770244509 (2026-10-22, 11:23Z, dispatched by the
+owner on cbf4042) re-attested the document on the index and both platform
+manifests and closed the issue at 11:38Z with `resolved:not_affected`, naming
+the statement as the covering artifact on both manifests; the status row reads
+decided (not_affected). The #302 merge had already closed the issue by itself
+at 07:45Z the same day, through the word "closes" before the issue number in
+the pull request description, a GitHub closing keyword that pre-empts the
+rescan; the issue was reopened by hand at 11:21Z, before the run, so that the
+close carries the evidence and the graded label (Req 6.53, 6.56).
 
 **The other two.** CVE-2026-100352 (#275) and CVE-2026-100354 (#277) sit in
 the linked `openapi3` schema code, where `visitXOFOperations` and
