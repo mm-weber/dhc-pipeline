@@ -161,10 +161,11 @@ stay as history.
       the vulnerable middleware (#274), request decoder (#276) and response
       validator (#287) live (statements in `triage/vex/`, LOG 2026-10-21, the
       measurement script
-      `triage/upstream/checks/grafana-kin-openapi-symbols.sh`); each proven
-      by the first rescan after its merge, which re-attests the document and
-      closes the issue on evidence. The same read places #275 and #277 in the
-      linked schema code, each awaiting a finer measurement.
+      `triage/upstream/checks/grafana-kin-openapi-symbols.sh`); all three
+      closed on evidence by rescan run 39770244509 of 2026-10-22, which
+      re-attested the document (`resolved:not_affected`). The same read
+      places #275 and #277 in the linked schema code, each awaiting a finer
+      measurement.
 - [ ] CVE-2026-111943 (#300, HIGH, Go `crypto/x509`, fixed in Go 1.26.10 and
       1.27.3): filed by the rescan of 2026-10-21 on twelve digests across the
       three cert-manager images, drill-app, hardened-app and grafana. The
@@ -209,7 +210,7 @@ stay as history.
   (`/workspace/repos/drill-app/.keys/90d_drill_app.pat`).
 - 2027-01-14: the ninety-day clocks of the two undecided kin-openapi
   findings in grafana 13.1.7 run out (#275 and #277; #274, #276 and #287
-  decided not affected on 2026-10-21).
+  decided not affected on 2026-10-21, closed on evidence 2026-10-22).
 - 2027-01-19: the ninety-day clock of CVE-2026-111943 (#300) runs out on all
   six images, grafana included.
 - 2027-01-17: `.keys/90d-pat.txt` expires (extended 2026-10-19; the agent's
