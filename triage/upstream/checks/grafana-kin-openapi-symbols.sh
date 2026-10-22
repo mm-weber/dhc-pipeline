@@ -50,6 +50,7 @@ FILES=(
   'kin-openapi@'
   'openapi3filter'
   'req_resp_decoder.go'
+  'validate_response.go'
   'gorilla/mux@'
 )
 # The functions the advisories name.
