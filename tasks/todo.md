@@ -175,9 +175,10 @@ stay as history.
       the server's own acyclic schema (cannot be controlled by an adversary,
       the first use of that justification). Statements in `triage/vex/`,
       LOG 2026-10-23, the caller script
-      `triage/upstream/checks/grafana-kin-openapi-callers.sh`; the first
-      rescan after the merge closes both on evidence (the run to be recorded
-      in the two entries). The image's last open finding is CVE-2026-111943
+      `triage/upstream/checks/grafana-kin-openapi-callers.sh`; both closed
+      on evidence by rescan run 39959263177 of 2026-10-23 (the owner's
+      dispatch at 13:12Z after #307's merge; the document re-attested,
+      `resolved:not_affected`). The image's last open finding is CVE-2026-111943
       (#300, Go's standard library, shared with five active images; next
       item).
 - [ ] CVE-2026-111943 (#300, HIGH, Go `crypto/x509`, fixed in Go 1.26.10 and
@@ -225,7 +226,7 @@ stay as history.
 - 2027-01-14: the ninety-day clocks of the five kin-openapi findings in
   grafana 13.1.7, all decided not affected (#274, #276 and #287 on
   2026-10-21, closed on evidence 2026-10-22; #275 and #277 recorded
-  2026-10-23, closed by the first rescan after the merge).
+  2026-10-23, closed on evidence the same day by run 39959263177).
 - 2027-01-19: the ninety-day clock of CVE-2026-111943 (#300) runs out on all
   six images, grafana included.
 - 2027-01-17: `.keys/90d-pat.txt` expires (extended 2026-10-19; the agent's
