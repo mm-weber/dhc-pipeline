@@ -3081,9 +3081,18 @@ fetched it through the same `curl` the declared feed goes through and
 failed with `the substituted KEV feed (drill kev-outage)
 (https://kev-feed.invalid/known_exploited_vulnerabilities.json) is
 unavailable: the exception tiers were not evaluated today, which is a
-failure of this run, not a pass (Req 6.60)`; the step's other checks, the
-visibility invariant, the admission proof and the attestation count, raised
-no annotation. The authenticity, portability, smoke-test and expiry steps
+failure of this run, not a pass (Req 6.60)`; the
+step's other checks passed in the same step, its log (read by the owner on
+the run page; the API exposes the annotations only) showing
+`check-visibility: 7 repositories and 47 tags all answer an unauthenticated
+request (Req 2.21)` and `verify-catalogue: 26 admitted, control rejected;
+the admission policy holds over every tag-referenced digest (Req 2.24)`
+before the warning, the fetch's own `curl: (6) Could not resolve host:
+kev-feed.invalid` between the warning and the error line, and
+`check-attestation-count: every one of 75 tag-referenced digest(s) and
+platform manifest(s) carries exactly one OpenVEX attestation` and
+`revocations: 0 recorded, 0 referenced by a catalogue tag` after it, exit 1
+after one minute and twenty-five seconds. The authenticity, portability, smoke-test and expiry steps
 ran under `always()` (21:19:16Z to 21:23:59Z). The refusals by name: the
 enrich step (21:23:59Z), `enrich: no KEV catalogue on disk (the invariants
 step reports why); today's issue set and status are not built (Req 6.60)`,
