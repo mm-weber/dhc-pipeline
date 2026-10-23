@@ -137,6 +137,15 @@ triage:
   # The KEV catalogue both arms fetch; an outage fails the pull request and
   # the rescan by name rather than evaluating without it (Req 6.59, 6.60).
   kev_feed: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+  # Task 16.8: the substitutes a dispatched rescan fetches in place of the
+  # KEV feed, by the `drill` input's name, read through `triage-policy.sh
+  # drill-feed` and nowhere else. kev-outage names an address under .invalid
+  # (RFC 2606: no resolver answers, so the fetch fails at once and the run
+  # takes its outage branch, Req 6.60); kev-synthetic names this repository's
+  # feed of one entry, the drill definition's HIGH, for task 16.3 (Req 6.51).
+  drills:
+    kev-outage: https://kev-feed.invalid/known_exploited_vulnerabilities.json
+    kev-synthetic: https://raw.githubusercontent.com/mm-weber/dhc-pipeline/main/triage/drills/kev-synthetic.json
   # The labels the rescan closes cve issues with, one per evidence grade
   # (task 10.6, Req 6.56): fixed and removed on the attested SBOMs,
   # not_affected and accepted on a covering statement or exception, absent
@@ -185,10 +194,15 @@ consumers:
 
 # Req 7.10's declared map: schedule cron and permissions per workflow, plus
 # explicit per-job permissions blocks. Jobs without an entry inherit the
-# workflow default and need none.
+# workflow default and need none. Each workflow_dispatch input is declared
+# here too, held equal by lint-workflow-policy.sh (task 16.8, Req 7.10).
 workflows:
   build.yml:
     schedule: *build_cron # the literal trigger in build.yml, held equal here
+    inputs:
+      image:
+        required: false
+        type: string
     permissions:
       contents: read
     jobs:
@@ -199,6 +213,11 @@ workflows:
           id-token: write
   rescan.yml:
     schedule: "17 6 * * *"
+    inputs:
+      drill: # task 16.8: the substitutes are triage.drills above
+        type: choice
+        options: [none, kev-outage, kev-synthetic]
+        default: none
     permissions:
       contents: read
       packages: write # re-attestation pushes .att manifests (task 10.3, Req 6.42, 6.43)
@@ -211,6 +230,14 @@ workflows:
           id-token: write # the deployment API's OIDC token
   renovate.yml:
     schedule: "0 */4 * * *"
+    inputs:
+      logLevel:
+        default: "info"
+        type: choice
+        options: [info, debug]
+      dryRun:
+        default: false
+        type: boolean
     permissions:
       contents: read
   validate.yml:
@@ -223,6 +250,10 @@ workflows:
       contents: read
   e2e.yml:
     schedule: null
+    inputs:
+      component:
+        required: false
+        type: string
     permissions:
       contents: read
       packages: read

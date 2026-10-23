@@ -21,6 +21,8 @@ triage:
   kev_ceiling: 14d
   expiry_warning: 14d
   kev_feed: https://example.invalid/kev.json
+  drills:
+    kev-outage: https://kev-feed.invalid/kev.json
 EOF
 }
 q() { "$TP" "$SB" "$@" 2>&1; }
@@ -33,6 +35,30 @@ fresh
 [ "$(q kev-ceiling)" = "14" ] && pass "the KEV ceiling" || fail "the KEV ceiling" "$(q kev-ceiling)"
 [ "$(q expiry-warning)" = "14" ] && pass "the expiry warning window" || fail "the expiry warning window" "$(q expiry-warning)"
 [ "$(q kev-feed)" = "https://example.invalid/kev.json" ] && pass "the KEV feed URL" || fail "the KEV feed URL" "$(q kev-feed)"
+# The drill substitutes (task 16.8, Req 7.7): what a dispatched rescan fetches
+# in place of the KEV feed is a declared value, read here and nowhere else.
+[ "$(q drill-feed kev-outage)" = "https://kev-feed.invalid/kev.json" ] && pass "a drill substitute reads by name" || fail "a drill substitute reads by name" "$(q drill-feed kev-outage)"
+
+# A drill name is a declared value (task 16.8): none is no drill, never a
+# feed, and an undeclared name or a missing drills map is a hole, refused by
+# name, so a dispatch with a value the policy does not declare never fetches
+# an accidental address.
+fresh
+out=$(q drill-feed none); rc=$?
+[ "$rc" -eq 2 ] && grep -q "none" <<<"$out" && pass "drill-feed refuses none by name" || fail "drill-feed refuses none by name" "rc=$rc" "$out"
+out=$(q drill-feed kev-bogus); rc=$?
+[ "$rc" -eq 2 ] && grep -q "kev-bogus" <<<"$out" && pass "drill-feed refuses an undeclared name by name" || fail "drill-feed refuses an undeclared name by name" "rc=$rc" "$out"
+fresh
+cat > "$SB/catalogue-policy.yaml" <<'EOF'
+triage:
+  aperture: [CRITICAL, HIGH]
+  ceilings: {CRITICAL: 30d, HIGH: 90d}
+  kev_ceiling: 14d
+  expiry_warning: 14d
+  kev_feed: https://example.invalid/kev.json
+EOF
+out=$(q drill-feed kev-outage); rc=$?
+[ "$rc" -eq 2 ] && grep -q "drills" <<<"$out" && pass "drill-feed refuses a missing drills map naming the hole" || fail "drill-feed refuses a missing drills map naming the hole" "rc=$rc" "$out"
 
 # A wider aperture is a fork switch: the order declared is the rank order, and
 # every severity in it must carry a ceiling or the tiering has a hole.

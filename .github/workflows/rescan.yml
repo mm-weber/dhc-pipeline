@@ -30,6 +30,17 @@ on:
   schedule:
     - cron: "17 6 * * *" # daily ~06:17 UTC, off the top of the hour
   workflow_dispatch:
+    inputs:
+      # Task 16.8 (Req 6.59, 6.60, 7.10): a drill substitutes a declared value
+      # for one run and takes no other code path. The allowed values are
+      # declared in catalogue-policy.yaml (workflows.rescan.yml.inputs, held
+      # equal by lint-workflow-policy.sh), the substitutes in its triage.drills
+      # map; a scheduled run reads none.
+      drill:
+        description: "Drill, this run only: kev-outage fetches an unresolvable KEV feed address (the run fails closed by name); kev-synthetic fetches this repository's one-entry feed (task 16.3)"
+        type: choice
+        options: [none, kev-outage, kev-synthetic]
+        default: none
 
 permissions:
   contents: read
@@ -62,6 +73,8 @@ jobs:
         shell: bash {0}
     env:
       OUT: ${{ github.workspace }}/rescan-out
+      # The drill input, `none` on a scheduled run (task 16.8).
+      DRILL: ${{ github.event.inputs.drill || 'none' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -383,11 +396,22 @@ jobs:
           # the owner's call); the issue enrichment and the status below
           # refuse by name when the file is absent.
           feed=$(scripts/triage-policy.sh . kev-feed)
+          label="the CISA KEV feed"
+          # Task 16.8: a drill run fetches the declared substitute instead,
+          # through the same fetch and the same outage branch; the name and
+          # the address travel to the summary. A scheduled run has DRILL=none.
+          if [ "${DRILL:-none}" != none ]; then
+            feed=$(scripts/triage-policy.sh . drill-feed "$DRILL")
+            label="the substituted KEV feed (drill ${DRILL})"
+            echo "::warning::drill ${DRILL}: the KEV feed is substituted with ${feed} for this run only (task 16.8); the scheduled run reads the declared feed"
+          fi
+          echo "drill=${DRILL:-none}" >> "$GITHUB_OUTPUT"
+          echo "feed=${feed}" >> "$GITHUB_OUTPUT"
           if curl -fsSL --max-time 60 "$feed" -o "$OUT/kev.json"; then
             scripts/check-exceptions.sh rescan . "$OUT/trivy" "$OUT/kev.json" || rc=1
           else
             rm -f "$OUT/kev.json"
-            echo "::error::the CISA KEV feed (${feed}) is unavailable: the exception tiers were not evaluated today, which is a failure of this run, not a pass (Req 6.60)"
+            echo "::error::${label} (${feed}) is unavailable: the exception tiers were not evaluated today, which is a failure of this run, not a pass (Req 6.60)"
             rc=1
           fi
           # Req 6.44, 6.45 (ADR 0004): exactly one OpenVEX attestation on every
@@ -850,6 +874,12 @@ jobs:
           set -euo pipefail
           {
             echo "### Daily rescan"
+            # Task 16.8: the drill, named on every run; the address when one was substituted.
+            if [ "${DRILL:-none}" = none ]; then
+              echo "- drill: none"
+            else
+              echo "- drill: ${DRILL} (the KEV feed substituted with ${{ steps.invariants.outputs.feed || 'an address the reader refused' }}, this run only; task 16.8)"
+            fi
             if [ -f "$OUT/enumeration.tsv" ]; then
               echo "- enumerated: $(wc -l < "$OUT/enumeration.tsv") platform manifest rows, $(cut -f1 "$OUT/enumeration.tsv" | sort -u | wc -l) repositories, $(cut -f1,2 "$OUT/enumeration.tsv" | sort -u | wc -l) tags ($(awk -F'\t' '$6=="superseded"' "$OUT/enumeration.tsv" | cut -f1,2 | sort -u | wc -l) superseded)"
             fi

@@ -1,0 +1,21 @@
+{
+  "title": "DRILL: synthetic Known Exploited Vulnerabilities feed of dhc-pipeline (task 16.8), not CISA's catalogue",
+  "catalogVersion": "2026.10.23",
+  "dateReleased": "2026-10-23T00:00:00.0000Z",
+  "count": 1,
+  "vulnerabilities": [
+    {
+      "cveID": "CVE-2025-30204",
+      "vendorProject": "golang-jwt",
+      "product": "jwt",
+      "vulnerabilityName": "golang-jwt/jwt Excessive Memory Allocation Vulnerability (DRILL entry, not a CISA listing)",
+      "dateAdded": "2026-10-23",
+      "shortDescription": "DRILL: this entry is the live-drill fixture of dhc-pipeline, task 16.3 (a KEV-listed finding under an exception). CISA's catalogue does not list CVE-2025-30204 (measured 2026-10-15); the drill definition drill-app pins golang-jwt/jwt/v5 v5.2.1, where Parser.ParseUnverified allocates in proportion to the token's segment count.",
+      "requiredAction": "None: a drill of this repository's exception tiering, substituted for CISA's feed on one dispatched rescan run by the drill input of task 16.8.",
+      "dueDate": "2026-10-23",
+      "knownRansomwareCampaignUse": "Unknown",
+      "notes": "https://github.com/mm-weber/dhc-pipeline/blob/main/conductor/tracks/kev-drill-input_20261023/spec.md ; task 16.8 FR-6, task 16.3",
+      "cwes": ["CWE-405"]
+    }
+  ]
+}

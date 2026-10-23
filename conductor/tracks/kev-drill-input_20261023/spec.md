@@ -80,7 +80,7 @@ Notes: `.invalid` is reserved by RFC 2606 and never resolves, so the outage is d
 
 IF a workflow's `workflow_dispatch` inputs differ from its declaration's `inputs` map in `catalogue-policy.yaml`, in an input's presence, its `type`, its `options`, its `default` or its `required`, THEN THE CI Pipeline SHALL fail validation naming that workflow, that input and that differing value.
 
-Notes: `lint-workflow-policy.sh` compares, per workflow, each dispatch input's map with `description` dropped (prose) against `workflows.<wf>.inputs.<name>`, both directions, the schedule precedent of review D3: an input the declaration lacks, a declared input the workflow lacks, and a differing key each fail by name; a workflow with no dispatch inputs and no `inputs` declaration passes as today. The declarations this track adds are literal mirrors: `build.yml` `inputs: {image: {required: false, type: string}}` (the existing input) and `rescan.yml` `inputs: {drill: {type: choice, options: [none, kev-outage, kev-synthetic], default: none}}`. Both directions mean `build.yml`'s input is declared in the same pull request as the lint change, or validation turns red on main.
+Notes: `lint-workflow-policy.sh` compares, per workflow, each dispatch input's map with `description` dropped (prose) against `workflows.<wf>.inputs.<name>`, both directions, the schedule precedent of review D3: an input the declaration lacks, a declared input the workflow lacks, and a differing key each fail by name; a workflow with no dispatch inputs and no `inputs` declaration passes as today. The declarations this track adds are literal mirrors of the existing inputs, found on the real-repository run of slice 1.1 (the draft counted build.yml alone): `build.yml` `image` (`required: false`, `type: string`), `renovate.yml` `logLevel` (choice, `info` and `debug`, default `info`) and `dryRun` (boolean, default false), `e2e.yml` `component` (`required: false`, `type: string`), plus `rescan.yml` `inputs: {drill: {type: choice, options: [none, kev-outage, kev-synthetic], default: none}}`. Both directions mean every existing input is declared in the same pull request as the lint change, or validation turns red on main.
 
 **Acceptance criteria:**
 
@@ -133,11 +133,11 @@ Notes: the LOG heading `## <date>: the KEV feed outage drill, both arms fail clo
 
 THE Repository SHALL name its drill input in `docs/user-manual.md`'s rows for `rescan.yml` and SHALL add to `docs/CONVENTIONS.md`'s manual-controls register one row for dispatching a rescan with a drill input, stating that such a run is red by name and publishes attestations only.
 
-Notes: row M20 (M19 is the last); the manual's workflow table (the `rescan.yml` row) and the cron table's rescan row, plus a sentence under "Both are dispatchable on demand". The policy file's comments name the two new keys and what reads them.
+Notes: row M26, the table's next free id, placed last (the draft said M20, then M21, then M22, each time from a partial read of the table; the rows are counted now); the manual's workflow table (the `rescan.yml` row) and the cron table's rescan row, plus a sentence under "Both are dispatchable on demand". The policy file's comments name the two new keys and what reads them.
 
 **Acceptance criteria:**
 
-- [ ] Both rows and the sentence present; `grep -c 'M20' docs/CONVENTIONS.md` is 1; no em-dashes added
+- [ ] Both rows and the sentence present; `grep -c '^| M26 ' docs/CONVENTIONS.md` is 1; no em-dashes added
 
 ## Scope
 
