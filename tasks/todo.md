@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-10-21
+# Live drills (task group 16): where we are and what is next, as of 2026-10-23
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -88,7 +88,12 @@ stay as history.
       modules; the open issues close resolved:fixed on attested SBOMs.
 - [ ] 16.7 Regression and reopen (6.57): the vulnerable pin returns as a new
       release; the closed issues reopen with the original first-seen.
-- [ ] 16.8 KEV feed outage fails closed (6.59, 6.60): a `drill` input on
+- [ ] 16.8 KEV feed outage fails closed (6.59, 6.60): OPENED 2026-10-23 as
+      conductor track `kev-drill-input_20261023` (phase 0 the spec amendment
+      of 7.7 and 7.10 and the track; phase 1 the input, the declarations, the
+      lint and the reader by TDD; phase 2 the drill branch, the dispatched
+      outage run, the next scheduled run, the evidence). The plan as written
+      on 2026-10-17: a `drill` input on
       rescan.yml's workflow_dispatch (`kev-outage`) substituting an unreachable
       URL for one run, printed in the summary; lint-workflow-policy learns the
       input; a drill branch does the same on a pull request's tiering step.
