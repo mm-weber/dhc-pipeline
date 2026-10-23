@@ -69,6 +69,7 @@ Dependency: phase 1 merged. Worktree `kev-drill-evidence` from main for the evid
 
 | Date | Task | Deviation | Reason | Resolution |
 | --- | --- | --- | --- | --- |
+| 2026-10-23 | 1.8 | The register's next free row is M21, not M20 | The draft read the table's first rows only; M20 (chart image-pin tag bumps) exists | FR-10's note and acceptance say M21 |
 | 2026-10-23 | 1.1 | Three workflows carry dispatch inputs, not one: build.yml `image`, renovate.yml `logLevel` and `dryRun`, e2e.yml `component` | The spec's FR-5 note counted build.yml alone, from a read of build.yml and rescan.yml only | GREEN-1 declared all four inputs as literal mirrors (the GREEN agent found the two others on the real-repository run); FR-5's note corrected |
 
 ---

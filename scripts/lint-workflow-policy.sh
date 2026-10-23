@@ -14,7 +14,8 @@
 #
 # Since task 16.8 (Req 7.10 as amended): a workflow_dispatch input is a
 # declared value too, so each input a workflow carries must be listed by name
-# under its declaration's `inputs` map.
+# under its declaration's `inputs` map, and each input listed there must be
+# carried by the workflow.
 #
 # YAML via python3 + PyYAML (the lint-accepted-risk.sh precedent; installed by
 # validate.yml's yamllint step, present in the devcontainer).
@@ -79,6 +80,11 @@ for path in sorted(glob.glob(os.path.join(root, ".github", "workflows", "*.yml")
         if name not in decl_inputs:
             listed = ", ".join(f"'{k}'" for k in decl_inputs) or "none"
             err(wf, f"workflow_dispatch input '{name}' is not declared (declared inputs: {listed})")
+    for name in decl_inputs:
+        if name not in inputs:
+            # The D3 direction: a declared input the workflow lacks is drift
+            # that silently drops a declared value.
+            err(wf, f"declares workflow_dispatch input '{name}' in catalogue-policy.yaml but the workflow carries no such input")
 
     def diff_perms(where, actual, wanted):
         actual = actual or {}
