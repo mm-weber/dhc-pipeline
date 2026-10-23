@@ -42,22 +42,44 @@ release:
 # and scripts/definition-lib.sh's active_definitions is the one reader: an
 # entry naming no image/<name>/image.yaml, a duplicate, or an
 # empty list is refused by name rather than read as "nothing to do".
-# Deactivating a definition means removing its line, and only that: no new
+# Deactivating a definition means removing its line (and its proofs entry
+# below, if it declared one), and only that: no new
 # digest is pushed and no new tag applied for it (Req 1.15), a bump PR
 # touching it fails validation (Req 1.16), while its already-published tags
 # keep every tag-driven plane (enumeration, daily scans, attestations,
 # issues over its current tags) until retention retires them; the directory
 # stays, the reference demonstrates the switch. The reference instance
-# activates everything, grafana's repackaged tarball included (design
-# Decision 11). A fork lists what it stands behind.
+# activates everything but grafana, deactivated on 2026-10-19 by this
+# switch (design Decision 11; triage/LOG.md 2026-10-19). A fork lists what
+# it stands behind.
 active_set:
   - hardened-app
   - cert-manager-controller
   - cert-manager-webhook
   - cert-manager-cainjector
-  - grafana
   - valkey
   - valkey-compat
+  - drill-app
+
+# Req 5.8 to 5.10 (task 17.2; design Decision 14): how each active definition
+# is proved functional. No entry means chart: a chart under chart/ names the
+# definition under deploys: and declares the probe the e2e suite runs once
+# its pods are Ready (Req 5.5). An entry of kind none is a declared gap for a
+# definition no chart deploys yet (an onboarding's first pull request) or
+# ever (a drill fixture): a reason is required, and the probe lint prints the
+# entry by name on every validation run, so the gap is never silent
+# (Req 5.9). A kind the lint does not implement, an entry naming a definition
+# outside the active set, a none without a reason, or a none for a definition
+# a chart deploys is refused by name (Req 5.10); design Decision 14 names
+# smoke as the next kind. scripts/definition-lib.sh's proof_entries is the
+# one reader. The reference instance declares one: the drill definition
+# (task 16.2), which no chart will ever deploy; every other active
+# definition is chart-proved. A fork adds entries here; onboarding adds one
+# and removes it with the chart.
+proofs:
+  drill-app:
+    kind: none
+    reason: "live-drill fixture, never installed by design (task 16.2)"
 
 verification:
   # The registry namespace the four registry criteria bind through (Req 2.2,

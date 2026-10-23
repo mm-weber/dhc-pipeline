@@ -37,6 +37,8 @@ chart() { # dir probe deploys...
   { [ -n "$p" ] && printf 'probe: %s\n' "$p"; printf 'deploys:\n'; printf '  - %s\n' "$@"; } > "$SB/chart/$d/chart.yaml"
 }
 policy() { { printf 'active_set:\n'; printf '  - %s\n' "$@"; } > "$SB/catalogue-policy.yaml"; }
+# proofs: append a proofs: block to the policy file; each argument is one line, already indented relative to its entry
+proofs() { printf 'proofs:\n' >> "$SB/catalogue-policy.yaml"; printf '  %s\n' "$@" >> "$SB/catalogue-policy.yaml"; }
 
 # 1: every active definition is deployed by a chart with a probe; the
 #    summary counts definitions and the distinct probes covering them
@@ -78,6 +80,42 @@ expect "a non-string probe is refused naming the chart" 1 "$rc" "$out" "chart/ap
 fresh; policy app typo
 out=$("$LINT" "$SB" 2>&1); rc=$?
 expect "a malformed active set fails naming the entry" 1 "$rc" "$out" "typo"
+
+# 8: an active definition no chart deploys passes when the policy file declares a none proof for it, and the declaration is printed by name (Req 5.9)
+fresh; mkdir -p "$SB/image/lonely"; printf 'image: ghcr.io/acme/imgs/lonely\n' > "$SB/image/lonely/image.yaml"
+policy app cm-a cm-b db db-compat lonely
+proofs 'lonely:' '  kind: none' '  reason: drill fixture'
+out=$("$LINT" "$SB" 2>&1); rc=$?
+expect "a declared none proof covers an uncovered active definition and is printed by name" 0 "$rc" "$out" "lonely" "proof none" "drill fixture" "Req 5.9"
+
+# 9: the summary counts the declared none proofs beside the probe registrations (Req 5.9)
+fresh; mkdir -p "$SB/image/lonely"; printf 'image: ghcr.io/acme/imgs/lonely\n' > "$SB/image/lonely/image.yaml"
+policy app cm-a cm-b db db-compat lonely
+proofs 'lonely:' '  kind: none' '  reason: drill fixture'
+out=$("$LINT" "$SB" 2>&1); rc=$?
+expect "the summary counts declared none proofs" 0 "$rc" "$out" "6 active definition(s)" "1 declared none"
+
+# 10: the undeclared, uncovered refusal names the three ways out: a chart with a probe, a declared none proof, deactivation (Req 5.8)
+fresh; mkdir -p "$SB/image/lonely"; printf 'image: ghcr.io/acme/imgs/lonely\n' > "$SB/image/lonely/image.yaml"
+policy app cm-a cm-b db db-compat lonely
+out=$("$LINT" "$SB" 2>&1); rc=$?
+expect "the uncovered refusal names the none way out" 1 "$rc" "$out" "lonely" "no chart" "proof of kind none" "Req 5.8"
+
+# 11: a none proof for a definition a chart deploys is a contradiction: one proof per definition, the stale entry must go (Req 5.10)
+fresh
+proofs 'app:' '  kind: none' '  reason: stale record'
+out=$("$LINT" "$SB" 2>&1); rc=$?
+expect "a none proof for a chart-deployed definition fails naming both" 1 "$rc" "$out" "app" "chart/app/chart.yaml" "none" "Req 5.10"
+
+# 12: a refusal from the proofs reader is the lint's failure by name, nothing else checked (Req 5.10; the malformed active set precedent)
+fresh
+proofs 'app:' '  kind: smoke'
+out=$("$LINT" "$SB" 2>&1); rc=$?
+expect "a reader refusal surfaces by name and stops the lint" 1 "$rc" "$out" "app" "smoke" "Req 5.10" "nothing checked"
+
+# 13: this repository: six definitions chart-proved, the drill declared none and grafana inactive, the lint green (the live state the reference instance ships since the deactivation of 2026-10-19)
+out=$("$LINT" "$HERE/.." 2>&1); rc=$?
+expect "the repository passes with six chart-proved, one declared none and grafana inactive" 0 "$rc" "$out" "7 active definition(s)" "6 covered by 3 probe registration(s)" "1 declared none" "drill-app: proof none"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi

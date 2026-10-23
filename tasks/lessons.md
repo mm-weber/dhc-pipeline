@@ -190,3 +190,114 @@ tested in.
    a test observe the credential arriving (a stub that records the
    `Authorization` header), the way the 2026-09-08 rule checks a step's
    tools against its install order.
+
+## 2026-10-05: a tool's error wording is not the cause; read the API's answer
+
+**What happened.** `gh run rerun` answered "cannot be rerun; its workflow
+file may be broken" for runs that had lost their hosted runner. The workflow
+file was fine: the REST call behind it returns 403 "Resource not accessible
+by personal access token", because the token holds Actions read only. The
+same message had been taken at face value once before (PR #238).
+
+**Rule.** When a CLI's message names a cause that would be surprising, call
+the underlying API once (`gh api -X POST .../rerun`) and read its status
+and message before repeating the CLI's explanation to the owner. Record the
+permission limit where the next session finds it (memory and this file):
+re-runs are the owner's, from the Actions tab.
+
+## 2026-10-08: describe live behaviour from the data model, not from memory
+
+**What happened.** Asked how the catalogue records a finding fixed by an
+upstream update, the session said that a finding which stops appearing
+"vanishes from the table" of the status page, and built a dashboard
+proposal on that gap. The next day's rescan showed the page keeps the row,
+fills a Fixed date and Days to fix, and counts fixed findings in its header:
+`metrics.json` carries `status: fixed`, `fixed`, `days_to_fix`. The claim
+had been made before the first fix had ever happened live and without
+reading `triage/rescan/page.go` or the status data's shape.
+
+**Rule.** Before describing what a mechanism does live, read the renderer or
+the data it renders (`metrics.json`, the status issue) and cite the field.
+When the event has never happened yet, say "not yet observed" and what the
+data model says will happen, rather than asserting an outcome. A proposal
+built on an unverified gap is withdrawn with the correction, in the same
+message, naming what was wrong.
+
+## 2026-10-16: a precedent shape was copied whole, and the owner had to ask what the clock was for
+
+**What happened.** The proof-kinds amendment (#271) gave the declared none
+proof a review-by date and a lapse criterion because the compat decision has
+one. The review of the pull request then followed that shape to its end: a
+start date, a ceiling to bound it, a drill to lapse it, a repository-wide red
+run when it lapsed. The owner asked what two pull requests and two dates were
+buying, and the honest answer was a forcing function for a chart pull request
+that, in the owner's workflow, follows the first publish within minutes. The
+date and everything built on it came out before merge.
+
+**Rule.** Before importing a shape from elsewhere in the repository (a dated
+decision, a ceiling, a clock seam), name the failure it prevents here and check
+it against the owner's actual workflow, not the precedent's. Take the smallest
+explicit state that keeps the gap visible (a reason, printed by name on every
+run) and add a clock only when the window it guards is real. Put the
+simplification question to the owner before the review has to.
+
+## 2026-10-16: the pull request text is part of the change, and it went stale
+
+**What happened.** The proof-kinds amendment (#271) was re-decided after
+its review: the date left the criteria, the decision, the code and the
+docs on every branch, one deletion commit each, and the report to the
+owner listed the branches and their heads. The titles and bodies of #271,
+#272 and #273 were not touched: #271 still announced "a dated none" under
+Req 5.8 to 5.11 and a lapse that fails validation, #273 still described
+`review_by` and cases 22 to 34. The owner, opening #271 to merge it, found
+nine open review threads and no statement of what the pull request now
+ships, and had to ask.
+
+**Rule.** The pull request title and body are the first thing a reviewer
+reads and the last thing a re-decision updates, so they are part of every
+push that changes what the branch ships. After a review or a re-decision,
+rewrite the body to say what ships now (criteria, decision, files), and
+list every review finding with its disposition in the body, so the open
+threads have one place that answers them. Check the title and body against
+the branch head before reporting a pull request as ready, the way the
+suites are re-run after the last edit (the 2026-08-26 rule). Repository
+rule since 2026-10-16: every pull request body opens with a `## TL;DR`
+section, updated whenever a review comes in (`docs/CONVENTIONS.md`).
+
+## 2026-10-19: a pull request that says "more to come before the merge" gets merged
+
+**What happened.** #292, the first half of the retire-grafana evidence,
+carried a TL;DR line saying the nightly and the rescan were still to be
+added before the merge. The owner merged it the same evening, as a green
+pull request deserves; the ledger's row 1.15 and the track's closure then
+needed a second pull request, and a revert branch was cut and abandoned on
+the way.
+
+**Rule.** Evidence that is still arriving goes into a draft pull request,
+which GitHub refuses to merge, or into its own later pull request. A
+sentence in the body holds nothing back, and it should not have to: a green
+pull request is there to be merged. The repository's own device held the
+same day: drill #291 was opened as a draft because it must never merge, and
+it did not.
+
+## 2026-10-20: "just dispatch the nightly" is a release
+
+**What happened.** Asked whether the nightly build could be triggered by
+hand to finish the evidence early, the agent said a blank dispatch builds
+every active definition and that the comparator decides per definition
+whether a rebuild publishes, as every night. The second half was wrong:
+`build.yml`'s publish-on-change comparator runs only on the schedule, and
+the dispatch path is a release by design (register row M17: a human asking
+for a release gets one). The owner dispatched; seven definitions were
+rebuilt and republished at 21:49Z (run 39330433276), 21 tags moved to new
+digests, and Renovate opened the two chart-pin bumps that follow a release
+(#293, #294). Grafana, inactive, was absent from the matrix and kept its
+digest: the evidence held, the side effect was not announced.
+
+**Rule.** Before advising any manual trigger, read that workflow's dispatch
+branch and every `if:` on the path, and say in the answer what the dispatch
+publishes, moves or deletes; where the answer is a release, use the word.
+"The same as the schedule" is a claim to verify against the workflow, never
+to assume from the job list. The register's M17 row had the answer in one
+line.
+

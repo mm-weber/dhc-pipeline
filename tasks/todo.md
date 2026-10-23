@@ -1,3 +1,293 @@
+# Live drills (task group 16): where we are and what is next, as of 2026-10-23
+
+The owner's call of 2026-10-01: hit everything this repository offers live at
+least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
+the handover plan for continuing that program from any session: state, order,
+owner actions, open decisions, calendar, and the working rules the owner set.
+First written on 2026-10-12 on the branch `plan-live-drills`; folded into main
+and revisited on 2026-10-17, when the proof-kinds track unblocked 16.2. From
+here, each drill runs as its own conductor track (`conductor/tracks.md`), and
+this section keeps the program's order and calendar. The older plans below it
+stay as history.
+
+## State
+
+- [x] 16.1 The ledger `docs/live-evidence.md` and its validate check
+      `scripts/lint-live-evidence.sh`: PR #257, merged 2026-10-12 as 2ba7ad0.
+      153 rows: 114 exercised, 32 waiting for a drill, 6 unexercised with a
+      reason (1.18, 2.26, 3.13, 3.15, 4.8, 4.9), 1 defect (6.55, below). LOG
+      entry 2026-10-08. Everything the ledger states is re-derivable from the
+      GitHub API (recipes at the end).
+- [x] Nature supplied one drill early: grafana 13.1.7 (#246, published
+      2026-10-06 by the scheduled build, run 37457046807) bundled zipkin
+      v12.4.8 and thrift 0.24.0, twelve findings left the supported digest, the
+      rescan (run 37470485195) published the first fix clock (12 fixed, median
+      30 days). 16.6's fix-clock half is therefore done by nature; its
+      issue-closure half (resolved:fixed on an open issue) is not.
+- [x] Nature's second event, 2026-10-09 to 13: three Go HTTP/2 HIGH findings
+      (CVE-2026-78667, CVE-2026-97031, CVE-2026-78669; issues #258, #259,
+      #263) on all five Go-based images, none in KEV. hardened-app: fixed by
+      #256's toolchain. cert-manager: fixed by the `go/bump@v2` x/net v0.60.0
+      step on #256 (LOG 2026-10-12). grafana: twelve per-binary transfers
+      decided one at a time on 2026-10-13 (LOG 2026-10-13; re-decision date
+      2026-12-12). #256 merged 2026-10-13 with the tool bumps #260, #261,
+      #262; the three issues are closed `resolved:accepted`.
+- [x] The onboarding cycle broken (task group 17, 2026-10-15 to 17): a
+      definition no chart deploys declares a proof of kind `none` with a
+      reason, printed by name on every validation run, no date (#271 spec,
+      #272 context, #273 reader, #281 lint, #282 docs, #283 ticks). Adding an
+      image is two pull requests (`docs/user-manual.md`, "Add an image
+      definition"); 16.2 is the first.
+- [x] drill-app exists: `mm-weber/drill-app`, public, MIT, created
+      2026-10-15, v0.1.0 at b7868d7a6f41a8dc2181bd874776cf4976d11591 (signed,
+      verified), go.mod pinning gorilla/handlers v1.2.1 (CVE-2017-20146,
+      CRITICAL) and golang-jwt/jwt/v5 v5.2.1 (CVE-2025-30204, HIGH); rulesets
+      as hardened-app; the README's first line warns.
+- [x] The owner's call of 2026-10-19: grafana deactivated by the documented
+      switch, level one of four (track `retire-grafana_20261019`: #289 the
+      track, #290 the switch, #291 the drill bump, never merged; Renovate
+      autoclosed its own #279 once grafana's paths were ignored). 1.13, 1.14
+      and 1.16 exercised by nature; 1.15 completed by the first rescan after
+      the merge (run 39417467219, 2026-10-20; the track closed with #295).
+      The twelve moot exceptions of 2026-09-03
+      retired; the nine transfers of 2026-10-13 lose their 13.1.8 exit; five
+      kin-openapi HIGHs in the frozen image are the owner's open calls (all
+      five decided not affected by 2026-10-23).
+
+## The drills, in order (one pull request each; each ends with a LOG entry and its ledger rows)
+
+- [x] 16.2 The drill definition `image/drill-app/` and its first findings:
+      DONE 2026-10-18 (#286, conductor track `drill-definition_20261017`;
+      the evidence pull request of 2026-10-19 closed the track). Next: 16.8,
+      then 16.3. What follows was the plan as written on 2026-10-17.
+      Pull request 1 of the onboarding flow: the definition (hardened-app
+      archetype, `name:` and annotation say drill, the symbol table kept so
+      govulncheck measures at symbol level), the active-set entry, the first
+      `none` entry with the reason "live-drill fixture, never installed by
+      design (task 16.2)". The gate names both findings; the owner decides
+      each, one at a time, reach order, evidence first; merge; main publishes;
+      the rescan observed, not predicted. OPEN (the owner's call, the spec's
+      amendment): the task text leaves the HIGH undecided and publishes, which
+      the gate cannot admit (Req 6.1); proposed: both decided within their
+      ceilings in 16.2, the HIGH's exception re-decided against the KEV
+      ceiling in 16.3.
+- [ ] 16.3 KEV-listed finding under an exception (6.50, 6.51): the HIGH's
+      exception re-decided with an expiry beyond decision date plus the 14-day
+      KEV ceiling fails the gate by name; corrected and merged; the rescan
+      evaluates it against today's KEV; status issue and page show KEV: yes.
+      trivy attributes no KEV entry to CVE-2025-30204 (measured 2026-10-15), so
+      16.8's drill input must exist first: build 16.8 before 16.3.
+- [ ] 16.4 Expiry warning, then lapse (6.9, 6.10, 6.35, 6.41, 6.43): expiry
+      four days out; the warning inside the 14-day window; the day after,
+      under_investigation with first-seen carried, re-attestation, the gate no
+      longer counts the exception, the finding undecided again.
+- [ ] 16.5 Over the ceiling (6.46, 6.47, 6.49): HIGH ceiling lowered to one
+      day for one rescan through a pull request, the only policy value a drill
+      changes; over ceiling: 1; reverted next day.
+- [ ] 16.6 The fix, issue-closure half (6.52, 6.56): drill-app bumps the
+      modules; the open issues close resolved:fixed on attested SBOMs.
+- [ ] 16.7 Regression and reopen (6.57): the vulnerable pin returns as a new
+      release; the closed issues reopen with the original first-seen.
+- [ ] 16.8 KEV feed outage fails closed (6.59, 6.60): OPENED 2026-10-23 as
+      conductor track `kev-drill-input_20261023` (phase 0 the spec amendment
+      of 7.7 and 7.10 and the track; phase 1 the input, the declarations, the
+      lint and the reader by TDD; phase 2 the drill branch, the dispatched
+      outage run, the next scheduled run, the evidence). The plan as written
+      on 2026-10-17: a `drill` input on
+      rescan.yml's workflow_dispatch (`kev-outage`) substituting an unreachable
+      URL for one run, printed in the summary; lint-workflow-policy learns the
+      input; a drill branch does the same on a pull request's tiering step.
+      Also the substituted feed naming a CVE, for 16.3.
+- [ ] 16.9 Fail-closed release gate (2.11, 2.13): `release.fail_closed` true by
+      pull request; the drill exception allowed to expire; build.yml
+      dispatched for drill-app; the digest frozen, unsigned, untagged,
+      pullable by digest; one of the four ways out taken; switch back or kept,
+      recorded.
+- [ ] 16.10 True authenticity mismatch (3.10, 3.13, M18). OWNER: move the
+      pinned tag of drill-app to a commit signed by no key, or re-sign with
+      another key; the daily re-verification files the first true mismatch
+      issue; owner decides and restores; the issue closes with the reason.
+- [ ] 16.11 Deactivation (1.13 to 1.16, 1.19): 1.13, 1.14 and 1.16 exercised
+      on 2026-10-19 by grafana's deactivation (#290; the bump refused on drill
+      #291; track `retire-grafana_20261019`), 1.15's detective half by the
+      first rescan after it (run 39417467219, 2026-10-20). What the drill keeps: drill-app's proofs entry
+      leaves in the same pull request (the reader refuses an entry for an
+      inactive name, Req 5.10), and a removed directory with the policy entry
+      kept (1.19), a drill branch never merged.
+- [ ] 16.12 Revocation, advisory, runbook (9.4, 9.5, 9.7, M14): the drill
+      digest in triage/revocations.yaml with reason "drill" while a tag still
+      references it; the posture step fails by name; the runbook executed as
+      written; the advisory as a repository security advisory titled as a
+      drill (draft or published, the owner's call, the ledger says which).
+- [ ] 16.13 The switches (2.17, 6.61, 6.62): `release.page` false for one
+      rescan (the page job skips, the served page keeps yesterday's data and
+      says so); `release.publish_policy` always for one nightly (every active
+      definition publishes, the chart digest pulls follow); costs stated.
+      `release.public` stays true.
+- [ ] 16.14 Private report channel (9.2, 9.3). OWNER: a private vulnerability
+      report or draft advisory titled as a drill, handled as SECURITY.md
+      promises, closed; the ledger records id and elapsed time.
+- [ ] 16.15 Deliberate violations, one pull request, never merged, one commit
+      per rule, each observed failing by name: the task's list (tag pin in a
+      chart overlay, root securityContext, registry outside the namespace,
+      missing checksum, exception without a LOG anchor, hand-edited rendered
+      artifact, cron edited in the workflow only, EARS-invalid criterion, a
+      proof of an unknown kind, a none proof for hardened-app) plus what the
+      ledger found never refused live: 1.11 (no authenticity class), 1.12
+      (off-shape package repository), 5.8 (probe removed), 6.19 (subcomponent
+      with a version), 9.6 (malformed revocation record); candidates 1.18 (a
+      split group) and 4.8 (a past review-by date).
+- [ ] 16.16 Retirement: drill-app out of the active set and out of image/ in
+      one pull request; its tags keep daily scans outside issue scope; the
+      upstream repository archived; every ledger row carries evidence or its
+      reason; the LOG's drill entries name what each one found.
+
+## Open items outside the drills (one decision each, the owner's)
+
+- [ ] 6.55 defect: the attested scan reports carry empty `scanner.db.uri` and
+      `scanner.db.version` (trivy convert leaves them empty; measured
+      2026-09-27 and 2026-10-08). A fix in the attestation step, test-first,
+      then the ledger row flips from `defect` to `exercised`.
+- [x] The twelve grafana exceptions of 2026-09-03, moot since 13.1.7: retired
+      on 2026-10-19 with grafana's deactivation (#290, LOG 2026-10-19); the
+      expiry warnings stopped with the merge.
+- [x] Grafana 13.1.7, frozen: the five HIGH findings in
+      `github.com/getkin/kin-openapi` v0.144.0, all decided not affected.
+      No build will fix a frozen image (Grafana 13.1.8 of 2026-10-13 still
+      pins v0.144.0, only main has moved), so each was measured on the
+      published binaries, one at a time, the owner's calls.
+      CVE-2026-100351 (#274), CVE-2026-100353 (#276) and CVE-2026-100349
+      (#287) decided 2026-10-21: the server links kin-openapi's `openapi3`
+      schema package only and nothing of `openapi3filter`, where the
+      vulnerable middleware (#274), request decoder (#276) and response
+      validator (#287) live (statements in `triage/vex/`, LOG 2026-10-21,
+      the measurement script
+      `triage/upstream/checks/grafana-kin-openapi-symbols.sh`); all three
+      closed on evidence by rescan run 39770244509 of 2026-10-22, which
+      re-attested the document (`resolved:not_affected`).
+      CVE-2026-100352 (#275) and CVE-2026-100354 (#277), in the linked
+      schema code, decided on the evidence pass of 2026-10-22 and recorded
+      2026-10-23: a disassembly of the whole server finds two calls into
+      kin-openapi, the SDK loading grafana's own kind schema and the alerting
+      rules validator visiting a value with the MultiErrors option alone, so
+      the JSON Schema 2020-12 validator of #275 is never selected (not in
+      the execute path), and the cycle-free visitor of #277 only ever walks
+      the server's own acyclic schema (cannot be controlled by an adversary,
+      the first use of that justification). Statements in `triage/vex/`,
+      LOG 2026-10-23, the caller script
+      `triage/upstream/checks/grafana-kin-openapi-callers.sh`; both closed
+      on evidence by rescan run 39959263177 of 2026-10-23 (the owner's
+      dispatch at 13:12Z after #307's merge; the document re-attested,
+      `resolved:not_affected`). The image's last open finding is CVE-2026-111943
+      (#300, Go's standard library, shared with five active images; next
+      item).
+- [ ] CVE-2026-111943 (#300, HIGH, Go `crypto/x509`, fixed in Go 1.26.10 and
+      1.27.3): filed by the rescan of 2026-10-21 on twelve digests across the
+      three cert-manager images, drill-app, hardened-app and grafana. The
+      remedy is a build on the fixed toolchain wherever each binary is built;
+      not yet looked at, its own track when the owner opens it.
+- [ ] Dashboard usability amendment (owner liked the direction, parked on
+      2026-10-08): a legend for the four statuses; on fixed rows, the version
+      and component change that fixed them; a release line per definition;
+      "fix available upstream" on open transfers; the superseded set as a
+      table; header with expiring-soon and scanner versions. Spec amendment
+      first (Req 6.61 criteria, one design decision, tasks), then one pull
+      request per section.
+- [ ] Upstream valkey-helm: PR 263 rebased onto their main (head 10854ee,
+      mergeable, DCO green) awaiting sgissi's answer on the three-point
+      Sentinel plan; #264 fixed by their #266 (unreleased, Chart.yaml still
+      0.12.0); the chart.yaml comment beside our pin and the check script
+      verify the fix when the 0.13 bump arrives. Nothing goes to valkey-io
+      without the owner's explicit approval.
+- [ ] The TL;DR rule's enforcement: `docs/CONVENTIONS.md` and the pull
+      request template (#278) state it; no lint enforces it, and Renovate's
+      pull requests would need an exemption first. The owner's call.
+
+## Calendar (owner-side)
+
+- 2026-10-20 07:26Z: `.keys/90d_dhc_classic_readpackages.txt` expires (a
+  classic PAT, read:packages). No script or workflow reads it and every dhc
+  package answers anonymous reads: let it lapse or delete the file.
+  `.keys/90d_hardened-app.txt` (2026-07-19) expired on 2026-10-19; nothing
+  reads it either, the hardened-app clone uses its own key (below). Dates
+  measured 2026-10-19 from the API's expiry header, never from a token.
+- 2026-10-22: register row M5, re-measure cosign v3 with the current kyverno
+  and trivy.
+- 2026-10-29: the valkey-helm fork PAT expires (`/workspace/repos/valkey-helm/.keys/fork.pat`).
+- 2026-11-21: register row M6, re-verify the DHI terms memo.
+- 2026-11-24: the valkey compat decision's review-by date (4.8 lapses the day
+  after unless renewed).
+- 2026-12-05: the hardened-app clone's PAT expires
+  (`/workspace/repos/hardened-app/.keys/90d_hardened_app.pat`).
+- 2026-12-12: the nine grafana transfers of 2026-10-13 re-decided; grafana
+  inactive, no 13.1.8 build will fix them: accept, or level two.
+- 2027-01-13: the drill-app clone's PAT expires
+  (`/workspace/repos/drill-app/.keys/90d_drill_app.pat`).
+- 2027-01-14: the ninety-day clocks of the five kin-openapi findings in
+  grafana 13.1.7, all decided not affected (#274, #276 and #287 on
+  2026-10-21, closed on evidence 2026-10-22; #275 and #277 recorded
+  2026-10-23, closed on evidence the same day by run 39959263177).
+- 2027-01-19: the ninety-day clock of CVE-2026-111943 (#300) runs out on all
+  six images, grafana included.
+- 2027-01-17: `.keys/90d-pat.txt` expires (extended 2026-10-19; the agent's
+  git and gh access); rotate and replace the file. RENOVATE_TOKEN was
+  regenerated on 2026-10-19 after expiring that day (Renovate down from
+  04:02Z to 21:17Z, two runs failed at startup). DHI_TOKEN stopped being
+  accepted on 2026-10-20 (the nightly 39402331027 failed at every dhi.io
+  login, nothing built); rotated by the owner the same day, the re-run of
+  20:45Z green. The new expiries are unknown here (secrets API 403): note
+  them beside this line.
+
+## Working rules the owner set (apply in every session)
+
+- One decision at a time, framed as pull requests; state the goal before the
+  mechanism; ask one question, then stop. Plain language with one example per
+  concept in conversation; the formal register stays inside repo artifacts.
+- Amend the spec before implementing (EARS validator:
+  `node .claude/skills/ears-notation/scripts/ears-validator.js .specs/dhc-catalogue-mvp/requirements.md`);
+  criteria never reuse retired numbers. Each piece of work is a conductor
+  track (`conductor/workflow.md`): an EARS spec, a phased plan, progress in
+  the plan, one pull request per phase.
+- TDD: the failing test first, watched red; RED and GREEN as separate agents,
+  the orchestrator commits; every script has a `_test.sh` and both are
+  enumerated in validate.yml (the completeness check).
+- Every triage call is the owner's; reach order mitigate, not_affected,
+  transfer, accept, avoid; one finding at a time, evidence first.
+- Every pull request body opens with a `## TL;DR` section, updated whenever a
+  review comes in with each finding's disposition (rule of 2026-10-16,
+  `docs/CONVENTIONS.md`); the pull request text is part of the change.
+- Nothing to upstream projects without the owner's explicit approval; fork
+  commits carry no `#N` (cross-references the parent's issue).
+- No em dashes anywhere; no session URLs in pull requests or commits; tokens
+  only in `.keys/` files; `gh` runs with `GH_TOKEN=$(cat .keys/90d-pat.txt)`.
+- GitHub quirks learned: the PAT has Actions read only, so `gh run rerun`
+  reports "cannot be rerun; its workflow file may be broken" (a 403); re-runs
+  are the owner's from the Actions tab. "The job was not acquired by Runner of
+  type hosted" is GitHub's runner capacity, not the workflow. Local gh 2.23.0
+  mangles `\u` escapes in JSON; read issue bodies with curl. grype's database
+  host is outside the devcontainer allowlist (trivy's is on ghcr.io); the
+  cisa.gov KEV feed is blocked too (github.com/cisagov/kev-data mirrors it).
+  The ruleset puts every open pull request "behind" after each merge: rebase
+  with `--force-with-lease`, the rebase re-signs.
+
+## Regenerating the ledger's evidence (if the seed is ever questioned)
+
+- Steps per run: `gh api repos/mm-weber/dhc-pipeline/actions/runs/<id>/jobs`
+  (job and step names with conclusions); tally first success and first
+  failure per step over all runs of build.yml and rescan.yml.
+- Which step refused a pull request, and when first:
+  `.../actions/workflows/<wf>/runs?event=pull_request&status=failure` then the
+  jobs of each; the earliest runs need `&created=2026-07-18..2026-07-31`
+  because listings cap at the newest runs.
+- Automerges: a merge whose timestamp falls inside a Renovate run's
+  `created_at..updated_at` window (`.../workflows/renovate.yml/runs?created=<date>`).
+- Registry state: `cosign verify`, `verify-attestation --type openvex|vuln|spdxjson`
+  with `--trusted-root trusted_root.json --offline` (the root from
+  `repos/sigstore/root-signing/contents/targets/trusted_root.json`), on the
+  platform manifest digests (scan reports and VEX are attested per manifest).
+
+---
+
 # Production-readiness critique and spec revision (one-man-show scope)
 
 Goal: turn the 2026-08-21 security-leader critique of the catalogue into a

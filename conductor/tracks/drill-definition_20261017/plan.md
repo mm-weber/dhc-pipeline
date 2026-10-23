@@ -1,0 +1,80 @@
+# Implementation plan: The drill definition and its first findings
+
+**Track ID:** drill-definition_20261017
+**Spec:** [spec.md](./spec.md)
+**Created:** 2026-10-17
+**Status:** [x] completed (phase 1 and 2 in #286, merged 2026-10-18; phase 3 the evidence pull request, 2026-10-19)
+
+## Overview
+
+Three phases. Phase 1 builds the definition and the declaration by TDD and opens the drill's pull request, whose first CI run is red by design: the gate names the two findings and govulncheck measures them. Phase 2 is the decisions, one finding at a time, the owner's calls on that evidence, written into the lane with the LOG entry; the gate turns green and the owner merges. Phase 3 observes the publish and the first rescan, records the evidence in the ledger and the LOG, ticks 16.2 and closes the track in its own small pull request. The working rules are `conductor/workflow.md`'s: one test per slice, RED and GREEN as separate agents, the orchestrator commits, signed commits, a `## TL;DR` at the top of every pull request body.
+
+Dependency: the spec amendment of the open question (the HIGH decided in 16.2) is the owner's call before phase 2 writes anything into the lane; phase 1 does not depend on it.
+
+## Phase 1: the definition and the declaration (one pull request, red by design)
+
+The definition is data; the one behaviour the repository can test is its own live state. The slice is the probe lint's live-state guard: it asserts the counts of this repository, so it is the red test that the definition and its entries turn green.
+
+### Tasks (one slice: RED agent, GREEN agent, orchestrator commit)
+
+- [x] **1.1 RED: the live-state guard asserts the drill** (FR-2) (39dd8b8): `scripts/lint-probes_test.sh` case 13 expects `8 active definition(s)`, `1 declared none` and `drill-app: proof none` on this repository; fails on main's seven and zero
+- [x] **1.2 GREEN: the definition, the active-set entry, the proofs entry** (FR-1, FR-2) (7790601): `image/drill-app/image.yaml` copied from hardened-app and adapted as FR-1 lists (name, image, tags, release date, source, checksum, authenticity marker, spdx, `-w` only, outputs, entrypoint, annotation); `drill-app` in `active_set`; the `proofs` entry with its reason; case 13 green, every suite green
+- [x] **1.3 Named a drill in the tables** (FR-3) (the docs commit; docs/CONVENTIONS.md's proofs paragraph updated too): the README's `image/` row and the manual's definitions row (no test; two sentences)
+- [x] **1.4 The pull request**: #286, opened 2026-10-18 (7787f95), its TL;DR saying the gate is red by design until the decisions land; the evidence section filled from the runs
+
+### Verification (orchestrator)
+
+- [ ] `scripts/lint-probes_test.sh` green (13 cases); all 41 suites green
+- [ ] The fourteen repository lints green, among them `scripts/lint-probes.sh .` printing the drill's line and `8 active definition(s)`, `scripts/lint-active-set.sh .` printing `8 active, 0 inactive`, `scripts/render-tracking.sh --check` unchanged; `yamllint`; `node test/renovate/managers.test.mjs`
+- [x] The pull request's first run: validate green with the line (5.9 evidence: run 39107650952); build gate red naming CVE-2017-20146 and CVE-2025-30204 (6.1; run 39107650953 after the test-step fix, the first run 39106821681 having failed in the build); the govulncheck table (6.13, both symbol level); the Grype step ran; the annotation and the table pasted by the owner (the log storage is unreachable from the container) and quoted in LOG 2026-10-18 (checkpoint reached 2026-10-18)
+
+## Phase 2: the decisions (the same pull request)
+
+No behaviour is added, so there is no red test: the lane's lints are the tests. The agent drafts the entries and the LOG text from the run's evidence; the owner decides each finding, one at a time, in reach order; nothing is written into the lane before the decision (the owner's standing rule).
+
+### Tasks
+
+- [x] **2.1 The spec amendment of the open question** merged, or re-decided by the owner (the HIGH decided in 16.2); the plan's 2.3 follows the decision (merged with #284, 2026-10-18)
+- [x] **2.2 CVE-2017-20146 (CRITICAL)** (decided 2026-10-18, accept to 2026-11-17; LOG 2026-10-18): the rungs walked with the evidence (fix 1.3.0 available and declined, avoidance available and declined, not_affected unavailable for a reachable symbol, transfer has no owner but the owner): `accept`, `decided_at` the decision date, `expired_at` within 30 days, `paths: ["usr/local/bin/drill-app"]`, the purl, `issue` the drill-app repository, `ref` the LOG anchor, `blocked` and `statement` one line each
+- [x] **2.3 CVE-2025-30204 (HIGH)** (decided 2026-10-18, accept to 2027-01-16; LOG 2026-10-18): the same rungs; `accept` within 90 days (the entry 16.3 will re-decide), or as the owner re-decides the open question
+- [x] **2.4 The LOG entry** (2026-10-18, two ACCEPT headings, the exceptions' refs resolve) `## <date>: the drill definition joins the catalogue, two findings decided (task 16.2)`: the definition, the gate's run and annotation, the govulncheck table, the decisions in the LOG's rung format, the ceilings, the exit conditions (16.6 fixes, 16.16 retires); the entries' `ref` anchors point at it
+- [x] **2.5 The second run** (the third, after the test-step fix: 39172201030 green at the gate, 2026-10-18; merged as 1b941ea 22:31Z): the exception tiers step green (Req 6.50), the scan gate `nothing uncovered within the aperture`, the VEX portability block listing both as affected; the pull request body's TL;DR rewritten with the decisions; the owner merges (checkpoint)
+
+### Verification (orchestrator)
+
+- [x] `scripts/lint-accepted-risk.sh`, `scripts/lint-log-anchors.sh statements`, `scripts/lint-live-evidence.sh` green locally; `yamllint triage/accepted-risk/drill-app.yaml` (2026-10-18)
+- [x] `scripts/check-exceptions.sh gate` rehearsed locally against a report shaped from the gate's annotation (the artifact store is unreachable from the container too) and the KEV snapshot of 2026-10-16 from `github.com/cisagov/kev-data`: both entries within their tiers
+- [x] The run ids noted: 39106821681 (build failed in the test step), 39107650953 (red at the gate, the evidence), 39172201030 (green); validate 39107650952
+
+## Phase 3: the publish, the first rescan, the evidence (a small pull request)
+
+### Tasks
+
+- [x] **3.1 The publish observed** (FR-6) (run 39172583475; index sha256:53e0c498…, amd64 sha256:7d59e3a2…, arm64 sha256:2e19dfd9…; public on the first publish, read anonymously 2026-10-19): main's build run, the three tags and the platform manifest digests; the package's visibility checked anonymously the way `check-visibility.sh` does; the owner sets it public if the first publish left it private (OPERATOR)
+- [x] **3.2 The first rescan observed** (FR-7) (run 39223026946, dispatched 2026-10-19 08:28Z: no issue filed, both rows `decided (affected)` in #151, the invariants green with the package public): the enumeration lists the drill's tags, the visibility invariant passes, what happened to the two findings (issues filed and closed with `resolved:accepted`, or the status row under the exceptions) quoted as the run shows it
+- [x] **3.3 The ledger** (FR-8) (row 5.9 exercised, 2026-10-18, run 39107650952): row 5.9 to `exercised` with the validate run id and the date; the induced-by column `drill definition`
+- [x] **3.4 The LOG addendum** (2026-10-19, under the 2026-10-18 entry): the publish and rescan facts under the phase 2 entry
+- [x] **3.5 The ticks** (2026-10-19): 16.2 `[done <date>, #<pull request>]` in `tasks.md`; this plan's checkpoints; `conductor/tracks.md` to Completed; `metadata.json`; `conductor/index.md`
+
+### Verification (orchestrator)
+
+- [ ] `scripts/lint-live-evidence.sh`, `scripts/lint-log-anchors.sh statements` green; the fourteen repository lints green
+- [ ] The pull request merged (track complete)
+
+## Final verification
+
+- [x] FR-1 to FR-8 each have their evidence in the LOG entry or the ledger (FR-7's rescan paragraph recorded as observed on 2026-10-19)
+- [x] Both pull requests merged by squash (#286 as 1b941ea on 2026-10-18; the evidence pull request #288 closes the track)
+- [x] `tasks/todo.md`'s program section says 16.2 is done and names 16.8 then 16.3 as next (2026-10-19)
+
+## Deviations log
+
+| Date | Task | Deviation | Reason | Resolution |
+| --- | --- | --- | --- | --- |
+| 2026-10-17 | phase 2 | No red test: the decisions are data in the lane | The lane's lints already specify the shape; a test that asserts a decision would decide it | The lints run locally before every push; the gate's second run is the verification |
+| 2026-10-18 | 1.2 | The first run of #286 (39106821681) failed in the frontend's test step before any scan: `/pipeline-test amd64` exit 1; validate was green with the drill's none line (39106821650) | The archetype's `go test ./...` runs in a `runs:` step, and the build sandbox has no egress (docs/CONVENTIONS.md, measured 2026-07-26); hardened-app never needs it, having no module dependencies; the drill's two modules cannot be fetched there (its tests pass outside the sandbox, verified locally at v0.1.0) | The test step dropped with a comment, the cert-manager precedent: `go/build@v1` fetches the modules itself; the drill's unit tests run in its own repository's CI; FR-1's note amended |
+
+---
+
+**Plan created:** 2026-10-17
+**Last updated:** 2026-10-17 (drafted with the track; pending the owner's confirmation and the open question)

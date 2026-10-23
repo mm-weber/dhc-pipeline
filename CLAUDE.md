@@ -9,8 +9,8 @@ in `docs/`.
 
 ## Process tooling (required in this repo)
 
-- **agent-orchestration plugin** — manage progress and split implementation
-  work into scalable bits
+- **conductor plugin** (`conductor/`): project context, one track per piece of
+  work with an EARS spec and a phased plan, progress tracked in the plan
 - **ears-notation skill** — all requirements / acceptance-criteria writing is
   formatted in EARS notation
 - **TDD** (`superpowers:test-driven-development`, aka /tdd) — for coding tasks

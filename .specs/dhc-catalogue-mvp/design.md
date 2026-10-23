@@ -250,9 +250,10 @@ graph TB
      Workflows read the switches at run time with `yq`; the Kyverno policy and the README and
      manual verification snippets are rendered from the `verification` section by a tested
      script, the way `compile-vex.sh` renders VEX, so the consumer instructions cannot drift
-     from the policy (Req 7.8, 7.9). Two things GitHub reads only as literal workflow YAML,
-     the `schedule:` cron and per-job `permissions:`, stay in the workflows and `validate`
-     lints them against the file (Req 7.10). Rejected: repository variables (outside git, no
+     from the policy (Req 7.8, 7.9). Three things GitHub reads only as literal workflow YAML,
+     the `schedule:` cron, per-job `permissions:` and a `workflow_dispatch` input's shape
+     (its options are what the form offers and the API admits), stay in the workflows and
+     `validate` lints them against the file (Req 7.10; the inputs since task 16.8). Rejected: repository variables (outside git, no
      pull request, invisible in a fork's diff) and per-workflow `env:` blocks (policy
      scattered across files, snippets hand-transcribed). A fork's switches are then one
      file's values.
@@ -927,6 +928,85 @@ graph TB
       Option C was rejected because a fork proves the fork; option A because the owner's
       successor cut (task 12.1) waits on nobody's bad day.
 
+14. **Proof kinds per definition: the functional proof is declared, the chart probe stays the default, a `none` with a reason is admitted, image-level smoke proofs are the next kind (Req 5.8 to 5.10, 7.7; onboarding research of 2026-10-15; decided 2026-10-15, the date dropped 2026-10-16)**
+    - **Context**: the drill definition of task 16.2 was the first definition to join the
+      catalogue through its own gates (every one of today's seven arrived with the greenfield
+      seed of 2026-09-08), and it could not: a pull request that adds a definition must
+      activate it (1.16), an active definition must be deployed by a chart with a probe in
+      that same pull request (5.8), a chart must pin a published digest, which the e2e pulls
+      from the registry (5.2; Kyverno's require-image-digest checks only that the reference
+      is a digest, the e2e pull is what demands it exist), and a digest is published only from
+      main after the merge (1.15, build.yml). Four rules from four reviews between 2026-08-25
+      and 2026-09-09, each right on its own, joined end to end by nobody: the manual's
+      one-pull-request walkthrough was written, never run, and the 16.2 sentence of
+      2026-10-01 ("no chart by design") contradicts the probe lint of 2026-09-09. The memo
+      `data/image-onboarding-practices-2026-10-15.md` read seven catalogues and release
+      systems (Docker Hardened Images, Chainguard, Docker Official Images, Bitnami,
+      Kubernetes image promotion, Konflux, Helm chart-testing) and found three invariants
+      everywhere: functional tests bind to the image candidate and run before it is tagged
+      (the DHI definition schema carries a per-image `tests:` block; Chainguard tests the
+      pushed digest before its tagger runs), charts and deployments reference published
+      digests and follow them through bots, and adding an image is therefore two stages,
+      artifact first, consumers second. This catalogue has the second and third invariants
+      for changes to an image (the chart-pin bump, Req 5.6) and lacks the first: its only
+      proof of an image is the consumer's probe, so a first image has no proof of its own,
+      and 5.8 forbids stage one without stage two.
+    - **Options**: (A) the chart in the first pull request, impossible without a digest;
+      (A1) the same, merged over a red e2e by administrator bypass, one recorded bypass per
+      onboarding; (B) a drill-only exemption in the lint; (C) a declared `none` proof with a
+      reason, first drafted with a review-by date in the compat decisions' shape (4.5, 4.8);
+      (D) a proof kind declared per definition, `chart` the default, `none` as in C, `smoke`
+      later, an image-level test on the candidate inside the pull request build; (E) candidate
+      digests pushed untagged to the production repository by pull requests and promoted by
+      tagging on merge, no rebuild; (F) a staging namespace with promotion by digest, the
+      Kubernetes and Konflux shape; (G) 5.8 as a daily report instead of a gate; (H)
+      reproducible builds, so a pull request could pin the digest main will publish; (I) the
+      e2e as a release gate on the pushed digest before tagging, Chainguard's order.
+    - **Decision**: **D**, built as **C** first, the owner's call of 2026-10-15; the review-by
+      date dropped on 2026-10-16, the owner's call again (below). The catalogue policy file
+      gains a `proofs:` map, one entry per definition that no chart proves: `kind: none` with
+      a `reason`; an absent entry means `chart`, today's rule unchanged (5.5, 5.8), and an
+      explicit `kind: chart` means the same. `scripts/definition-lib.sh` is the one reader
+      (`proof_entries`, every entry validated before any prints; `proof_of` the per-name
+      lookup over it), refusing by name a kind it does not implement, a name outside the
+      active set and a `none` without a reason (5.10), so a kind not yet built is a refusal,
+      never a silent pass (the 6.1 precedent for consumers). `scripts/lint-probes.sh` accepts
+      a `none` definition and prints it with its reason on every validation run (5.9), so the
+      gap is never silent (the 6.3 lesson); refuses a `none` for a definition a
+      probe-declaring chart deploys, one proof per definition, so an entry cannot outlive its
+      chart and mask a lost probe (5.10); and keeps refusing an uncovered active definition
+      that declares nothing (5.8). Nothing else moves: the e2e keeps installing published
+      digests (5.2), the release flow is unchanged, Renovate never reads the map. Deactivating
+      a definition that declares a `none` removes its entry with its active-set line in the
+      same pull request, the 1.19 shape (the directory and its line leave together, or
+      validation names what stayed). Onboarding becomes two pull requests, the industry's two
+      stages: the definition with its `none` entry, merged once the scan gate is satisfied and
+      published from main; then the chart, its harness entry and the entry's removal, whose
+      e2e is a plain install against the published digest (e2e.yml already treats a chart new
+      on the branch as a plain install). The second pull request has the shape of every
+      chart-pin bump and follows the first publish within the owner's workflow. Why no date:
+      the first draft carried a `review_by` and a lapse criterion, the compat decisions'
+      shape (4.5, 4.8), and the 2026-10-16 review of its pull request showed where that shape
+      led: a start date and a ceiling to bound it (the accepted-risk shape, 6.7, 6.11), a
+      drill to lapse it, a repository-wide red run when it lapsed, all of it to force a second
+      pull request that follows in minutes. One pull request to add an image is not possible
+      without publishing candidates from pull requests (E), rejected again for the same
+      reasons. A `none` that stays is visible by name on every run; an image no chart will
+      ever deploy is the `smoke` kind's job, not a calendar's. drill-app is the first `none`:
+      it never takes the second step, and its entry leaves with its active-set line (16.11).
+      `smoke` is named, not built: the first candidate is the frontend's own `tests:` block
+      (name, directory, commands, exit-code, timeout, output in the DHI schema; no public DHI
+      definition uses it as of 2026-10-15, and whether `dhi.io/build` executes it is to be
+      verified in CI), the fallback a `docker run` against the pull request's local-registry
+      image; it arrives with its own criterion and restores the first invariant for images no
+      chart will deploy (base and dev images). A1 and G were rejected because a recorded
+      bypass or a warning reintroduces the 6.3 gap under another name; B because this
+      rulebook has no special cases; E and F because they change the release flow, the
+      provenance story and the public namespace for a problem one declaration handles, and
+      no surveyed catalogue proves a chart against a candidate image inside the image's own
+      pull request; H because Decision 6 measured the frontend as non-reproducible; I because
+      the chart pin would still need a declared first-release state before the first install.
+
 ## System Flows
 
 ### Release flow (Req 2.7 to 2.17, 2.26; as specified 2026-08-22, implementation task 9)
@@ -1030,6 +1110,25 @@ for. Chart *versions* (`chart.yaml`) are tracked by a third manager against the 
 `helm` datasource (Req 3.11, Decision 8), never automerged; digest-only chart-pin
 updates automerge behind the required checks (Req 3.12). Before cluster C they were
 hand-pinned and untracked, the gap `chart/cert-manager/chart.yaml` recorded.
+
+### Onboarding a definition (Req 1.13 to 1.16, 5.8 to 5.10; Decision 14)
+
+```
+pull request 1: image/<name>/image.yaml + the active_set entry
+                + proofs.<name>: {kind: none, reason}
+  ─► validate: lint-active-set (the entry names a directory, no group split)
+      lint-probes: "<name>: proof none, <reason>" (5.9); no chart, nothing fails
+  ─► build gate: the definition compiles; the scan gate names every uncovered finding (6.1)
+  ─► e2e: no component, because no chart deploys <name>
+  ─► merge ─► main builds, scans, signs, attests, tags ─► a published digest exists
+pull request 2: chart/<name>/ (deploys: [<name>], probe: <registration>) + the harness entry
+                + the proofs.<name> entry removed
+  ─► chart gate: render + Kyverno (the reference is a digest; the registry is not consulted)
+  ─► e2e: plain install against the published digest (no base state on main) ─► the probe
+  ─► merge; from here every change rides the chart-pin bump (5.6)
+a definition no chart will ever deploy keeps its none entry, named on every run, until a
+smoke proof exists for it (17.5); deactivating it removes the entry with its line (5.10)
+```
 
 ## Components and Interfaces
 
@@ -1455,7 +1554,9 @@ ports: [3000/tcp]
 | A tool the publish-on-change comparator needs (docker, cosign, jq) is missing from PATH | the comparator refuses (exit 2) naming the tool, the rebuild leg fails, nothing is published or discarded; a missing tool never reads as a package-set difference | 2.15, 2.16 |
 | Repository or catalogue tag refuses an anonymous pull | daily invariants step fails the rescan run naming it | 2.21 |
 | Tag-referenced digest rejected by the verification policy, or the control digest admitted | daily invariants step fails the rescan run | 2.24 |
-| Rendered verification artifact, workflow cron or job permissions drift from `catalogue-policy.yaml` | validate.yml fails naming the artifact or value | 7.9, 7.10 |
+| Rendered verification artifact, workflow cron, job permissions or dispatch inputs drift from `catalogue-policy.yaml` | validate.yml fails naming the artifact or value | 7.9, 7.10 |
+| An active definition declares a proof of kind none | validate reports it by name with its reason on every run; nothing installs it | 5.8, 5.9 |
+| The policy file declares an unknown proof kind, a proof for a non-active name, a none without a reason, or a none for a definition a chart deploys | validate.yml fails naming the entry or the chart | 5.10 |
 | A tag-referenced digest carries more than one OpenVEX attestation | daily invariants step fails the rescan run naming it; the next re-attestation replaces | 6.44, 6.45 |
 | Exception expiry exceeds its ceiling for the finding's severity or KEV status | validate.yml fails (outer ceiling), the scan gate fails naming the exception (tier), the rescan reports it daily (KEV status moved) | 6.11, 6.50, 6.51 |
 | A VEX source statement records a status the lane does not author | validate.yml fails naming the statement | 6.39 |
@@ -1492,6 +1593,7 @@ ports: [3000/tcp]
 
 ### Live drills (Req 7.11, Decision 13)
 - `docs/live-evidence.md`: one row per mechanism the criteria name, its first live exercise and the evidence (run, issue, pull request, registry state). Task group 16 fills the empty rows through the drill definition and one-run switch flips; a row no drill reaches without harming consumers names its reason instead.
+- Drill inputs (task 16.8, track kev-drill-input_20261023): a `drill` choice on `rescan.yml`'s `workflow_dispatch` substitutes a declared value for one run, the KEV feed address first (`kev-outage`, an address under the reserved `.invalid` domain; `kev-synthetic`, a feed of this repository naming the drill definition's HIGH for task 16.3). The input's allowed values are declared in `catalogue-policy.yaml` (`workflows.<wf>.inputs`, held by `lint-workflow-policy.sh`, Req 7.10) and the substitutes in its `triage.drills` map (read by `triage-policy.sh drill-feed`); the run prints the drill in its summary. A drill run is red by name and publishes attestations only: the issue set, the status and the page wait for the next scheduled run. The gate's half is a drill branch, never merged, whose policy file names the outage address.
 
 ## Security Considerations
 

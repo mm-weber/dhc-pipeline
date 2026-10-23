@@ -1,0 +1,10 @@
+{
+  "id": "retire-grafana_20261019",
+  "type": "chore",
+  "status": "completed",
+  "created_at": "2026-10-19T10:52:08Z",
+  "updated_at": "2026-10-20T12:22:58Z",
+  "description": "Grafana deactivated by the documented switch (its line leaves the active set; directory and chart stay), the switch exercised live for the ledger's 1.15 and 1.16 rows; the twelve moot exceptions of 2026-09-03 retired with their evidence (Req 1.13 to 1.16, 3.2, 6.7, 6.11, 7.11) (completed 2026-10-20: #290 merged 2026-10-19 as 04c6eeb; the evidence in #292 and #295)",
+  "spec_path": "conductor/tracks/retire-grafana_20261019/spec.md",
+  "plan_path": "conductor/tracks/retire-grafana_20261019/plan.md"
+}

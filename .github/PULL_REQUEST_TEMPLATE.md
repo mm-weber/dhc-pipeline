@@ -1,6 +1,14 @@
 <!-- One logical change per PR (docs/CONVENTIONS.md). Definition bumps and
      chart changes do not mix unless the bump forces the chart change. -->
 
+## TL;DR
+
+<!-- Three to five lines a reader can merge from: what this PR ships, as of
+     its head commit. Updated whenever a review comes in: each finding's
+     disposition (fixed in <commit>, accepted, re-decided by the owner), or
+     "Reviews: none yet". The body answers the threads, not the other way
+     round (docs/CONVENTIONS.md, rule of 2026-10-16). -->
+
 ## What
 
 <!-- Which kind of change: definition bump / new definition / chart adaptation /

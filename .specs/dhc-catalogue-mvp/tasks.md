@@ -439,11 +439,11 @@
     - A validate check that every criterion number in requirements.md has a row, so a new criterion arrives with its evidence obligation
     - As built (2026-10-08): 153 rows, one per criterion, in four statuses: 114 exercised, 32 drill (tasks 16.3 to 16.15), 6 unexercised with a reason (1.18, 2.26, 3.13, 3.15, 4.8, 4.9) and 1 defect (6.55: the attested scan reports' database fields are empty, measured 2026-09-27 and again 2026-10-08 on the 13.1.7 attestation). The seed added the pull-request histories of validate, chart and e2e (the audit's job data covered build and rescan only) and the events since the audit: the fix clock first published by nature on 2026-10-06 (grafana 13.1.7, twelve findings fixed, median 30 days), two automerges placed inside Renovate runs by their timestamps (#111 for 3.5, #252 and #253 for 3.12), the 2026-09-08 posture failures that exercised 9.3 and 9.9, the 2026-09-12 scheduled run that first published selectively (2.16). The lint `scripts/lint-live-evidence.sh` (`lint-live-evidence_test.sh`, 13 cases, the last one over the real ledger) holds one row per criterion, no row for a retired number, a status among the four, a mechanism and evidence or a reason; wired into validate.yml beside the LOG-citation lint. 16.15's list grows by 1.11, 1.12, 5.8, 6.19 and 9.6, which the ledger found never refused live; 1.18 and 4.8 are candidates for it
     - _Requirements: Req 7.11_
-  - [ ] 16.2 The drill definition, `image/drill-app/`, and its first findings
+  - [x] 16.2 The drill definition, `image/drill-app/`, and its first findings [done 2026-10-18, #286; conductor track drill-definition_20261017]
     - [OPERATOR: create `mm-weber/drill-app`, a copy of hardened-app whose go.mod pins a module with a reachable KEV-listed HIGH and one with a CRITICAL, chosen from the advisory database at drill time and verified with Trivy locally before the first push; signed tags and commits as hardened-app has]
-    - The definition in native DHI syntax, authenticity class declared, named a drill in its README row and in the status page (the definition's `name:`); joins the active set and every matrix with it (1.13, 1.14); the chart gate and e2e get no chart for it (no probe, Req 5.5 keeps it out of the e2e matrix by design, stated in the definition)
-    - Observed live: the pull request scan gate blocks it on the uncovered findings by name (6.1); the decisions follow the reach order, mitigate to not_affected to transfer to accept, one finding at a time, with govulncheck evidence (6.13): the CRITICAL covered by a time-boxed exception, the KEV-listed HIGH left undecided for 16.3; publish; the rescan files the issues (6.3) and the Grype second opinion on CRITICAL step runs for the first time under its current name
-    - _Requirements: Req 1.13, Req 1.14, Req 6.1, Req 6.3, Req 6.13, Req 9.11, Req 7.11_
+    - The definition in native DHI syntax, authenticity class declared, named a drill in its README row and in the status page (the definition's `name:`); joins the active set and every matrix with it (1.13, 1.14); no chart deploys it, so the e2e has nothing to install: it is the first declared proof of kind none in the policy file, with its reason, printed by name on every validation run (Req 5.8, 5.9, task 17, after 17.3 merges; the 2026-10-01 text had the exemption stated in the definition, a shape the probe lint refuses)
+    - Observed live: the pull request scan gate blocks it on the uncovered findings by name (6.1); the decisions follow the reach order, mitigate to not_affected to transfer to accept, one finding at a time, with govulncheck evidence (6.13): the CRITICAL and the HIGH each covered by a time-boxed accept exception within its ceiling (the gate admits nothing uncovered within the aperture, Req 6.1, so an undecided finding cannot publish; 16.3 re-decides the HIGH's entry against the KEV ceiling); publish; the rescan's handling of the two findings recorded as observed (6.3) and the Grype second opinion on CRITICAL step runs for the first time under its current name
+    - _Requirements: Req 1.13, Req 1.14, Req 5.9, Req 6.1, Req 6.3, Req 6.13, Req 9.11, Req 7.11_
   - [ ] 16.3 A KEV-listed finding under an exception (6.50, 6.51), and the status's KEV column
     - An exception for the KEV-listed HIGH whose expiry exceeds its decision date plus the 14-day KEV ceiling: the pull request gate fails naming that exception (6.50, first time live); corrected to within the ceiling and merged; the rescan evaluates it against today's KEV (6.51), the status issue and the page show KEV: yes
     - If Trivy does not attribute the chosen CVE to a KEV entry, the `drill` input of 16.8 substitutes a synthetic feed naming it for one run, recorded as such
@@ -470,8 +470,8 @@
   - [ ] 16.10 A true authenticity mismatch (3.10, 3.13, M18)
     - [OPERATOR: in drill-app, move the tag the definition pins to a commit signed by no key, or re-sign it with another key]: the daily re-verification files a supply-chain issue naming the definition, the class and the origin (first true mismatch; the 2026-09-16 six were unreadable reads, 3.13); the owner decides what it means (M18) and restores the tag; the issue closes with the reason
     - _Requirements: Req 3.10, Req 3.13, Req 7.11_
-  - [ ] 16.11 Deactivation (1.13 to 1.16, 1.19), and the detective check with something to check
-    - drill-app leaves the active set: the build and e2e matrices and Renovate's rendered ignorePaths exclude it (1.14), no new digest or tag appears (1.15) and the rescan's inactive-digest check passes with a non-empty inactive set for the first time; a pull request bumping the inactive definition fails validation naming it (1.16, a drill branch, never merged); a pull request removing the directory but not the policy entry fails validation naming the entry (1.19, never merged)
+  - [ ] 16.11 Deactivation (1.13 to 1.16, 1.19): 1.13 to 1.16 exercised by grafana's deactivation on 2026-10-19; the drill keeps the proofs entry and 1.19
+    - Exercised by grafana, not by the drill: the owner's call of 2026-10-19 took grafana out of the active set by the documented switch (pull request #290, track `retire-grafana_20261019`, LOG 2026-10-19). The build and e2e matrices and Renovate's rendered ignorePaths excluded it (1.14); no new digest or tag appeared, and the rescan's inactive-digest check passed with a non-empty inactive set for the first time on 2026-10-20 (run 39417467219; 1.15); the real 13.1.8 bump, replayed as drill #291, failed validation naming it (1.16, never merged). What the drill keeps, with drill-app: its proofs entry leaves in the same pull request (the reader refuses an entry for an inactive name, Req 5.10), and a pull request removing the directory but not the policy entry fails validation naming the entry (1.19, a drill branch, never merged)
     - _Requirements: Req 1.13, Req 1.14, Req 1.15, Req 1.16, Req 1.19, Req 7.11_
   - [ ] 16.12 A revocation, its advisory and the runbook (9.4, 9.5, 9.7, M14)
     - The drill digest recorded in triage/revocations.yaml with reason "drill" while a tag still references it: the posture step fails naming the tag (9.7, first time live); docs/revocation-runbook.md executed as written (the tag re-pointed or the version deleted, the advisory, the record completed); the status issue and the page show revocations: 1; the advisory is a GitHub repository security advisory marked a drill in its title, draft or published as the owner decides, and the ledger says which
@@ -483,11 +483,28 @@
     - [OPERATOR: open a private vulnerability report on the repository, or a draft advisory, titled as a drill; handle it as SECURITY.md promises; close it]: the ledger records the advisory id and the elapsed time against the stated response window
     - _Requirements: Req 9.2, Req 9.3, Req 7.11_
   - [ ] 16.15 Deliberate violations, one pull request, never merged
-    - One commit per rule, each observed failing by name on the pull request: a chart overlay with a tag pin instead of a digest (chart gate), a root securityContext (require-nonroot), a registry outside the declared namespace (restrict-registries), a definition with a missing checksum (lint-pins), an exception without a LOG anchor (13.6), a rendered artifact edited by hand (7.9), a cron edited in the workflow but not the policy file (7.10), an EARS-invalid criterion (the validator); the pull request closed with the evidence linked
-    - _Requirements: Req 4.2, Req 4.3, Req 7.2, Req 7.4, Req 7.9, Req 7.10, Req 9.18, Req 7.11_
+    - One commit per rule, each observed failing by name on the pull request: a chart overlay with a tag pin instead of a digest (chart gate), a root securityContext (require-nonroot), a registry outside the declared namespace (restrict-registries), a definition with a missing checksum (lint-pins), an exception without a LOG anchor (13.6), a rendered artifact edited by hand (7.9), a cron edited in the workflow but not the policy file (7.10), an EARS-invalid criterion (the validator), a proof of an unknown kind and a none proof for hardened-app, which its chart deploys (5.10, both against an active definition a chart proves, so the drill definition's own entry is not touched); the pull request closed with the evidence linked
+    - _Requirements: Req 4.2, Req 4.3, Req 5.10, Req 7.2, Req 7.4, Req 7.9, Req 7.10, Req 9.18, Req 7.11_
   - [ ] 16.16 Retirement of the drill definition, and the ledger complete
     - drill-app removed from the active set and from image/ in one pull request (1.19 satisfied); its published tags keep their daily scans and attestations until retention, outside issue scope (the support statement, 6.49); the upstream repository archived; the ledger's every row carries evidence or its reason, and the LOG's drill entries name what each one found
     - _Requirements: Req 1.19, Req 6.49, Req 7.11_
+
+- [ ] 17. Proof kinds per definition: the functional proof declared in the policy file, the chart probe the default, a `none` with a reason admitted, image-level smoke proofs the next kind (Req 5.8 to 5.10, 7.7; design Decision 14; research `data/image-onboarding-practices-2026-10-15.md`; owner's calls of 2026-10-15 and 2026-10-16). Unblocks 16.2, whose definition is the first declared `none`; one pull request per task
+  - [x] 17.1 Spec amendment [done 2026-10-17, #271]
+    - requirements.md: 5.8 and 7.7 amended, 5.9 and 5.10 added; design.md: Decision 14, the onboarding flow, two error-handling rows; this group; 16.2 and 16.15 amended; the ledger rows for 5.9 and 5.10 (drill 16.2, drill 16.15); the research memo under data/. The 2026-10-16 review of the pull request (nine findings) dropped the first draft's review-by date and lapse criterion before merge, the owner's call
+    - _Requirements: Req 5.8, Req 5.9, Req 5.10, Req 7.7_
+  - [x] 17.2 The declaration and its one reader [done 2026-10-17, #273]
+    - `proofs:` in catalogue-policy.yaml, a map from definition name to `kind` and `reason`, absent meaning chart, its comment block naming it a fork switch; `scripts/definition-lib.sh` gains `proof_entries <root>`, the one reader of the map, validating every entry before printing one line per entry (name, kind, reason) in declared order, and `proof_of <root> <definition>`, the per-name lookup over it, `chart` when absent; refusals by name through the library's refusal path, no entry printed: a `proofs:` or an entry that is not a map, a kind other than chart or none, a name outside the active set, a none without a reason (Req 5.10); cases in `definition-lib_test.sh`. TDD, one test per slice
+    - _Requirements: Req 5.10, Req 7.7_
+  - [x] 17.3 The probe lint honours the declaration [done 2026-10-17, #281]
+    - `scripts/lint-probes.sh`: a none definition passes and is printed by name with its reason (Req 5.9); a none for a definition a probe-declaring chart deploys fails the run naming the chart, one proof per definition (Req 5.10); an uncovered active definition with no declaration still fails, the message naming the three ways out (Req 5.8 as amended); the summary line counts the declared nones; cases in `lint-probes_test.sh`, including a reader refusal surfacing by name up front; validate.yml's step name cites 5.8 to 5.10. TDD, one test per slice
+    - _Requirements: Req 5.8, Req 5.9, Req 5.10_
+  - [x] 17.4 Documentation and the walkthrough [done 2026-10-17, #282]
+    - docs/CONVENTIONS.md (the active-set section and the probe sentence), docs/user-manual.md (the add-a-definition walkthrough becomes two pull requests: the image with its none entry, then the chart, the harness entry and the entry's removal after the first publish; the e2e section's probe paragraph), the policy file's comment block; the plan's 16.2 order in tasks/todo.md on the plan-live-drills branch, where the live-drills plan lives (main carries no group-16 item)
+    - _Requirements: Req 5.9, Req 7.7_
+  - [ ] 17.5 The `smoke` kind [deferred, unscheduled: needs its own criterion first]
+    - An image-level functional test on the candidate inside the pull request build: first the frontend's `tests:` block (verify in CI whether `dhi.io/build` executes it; no public DHI definition uses it as of 2026-10-15), else a `docker run` step against the local-registry image with a per-definition check; registered like the e2e probes, so a declared name must exist; for the base and dev images no chart will deploy
+    - _Requirements: none yet; a new criterion when scheduled_
 
 ## Requirements Coverage
 
@@ -497,15 +514,17 @@
 | Req 2: Image Build and Release | 3.3, 8.2, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 10.1, 14.1, 14.2 |
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2, 11.1, 11.2, 11.3, 11.4, 11.6, 11.7, 14.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4, 8.7, 11.3, 11.4, 14.4 |
-| Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7, 14.3 |
+| Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7, 14.3, 17.1, 17.2, 17.3, 17.4 |
 | Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5, 9.1, 9.3, 10.1, 10.2, 10.3, 10.4, 10.6, 10.7 |
-| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5, 14.1, 16.1 to 16.16 |
+| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5, 14.1, 16.1 to 16.16, 17.1, 17.2, 17.4 |
 | Req 9: Catalogue Posture | 13.1, 13.2, 13.3, 13.4, 13.5, 13.6 |
 
 Requirement 8 was retired whole on 2026-08-26 (primitives pass, finding 5.8): its guidance
 lives in CLAUDE.md, design.md and CONVENTIONS.md, and its coverage row went with it.
 
 Task group 16 (live drills) adds one criterion, 7.11; its other tasks exercise mechanisms earlier groups built, so they appear only in the Req 7 row.
+
+Task group 17 (proof kinds) amends 5.8 and 7.7 and adds 5.9 and 5.10; 16.2 and 16.15 exercise the new criteria live, so their rows in the ledger read drill 16.2 and drill 16.15.
 
 Task group 12 (greenfield successor) adds no new criterion: it executes the dated F9
 re-decision of 2026-08-25 (revised the same day to the successor mechanism) rather than
