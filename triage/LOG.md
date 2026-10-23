@@ -3063,22 +3063,44 @@ run 40021724130 green. Rehearsed in the worktree before the push with the
 step's shell verbatim: `curl: (6) Could not resolve host: kev-feed.invalid`,
 the same line, exit 1. Ledger row 6.59 flips to exercised on this.
 
-**The rescan's half, pending.** The owner dispatches `rescan.yml` with
-`drill: kev-outage` after the day's scheduled run (today's, 39948543838 at
-11:47Z, and the owner's 13:12Z dispatch 39959263177, the close on evidence
-of #275 and #277, are in). Expected from the workflow as merged: the invariants step
-red with `the substituted KEV feed (drill kev-outage)
+**The rescan's half (2026-10-23, 21:04 to 21:24Z).** The owner dispatched
+`rescan.yml` on main (2f53e31) with `drill: kev-outage` at 21:04:35Z, after
+the day's scheduled run (39948543838, 11:47Z) and the 13:12Z dispatch
+(39959263177, the close on evidence of #275 and #277): run 40024066594, job
+120655680352. Up to the invariants step the run did what every dispatch
+does: enumerated the catalogue, scanned every platform manifest (21:07:50Z),
+read the lifecycle's evidence and decided on it, attested today's reports
+with replace (21:08:11Z to 21:17:40Z, the day's reports replaced by the
+day's reports) and applied the lifecycle on the attested evidence
+(21:17:42Z; #300, the one open cve issue, untouched). Then the invariants
+step (21:19:07Z) read the substitute through `scripts/triage-policy.sh .
+drill-feed kev-outage`, annotated `drill kev-outage: the KEV feed is
+substituted with https://kev-feed.invalid/known_exploited_vulnerabilities.json
+for this run only (task 16.8); the scheduled run reads the declared feed`,
+fetched it through the same `curl` the declared feed goes through and
+failed with `the substituted KEV feed (drill kev-outage)
 (https://kev-feed.invalid/known_exploited_vulnerabilities.json) is
 unavailable: the exception tiers were not evaluated today, which is a
-failure of this run, not a pass (Req 6.60)`; the enrich step refusing by
-name (no KEV catalogue on disk), so no issue set and no new-CVE filing; the
-status step refusing by name (`kev.json` missing), so no status and no
-page, the page job skipped; the summary line `- drill: kev-outage (the KEV
-feed substituted with
-https://kev-feed.invalid/known_exploited_vulnerabilities.json, this run
-only; task 16.8)`. What the dispatch publishes as any dispatch does
-(register rows M17 and M26): today's reports attested with replace, the
-OpenVEX document re-attested where it changed, the issue lifecycle applied
-on attested evidence. The status issue and the page keep the 13:33Z data
-until the next scheduled run, which reads the declared feed and publishes
-with `- drill: none`. Part two, both runs, follows.
+failure of this run, not a pass (Req 6.60)`; the step's other checks, the
+visibility invariant, the admission proof and the attestation count, raised
+no annotation. The authenticity, portability, smoke-test and expiry steps
+ran under `always()` (21:19:16Z to 21:23:59Z). The refusals by name: the
+enrich step (21:23:59Z), `enrich: no KEV catalogue on disk (the invariants
+step reports why); today's issue set and status are not built (Req 6.60)`,
+behind it the dedup, the issue set, the Grype second opinion and the
+new-CVE filing skipped; the status step (21:24:00Z), `catalogue status:
+/home/runner/work/dhc-pipeline/dhc-pipeline/rescan-out/kev.json is missing
+(the step that produces it reports why); no status published today (Req
+6.46, 6.47)`, behind it the status publish, the status upload and the page
+upload skipped, and the page job skipped for want of a generation date.
+The posture invariants, the summary and the artifact upload ran; the
+summary's first line is the workflow's `- drill: kev-outage (the KEV feed
+substituted with https://kev-feed.invalid/known_exploited_vulnerabilities.json,
+this run only; task 16.8)` (the job summary is not readable through the API
+from the devcontainer; the warning annotation above carries the same input
+and address). The status issue (#151) kept its 13:33Z body and the page its
+13:33Z data. The run red by the invariants step and by each refusal, as Req
+6.60 asks: a feed outage is a non-evaluation, never an evaluation against an
+empty KEV set. Ledger row 6.60 flips to exercised on this. Part three, the
+next scheduled run (the declared feed read again, `- drill: none`, the
+status and the page published), follows.
