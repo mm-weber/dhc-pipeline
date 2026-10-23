@@ -1,4 +1,4 @@
-# syntax=dhi.io/build:2-alpine3.23@sha256:976eef62e394c4a33e8dfbeebd11dce2fa40f995ad08c21bfd3f77f8b303dc3e
+# syntax=dhi.io/build:2-alpine3.23@sha256:8aa6c00cdb38f5ee6ded2ce8922124624c2415d6f381377c15014c2502495bf7
 
 name: Hardened App 0.1.x
 image: ghcr.io/mm-weber/dhc/hardened-app
@@ -14,7 +14,7 @@ dates:
   release: "2026-07-19"
 vars:
   COMMIT_SHA: 4a12e725a55a520476eac1a4c123e8461024bbef
-  GOLANG_REFERENCE: dhi.io/golang:1.27.2-alpine3.23-dev@sha256:f5fc668f4a043deb67c167af22cf6b09f45d5330c1a9fc30e99ba8385e8acf30
+  GOLANG_REFERENCE: dhi.io/golang:1.27.3-alpine3.23-dev@sha256:568da883960cf1ef92931413a4b5f8c424eb05b1b41384343ec54f01f404d721
   SEMVER_MAJOR_MINOR_VERSION: "0.1"
   SEMVER_MAJOR_VERSION: "0"
   SEMVER_VERSION: 0.1.1
@@ -31,7 +31,7 @@ contents:
     - ca-certificates-bundle
   builds:
     - name: hardened-app
-      uses: dhi.io/golang:1.27.2-alpine3.23-dev@sha256:f5fc668f4a043deb67c167af22cf6b09f45d5330c1a9fc30e99ba8385e8acf30
+      uses: dhi.io/golang:1.27.3-alpine3.23-dev@sha256:568da883960cf1ef92931413a4b5f8c424eb05b1b41384343ec54f01f404d721
       work-dir: /go/src/github.com/mm-weber/hardened-app
       caches:
         - path: /go/pkg/mod
