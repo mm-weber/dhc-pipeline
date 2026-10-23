@@ -610,7 +610,7 @@ run alone, so the run fails closed by name (Req 6.60), and `kev-synthetic`
 substitutes this repository's feed of one entry, the drill definition's HIGH,
 for task 16.3. A drill run attests today's reports as any dispatch does and
 publishes no issue set, status or page; the next scheduled run reads the
-declared feed and publishes (register row M22, task 16.8). A
+declared feed and publishes (register row M26, task 16.8). A
 healthy quiet day is: Renovate runs green and opens nothing; rescan runs
 green, files nothing, and its compile report shows every statement applied.
 
