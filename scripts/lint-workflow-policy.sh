@@ -15,7 +15,9 @@
 # Since task 16.8 (Req 7.10 as amended): a workflow_dispatch input is a
 # declared value too, so each input a workflow carries must be listed by name
 # under its declaration's `inputs` map, and each input listed there must be
-# carried by the workflow.
+# carried by the workflow. An input present on both sides is held equal to its
+# declaration in type, options, default and required; its description is prose
+# GitHub shows on the run form, which the lint drops before comparing.
 #
 # YAML via python3 + PyYAML (the lint-accepted-risk.sh precedent; installed by
 # validate.yml's yamllint step, present in the devcontainer).
@@ -80,6 +82,16 @@ for path in sorted(glob.glob(os.path.join(root, ".github", "workflows", "*.yml")
         if name not in decl_inputs:
             listed = ", ".join(f"'{k}'" for k in decl_inputs) or "none"
             err(wf, f"workflow_dispatch input '{name}' is not declared (declared inputs: {listed})")
+            continue
+        # An input on both sides is held equal in type, options, default and
+        # required. The description is prose GitHub shows on the run form,
+        # which the declaration never carries, so it is dropped first.
+        actual = {k: v for k, v in (inputs[name] or {}).items() if k != "description"}
+        wanted = decl_inputs[name] or {}
+        bad = [k for k in sorted(set(actual) | set(wanted)) if actual.get(k) != wanted.get(k)]
+        if bad:
+            detail = ", ".join(f"{k}: workflow says {actual.get(k)!r}, declared {wanted.get(k)!r}" for k in bad)
+            err(wf, f"workflow_dispatch input '{name}' differs from its declaration: {detail}")
     for name in decl_inputs:
         if name not in inputs:
             # The D3 direction: a declared input the workflow lacks is drift
