@@ -22,6 +22,13 @@
 # spelled as the table spells a module's files, version included:
 # `github.com/getkin/kin-openapi@v0.144.0/openapi3/schema.go`.
 #
+# The entries of 2026-10-23 (CVE-2026-100352, #275; CVE-2026-100354, #277)
+# concern functions the server does link, in the openapi3 schema package and
+# in santhosh-tekuri/jsonschema; for those the question moves from "is it in
+# the binary" to "who calls it", which the sibling
+# grafana-kin-openapi-callers.sh answers from a disassembly. This script
+# keeps counting presence, now for those names and the jsonschema module too.
+#
 # With an image ref the binaries are read out of a `docker create` container;
 # with --rootfs the directory must hold usr/share/grafana as extracted.
 # Sibling: grafana-go-wave-symbols.sh (2026-10-13), the same instrument.
@@ -42,6 +49,7 @@ mapfile -t BINS < <(find "$G/bin" "$G/data/plugins-bundled" -type f -exec sh -c 
 PREFIXES=(
   'github.com/getkin/kin-openapi/'
   'github.com/gorilla/mux.'
+  'github.com/santhosh-tekuri/jsonschema/'
 )
 # The source files a linked or inlined copy of a package leaves in the file
 # table, grouped by the directory after the pattern; the module's own files
@@ -52,6 +60,9 @@ FILES=(
   'req_resp_decoder.go'
   'validate_response.go'
   'gorilla/mux@'
+  'schema_jsonschema_validator.go'
+  'example_validation.go'
+  'santhosh-tekuri/jsonschema/v6@'
 )
 # The functions the advisories name.
 SYMS=(
@@ -92,6 +103,26 @@ SYMS=(
   'github.com/getkin/kin-openapi/openapi3filter.ValidateRequest'
   'github.com/getkin/kin-openapi/openapi3filter.ValidateResponse'
   'github.com/getkin/kin-openapi/openapi3filter.RegisterBodyDecoder'
+  # CVE-2026-100352 (GHSA-rj39-cv6w-8wv7, #275): VisitJSON under the
+  # EnableJSONSchema2020 option takes useJSONSchema2020, which hands the value
+  # to jsonschema/v6 v6.0.2 without the built-in visitor's NaN and Inf guard;
+  # numValidate dereferences a nil *big.Rat. The fix (4487f19, 0.148.0) bumps
+  # jsonschema to v6.0.3. The names are present in the server; who calls them
+  # is the callers script's answer (two entry points, neither passes the
+  # option; the one closure that sets it is inlined into validateExampleValue).
+  'github.com/getkin/kin-openapi/openapi3.(*Schema).useJSONSchema2020'                # the 2020-12 path
+  'github.com/getkin/kin-openapi/openapi3.newJSONSchemaValidator'                     # builds the validator
+  'github.com/getkin/kin-openapi/openapi3.(*jsonSchemaValidator).validate'            # hands the value over
+  'github.com/santhosh-tekuri/jsonschema/v6.(*validator).numValidate'                 # where the nil is dereferenced
+  'github.com/getkin/kin-openapi/openapi3.EnableJSONSchema2020'                       # the option: 0 as a function, inlined into its callers
+  'github.com/getkin/kin-openapi/openapi3.validateExampleValue'                       # the one in-library caller passing the option
+  'github.com/getkin/kin-openapi/openapi3filter.YamlBodyDecoder'                      # the advisory's delivery
+  # CVE-2026-100354 (GHSA-g8cf-rcjf-c8cf, #277): visitJSON and
+  # visitXOFOperations recurse through allOf, anyOf and oneOf with no cycle
+  # check; the fix (9245cef, 0.149.0) carries a visited set. Present and run on
+  # every rule write; the schema they walk is the server's own (LOG 2026-10-23).
+  'github.com/getkin/kin-openapi/openapi3.(*Schema).visitJSON'                        # the built-in visitor
+  'github.com/getkin/kin-openapi/openapi3.(*Schema).visitNotOperation'
   # Controls: what grafana does link of kin-openapi.
   'github.com/getkin/kin-openapi/openapi3.(*Schema).VisitJSON'                        # control: what grafana calls
   'github.com/getkin/kin-openapi/openapi3.(*Schema).visitXOFOperations'               # control: allOf/anyOf/oneOf
