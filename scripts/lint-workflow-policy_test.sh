@@ -37,6 +37,11 @@ workflows:
       contents: read
   wired-later.yml:
     schedule: "47 4 * * *"
+    inputs:
+      drill:
+        type: choice
+        options: [none, kev-outage]
+        default: none
     permissions:
       contents: read
 EOF
@@ -76,6 +81,13 @@ on:
   pull_request:
   schedule:
     - cron: "47 4 * * *"
+  workflow_dispatch:
+    inputs:
+      drill:
+        description: "a drill, this run only"
+        type: choice
+        options: [none, kev-outage]
+        default: none
 permissions:
   contents: read
 jobs:
@@ -249,6 +261,23 @@ if [ "$rc" -eq 1 ] && grep -qF "plain.yml" <<<"$out" && grep -qF "drill" <<<"$ou
   pass "a declared input absent from its workflow fails naming both"
 else
   fail "a declared input absent from its workflow fails naming both" "exit=$rc" "$out"
+fi
+
+# 11 (task 16.8, Req 7.10 as amended): an input is held equal to its
+# declaration in type, options, default and required; the description is
+# prose GitHub shows on the run form, which the declaration does not carry
+# and the lint drops before comparing (the fixture pair on wired-later.yml,
+# which case 1 passes, differs only in it). A differing value fails naming
+# the workflow, the input and both values, the cron-drift precedent of case
+# 2. Here the declared options drift while the workflow keeps
+# [none, kev-outage].
+fresh
+sed -i 's/\[none, kev-outage\]/[none, kev-synthetic]/' "$SB/catalogue-policy.yaml"
+out=$("$LINT" "$SB" 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "wired-later.yml" <<<"$out" && grep -qF "drill" <<<"$out" && grep -qF "kev-outage" <<<"$out" && grep -qF "kev-synthetic" <<<"$out"; then
+  pass "a differing input value fails naming the input and both values"
+else
+  fail "a differing input value fails naming the input and both values" "exit=$rc" "$out"
 fi
 
 echo
