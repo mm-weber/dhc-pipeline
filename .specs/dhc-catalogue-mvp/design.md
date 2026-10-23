@@ -250,9 +250,10 @@ graph TB
      Workflows read the switches at run time with `yq`; the Kyverno policy and the README and
      manual verification snippets are rendered from the `verification` section by a tested
      script, the way `compile-vex.sh` renders VEX, so the consumer instructions cannot drift
-     from the policy (Req 7.8, 7.9). Two things GitHub reads only as literal workflow YAML,
-     the `schedule:` cron and per-job `permissions:`, stay in the workflows and `validate`
-     lints them against the file (Req 7.10). Rejected: repository variables (outside git, no
+     from the policy (Req 7.8, 7.9). Three things GitHub reads only as literal workflow YAML,
+     the `schedule:` cron, per-job `permissions:` and a `workflow_dispatch` input's shape
+     (its options are what the form offers and the API admits), stay in the workflows and
+     `validate` lints them against the file (Req 7.10; the inputs since task 16.8). Rejected: repository variables (outside git, no
      pull request, invisible in a fork's diff) and per-workflow `env:` blocks (policy
      scattered across files, snippets hand-transcribed). A fork's switches are then one
      file's values.
@@ -1553,7 +1554,7 @@ ports: [3000/tcp]
 | A tool the publish-on-change comparator needs (docker, cosign, jq) is missing from PATH | the comparator refuses (exit 2) naming the tool, the rebuild leg fails, nothing is published or discarded; a missing tool never reads as a package-set difference | 2.15, 2.16 |
 | Repository or catalogue tag refuses an anonymous pull | daily invariants step fails the rescan run naming it | 2.21 |
 | Tag-referenced digest rejected by the verification policy, or the control digest admitted | daily invariants step fails the rescan run | 2.24 |
-| Rendered verification artifact, workflow cron or job permissions drift from `catalogue-policy.yaml` | validate.yml fails naming the artifact or value | 7.9, 7.10 |
+| Rendered verification artifact, workflow cron, job permissions or dispatch inputs drift from `catalogue-policy.yaml` | validate.yml fails naming the artifact or value | 7.9, 7.10 |
 | An active definition declares a proof of kind none | validate reports it by name with its reason on every run; nothing installs it | 5.8, 5.9 |
 | The policy file declares an unknown proof kind, a proof for a non-active name, a none without a reason, or a none for a definition a chart deploys | validate.yml fails naming the entry or the chart | 5.10 |
 | A tag-referenced digest carries more than one OpenVEX attestation | daily invariants step fails the rescan run naming it; the next re-attestation replaces | 6.44, 6.45 |
@@ -1592,6 +1593,7 @@ ports: [3000/tcp]
 
 ### Live drills (Req 7.11, Decision 13)
 - `docs/live-evidence.md`: one row per mechanism the criteria name, its first live exercise and the evidence (run, issue, pull request, registry state). Task group 16 fills the empty rows through the drill definition and one-run switch flips; a row no drill reaches without harming consumers names its reason instead.
+- Drill inputs (task 16.8, track kev-drill-input_20261023): a `drill` choice on `rescan.yml`'s `workflow_dispatch` substitutes a declared value for one run, the KEV feed address first (`kev-outage`, an address under the reserved `.invalid` domain; `kev-synthetic`, a feed of this repository naming the drill definition's HIGH for task 16.3). The input's allowed values are declared in `catalogue-policy.yaml` (`workflows.<wf>.inputs`, held by `lint-workflow-policy.sh`, Req 7.10) and the substitutes in its `triage.drills` map (read by `triage-policy.sh drill-feed`); the run prints the drill in its summary. A drill run is red by name and publishes attestations only: the issue set, the status and the page wait for the next scheduled run. The gate's half is a drill branch, never merged, whose policy file names the outage address.
 
 ## Security Considerations
 

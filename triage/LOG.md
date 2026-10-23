@@ -2863,6 +2863,23 @@ supported digest, re-attests the changed document (Req 6.43), and gives
 #275 its close on evidence with the `resolved:not_affected` grade (Req 6.53,
 6.56); the run is recorded here when it does.
 
+**The run.** Rescan run 39959263177, dispatched by the owner on 2026-10-23 at
+13:12Z on db23c0f, the squash of #307 and the first run carrying this
+statement: the day's scheduled run (39948543838, 11:47Z) had checked out
+203c230, before the merge. It attested today's reports and re-attested
+grafana's document at 13:24Z (the document on the index digest, read back
+from the registry at 13:40Z, carries nineteen statements with the timestamp
+2026-10-23, CVE-2026-100352 among them) and closed the issue at 13:24Z with
+`resolved:not_affected`, naming this statement, applied from
+`grafana.openvex.json` with the justification
+`vulnerable_code_not_in_execute_path`, as the covering artifact on both
+platform manifests, e4f626e99435 and f26298a61be4; the status issue and the
+page followed at 13:33Z, the row reading decided (not_affected), decided
+2026-10-23, "not affected: vulnerable code not in execute path". No detour
+this time: the squash message and the pull request description carried no
+closing keyword before an issue number, and the issue stayed open from the
+merge at 13:08Z until the evidence closed it (Req 6.53, 6.54).
+
 ## 2026-10-23: not affected: CVE-2026-100354, the grafana server validates only its own acyclic schema (#277)
 
 *Image: grafana, frozen at 13.1.7 as above. The last of the five kin-openapi
@@ -2981,3 +2998,18 @@ rescan after the merge re-attests the changed document and gives #277 its
 close on evidence with the `resolved:not_affected` grade (Req 6.43, 6.53,
 6.56); the run is recorded here when it does. With it the five kin-openapi findings of
 the frozen image are decided, and #300 is the image's last open finding.
+
+**The run.** The same run, 39959263177 (2026-10-23, 13:12Z, dispatched by the
+owner on db23c0f after the day's scheduled run had checked out 203c230),
+re-attested the document at 13:24Z with this statement in it (nineteen
+statements, timestamp 2026-10-23, read back from the index digest at 13:40Z)
+and closed the issue at 13:24Z with `resolved:not_affected`, naming the
+statement, applied from `grafana.openvex.json` with the justification
+`vulnerable_code_cannot_be_controlled_by_adversary`, as the covering
+artifact on both platform manifests. The closing comment quotes the
+justification as written; the status row of 13:33Z renders it as words,
+"not affected: vulnerable code cannot be controlled by adversary", the
+generic rendering noted above, so the first use of this justification
+reached the published status without a code change. With it the five
+kin-openapi findings of the frozen image are closed on evidence: #274, #276
+and #287 by run 39770244509 on 2026-10-22, #275 and #277 by this run.

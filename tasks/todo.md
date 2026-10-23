@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-10-21
+# Live drills (task group 16): where we are and what is next, as of 2026-10-23
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -88,7 +88,12 @@ stay as history.
       modules; the open issues close resolved:fixed on attested SBOMs.
 - [ ] 16.7 Regression and reopen (6.57): the vulnerable pin returns as a new
       release; the closed issues reopen with the original first-seen.
-- [ ] 16.8 KEV feed outage fails closed (6.59, 6.60): a `drill` input on
+- [ ] 16.8 KEV feed outage fails closed (6.59, 6.60): OPENED 2026-10-23 as
+      conductor track `kev-drill-input_20261023` (phase 0 the spec amendment
+      of 7.7 and 7.10 and the track; phase 1 the input, the declarations, the
+      lint and the reader by TDD; phase 2 the drill branch, the dispatched
+      outage run, the next scheduled run, the evidence). The plan as written
+      on 2026-10-17: a `drill` input on
       rescan.yml's workflow_dispatch (`kev-outage`) substituting an unreachable
       URL for one run, printed in the summary; lint-workflow-policy learns the
       input; a drill branch does the same on a pull request's tiering step.
@@ -170,9 +175,10 @@ stay as history.
       the server's own acyclic schema (cannot be controlled by an adversary,
       the first use of that justification). Statements in `triage/vex/`,
       LOG 2026-10-23, the caller script
-      `triage/upstream/checks/grafana-kin-openapi-callers.sh`; the first
-      rescan after the merge closes both on evidence (the run to be recorded
-      in the two entries). The image's last open finding is CVE-2026-111943
+      `triage/upstream/checks/grafana-kin-openapi-callers.sh`; both closed
+      on evidence by rescan run 39959263177 of 2026-10-23 (the owner's
+      dispatch at 13:12Z after #307's merge; the document re-attested,
+      `resolved:not_affected`). The image's last open finding is CVE-2026-111943
       (#300, Go's standard library, shared with five active images; next
       item).
 - [ ] CVE-2026-111943 (#300, HIGH, Go `crypto/x509`, fixed in Go 1.26.10 and
@@ -220,7 +226,7 @@ stay as history.
 - 2027-01-14: the ninety-day clocks of the five kin-openapi findings in
   grafana 13.1.7, all decided not affected (#274, #276 and #287 on
   2026-10-21, closed on evidence 2026-10-22; #275 and #277 recorded
-  2026-10-23, closed by the first rescan after the merge).
+  2026-10-23, closed on evidence the same day by run 39959263177).
 - 2027-01-19: the ninety-day clock of CVE-2026-111943 (#300) runs out on all
   six images, grafana included.
 - 2027-01-17: `.keys/90d-pat.txt` expires (extended 2026-10-19; the agent's

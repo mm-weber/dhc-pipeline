@@ -8,7 +8,13 @@
 
 ## Active tracks
 
-<!-- No active track; the next drill is 16.8 (the KEV drill input), then 16.3 -->
+### [ ] kev-drill-input_20261023: The KEV drill input, a feed outage fails closed in both arms, live
+
+**Description:** A `drill` input on `rescan.yml`'s dispatch substitutes a declared value for the KEV feed for one run (`kev-outage`: an address under `.invalid` that never resolves; `kev-synthetic`: a feed of this repository naming the drill definition's HIGH, for task 16.3), the policy lint holds the input's allowed values beside the crons and the permissions, and both fail-closed branches run live for the first time: the gate on a drill branch never merged, the rescan on a dispatched run that is red by name and publishes attestations only; the ledger rows 6.59 and 6.60 filled (Req 6.59, 6.60, 7.7, 7.10, 7.11; task 16.8).
+**Priority:** high (the next drill of the live program; 16.3 depends on it)
+**Folder:** [./tracks/kev-drill-input_20261023/](./tracks/kev-drill-input_20261023/)
+
+---
 
 
 ## Completed tracks
