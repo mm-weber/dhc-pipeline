@@ -3,7 +3,7 @@
 **Track ID:** kev-drill-input_20261023
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-10-23
-**Status:** [ ] not started (phase 0, this pull request: the spec amendment and the track)
+**Status:** [~] in progress (phase 0 merged 2026-10-23 as a5decb6, #308; phase 1 started 2026-10-23)
 
 ## Overview
 
@@ -13,13 +13,13 @@ Three phases. Phase 0 is this pull request: the spec amendment (7.7 and 7.10, a 
 
 ### Tasks
 
-- [ ] **0.1 The amendment** (Req 7.7, 7.10): 7.7 lists each dispatch input a workflow accepts with its allowed values, a drill's substitute values beside it; 7.10 names a workflow's dispatch inputs beside the schedule trigger and the permissions; the amendment log sentence; design.md's policy-file paragraph, its error-handling row and the "Live drills" section name the drill input
-- [ ] **0.2 The track**: this folder, `conductor/tracks.md`, `conductor/index.md`, the todo's program state
-- [ ] **0.3 The pull request**: title `conductor: track kev-drill-input_20261023, the KEV drill input (Req 6.59, 6.60, 7.7, 7.10; task 16.8)`, a TL;DR; the owner merges (checkpoint)
+- [x] **0.1 The amendment** (Req 7.7, 7.10): 7.7 lists each dispatch input a workflow accepts with its allowed values, a drill's substitute values beside it; 7.10 names a workflow's dispatch inputs beside the schedule trigger and the permissions; the amendment log sentence; design.md's policy-file paragraph, its error-handling row and the "Live drills" section name the drill input
+- [x] **0.2 The track**: this folder, `conductor/tracks.md`, `conductor/index.md`, the todo's program state
+- [x] **0.3 The pull request**: title `conductor: track kev-drill-input_20261023, the KEV drill input (Req 6.59, 6.60, 7.7, 7.10; task 16.8)`, a TL;DR; the owner merges (checkpoint)
 
 ### Verification (orchestrator)
 
-- [ ] The ten FR statements pass the EARS validator in its acceptance-criteria shape; `scripts/lint-live-evidence.sh .` green after the requirements change; no em-dashes in the added lines; no closing keyword before an issue number
+- [x] (2026-10-23, #308 merged as a5decb6) The ten FR statements pass the EARS validator in its acceptance-criteria shape; `scripts/lint-live-evidence.sh .` green after the requirements change; no em-dashes in the added lines; no closing keyword before an issue number
 
 ## Phase 1: the input, the declarations, the lint, the reader (one pull request)
 
@@ -27,7 +27,7 @@ Dependency: phase 0 merged. Worktree `kev-drill-input` from main.
 
 ### Tasks (slices 1.1 to 1.5: RED agent, GREEN agent, orchestrator commit)
 
-- [ ] **1.1 RED and GREEN: an undeclared dispatch input fails naming the workflow and the input** (FR-5): `scripts/lint-workflow-policy_test.sh` case 9 gives the fixture's `cron.yml` a `workflow_dispatch` input `drill` (choice, options `[none, kev-outage]`, default `none`) with no `inputs` declaration; expects exit 1, `cron.yml` and `drill` in the output. GREEN: the lint reads `on.workflow_dispatch.inputs` (a bare `workflow_dispatch:` is empty) and compares each input against `decl.inputs`
+- [~] **1.1 RED and GREEN: an undeclared dispatch input fails naming the workflow and the input** (FR-5): `scripts/lint-workflow-policy_test.sh` case 9 gives the fixture's `cron.yml` a `workflow_dispatch` input `drill` (choice, options `[none, kev-outage]`, default `none`) with no `inputs` declaration; expects exit 1, `cron.yml` and `drill` in the output. GREEN: the lint reads `on.workflow_dispatch.inputs` (a bare `workflow_dispatch:` is empty) and compares each input against `decl.inputs`
 - [ ] **1.2 RED and GREEN: a declared input absent from its workflow fails naming it** (FR-5): case 10 declares `inputs: {drill: ...}` for `plain.yml`, which carries none; expects exit 1 naming `plain.yml` and `drill`
 - [ ] **1.3 RED and GREEN: a differing value fails naming the input and both values; a matching pair passes** (FR-5): case 11 declares options `[none, kev-outage]` and the workflow carries `[none, kev-synthetic]`; expects exit 1 naming `drill` and both lists. The fixture's `fresh` gains the input on `cron.yml` and its declaration from this slice on, so case 1 proves the match (`description` dropped before the comparison)
 - [ ] **1.4 RED and GREEN: `drill-feed <name>` prints the declared substitute** (FR-4): `scripts/triage-policy_test.sh` gives the fixture `drills: {kev-outage: https://kev-feed.invalid/kev.json}`; `q drill-feed kev-outage` prints it

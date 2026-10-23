@@ -196,6 +196,34 @@ else
   fail "unparseable workflow fails naming the file, no traceback" "exit=$rc" "$out"
 fi
 
+# 9 (task 16.8, Req 7.10 as amended): a workflow_dispatch input is a declared
+# value like a schedule cron: the `workflows:` entry names each input under an
+# `inputs` map, and an input the declaration lacks fails naming the workflow
+# and the input, the schedule precedent of review D3 (an undeclared cron fails
+# by name, case 3). The policy file here declares no inputs for cron.yml.
+fresh
+python3 - "$SB/.github/workflows/cron.yml" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+s = s.replace('on:\n  schedule:\n    - cron: "17 6 * * *"\n',
+              'on:\n  schedule:\n    - cron: "17 6 * * *"\n'
+              '  workflow_dispatch:\n'
+              '    inputs:\n'
+              '      drill:\n'
+              '        description: "a drill, this run only"\n'
+              '        type: choice\n'
+              '        options: [none, kev-outage]\n'
+              '        default: none\n')
+open(p, "w").write(s)
+PY
+out=$("$LINT" "$SB" 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "cron.yml" <<<"$out" && grep -qF "drill" <<<"$out"; then
+  pass "undeclared dispatch input fails naming the workflow and the input"
+else
+  fail "undeclared dispatch input fails naming the workflow and the input" "exit=$rc" "$out"
+fi
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all lint-workflow-policy tests passed"
