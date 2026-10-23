@@ -1,9 +1,9 @@
 {
   "id": "kev-drill-input_20261023",
   "type": "feature",
-  "status": "pending",
+  "status": "in_progress",
   "created_at": "2026-10-23T13:30:00Z",
-  "updated_at": "2026-10-23T13:30:00Z",
+  "updated_at": "2026-10-23T13:50:00Z",
   "description": "A drill input on rescan.yml's dispatch substitutes a declared value for the KEV feed for one run (kev-outage: an address under .invalid; kev-synthetic: a feed of this repository naming the drill definition's HIGH, for task 16.3), the policy lint holds the input's allowed values, and both arms' fail-closed branches run live: the gate on a drill branch never merged, the rescan on a dispatched run, the ledger rows 6.59 and 6.60 filled (Req 6.59, 6.60, 7.7, 7.10, 7.11; task 16.8)",
   "spec_path": "conductor/tracks/kev-drill-input_20261023/spec.md",
   "plan_path": "conductor/tracks/kev-drill-input_20261023/plan.md"

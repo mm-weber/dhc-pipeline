@@ -37,6 +37,11 @@ workflows:
       contents: read
   wired-later.yml:
     schedule: "47 4 * * *"
+    inputs:
+      drill:
+        type: choice
+        options: [none, kev-outage]
+        default: none
     permissions:
       contents: read
 EOF
@@ -76,6 +81,13 @@ on:
   pull_request:
   schedule:
     - cron: "47 4 * * *"
+  workflow_dispatch:
+    inputs:
+      drill:
+        description: "a drill, this run only"
+        type: choice
+        options: [none, kev-outage]
+        default: none
 permissions:
   contents: read
 jobs:
@@ -194,6 +206,78 @@ if [ "$rc" -eq 1 ] && grep -qF "plain.yml" <<<"$out" && ! grep -qF "Traceback" <
   pass "unparseable workflow fails naming the file, no traceback"
 else
   fail "unparseable workflow fails naming the file, no traceback" "exit=$rc" "$out"
+fi
+
+# 9 (task 16.8, Req 7.10 as amended): a workflow_dispatch input is a declared
+# value like a schedule cron: the `workflows:` entry names each input under an
+# `inputs` map, and an input the declaration lacks fails naming the workflow
+# and the input, the schedule precedent of review D3 (an undeclared cron fails
+# by name, case 3). The policy file here declares no inputs for cron.yml.
+fresh
+python3 - "$SB/.github/workflows/cron.yml" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+s = s.replace('on:\n  schedule:\n    - cron: "17 6 * * *"\n',
+              'on:\n  schedule:\n    - cron: "17 6 * * *"\n'
+              '  workflow_dispatch:\n'
+              '    inputs:\n'
+              '      drill:\n'
+              '        description: "a drill, this run only"\n'
+              '        type: choice\n'
+              '        options: [none, kev-outage]\n'
+              '        default: none\n')
+open(p, "w").write(s)
+PY
+out=$("$LINT" "$SB" 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "cron.yml" <<<"$out" && grep -qF "drill" <<<"$out"; then
+  pass "undeclared dispatch input fails naming the workflow and the input"
+else
+  fail "undeclared dispatch input fails naming the workflow and the input" "exit=$rc" "$out"
+fi
+
+# 10 (task 16.8, Req 7.10 as amended): the other direction of case 9. An input
+# the declaration lists under its `inputs` map that the workflow's
+# workflow_dispatch does not carry fails naming the workflow and the input,
+# the schedule precedent of review D3 (a declared cron absent from its
+# workflow, case 1b): drift in the direction that silently drops a declared
+# value. plain.yml here carries no workflow_dispatch at all.
+fresh
+python3 - "$SB/catalogue-policy.yaml" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+s = s.replace('  plain.yml:\n    schedule: null\n    permissions:\n      contents: read\n',
+              '  plain.yml:\n    schedule: null\n    permissions:\n      contents: read\n'
+              '    inputs:\n'
+              '      drill:\n'
+              '        type: choice\n'
+              '        options: [none, kev-outage]\n'
+              '        default: none\n')
+open(p, "w").write(s)
+PY
+out=$("$LINT" "$SB" 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "plain.yml" <<<"$out" && grep -qF "drill" <<<"$out"; then
+  pass "a declared input absent from its workflow fails naming both"
+else
+  fail "a declared input absent from its workflow fails naming both" "exit=$rc" "$out"
+fi
+
+# 11 (task 16.8, Req 7.10 as amended): an input is held equal to its
+# declaration in type, options, default and required; the description is
+# prose GitHub shows on the run form, which the declaration does not carry
+# and the lint drops before comparing (the fixture pair on wired-later.yml,
+# which case 1 passes, differs only in it). A differing value fails naming
+# the workflow, the input and both values, the cron-drift precedent of case
+# 2. Here the declared options drift while the workflow keeps
+# [none, kev-outage].
+fresh
+sed -i 's/\[none, kev-outage\]/[none, kev-synthetic]/' "$SB/catalogue-policy.yaml"
+out=$("$LINT" "$SB" 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "wired-later.yml" <<<"$out" && grep -qF "drill" <<<"$out" && grep -qF "kev-outage" <<<"$out" && grep -qF "kev-synthetic" <<<"$out"; then
+  pass "a differing input value fails naming the input and both values"
+else
+  fail "a differing input value fails naming the input and both values" "exit=$rc" "$out"
 fi
 
 echo
