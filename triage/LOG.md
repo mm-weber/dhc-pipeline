@@ -3013,3 +3013,72 @@ generic rendering noted above, so the first use of this justification
 reached the published status without a code change. With it the five
 kin-openapi findings of the frozen image are closed on evidence: #274, #276
 and #287 by run 39770244509 on 2026-10-22, #275 and #277 by this run.
+
+## 2026-10-23: the KEV feed outage drill, both arms fail closed by name (task 16.8)
+
+*Image: drill-app. Task 16.8, conductor track `kev-drill-input_20261023`:
+#308 amended Req 7.7 and 7.10 so that a dispatch input is a declared value
+the policy lint holds, #310 added the `drill` input to `rescan.yml`'s
+dispatch with its substitutes under `triage.drills` in
+`catalogue-policy.yaml`. Both arms fetch CISA's KEV catalogue before
+evaluating the exception tiers and fail closed when the fetch fails (Req
+6.59, 6.60); neither outage branch had run live (ledger rows 6.59 and 6.60,
+status `drill 16.8`). The drill induces the outage without a second code
+path: the declared `kev-outage` address,
+`https://kev-feed.invalid/known_exploited_vulnerabilities.json`, under a
+top-level domain RFC 2606 reserves so that no resolver answers, substituted
+for the feed, on the gate by a branch and on the rescan by the input.*
+
+**Why an address under `.invalid`.** The outage has to be certain and
+harmless: `curl` fails at name resolution (exit 6, could not resolve host)
+before any connection, every time, on every runner, with nothing reached;
+the error line each arm prints carries the address, so a resolver that
+answered would show as a fetch that succeeded. The alternative, a reachable
+address serving an error, exercises the same `curl -f` branch but depends
+on a server.
+
+**The gate's half (2026-10-23, 20:45 to 20:51Z).** A pull request carries
+no dispatch inputs, so the gate's half is a branch: drill #313, a draft
+never merged, commit 1b221d8 on 9e62294, sets `triage.kev_feed` to that
+address and adds one comment line to `image/drill-app/image.yaml`, the
+smallest change that puts drill-app in the build matrix (the matrix
+derives from changed paths under `image/`, so the policy edit alone builds
+nothing; the active-set lint admits a change to an active definition).
+Build run 40021724071: the affected-definitions job named drill-app; the
+matrix job built the image (20:49:01Z), gave it a local identity, scanned
+it (Trivy, 20:49:11Z) and ran the portability and reachability steps as on
+every drill-app pull request; then step 19, `exception tiers against KEV
+(Req 6.50)`, read the policy file's feed through `scripts/triage-policy.sh
+. kev-feed` and failed in one second (20:50:48Z to 20:50:49Z) with
+`drill-app: the CISA KEV feed
+(https://kev-feed.invalid/known_exploited_vulnerabilities.json) is
+unavailable, so the exception tiers cannot be evaluated; this pull request
+fails closed (Req 6.59)`. Behind it the scan gate and every release step
+were skipped (only the scan-report upload, which runs regardless, ran), and
+the build gate went red at 20:51:05Z (job 120647720657): the tiers were not
+evaluated against an empty KEV set, which would have handed every exploited
+finding the widest tier. Validate run 40021724024 green, the fourteen lints
+over the drilled state; e2e run 40021724069 with nothing to test; the chart
+run 40021724130 green. Rehearsed in the worktree before the push with the
+step's shell verbatim: `curl: (6) Could not resolve host: kev-feed.invalid`,
+the same line, exit 1. Ledger row 6.59 flips to exercised on this.
+
+**The rescan's half, pending.** The owner dispatches `rescan.yml` with
+`drill: kev-outage` after the day's scheduled run (today's, 39948543838 at
+11:47Z, and the owner's 13:12Z dispatch 39959263177, the close on evidence
+of #275 and #277, are in). Expected from the workflow as merged: the invariants step
+red with `the substituted KEV feed (drill kev-outage)
+(https://kev-feed.invalid/known_exploited_vulnerabilities.json) is
+unavailable: the exception tiers were not evaluated today, which is a
+failure of this run, not a pass (Req 6.60)`; the enrich step refusing by
+name (no KEV catalogue on disk), so no issue set and no new-CVE filing; the
+status step refusing by name (`kev.json` missing), so no status and no
+page, the page job skipped; the summary line `- drill: kev-outage (the KEV
+feed substituted with
+https://kev-feed.invalid/known_exploited_vulnerabilities.json, this run
+only; task 16.8)`. What the dispatch publishes as any dispatch does
+(register rows M17 and M26): today's reports attested with replace, the
+OpenVEX document re-attested where it changed, the issue lifecycle applied
+on attested evidence. The status issue and the page keep the 13:33Z data
+until the next scheduled run, which reads the declared feed and publishes
+with `- drill: none`. Part two, both runs, follows.

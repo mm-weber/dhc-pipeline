@@ -3,7 +3,7 @@
 **Track ID:** kev-drill-input_20261023
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-10-23
-**Status:** [~] in progress (phase 0 merged 2026-10-23 as a5decb6, #308; phase 1 started 2026-10-23)
+**Status:** [~] in progress (phase 0 merged 2026-10-23 as a5decb6, #308; phase 1 merged 2026-10-23 as 9e62294, #310; phase 2 started 2026-10-23)
 
 ## Overview
 
@@ -35,13 +35,13 @@ Dependency: phase 0 merged. Worktree `kev-drill-input` from main.
 - [x] **1.6 The declarations and the workflow** (72bab3f) (FR-1, FR-2, FR-3; orchestrator, the lints are the test): `catalogue-policy.yaml` gains `triage.drills` (both addresses, a comment naming what reads them and why `.invalid`), `workflows.build.yml.inputs.image` (`required: false`, `type: string`) and `workflows.rescan.yml.inputs.drill` (choice, the three options, default `none`); `rescan.yml` gains the input, the job env `DRILL`, the lookup with its `::warning::` annotation, the drill's name in the outage error line, the `drill` and `feed` outputs, and the summary line; the reader's header and usage line name `drill-feed`
 - [x] **1.7 The synthetic feed** (6ba42ea) (FR-6): `triage/drills/kev-synthetic.json`, one entry, CVE-2025-30204, titled DRILL
 - [x] **1.8 The docs** (6c802de, the row renumbered in 1da95af) (FR-10): the manual's two rescan rows and the dispatch sentence; register row M20; the policy file's comments
-- [ ] **1.9 The pull request**: title `feat: the KEV drill input on the rescan's dispatch, a declared value substituted for one run (Req 6.59, 6.60, 7.7, 7.10; task 16.8)`, a TL;DR naming what the drill run publishes and withholds; the owner merges (checkpoint)
+- [x] **1.9 The pull request** (#310, merged 2026-10-23 as 9e62294): title `feat: the KEV drill input on the rescan's dispatch, a declared value substituted for one run (Req 6.59, 6.60, 7.7, 7.10; task 16.8)`, a TL;DR naming what the drill run publishes and withholds; the owner merges (checkpoint)
 
 ### Verification (orchestrator)
 
 - [x] (2026-10-23) `scripts/lint-workflow-policy_test.sh` (13 cases, two more than planned: both directions and the value comparison each got their own) and `scripts/triage-policy_test.sh` (34 assertions) green; all 41 suites green
 - [x] (2026-10-23, locally; the substitution rehearsed with DRILL=kev-outage: curl exit 6, could not resolve host, the Req 6.60 line naming the drill and the address) On this repository: `scripts/lint-workflow-policy.sh .` prints its all-green line; `scripts/lint-rescan-steps.sh`; `yamllint .github/workflows/rescan.yml catalogue-policy.yaml`; `scripts/release-policy.sh . check`; `scripts/triage-policy.sh . drill-feed kev-outage` prints the address, `drill-feed none` refuses; `jq -r '.vulnerabilities[].cveID' triage/drills/kev-synthetic.json` prints the CVE; the fourteen repository lints
-- [ ] The pull request's validate run green; its build run names nothing (no definition changed)
+- [x] (2026-10-23, #310 on 0ee1e95: seven jobs green, the build and e2e matrices skipped, no definition changed) The pull request's validate run green; its build run names nothing (no definition changed)
 
 ## Phase 2: the drill (a draft pull request, ready when the last run is in)
 
@@ -49,7 +49,7 @@ Dependency: phase 1 merged. Worktree `kev-drill-evidence` from main for the evid
 
 ### Tasks
 
-- [ ] **2.1 The gate's drill branch** (FR-7): `triage.kev_feed` set to the outage address, one comment line in `image/drill-app/image.yaml`; draft pull request; the build run red at `exception tiers against KEV` with the Req 6.59 line naming the address; validate green; the run id recorded
+- [x] **2.1 The gate's drill branch** (FR-7) (draft #313, commit 1b221d8; build run 40021724071 red at step 19 `exception tiers against KEV (Req 6.50)` at 20:50:49Z, job 120647720657, after the build and the scan; validate run 40021724024 green): `triage.kev_feed` set to the outage address, one comment line in `image/drill-app/image.yaml`; draft pull request; the build run red at `exception tiers against KEV` with the Req 6.59 line naming the address; validate green; the run id recorded
 - [ ] **2.2 The outage run** (FR-8): the owner dispatches `rescan.yml` with `drill: kev-outage` after the day's scheduled run, told beforehand what the dispatch publishes (today's reports attested with replace, the document re-attested where changed, the lifecycle applied on attested evidence) and withholds (the issue set, the status, the page); observed: the invariants step red naming the address and Req 6.60, the enrich, issue-set and status refusals by name, the page job skipped, the summary's drill line; the run id and the lines recorded
 - [ ] **2.3 The next scheduled run** (FR-8): green, `- drill: none`, the status issue and the page published; the run id recorded
 - [ ] **2.4 The evidence** (FR-9): ledger rows 6.59 and 6.60 to `exercised`, induced by `drill input`, with the run ids; the LOG entry `## <date>: the KEV feed outage drill, both arms fail closed by name (task 16.8)`; `tasks.md` 16.8 ticked `[done <date>, #nnn; conductor track kev-drill-input_20261023]`; `tasks/todo.md`'s program state to 16.3
