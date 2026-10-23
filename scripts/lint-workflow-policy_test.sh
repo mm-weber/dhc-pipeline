@@ -224,6 +224,33 @@ else
   fail "undeclared dispatch input fails naming the workflow and the input" "exit=$rc" "$out"
 fi
 
+# 10 (task 16.8, Req 7.10 as amended): the other direction of case 9. An input
+# the declaration lists under its `inputs` map that the workflow's
+# workflow_dispatch does not carry fails naming the workflow and the input,
+# the schedule precedent of review D3 (a declared cron absent from its
+# workflow, case 1b): drift in the direction that silently drops a declared
+# value. plain.yml here carries no workflow_dispatch at all.
+fresh
+python3 - "$SB/catalogue-policy.yaml" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+s = s.replace('  plain.yml:\n    schedule: null\n    permissions:\n      contents: read\n',
+              '  plain.yml:\n    schedule: null\n    permissions:\n      contents: read\n'
+              '    inputs:\n'
+              '      drill:\n'
+              '        type: choice\n'
+              '        options: [none, kev-outage]\n'
+              '        default: none\n')
+open(p, "w").write(s)
+PY
+out=$("$LINT" "$SB" 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "plain.yml" <<<"$out" && grep -qF "drill" <<<"$out"; then
+  pass "a declared input absent from its workflow fails naming both"
+else
+  fail "a declared input absent from its workflow fails naming both" "exit=$rc" "$out"
+fi
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all lint-workflow-policy tests passed"
