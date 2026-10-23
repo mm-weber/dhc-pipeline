@@ -85,7 +85,18 @@ elif query == "kev-feed":
     if not t.get("kev_feed"): refuse("kev_feed is missing")
     print(t["kev_feed"])
 elif query == "drill-feed":
-    print(t["drills"][arg])
+    # A dispatched rescan's drill input defaults to none: no drill, never a
+    # feed. Only a declared name reads an address (task 16.8).
+    drills = t.get("drills") or {}
+    if not isinstance(drills, dict) or not drills:
+        refuse("drills is missing: the drill substitutes are declared under triage.drills (task 16.8)")
+    if not arg or arg == "none":
+        refuse("drill-feed needs a declared drill name: 'none' (the drill input's default) is no drill and no feed")
+    if arg not in drills:
+        refuse(f"drill '{arg}' is not declared under triage.drills (declared: {', '.join(map(str, drills))})")
+    if not isinstance(drills[arg], str) or not drills[arg].strip():
+        refuse(f"drill '{arg}' has no address under triage.drills")
+    print(drills[arg].strip())
 elif query == "resolved-labels":
     import json
     labels = t.get("resolved_labels") or {}
