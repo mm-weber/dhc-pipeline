@@ -2716,3 +2716,268 @@ close carries the evidence and the graded label (Req 6.53, 6.56).
 the linked `openapi3` schema code, where `visitXOFOperations` and
 `visitJSONArray` are present, and each needs a finer read than an absent
 package allows.
+
+## 2026-10-23: not affected: CVE-2026-100352, the grafana server never selects kin-openapi's JSON Schema 2020-12 validator (#275)
+
+*Image: grafana, inactive since 2026-10-19 and frozen at 13.1.7 (index
+sha256:89c5680a868b, the digest the #256 base bump built on 2026-10-13). The
+fourth of the five kin-openapi findings and the first that sits in code the
+server does link, the `openapi3` schema package the three entries of
+2026-10-21 counted at 1,125 functions. The evidence pass is of 2026-10-22,
+the owner's call in chat on it, recorded here on 2026-10-23 together with
+#277 below, one pull request for both. The binaries are the ones of the
+entries above, the published linux/amd64 manifest sha256:e4f626e9…, read in
+place: `go version -m`, the pclntab readers and `go tool nm` of
+`triage/upstream/checks/grafana-kin-openapi-symbols.sh`, which now names this
+finding's functions and files and the jsonschema module, and a new
+instrument, a disassembly of the whole server binary with `go tool objdump`
+that lists every direct call into kin-openapi and into the validator it
+hands values to: `triage/upstream/checks/grafana-kin-openapi-callers.sh`.*
+
+**What the vulnerability is.** GHSA-rj39-cv6w-8wv7, CVSS 3.1 7.5 (network,
+low complexity, no privileges, no user interaction, availability high), EPSS
+0.43 percent (36th percentile), not in CISA's KEV (the rescan's check of
+2026-10-22); CWE-754. kin-openapi's built-in schema visitor, `visitJSON`,
+refuses a NaN or infinite float before it compares anything
+(`ErrSchemaInputNaN`, `ErrSchemaInputInf`, `openapi3/schema.go:1960`). Its
+JSON Schema 2020-12 path does not: when `Schema.VisitJSON` is called with the
+`EnableJSONSchema2020()` option, the option the library documents for
+OpenAPI 3.1 documents, it dispatches to `useJSONSchema2020`
+(`schema.go:1945`), which builds a validator from
+`santhosh-tekuri/jsonschema/v6` and hands the value straight through
+(`schema_jsonschema_validator.go:204`). In jsonschema v6.0.2, `numValidate`
+turns the number into a `*big.Rat` by parsing its printed form; for NaN and
+Inf the parse fails silently and returns nil, which `Rat.Cmp` dereferences.
+The advisory's delivery is a YAML request body (`.nan`, `.inf`, `-.inf`,
+which `openapi3filter.YamlBodyDecoder` turns into the Go values) validated
+against a 3.1 document with a numeric constraint; the panic takes the
+validating goroutine, under `net/http` the connection. Fixed in 0.148.0
+(commit 4487f198 of 2026-08-27, released the same day) by bumping
+jsonschema to v6.0.3, which guards the parse. Trivy names the module at
+v0.144.0 from the server's build info, fix version 0.148.0, on
+`usr/share/grafana/bin/grafana` and on no other binary.
+
+**Where it sits.** Unlike the three findings above, the functions are in
+the binary: `useJSONSchema2020`, `newJSONSchemaValidator`,
+`(*jsonSchemaValidator).validate` and jsonschema's `numValidate` are present
+(one symbol each in `go tool nm`), and so is jsonschema/v6 v6.0.2 itself
+(284 functions, 383 symbols). Presence is not reachability, and Req 6.14
+speaks of a reachable symbol; the measurement for this entry is who calls
+them. `go tool objdump` on the whole server (418,865 functions in the
+pclntab; every call the linker resolved by name, 33 sites among the named
+functions) gives the call graph below; `go tool nm` adds the closures, which
+a disassembly cannot attribute because an option is passed as a function
+value.
+
+| Measured on `bin/grafana` | Result |
+|---|---|
+| Direct calls into kin-openapi from outside the module | 2: `grafana-app-sdk/app.(*VersionSchema).AsOpenAPI3` to `openapi3.(*Loader).LoadFromData`; `grafana/apps/alerting/rules/pkg/app/validation.(*SpecValidator).ValidateOpenAPISpec` to `openapi3.(*Schema).VisitJSON` |
+| Direct calls into jsonschema/v6 from outside jsonschema and kin-openapi | 0 |
+| Callers of `useJSONSchema2020` | 1, `VisitJSON`, under the setting |
+| Callers of `newJSONSchemaValidator` and of `(*jsonSchemaValidator).validate` | 1 each, `useJSONSchema2020` |
+| Callers of jsonschema's `numValidate` | 1, jsonschema's own `(*validator).validate` |
+| Callers of `validateExampleValue` | 3, all in kin-openapi: `(*MediaType).Validate`, `(*Parameter).Validate`, `(*Schema).validate` |
+| Callers of `(*T).Validate`, the spec-time entry point | 0 |
+| Closures that can set the 2020-12 setting (`EnableJSONSchema2020`, named after the caller it was inlined into) | 1: `validateExampleValue.EnableJSONSchema2020.func4` |
+| Option closures handed to `VisitJSON` by callers outside kin-openapi | 1: `ValidateOpenAPISpec.MultiErrors.func1` |
+| Method values taken of any `openapi3` `Validate` method (`-fm` wrappers) | 0 |
+| `openapi3filter`, `YamlBodyDecoder` | 0 symbols (the entries above) |
+
+**What the calls mean.** The two entry points are the whole of grafana's
+use of kin-openapi. The first loads grafana's own kind schema at app start:
+`AsOpenAPI3` (grafana-app-sdk v0.56.2, `app/manifest.go:693-711`) wraps the
+generated schemas in a document declared `openapi: 3.0.0` and hands it to
+`LoadFromData`, which parses and resolves references and validates nothing;
+no function in the binary calls `(*T).Validate`. The second runs on every
+create and update of an alerting rule, recording rule and rule sequence
+(`validation/builder.go:50-58` and `app.go:76-94` at v13.1.7; the app
+installs whenever unified alerting is on, `register.go:56`):
+`ValidateOpenAPISpec` (`validation/openapi.go:38-50`) marshals the typed
+spec with `encoding/json`, decodes it back into `any`, and calls
+`VisitJSON(decoded, openapi3.MultiErrors())`. That option list is the
+measurement. `VisitJSON` takes the 2020-12 path only when
+`settings.useJSONSchema2020` is true (`schema.go:1945`); the field is set
+only by the closure `EnableJSONSchema2020` returns
+(`schema_validation_settings.go:158-160`); the symbol table holds one copy
+of that closure in the whole binary, the one the compiler inlined into
+kin-openapi's own `validateExampleValue` (`example_validation.go:15-16`),
+which validates a document's examples under `(*T).Validate`, which nothing
+calls; and the grafana caller's only option closure is `MultiErrors`. So
+every value the server ever validates goes through `visitJSON`, the visitor
+with the guard, and the validator that panics is never constructed. Source
+agrees with the binary: at v0.144.0 the option is passed in four places,
+example validation and three sites in `openapi3filter`'s request and
+response validators (`validate_request.go:248` and `:360`,
+`validate_response.go:77`), the package the entries above showed absent.
+
+**The second wall.** The guarded visitor never sees the values the advisory
+needs either. A rule arrives as JSON through the Kubernetes-style API (the
+binary holds no YAML body decoder), is decoded into the typed spec, and is
+marshalled and decoded once more before the visit. `encoding/json` refuses
+NaN and both infinities on the way out (`json: unsupported value: NaN`) and
+refuses the literals and an overflowing number on the way in (`cannot
+unmarshal number 1e400 into Go value of type float64`), measured with a
+four-line program on go1.25.7. The numeric constraints that would make the
+2020-12 validator compare at all exist in two places of the generated
+schemas, AlertRule's `PanelRef.panelID` (`minimum: 0`, exclusive) and
+`spec.missingSeriesEvalsToResolve` (`minimum: 0`), and neither can be handed
+a NaN.
+
+**What govulncheck could measure: nothing.** The Go vulnerability database
+has no report for this CVE: golang/vulndb#6795, filed 2026-10-15, is open.
+The pull request gate's run (Req 6.13) never fires for an inactive
+definition. The disassembly and the symbol table are the instrument, and the
+basis is structural (Req 6.15): the image's entrypoint, `bin/grafana`,
+constructs the JSON Schema 2020-12 validator in no code path it starts.
+
+**The rungs.** Fix: closed. The image is frozen, and no 13.1 release carries
+the fix: Grafana 13.1.8 (2026-10-13) still pins kin-openapi v0.144.0, no
+13.1 release has followed it, and only `main` has moved, to v0.149.0. Avoid:
+nothing to drop; the schema package is in use. Not affected: writable. Req
+6.14 is satisfied because govulncheck reports no symbol for this CVE,
+reachable or not, and the structural basis of Req 6.15 is the one stated.
+Transfer: nothing to wait for. Accept: not needed.
+
+**Decision: not affected, vulnerable code not in the execute path, scoped to
+the release** (owner's call in chat on the evidence pass of 2026-10-22).
+`triage/vex/CVE-2026-100352.openvex.json`: product
+`pkg:oci/grafana@13.1.7-alpine3.23`, subcomponent
+`pkg:golang/github.com/getkin/kin-openapi`, tag-scoped for the reason given
+for #274: the claim rests on what this build links and calls, and the tag is
+the whole story for a frozen image. No version-independent note: a future
+Grafana may validate a 3.1 document with examples, and no future Grafana
+will be built here.
+
+**How it is proved.** As for the three entries above: the gate builds
+nothing for an inactive definition (Req 1.15), so the statement was proved
+locally before the merge, compiled for the supported digest with its three
+tags and both platform manifests (`scripts/compile-vex.sh`: ten statements
+compiled for grafana, eight products of other images dropped), then
+`scripts/scan-image.sh` on the pulled linux/amd64 manifest with Trivy 0.72.0
+and the vulnerability database of 2026-10-21 07:13Z. With the compiled
+document all five kin-openapi findings are suppressed as `not_affected` from
+`grafana.openvex.json` and one finding stays reported, CVE-2026-111943
+(#300, Go's `crypto/x509`); with an empty document directory all five are
+reported, eight in all. The first rescan after the merge compiles it for the
+supported digest, re-attests the changed document (Req 6.43), and gives
+#275 its close on evidence with the `resolved:not_affected` grade (Req 6.53,
+6.56); the run is recorded here when it does.
+
+## 2026-10-23: not affected: CVE-2026-100354, the grafana server validates only its own acyclic schema (#277)
+
+*Image: grafana, frozen at 13.1.7 as above. The last of the five kin-openapi
+findings, the same evidence pass, binaries and instruments as the entry
+above, the same pull request. This one needs the finest read of the five:
+the vulnerable functions are present, and they run.*
+
+**What the vulnerability is.** GHSA-g8cf-rcjf-c8cf, CVSS 3.1 7.5 (the same
+vector), EPSS 0.44 percent (37th percentile), not in CISA's KEV (the
+rescan's check of 2026-10-22); CWE-674. kin-openapi's spec-time `Validate`
+walks a schema with a stack and tolerates a combinator chain that refers
+back to itself (`schema.go:1396`), and its loader resolves circular
+references on purpose, to allow recursive data. The runtime visitor has no
+such check: `visitJSON` calls `visitXOFOperations` (`schema.go:2189`), which
+calls `visitJSON` on every member of `oneOf`, `anyOf` and `allOf` (five call
+sites in the disassembly), and on a schema whose chain comes back to itself
+the recursion is unbounded on the first value visited. In Go that is a fatal
+stack overflow, not a panic: `recover` does not catch it, `net/http`'s
+per-connection recovery does not help, and the process ends with every
+goroutine in it. The advisory names a second site of the same shape,
+`decodeValue` in `openapi3filter`'s request decoder, with `parseValue` and
+`buildResObj`. Fixed in 0.149.0 (commit 9245cef6 of 2026-08-28, released
+the same day): a set of visited schemas carried through `visitJSON`, and a
+guarded `decodeValue`. Trivy names the module at v0.144.0, fix version
+0.149.0, on `bin/grafana` alone.
+
+**Where it sits, and what runs.** `visitJSON` and `visitXOFOperations` are
+present (the controls of the three entries above); `decodeValue` and the
+rest of `openapi3filter` are absent (0 functions, 0 symbols, 0 files, 0
+strings, the entries of 2026-10-21). The visitor runs: `ValidateOpenAPISpec`
+calls `VisitJSON` on every create and update of the three alerting kinds,
+and `VisitJSON` without the 2020-12 option is `visitJSON`. What decides this
+finding is not whether the function runs but what it is given. The
+recursion needs a schema with a cycle; the value is only walked along it.
+
+**Whose schema.** There is one schema, and the server builds it from itself.
+The three kind schemas are generated into the binary at build time
+(`apps/alerting/rules/pkg/apis/manifestdata/alerting_manifest.go` at
+v13.1.7, three embedded OpenAPI component sets), and a parse of them (a walk
+over the JSON, counting keys, and a depth-first search over the component
+reference graph) gives:
+
+| Kind | Components | `$ref` | `oneOf` | `allOf` | `anyOf` | `not` | Reference cycles |
+|---|---|---|---|---|---|---|---|
+| AlertRule | 20 | 26 | 1 (`NotificationSettings`: `SimplifiedRouting` or `NamedRoutingTree`, no discriminator) | 0 | 0 | 1 (a pattern under `PromDuration`) | none |
+| RecordingRule | 13 | 14 | 0 | 0 | 0 | 1 (the same) | none |
+| RuleSequence | 8 | 8 | 0 | 0 | 0 | 1 (the same) | none |
+
+The visitor never sees even these as written. `NewSpecValidator`
+(`validation/openapi.go:23-36`) takes the kind's `spec` schema from
+`AsCRDOpenAPI3`, which loads the document (`AsOpenAPI3`, the entry above)
+and rebuilds the kind's schema with `GetCRDOpenAPISchema` and
+`resolveSchema` (grafana-app-sdk v0.56.2, `app/manifest.go:1069-1320`):
+every `$ref` is replaced by a fresh copy of the referenced schema, with a
+visited set per branch, and a reference met again on the same branch becomes
+`{type: object, x-kubernetes-preserve-unknown-fields: true}` (lines
+1109-1115); properties, items and additional properties are resolved the
+same way into new nodes; and the combinators are rewritten for Kubernetes'
+structural schemas, each `allOf` and `anyOf` member into a leaf of required
+fields while its fields merge into the parent (1236-1251, 1306-1320), each
+`oneOf` member into a leaf of required fields with a `not` of `anyOf`
+required leaves excluding the other branches, or the `oneOf` cleared when no
+branch has required fields (1255-1300). The output is a tree built by a
+terminating recursion out of new nodes: no node points back to an ancestor,
+and no combinator member is anything but a leaf. The visitor is handed
+`crd.Properties["spec"]` of that tree, once, for the life of the process.
+
+**What a client controls.** The value: a rule's `spec`, as JSON through the
+Kubernetes-style API, marshalled and decoded again before the visit (the
+entry above). `VisitJSON` takes the value as data and the schema as its
+receiver; no field of the value selects, loads or alters a schema (the one
+`oneOf` has no discriminator, so `resolveDiscriminatorRef` reads nothing
+from the value, `schema.go:2149-2152`). A request can make the visitor
+reject a rule; it cannot make the visitor recurse through a chain the server
+did not build, and the only recursion the generated schemas allow is the
+data's own (an `ExpressionMap` of `Expression`s, arrays of
+`TimeIntervalRef`), which the JSON decoder bounds first. No other code in
+the binary gives kin-openapi a schema: the two entry points of the table
+above are all there is, and nothing links the request decoder.
+
+**What govulncheck could measure: nothing.** golang/vulndb#6785, filed
+2026-10-15, is open, so there is no report; the gate never runs for an
+inactive definition.
+
+**The rungs.** Fix: closed, as above (13.1.8 pins v0.144.0; v0.149.0 is on
+`main` only). Avoid: the schema validation of rules is the feature; nothing
+to drop. Not affected: writable, but not in the direction of the entries
+above. The vulnerable code is in the execute path, it runs on every rule
+write, so `vulnerable_code_not_in_execute_path` would be false, and Req 6.14
+and 6.15 do not apply. OpenVEX's
+`vulnerable_code_cannot_be_controlled_by_adversary` says what the evidence
+says: the input that triggers the flaw is the schema, the schema is the
+server's own, built from a generated document by a resolver that produces an
+acyclic tree, and no request reaches it. The first use of this justification
+in the repo; the rescan's status renderer prints any justification as words
+(`triage/rescan/decision.go:92`), so the status row reads "not affected:
+vulnerable code cannot be controlled by adversary", and Trivy applied the
+statement in the local proof below. Transfer: nothing to wait for. Accept:
+not needed.
+
+**Decision: not affected, vulnerable code cannot be controlled by an
+adversary, scoped to the release** (owner's call in chat on the evidence
+pass of 2026-10-22). `triage/vex/CVE-2026-100354.openvex.json`: product
+`pkg:oci/grafana@13.1.7-alpine3.23`, subcomponent
+`pkg:golang/github.com/getkin/kin-openapi`, tag-scoped: the claim rests on
+the schemas this build generates and the resolver and callers this build
+links. No version-independent note: a future Grafana may hand kin-openapi a
+schema from elsewhere, and no future Grafana will be built here.
+
+**How it is proved.** The same local run as the entry above (ten statements
+compiled, Trivy 0.72.0, the database of 2026-10-21 07:13Z): with the
+compiled document CVE-2026-100354 is suppressed as `not_affected` with this
+justification, next to the four others, and CVE-2026-111943 alone stays
+reported; with an empty document directory all five are reported. The first
+rescan after the merge re-attests the changed document and gives #277 its
+close on evidence with the `resolved:not_affected` grade (Req 6.43, 6.53,
+6.56); the run is recorded here when it does. With it the five kin-openapi findings of
+the frozen image are decided, and #300 is the image's last open finding.

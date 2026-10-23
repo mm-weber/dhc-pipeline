@@ -51,7 +51,8 @@ stay as history.
       the merge (run 39417467219, 2026-10-20; the track closed with #295).
       The twelve moot exceptions of 2026-09-03
       retired; the nine transfers of 2026-10-13 lose their 13.1.8 exit; five
-      kin-openapi HIGHs in the frozen image are the owner's open calls.
+      kin-openapi HIGHs in the frozen image are the owner's open calls (all
+      five decided not affected by 2026-10-23).
 
 ## The drills, in order (one pull request each; each ends with a LOG entry and its ledger rows)
 
@@ -145,27 +146,35 @@ stay as history.
 - [x] The twelve grafana exceptions of 2026-09-03, moot since 13.1.7: retired
       on 2026-10-19 with grafana's deactivation (#290, LOG 2026-10-19); the
       expiry warnings stopped with the merge.
-- [ ] Grafana 13.1.7, frozen: two undecided HIGH findings in
-      `github.com/getkin/kin-openapi` v0.144.0 (CVE-2026-100352 and
-      CVE-2026-100354, #275 and #277, clocks from 2026-10-16; fixed upstream
-      in 0.148.0 and 0.149.0; Grafana 13.1.8 of 2026-10-13 still pins
-      v0.144.0, only main has moved), and one in Go's standard library
-      (CVE-2026-111943, #300, from 2026-10-21, shared with five active
-      images; next item). No build will fix a frozen image: not affected
-      where the measurement allows it, else accept with an expiry, or level
-      two (removal from the catalogue). One at a time, evidence first, the
-      owner's calls.
+- [x] Grafana 13.1.7, frozen: the five HIGH findings in
+      `github.com/getkin/kin-openapi` v0.144.0, all decided not affected.
+      No build will fix a frozen image (Grafana 13.1.8 of 2026-10-13 still
+      pins v0.144.0, only main has moved), so each was measured on the
+      published binaries, one at a time, the owner's calls.
       CVE-2026-100351 (#274), CVE-2026-100353 (#276) and CVE-2026-100349
-      (#287) decided 2026-10-21: not affected, the server links kin-openapi's
-      `openapi3` schema package only and nothing of `openapi3filter`, where
-      the vulnerable middleware (#274), request decoder (#276) and response
-      validator (#287) live (statements in `triage/vex/`, LOG 2026-10-21, the
-      measurement script
+      (#287) decided 2026-10-21: the server links kin-openapi's `openapi3`
+      schema package only and nothing of `openapi3filter`, where the
+      vulnerable middleware (#274), request decoder (#276) and response
+      validator (#287) live (statements in `triage/vex/`, LOG 2026-10-21,
+      the measurement script
       `triage/upstream/checks/grafana-kin-openapi-symbols.sh`); all three
       closed on evidence by rescan run 39770244509 of 2026-10-22, which
-      re-attested the document (`resolved:not_affected`). The same read
-      places #275 and #277 in the linked schema code, each awaiting a finer
-      measurement.
+      re-attested the document (`resolved:not_affected`).
+      CVE-2026-100352 (#275) and CVE-2026-100354 (#277), in the linked
+      schema code, decided on the evidence pass of 2026-10-22 and recorded
+      2026-10-23: a disassembly of the whole server finds two calls into
+      kin-openapi, the SDK loading grafana's own kind schema and the alerting
+      rules validator visiting a value with the MultiErrors option alone, so
+      the JSON Schema 2020-12 validator of #275 is never selected (not in
+      the execute path), and the cycle-free visitor of #277 only ever walks
+      the server's own acyclic schema (cannot be controlled by an adversary,
+      the first use of that justification). Statements in `triage/vex/`,
+      LOG 2026-10-23, the caller script
+      `triage/upstream/checks/grafana-kin-openapi-callers.sh`; the first
+      rescan after the merge closes both on evidence (the run to be recorded
+      in the two entries). The image's last open finding is CVE-2026-111943
+      (#300, Go's standard library, shared with five active images; next
+      item).
 - [ ] CVE-2026-111943 (#300, HIGH, Go `crypto/x509`, fixed in Go 1.26.10 and
       1.27.3): filed by the rescan of 2026-10-21 on twelve digests across the
       three cert-manager images, drill-app, hardened-app and grafana. The
@@ -208,9 +217,10 @@ stay as history.
   inactive, no 13.1.8 build will fix them: accept, or level two.
 - 2027-01-13: the drill-app clone's PAT expires
   (`/workspace/repos/drill-app/.keys/90d_drill_app.pat`).
-- 2027-01-14: the ninety-day clocks of the two undecided kin-openapi
-  findings in grafana 13.1.7 run out (#275 and #277; #274, #276 and #287
-  decided not affected on 2026-10-21, closed on evidence 2026-10-22).
+- 2027-01-14: the ninety-day clocks of the five kin-openapi findings in
+  grafana 13.1.7, all decided not affected (#274, #276 and #287 on
+  2026-10-21, closed on evidence 2026-10-22; #275 and #277 recorded
+  2026-10-23, closed by the first rescan after the merge).
 - 2027-01-19: the ninety-day clock of CVE-2026-111943 (#300) runs out on all
   six images, grafana included.
 - 2027-01-17: `.keys/90d-pat.txt` expires (extended 2026-10-19; the agent's
