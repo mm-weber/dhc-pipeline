@@ -21,6 +21,8 @@ triage:
   kev_ceiling: 14d
   expiry_warning: 14d
   kev_feed: https://example.invalid/kev.json
+  drills:
+    kev-outage: https://kev-feed.invalid/kev.json
 EOF
 }
 q() { "$TP" "$SB" "$@" 2>&1; }
@@ -33,6 +35,9 @@ fresh
 [ "$(q kev-ceiling)" = "14" ] && pass "the KEV ceiling" || fail "the KEV ceiling" "$(q kev-ceiling)"
 [ "$(q expiry-warning)" = "14" ] && pass "the expiry warning window" || fail "the expiry warning window" "$(q expiry-warning)"
 [ "$(q kev-feed)" = "https://example.invalid/kev.json" ] && pass "the KEV feed URL" || fail "the KEV feed URL" "$(q kev-feed)"
+# The drill substitutes (task 16.8, Req 7.7): what a dispatched rescan fetches
+# in place of the KEV feed is a declared value, read here and nowhere else.
+[ "$(q drill-feed kev-outage)" = "https://kev-feed.invalid/kev.json" ] && pass "a drill substitute reads by name" || fail "a drill substitute reads by name" "$(q drill-feed kev-outage)"
 
 # A wider aperture is a fork switch: the order declared is the rank order, and
 # every severity in it must carry a ceiling or the tiering has a hole.
