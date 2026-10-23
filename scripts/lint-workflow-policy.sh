@@ -12,6 +12,10 @@
 # while task 9.2 was wiring build.yml's cron; once wired, its absence is the
 # drift that silently stops a daily promise (Req 2.14, 2.22).
 #
+# Since task 16.8 (Req 7.10 as amended): a workflow_dispatch input is a
+# declared value too, so each input a workflow carries must be listed by name
+# under its declaration's `inputs` map.
+#
 # YAML via python3 + PyYAML (the lint-accepted-risk.sh precedent; installed by
 # validate.yml's yamllint step, present in the devcontainer).
 set -euo pipefail
@@ -66,6 +70,16 @@ for path in sorted(glob.glob(os.path.join(root, ".github", "workflows", "*.yml")
         # (Req 2.14, 2.22); it used to pass with a notice.
         err(wf, f"declares schedule '{want_cron}' in catalogue-policy.yaml but the workflow carries no schedule trigger")
 
+    # Dispatch inputs (task 16.8, Req 7.10 as amended): an input a workflow
+    # carries is a declared value like a cron, listed by name under the
+    # declaration's `inputs` map. A bare `workflow_dispatch:` parses as None.
+    inputs = (on.get("workflow_dispatch") or {}).get("inputs") or {}
+    decl_inputs = decl.get("inputs") or {}
+    for name in inputs:
+        if name not in decl_inputs:
+            listed = ", ".join(f"'{k}'" for k in decl_inputs) or "none"
+            err(wf, f"workflow_dispatch input '{name}' is not declared (declared inputs: {listed})")
+
     def diff_perms(where, actual, wanted):
         actual = actual or {}
         wanted = wanted or {}
@@ -93,5 +107,5 @@ for path in sorted(glob.glob(os.path.join(root, ".github", "workflows", "*.yml")
 if failures:
     print(f"lint-workflow-policy: {failures} declaration mismatch(es)", file=sys.stderr)
     sys.exit(1)
-print("lint-workflow-policy: every workflow schedule and permissions block matches catalogue-policy.yaml")
+print("lint-workflow-policy: every workflow schedule, dispatch input and permissions block matches catalogue-policy.yaml")
 PY
