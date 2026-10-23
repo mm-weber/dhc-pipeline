@@ -27,6 +27,7 @@ Navigation for the project context and the work tracks. Context first, then spec
 | proof-kinds_20261015 | completed | high | [spec](./tracks/proof-kinds_20261015/spec.md) | [plan](./tracks/proof-kinds_20261015/plan.md) |
 | drill-definition_20261017 | completed | high | [spec](./tracks/drill-definition_20261017/spec.md) | [plan](./tracks/drill-definition_20261017/plan.md) |
 | retire-grafana_20261019 | completed | high | [spec](./tracks/retire-grafana_20261019/spec.md) | [plan](./tracks/retire-grafana_20261019/plan.md) |
+| kev-drill-input_20261023 | pending | high | [spec](./tracks/kev-drill-input_20261023/spec.md) | [plan](./tracks/kev-drill-input_20261023/plan.md) |
 
 ## Recent activity
 
@@ -38,3 +39,4 @@ Navigation for the project context and the work tracks. Context first, then spec
 | 2026-10-19 | drill-definition_20261017 | Track completed: #286 merged 2026-10-18 (the definition, the first declared none proof, the owner's two accept decisions); the first publish and the first rescan observed in the evidence pull request |
 | 2026-10-19 | retire-grafana_20261019 | Track created from the owner's call to deactivate grafana by the documented switch (level 1 of four, kept in the spec); the twelve moot exceptions retired with it |
 | 2026-10-20 | retire-grafana_20261019 | Track completed: #290 merged 2026-10-19 (the switch, the twelve exceptions retired); the first inactive day observed in #292 and #295 (no grafana job in the push build, the drill's build, the owner's dispatch release and the nightly; the rescan's first non-empty inactive check, run 39417467219; Renovate autoclosed #279); rows 1.15 and 1.16 exercised |
+| 2026-10-23 | kev-drill-input_20261023 | Track created from spec task 16.8, the first drill input: the `drill` choice on `rescan.yml`'s dispatch substitutes a declared KEV feed address for one run, the policy lint holds its allowed values (Req 7.7 and 7.10 amended in the same pull request), both fail-closed branches to run live |
