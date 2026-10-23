@@ -314,7 +314,7 @@ tells you how portable the statements have proven to be so far, and
 | `chart.yml`    | every PR + main            | Render *every* chart, evaluate with the Kyverno policies; `ct lint` on owned charts |
 | `e2e.yml`      | PR + dispatch              | Per affected component: kind cluster, install the hardened chart, run the Ginkgo suite |
 | `renovate.yml` | cron every 4h + dispatch   | Self-hosted Renovate over the custom managers; postUpgradeTasks recompute derived fields |
-| `rescan.yml`   | daily 06:17 UTC + dispatch | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set, close them on evidence with graded labels and reopen them on recurrence; the clocks over the supported set to the catalogue status issue and the catalogue page to GitHub Pages; expiry warnings; the VEX portability block over the supported set and the consumer smoke test (the README recipe run verbatim against one digest) |
+| `rescan.yml`   | daily 06:17 UTC + dispatch (`drill` input: `none`, `kev-outage`, `kev-synthetic`; task 16.8) | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set, close them on evidence with graded labels and reopen them on recurrence; the clocks over the supported set to the catalogue status issue and the catalogue page to GitHub Pages; expiry warnings; the VEX portability block over the supported set and the consumer smoke test (the README recipe run verbatim against one digest) |
 
 Every GitHub Action is pinned to a full commit SHA, and every third-party
 executable a workflow installs is exact-version-pinned and checksum-verified
@@ -603,7 +603,14 @@ name. `CODEOWNERS` names the maintainer per lane (Req 9.10), and
 | Rebuild (`build.yml`)     | daily 04:47 UTC (Req 2.14)| Fresh digests for every definition whose package set changed; a discard line for the rest | Actions tab · the run summary per image |
 | Rescan (`rescan.yml`)     | daily 06:17 UTC (Req 2.22, which absorbed the retired Req 6.2)| Enumeration of every catalogue tag; the visibility invariant and the admission proof (Req 2.21, 2.24); every platform manifest scanned by digest; today's reports attested and the OpenVEX document re-attested on change, replacing (Req 6.42, 6.43); the cve issue lifecycle over the supported set, closing on evidence with graded labels and reopening on recurrence (Req 6.52 to 6.57); the clocks to the catalogue status issue (Req 6.46, 6.47) and the catalogue page to GitHub Pages (Req 6.61, 6.62); expiry warnings; VEX compile report | Actions tab · `cve`-labeled issues · the "Catalogue status" issue · the catalogue page |
 
-Both are dispatchable on demand (Renovate with dry-run and debug knobs). A
+Both are dispatchable on demand (Renovate with dry-run and debug knobs). The
+rescan's dispatch carries one more knob, `drill`, `none` by default:
+`kev-outage` substitutes an address under `.invalid` for the KEV feed on that
+run alone, so the run fails closed by name (Req 6.60), and `kev-synthetic`
+substitutes this repository's feed of one entry, the drill definition's HIGH,
+for task 16.3. A drill run attests today's reports as any dispatch does and
+publishes no issue set, status or page; the next scheduled run reads the
+declared feed and publishes (register row M22, task 16.8). A
 healthy quiet day is: Renovate runs green and opens nothing; rescan runs
 green, files nothing, and its compile report shows every statement applied.
 

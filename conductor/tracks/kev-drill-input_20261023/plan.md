@@ -31,10 +31,10 @@ Dependency: phase 0 merged. Worktree `kev-drill-input` from main.
 - [x] **1.2 RED and GREEN: a declared input absent from its workflow fails naming it** (FR-5) (red d9341b0, green 1ec4572): case 10 declares `inputs: {drill: ...}` for `plain.yml`, which carries none; expects exit 1 naming `plain.yml` and `drill`
 - [x] **1.3 RED and GREEN: a differing value fails naming the input and both values; a matching pair passes** (FR-5) (red d24ec69, green 20baab5): case 11 declares options `[none, kev-outage]` and the workflow carries `[none, kev-synthetic]`; expects exit 1 naming `drill` and both lists. The fixture's `fresh` gains the input on `cron.yml` and its declaration from this slice on, so case 1 proves the match (`description` dropped before the comparison)
 - [x] **1.4 RED and GREEN: `drill-feed <name>` prints the declared substitute** (FR-4) (red 81cb0de, green e8a7d1e): `scripts/triage-policy_test.sh` gives the fixture `drills: {kev-outage: https://kev-feed.invalid/kev.json}`; `q drill-feed kev-outage` prints it
-- [~] **1.5 RED and GREEN: `drill-feed` refuses `none`, an undeclared name and a missing map** (FR-4): exit 2 and the name or the hole in the message, one test per behaviour in the suite's style (three assertions, one slice: they are one refusal shape)
-- [ ] **1.6 The declarations and the workflow** (FR-1, FR-2, FR-3; orchestrator, the lints are the test): `catalogue-policy.yaml` gains `triage.drills` (both addresses, a comment naming what reads them and why `.invalid`), `workflows.build.yml.inputs.image` (`required: false`, `type: string`) and `workflows.rescan.yml.inputs.drill` (choice, the three options, default `none`); `rescan.yml` gains the input, the job env `DRILL`, the lookup with its `::warning::` annotation, the drill's name in the outage error line, the `drill` and `feed` outputs, and the summary line; the reader's header and usage line name `drill-feed`
-- [ ] **1.7 The synthetic feed** (FR-6): `triage/drills/kev-synthetic.json`, one entry, CVE-2025-30204, titled DRILL
-- [ ] **1.8 The docs** (FR-10): the manual's two rescan rows and the dispatch sentence; register row M20; the policy file's comments
+- [x] **1.5 RED and GREEN: `drill-feed` refuses `none`, an undeclared name and a missing map** (FR-4) (red 72e6b9b, green 956695f): exit 2 and the name or the hole in the message, one test per behaviour in the suite's style (three assertions, one slice: they are one refusal shape)
+- [~] **1.6 The declarations and the workflow** (FR-1, FR-2, FR-3; orchestrator, the lints are the test): `catalogue-policy.yaml` gains `triage.drills` (both addresses, a comment naming what reads them and why `.invalid`), `workflows.build.yml.inputs.image` (`required: false`, `type: string`) and `workflows.rescan.yml.inputs.drill` (choice, the three options, default `none`); `rescan.yml` gains the input, the job env `DRILL`, the lookup with its `::warning::` annotation, the drill's name in the outage error line, the `drill` and `feed` outputs, and the summary line; the reader's header and usage line name `drill-feed`
+- [~] **1.7 The synthetic feed** (FR-6): `triage/drills/kev-synthetic.json`, one entry, CVE-2025-30204, titled DRILL
+- [~] **1.8 The docs** (FR-10): the manual's two rescan rows and the dispatch sentence; register row M20; the policy file's comments
 - [ ] **1.9 The pull request**: title `feat: the KEV drill input on the rescan's dispatch, a declared value substituted for one run (Req 6.59, 6.60, 7.7, 7.10; task 16.8)`, a TL;DR naming what the drill run publishes and withholds; the owner merges (checkpoint)
 
 ### Verification (orchestrator)
@@ -69,7 +69,7 @@ Dependency: phase 1 merged. Worktree `kev-drill-evidence` from main for the evid
 
 | Date | Task | Deviation | Reason | Resolution |
 | --- | --- | --- | --- | --- |
-| 2026-10-23 | 1.8 | The register's next free row is M21, not M20 | The draft read the table's first rows only; M20 (chart image-pin tag bumps) exists | FR-10's note and acceptance say M21 |
+| 2026-10-23 | 1.8 | The register's next free row is M22, not M20 | The draft read the table's first rows only; M20 (chart image-pin tag bumps) and M21 (the fork's registry-namespace literals) exist, found at 1.8 by a count of the rows | FR-10's note and acceptance say M22; the row placed last |
 | 2026-10-23 | 1.1 | Three workflows carry dispatch inputs, not one: build.yml `image`, renovate.yml `logLevel` and `dryRun`, e2e.yml `component` | The spec's FR-5 note counted build.yml alone, from a read of build.yml and rescan.yml only | GREEN-1 declared all four inputs as literal mirrors (the GREEN agent found the two others on the real-repository run); FR-5's note corrected |
 
 ---

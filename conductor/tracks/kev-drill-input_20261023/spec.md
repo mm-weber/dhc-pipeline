@@ -133,11 +133,11 @@ Notes: the LOG heading `## <date>: the KEV feed outage drill, both arms fail clo
 
 THE Repository SHALL name its drill input in `docs/user-manual.md`'s rows for `rescan.yml` and SHALL add to `docs/CONVENTIONS.md`'s manual-controls register one row for dispatching a rescan with a drill input, stating that such a run is red by name and publishes attestations only.
 
-Notes: row M21 (the draft said M20, which the chart pin bumps row already holds); the manual's workflow table (the `rescan.yml` row) and the cron table's rescan row, plus a sentence under "Both are dispatchable on demand". The policy file's comments name the two new keys and what reads them.
+Notes: row M22 (the draft said M20, then M21; the table's last row is M21, the fork's registry-namespace literals); the manual's workflow table (the `rescan.yml` row) and the cron table's rescan row, plus a sentence under "Both are dispatchable on demand". The policy file's comments name the two new keys and what reads them.
 
 **Acceptance criteria:**
 
-- [ ] Both rows and the sentence present; `grep -c '^| M21 ' docs/CONVENTIONS.md` is 1; no em-dashes added
+- [ ] Both rows and the sentence present; `grep -c '^| M22 ' docs/CONVENTIONS.md` is 1; no em-dashes added
 
 ## Scope
 
