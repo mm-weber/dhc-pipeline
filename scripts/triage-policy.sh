@@ -14,6 +14,8 @@
 #   kev-ceiling        the ceiling for a finding listed in CISA KEV, in days
 #   expiry-warning     the window the rescan reports lapsing exceptions in
 #   kev-feed           the KEV catalogue URL both arms fetch
+#   drill-feed <name>  the substitute a dispatched rescan fetches in place of
+#                      the KEV feed, by the drill input's name (task 16.8)
 #   resolved-labels    the closing labels per evidence grade, as JSON
 #                      {grade: {name, color, description}} (task 10.6, Req 6.56)
 #   support            the support statement as JSON {supported_set,
@@ -37,7 +39,7 @@ set -euo pipefail
 
 err() { printf '::error::triage-policy: %s\n' "$1" >&2; }
 if [ "$#" -lt 2 ]; then
-  err "usage: triage-policy.sh <root> <aperture|ceiling <SEV>|largest-ceiling|kev-ceiling|expiry-warning|kev-feed|resolved-labels|support|consumers|authoritative-consumer|other-consumers|consumer-gating>"
+  err "usage: triage-policy.sh <root> <aperture|ceiling <SEV>|largest-ceiling|kev-ceiling|expiry-warning|kev-feed|drill-feed <name>|resolved-labels|support|consumers|authoritative-consumer|other-consumers|consumer-gating>"
   exit 2
 fi
 ROOT="$1"; QUERY="$2"; ARG="${3:-}"
@@ -82,6 +84,8 @@ elif query == "expiry-warning":
 elif query == "kev-feed":
     if not t.get("kev_feed"): refuse("kev_feed is missing")
     print(t["kev_feed"])
+elif query == "drill-feed":
+    print(t["drills"][arg])
 elif query == "resolved-labels":
     import json
     labels = t.get("resolved_labels") or {}
