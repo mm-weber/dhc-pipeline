@@ -72,16 +72,27 @@ stay as history.
       the gate cannot admit (Req 6.1); proposed: both decided within their
       ceilings in 16.2, the HIGH's exception re-decided against the KEV
       ceiling in 16.3.
-- [ ] 16.3 KEV-listed finding under an exception (6.50, 6.51): the HIGH's
+- [ ] 16.3 KEV-listed finding under an exception (6.50, 6.51): OPENED 2026-10-24
+      as conductor track `kev-ceiling_20261024` (phase 0 the track and the
+      task text's amendment; phase 1 the owner's dispatch with
+      `drill: kev-synthetic` on the standing 90-day exception, red by name and
+      publishing KEV: yes, then the drill pull request: red at the tiering
+      step on its first commit, the re-decision to four days from its decision
+      date D merged on its second; phase 2 a second dispatch for the pass and
+      the evidence). The lapse follows on D plus five: 16.4's track opens the
+      day phase 1 merges. The plan as written on 2026-10-17: the HIGH's
       exception re-decided with an expiry beyond decision date plus the 14-day
       KEV ceiling fails the gate by name; corrected and merged; the rescan
       evaluates it against today's KEV; status issue and page show KEV: yes.
       trivy attributes no KEV entry to CVE-2025-30204 (measured 2026-10-15), so
       16.8's drill input had to exist first; it does since #310 (2026-10-23):
       `drill: kev-synthetic` substitutes `triage/drills/kev-synthetic.json`,
-      which names that CVE, for one run. NEXT: its own conductor track.
+      which names that CVE, for one run.
 - [ ] 16.4 Expiry warning, then lapse (6.9, 6.10, 6.35, 6.41, 6.43): expiry
-      four days out; the warning inside the 14-day window; the day after,
+      four days out (16.3's re-decision, 2026-10-24: no second re-decision;
+      the warning half comes with the first scheduled run after 16.3's
+      correction merges, the lapse on its D plus five); the warning inside the
+      14-day window; the day after,
       under_investigation with first-seen carried, re-attestation, the gate no
       longer counts the exception, the finding undecided again.
 - [ ] 16.5 Over the ceiling (6.46, 6.47, 6.49): HIGH ceiling lowered to one
