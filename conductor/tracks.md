@@ -8,16 +8,19 @@
 
 ## Active tracks
 
-### [~] kev-drill-input_20261023: The KEV drill input, a feed outage fails closed in both arms, live
-
-**Description:** A `drill` input on `rescan.yml`'s dispatch substitutes a declared value for the KEV feed for one run (`kev-outage`: an address under `.invalid` that never resolves; `kev-synthetic`: a feed of this repository naming the drill definition's HIGH, for task 16.3), the policy lint holds the input's allowed values beside the crons and the permissions, and both fail-closed branches run live for the first time: the gate on a drill branch never merged, the rescan on a dispatched run that is red by name and publishes attestations only; the ledger rows 6.59 and 6.60 filled (Req 6.59, 6.60, 7.7, 7.10, 7.11; task 16.8).
-**Priority:** high (the next drill of the live program; 16.3 depends on it)
-**Folder:** [./tracks/kev-drill-input_20261023/](./tracks/kev-drill-input_20261023/)
-
----
+<!-- No active track; the next drill is 16.3 (the KEV-listed finding under an exception), its track to open -->
 
 
 ## Completed tracks
+
+### [x] kev-drill-input_20261023: The KEV drill input, a feed outage fails closed in both arms, live
+
+**Description:** A `drill` input on `rescan.yml`'s dispatch substitutes a declared value for the KEV feed for one run (`kev-outage`: an address under `.invalid` that never resolves; `kev-synthetic`: a feed of this repository naming the drill definition's HIGH, for task 16.3), the policy lint holds the input's allowed values beside the crons and the permissions, and both fail-closed branches run live for the first time: the gate on a drill branch never merged, the rescan on a dispatched run that is red by name and publishes attestations only; the ledger rows 6.59 and 6.60 filled (Req 6.59, 6.60, 7.7, 7.10, 7.11; task 16.8).
+**Priority:** high (the next drill of the live program; 16.3 depends on it)
+**Completed:** 2026-10-24 (#308 merged 2026-10-23 as a5decb6, the spec amendment and the track; #310 merged 2026-10-23 as 9e62294, the input, the declarations, the lint, the reader; the drill observed in #314: the gate's half red on #313, never merged, build runs 40021724071 and 40021765400; the dispatched run 40024066594 red by name, the status and the page withheld; the scheduled run 40088952931 green with the status and the page published; rows 6.59 and 6.60 exercised)
+**Folder:** [./tracks/kev-drill-input_20261023/](./tracks/kev-drill-input_20261023/)
+
+---
 
 ### [x] retire-grafana_20261019: Grafana deactivated, the documented switch exercised live
 

@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-10-23
+# Live drills (task group 16): where we are and what is next, as of 2026-10-24
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -58,8 +58,9 @@ stay as history.
 
 - [x] 16.2 The drill definition `image/drill-app/` and its first findings:
       DONE 2026-10-18 (#286, conductor track `drill-definition_20261017`;
-      the evidence pull request of 2026-10-19 closed the track). Next: 16.8,
-      then 16.3. What follows was the plan as written on 2026-10-17.
+      the evidence pull request of 2026-10-19 closed the track). Next after
+      16.8 (done 2026-10-24): 16.3. What follows was the plan as written on
+      2026-10-17.
       Pull request 1 of the onboarding flow: the definition (hardened-app
       archetype, `name:` and annotation say drill, the symbol table kept so
       govulncheck measures at symbol level), the active-set entry, the first
@@ -76,7 +77,9 @@ stay as history.
       KEV ceiling fails the gate by name; corrected and merged; the rescan
       evaluates it against today's KEV; status issue and page show KEV: yes.
       trivy attributes no KEV entry to CVE-2025-30204 (measured 2026-10-15), so
-      16.8's drill input must exist first: build 16.8 before 16.3.
+      16.8's drill input had to exist first; it does since #310 (2026-10-23):
+      `drill: kev-synthetic` substitutes `triage/drills/kev-synthetic.json`,
+      which names that CVE, for one run. NEXT: its own conductor track.
 - [ ] 16.4 Expiry warning, then lapse (6.9, 6.10, 6.35, 6.41, 6.43): expiry
       four days out; the warning inside the 14-day window; the day after,
       under_investigation with first-seen carried, re-attestation, the gate no
@@ -88,16 +91,19 @@ stay as history.
       modules; the open issues close resolved:fixed on attested SBOMs.
 - [ ] 16.7 Regression and reopen (6.57): the vulnerable pin returns as a new
       release; the closed issues reopen with the original first-seen.
-- [ ] 16.8 KEV feed outage fails closed (6.59, 6.60): OPENED 2026-10-23 as
-      conductor track `kev-drill-input_20261023` (phase 0 the spec amendment
-      of 7.7 and 7.10 and the track; phase 1 the input, the declarations, the
-      lint and the reader by TDD; phase 2 the drill branch, the dispatched
-      outage run, the next scheduled run, the evidence). The plan as written
-      on 2026-10-17: a `drill` input on
+- [x] 16.8 KEV feed outage fails closed (6.59, 6.60): DONE 2026-10-24
+      (conductor track `kev-drill-input_20261023`: #308 the spec amendment of
+      7.7 and 7.10 and the track, #310 the input, the declarations, the lint
+      and the reader by TDD, both merged 2026-10-23; #313 the drill branch,
+      never merged, red twice at the tiering step; the owner's dispatch
+      40024066594 of 21:04Z red by name, the status and the page withheld;
+      the scheduled run 40088952931 of 2026-10-24 green with `- drill: none`;
+      the evidence in #314). The plan as written on 2026-10-17: a `drill` input on
       rescan.yml's workflow_dispatch (`kev-outage`) substituting an unreachable
       URL for one run, printed in the summary; lint-workflow-policy learns the
       input; a drill branch does the same on a pull request's tiering step.
-      Also the substituted feed naming a CVE, for 16.3.
+      Also the substituted feed naming a CVE, for 16.3 (`kev-synthetic`,
+      shipped in #310).
 - [ ] 16.9 Fail-closed release gate (2.11, 2.13): `release.fail_closed` true by
       pull request; the drill exception allowed to expire; build.yml
       dispatched for drill-app; the digest frozen, unsigned, untagged,
