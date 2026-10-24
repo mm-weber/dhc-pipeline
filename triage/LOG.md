@@ -3100,7 +3100,8 @@ platform manifest(s) carries exactly one OpenVEX attestation` and
 after one minute and twenty-five seconds. The authenticity, portability, smoke-test and expiry steps
 ran under `always()` (21:19:16Z to 21:23:59Z). The refusals by name: the
 enrich step (21:23:59Z), `enrich: no KEV catalogue on disk (the invariants
-step reports why); today's issue set and status are not built (Req 6.60)`,
+step reports why); today's issue set and status are not built (Req 6.60)`
+(the step's log, read by the owner, shows `DRILL: kev-outage` in its env),
 behind it the dedup, the issue set, the Grype second opinion and the
 new-CVE filing skipped; the status step (21:24:00Z), `catalogue status:
 /home/runner/work/dhc-pipeline/dhc-pipeline/rescan-out/kev.json is missing
@@ -3115,6 +3116,23 @@ from the devcontainer; the warning annotation above carries the same input
 and address). The status issue (#151) kept its 13:33Z body and the page its
 13:33Z data. The run red by the invariants step and by each refusal, as Req
 6.60 asks: a feed outage is a non-evaluation, never an evaluation against an
-empty KEV set. Ledger row 6.60 flips to exercised on this. Part three, the
-next scheduled run (the declared feed read again, `- drill: none`, the
-status and the page published), follows.
+empty KEV set. Ledger row 6.60 flips to exercised on this.
+
+**The recovery (2026-10-24, 11:12 to 11:30Z).** The next scheduled run,
+40088952931 on main at ec0692e, carried no input, so `DRILL` fell back to
+`none` (the workflow's `inputs.drill || 'none'`): the invariants step read
+the declared feed and passed (11:21:32Z to 11:23:05Z, no drill annotation
+on the job), the enrich step ran (11:29:20Z), the issue set was built with
+nothing new to file (the Grype second opinion and the filing step skipped;
+#300 the one open cve issue, untouched), the status was published to #151
+at 11:29:24Z (`generated: 2026-10-24`, 42 findings, 1 undecided within its
+ceiling, 12 decided, 29 fixed), the status data and the page were uploaded,
+and the page job deployed the page at 11:29:47Z with its check that the
+served data is this run's (Req 6.62) green. The summary's drill line on a
+schedule event is the workflow's `- drill: none` (the summary is not
+readable through the API from the devcontainer; the absence of the
+substitution's warning annotation on the job says the same). The status
+issue and the page carried the 13:33Z data of 2026-10-23 until 11:29Z, as
+the task text and the track's risk table say. Task 16.8 is done on these
+runs; 16.3, the KEV-listed finding under an exception, is next, and its
+drill reads the `kev-synthetic` value this track shipped.

@@ -41,8 +41,8 @@ Notes: the job's `env` gains `DRILL: ${{ github.event.inputs.drill || 'none' }}`
 
 **Acceptance criteria:**
 
-- [ ] `yamllint .github/workflows/rescan.yml` and `scripts/lint-rescan-steps.sh` green; `scripts/lint-workflow-policy.sh .` green with FR-5's declaration
-- [ ] The "Run workflow" form shows the three options (observed by the owner at the drill, phase 2)
+- [x] `yamllint .github/workflows/rescan.yml` and `scripts/lint-rescan-steps.sh` green; `scripts/lint-workflow-policy.sh .` green with FR-5's declaration (#310's validate run on 0ee1e95, 2026-10-23; main's validate runs since 9e62294)
+- [x] The "Run workflow" form shows the three options (observed by the owner at the drill, phase 2) (the owner's dispatch of 2026-10-23 21:04Z carried `kev-outage` from the form, run 40024066594)
 
 ### FR-2: The substitution, one declared value, the same code path (Req 6.60, 7.7)
 
@@ -52,8 +52,8 @@ Notes: the step's diff is the lookup, one `::warning::` annotation naming the dr
 
 **Acceptance criteria:**
 
-- [ ] The pull request's diff of the invariants step shows the lookup and the annotation and no second branch (reviewed)
-- [ ] The kev-outage run's invariants step is red with the Req 6.60 line naming `https://kev-feed.invalid/known_exploited_vulnerabilities.json` and the drill
+- [x] The pull request's diff of the invariants step shows the lookup and the annotation and no second branch (reviewed) (#310, merged by the owner 2026-10-23 as 9e62294)
+- [x] The kev-outage run's invariants step is red with the Req 6.60 line naming `https://kev-feed.invalid/known_exploited_vulnerabilities.json` and the drill (run 40024066594, 21:19:07Z; the error annotation and the owner's paste of the step's log)
 
 ### FR-3: The run says so (Req 6.60, 7.11)
 
@@ -63,7 +63,7 @@ Notes: `- drill: none` on the schedule; `- drill: kev-outage (the KEV feed subst
 
 **Acceptance criteria:**
 
-- [ ] The drill run's summary carries the line with the address; the next scheduled run's carries `- drill: none`
+- [x] The drill run's summary carries the line with the address; the next scheduled run's carries `- drill: none` (runs 40024066594 and 40088952931, as the workflow prints them; the summaries are not readable through the API from the devcontainer, the drill run's warning annotation carries the same name and address, the scheduled run's job has none)
 
 ### FR-4: The declared substitutes and their reader (Req 7.7)
 
@@ -73,8 +73,8 @@ Notes: `.invalid` is reserved by RFC 2606 and never resolves, so the outage is d
 
 **Acceptance criteria:**
 
-- [ ] `scripts/triage-policy_test.sh`: `drill-feed kev-outage` prints the declared address; `drill-feed none`, an undeclared name and a missing `drills` map each refuse with exit 2 naming the name or the hole
-- [ ] `scripts/triage-policy.sh . drill-feed kev-outage` prints the `.invalid` address on this repository
+- [x] `scripts/triage-policy_test.sh`: `drill-feed kev-outage` prints the declared address; `drill-feed none`, an undeclared name and a missing `drills` map each refuse with exit 2 naming the name or the hole (#310, by TDD; green on its validate run and on main's since 9e62294)
+- [x] `scripts/triage-policy.sh . drill-feed kev-outage` prints the `.invalid` address on this repository (#310; the drill run's warning annotation of 2026-10-23 carries that address, run 40024066594)
 
 ### FR-5: The lint holds the inputs (Req 7.10 as amended)
 
@@ -84,8 +84,8 @@ Notes: `lint-workflow-policy.sh` compares, per workflow, each dispatch input's m
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-workflow-policy_test.sh` cases 9 to 11: an undeclared input fails naming the workflow and the input; a declared input absent from its workflow fails naming it; a differing `options` list fails naming the input and both lists; the matching fixture passes with an input on both sides
-- [ ] `scripts/lint-workflow-policy.sh .` prints its all-green line on this repository with both declarations
+- [x] (#310, by TDD) `scripts/lint-workflow-policy_test.sh` cases 9 to 11: an undeclared input fails naming the workflow and the input; a declared input absent from its workflow fails naming it; a differing `options` list fails naming the input and both lists; the matching fixture passes with an input on both sides
+- [x] `scripts/lint-workflow-policy.sh .` prints its all-green line on this repository with both declarations (#310; main's validate runs since 9e62294 green)
 
 ### FR-6: The synthetic feed, for task 16.3 (Req 6.51, 7.11)
 
@@ -95,7 +95,7 @@ Notes: the entry carries the fields CISA's entries carry (`vendorProject` golang
 
 **Acceptance criteria:**
 
-- [ ] `python3 -I -c 'import json,sys; json.load(open(sys.argv[1]))' triage/drills/kev-synthetic.json` succeeds; `jq -r '.vulnerabilities[].cveID'` prints `CVE-2025-30204` and nothing else; the title's first word is DRILL
+- [x] (#310's verification, 2026-10-23) `python3 -I -c 'import json,sys; json.load(open(sys.argv[1]))' triage/drills/kev-synthetic.json` succeeds; `jq -r '.vulnerabilities[].cveID'` prints `CVE-2025-30204` and nothing else; the title's first word is DRILL
 
 ### FR-7: The gate's drill branch (Req 6.59)
 
@@ -105,8 +105,8 @@ Notes: the build matrix derives from changed paths under `image/`, so the policy
 
 **Acceptance criteria:**
 
-- [ ] The drill pull request's build run is red at the tiering step with the Req 6.59 line naming the address; validate green; the run id recorded in the ledger's row 6.59
-- [ ] The pull request is closed unmerged after the evidence merges
+- [x] The drill pull request's build run is red at the tiering step with the Req 6.59 line naming the address; validate green; the run id recorded in the ledger's row 6.59 (#313: build run 40021724071 on 1b221d8 red at step 19 at 20:50:49Z, validate 40021724024 green; the owner's update with main, 8127bd0, ran it again, build run 40021765400 red at the same step at 20:51:14Z, validate 40021765479 green; row 6.59 carries both)
+- [ ] The pull request is closed unmerged after the evidence merges (#313, after #314 merges: the post-merge housekeeping)
 
 ### FR-8: The outage run (Req 6.60)
 
@@ -116,8 +116,8 @@ Notes, what the dispatch does beside the outage (register row M17): the scan run
 
 **Acceptance criteria:**
 
-- [ ] The drill run's id, its invariants line, the three refusals and the summary line recorded; the status issue's body unchanged that day
-- [ ] The next scheduled run green with `- drill: none` and the status published (its id recorded)
+- [x] The drill run's id, its invariants line, the three refusals and the summary line recorded; the status issue's body unchanged that day (run 40024066594; LOG 2026-10-23, part two; #151 kept its 13:33Z body)
+- [x] The next scheduled run green with `- drill: none` and the status published (its id recorded) (run 40088952931, 2026-10-24 11:12Z to 11:30Z: no input, the status published to #151 at 11:29:24Z, the page deployed 11:29:47Z)
 
 ### FR-9: The evidence (Req 7.11)
 
@@ -127,7 +127,7 @@ Notes: the LOG heading `## <date>: the KEV feed outage drill, both arms fail clo
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` and `scripts/lint-log-anchors.sh all .` green; the rows, the entry and the tick present; `conductor/tracks.md` lists the track under Completed
+- [x] `scripts/lint-live-evidence.sh .` and `scripts/lint-log-anchors.sh all .` green; the rows, the entry and the tick present; `conductor/tracks.md` lists the track under Completed (2026-10-24: 119 exercised; rows 6.59 and 6.60, LOG 2026-10-23 in three parts, the tick in `tasks.md`)
 
 ### FR-10: Named where a reader meets it (Req 7.1, 7.11)
 
@@ -137,7 +137,7 @@ Notes: row M26, the table's next free id, placed last (the draft said M20, then 
 
 **Acceptance criteria:**
 
-- [ ] Both rows and the sentence present; `grep -c '^| M26 ' docs/CONVENTIONS.md` is 1; no em-dashes added
+- [x] Both rows and the sentence present; `grep -c '^| M26 ' docs/CONVENTIONS.md` is 1; no em-dashes added (#310, 2026-10-23)
 
 ## Scope
 
@@ -177,8 +177,8 @@ Notes: row M26, the table's next free id, placed last (the draft said M20, then 
 
 ## Open questions (the owner's calls)
 
-- [ ] The value names `kev-outage` and `kev-synthetic` and the address `https://kev-feed.invalid/known_exploited_vulnerabilities.json` (drafted; rename or strike by review)
-- [ ] `kev-synthetic` ships in this track as task 16.8's text says, or waits for 16.3's track (drafted: ships here, unused until 16.3)
+- [x] The value names `kev-outage` and `kev-synthetic` and the address `https://kev-feed.invalid/known_exploited_vulnerabilities.json` (drafted; rename or strike by review) Kept as drafted: the owner merged #308 and #310 with them (2026-10-23).
+- [x] `kev-synthetic` ships in this track as task 16.8's text says, or waits for 16.3's track (drafted: ships here, unused until 16.3) Ships here: #310, the owner's merge of 2026-10-23.
 
 ## References
 

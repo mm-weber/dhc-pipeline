@@ -3,7 +3,7 @@
 **Track ID:** kev-drill-input_20261023
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-10-23
-**Status:** [~] in progress (phase 0 merged 2026-10-23 as a5decb6, #308; phase 1 merged 2026-10-23 as 9e62294, #310; phase 2 started 2026-10-23)
+**Status:** [x] completed (phase 0 in #308, merged 2026-10-23 as a5decb6; phase 1 in #310, merged 2026-10-23 as 9e62294; phase 2 the evidence in #314, 2026-10-24)
 
 ## Overview
 
@@ -51,19 +51,19 @@ Dependency: phase 1 merged. Worktree `kev-drill-evidence` from main for the evid
 
 - [x] **2.1 The gate's drill branch** (FR-7) (draft #313, commit 1b221d8, the tip since 20:46:07Z the owner's update with main, 8127bd0; build run 40021724071 red at step 19 `exception tiers against KEV (Req 6.50)` at 20:50:49Z, job 120647720657, after the build and the scan; validate run 40021724024 green; the update's build run 40021765400 red at the same step at 20:51:14Z, job 120647848842, with the same line): `triage.kev_feed` set to the outage address, one comment line in `image/drill-app/image.yaml`; draft pull request; the build run red at `exception tiers against KEV` with the Req 6.59 line naming the address; validate green; the run id recorded
 - [x] **2.2 The outage run** (FR-8) (run 40024066594, the owner's dispatch 21:04:35Z on 2f53e31, job 120655680352: the invariants step red 21:19:07Z naming the address and Req 6.60, the enrich (21:23:59Z) and status (21:24:00Z) refusals by name, the page job skipped, #151 unchanged; the summary's drill line is the workflow's): the owner dispatches `rescan.yml` with `drill: kev-outage` after the day's scheduled run, told beforehand what the dispatch publishes (today's reports attested with replace, the document re-attested where changed, the lifecycle applied on attested evidence) and withholds (the issue set, the status, the page); observed: the invariants step red naming the address and Req 6.60, the enrich, issue-set and status refusals by name, the page job skipped, the summary's drill line; the run id and the lines recorded
-- [ ] **2.3 The next scheduled run** (FR-8): green, `- drill: none`, the status issue and the page published; the run id recorded
-- [ ] **2.4 The evidence** (FR-9): ledger rows 6.59 and 6.60 to `exercised`, induced by `drill input`, with the run ids; the LOG entry `## <date>: the KEV feed outage drill, both arms fail closed by name (task 16.8)`; `tasks.md` 16.8 ticked `[done <date>, #nnn; conductor track kev-drill-input_20261023]`; `tasks/todo.md`'s program state to 16.3
-- [ ] **2.5 The ticks**: this plan's checkpoints; `conductor/tracks.md` to Completed; `metadata.json`; `conductor/index.md`; the drill pull request closed unmerged with a comment once the evidence merges
+- [x] **2.3 The next scheduled run** (FR-8) (run 40088952931, 2026-10-24 11:12Z to 11:30Z on ec0692e: both jobs green, the invariants step on the declared feed with no drill annotation, the status published to #151 at 11:29:24Z, the page deployed 11:29:47Z; the summary's line on a schedule event is the workflow's `- drill: none`): green, `- drill: none`, the status issue and the page published; the run id recorded
+- [x] **2.4 The evidence** (FR-9) (rows 6.59 and 6.60 with runs 40021724071, 40021765400, 40024066594 and 40088952931; the LOG entry of 2026-10-23 in three parts; `tasks.md` 16.8 ticked `[done 2026-10-24, #314; conductor track kev-drill-input_20261023]`; `tasks/todo.md` to 16.3): ledger rows 6.59 and 6.60 to `exercised`, induced by `drill input`, with the run ids; the LOG entry `## <date>: the KEV feed outage drill, both arms fail closed by name (task 16.8)`; `tasks.md` 16.8 ticked `[done <date>, #nnn; conductor track kev-drill-input_20261023]`; `tasks/todo.md`'s program state to 16.3
+- [x] **2.5 The ticks** (2026-10-24: this plan, `conductor/tracks.md`, `metadata.json`, `conductor/index.md`; #313's closure with a comment follows this pull request's merge, the post-merge housekeeping): this plan's checkpoints; `conductor/tracks.md` to Completed; `metadata.json`; `conductor/index.md`; the drill pull request closed unmerged with a comment once the evidence merges
 
 ### Verification (orchestrator)
 
-- [ ] `scripts/lint-live-evidence.sh .`, `scripts/lint-log-anchors.sh all .` green; the fourteen repository lints green; the pull request a draft until 2.3 is in, then ready; the owner merges (track complete)
+- [x] (2026-10-24: both lints green, 119 exercised; the fourteen on #314's validate runs; a draft from 2026-10-23 20:54Z until run 40088952931 was in, then ready; #314, this one) `scripts/lint-live-evidence.sh .`, `scripts/lint-log-anchors.sh all .` green; the fourteen repository lints green; the pull request a draft until 2.3 is in, then ready; the owner merges (track complete)
 
 ## Final verification
 
-- [ ] FR-1 to FR-10 each have their evidence in the LOG entry, the ledger or this plan (the spec's acceptance boxes carry the run ids)
-- [ ] Three pull requests merged by squash (phase 0, phase 1, the evidence); the drill pull request closed unmerged
-- [ ] Task 16.3's track is next in `tasks/todo.md`, its spec citing the `kev-synthetic` value
+- [x] FR-1 to FR-10 each have their evidence in the LOG entry, the ledger or this plan (2026-10-24; the spec's acceptance boxes carry the run ids)
+- [x] Three pull requests merged by squash (#308 as a5decb6 and #310 as 9e62294 on 2026-10-23; the evidence #314, this one); the drill pull request #313 closed unmerged after this merges (the post-merge housekeeping)
+- [x] Task 16.3's track is next in `tasks/todo.md` (2026-10-24); its spec, when opened, cites the `kev-synthetic` value declared since #310
 
 ## Deviations log
 
