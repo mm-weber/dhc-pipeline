@@ -3059,7 +3059,12 @@ the build gate went red at 20:51:05Z (job 120647720657): the tiers were not
 evaluated against an empty KEV set, which would have handed every exploited
 finding the widest tier. Validate run 40021724024 green, the fourteen lints
 over the drilled state; e2e run 40021724069 with nothing to test; the chart
-run 40021724130 green. Rehearsed in the worktree before the push with the
+run 40021724130 green. The owner's update of the branch with main at
+20:46:07Z (merge commit 8127bd0, the branch's tip since) ran the gate a
+second time: build run 40021765400 red at the same step at 20:51:14Z (job
+120647848842) with the same line, the build gate red at 20:51:31Z;
+validate run 40021765479, e2e run 40021765460 and chart run 40021765405
+green. Rehearsed in the worktree before the push with the
 step's shell verbatim: `curl: (6) Could not resolve host: kev-feed.invalid`,
 the same line, exit 1. Ledger row 6.59 flips to exercised on this.
 
