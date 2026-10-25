@@ -1,0 +1,10 @@
+{
+  "id": "deliberate-violations_20261025",
+  "type": "chore",
+  "status": "in_progress",
+  "created_at": "2026-10-25T14:10:00Z",
+  "updated_at": "2026-10-25T14:10:00Z",
+  "description": "One drill pull request, never merged, twenty-one commits each carrying one deliberate violation of a codified convention and undoing the previous one, so that every lint and gate that has never refused anything live refuses by name: the pin lint, the active set, the compat clock, the proof lint, the accepted-risk lane, the VEX product lint, the LOG anchors, the rendering drift check, the workflow policy, the revocation schema, the kyverno gate; fifteen ledger rows filled, four re-observed (Req 7.4, 7.11; task 16.15)",
+  "spec_path": "conductor/tracks/deliberate-violations_20261025/spec.md",
+  "plan_path": "conductor/tracks/deliberate-violations_20261025/plan.md"
+}

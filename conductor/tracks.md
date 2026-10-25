@@ -8,7 +8,13 @@
 
 ## Active tracks
 
-<!-- No active track. The next drill of the live program (task 16.4) opens its own track. -->
+### [~] deliberate-violations_20261025: Deliberate violations, one pull request, every lint refuses by name, live
+
+**Description:** One drill pull request, never merged, twenty-one commits each carrying one deliberate violation of a codified convention and undoing the previous one, so that every lint and gate that has never refused anything live refuses by name: the pin lint, the active set, the compat clock, the proof lint, the accepted-risk lane, the VEX product lint, the LOG anchors, the rendering drift check, the workflow policy, the revocation schema, the kyverno gate; fifteen ledger rows filled, four re-observed (Req 7.4, 7.11; task 16.15).
+**Priority:** high (the owner's call of 2026-10-25; no clock involved)
+**Folder:** [./tracks/deliberate-violations_20261025/](./tracks/deliberate-violations_20261025/)
+
+---
 
 ---
 
