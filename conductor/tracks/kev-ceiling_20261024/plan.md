@@ -3,7 +3,7 @@
 **Track ID:** kev-ceiling_20261024
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-10-24
-**Status:** [~] in progress (phase 0 opened 2026-10-24)
+**Status:** [~] in progress (phase 0 in #318, merged 2026-10-25 as a764a23; phase 1 in #319)
 
 ## Overview
 
@@ -15,13 +15,13 @@ The owner's calls: 2026-10-24, keep the total expiry short, no waiting on an arb
 
 ### Tasks
 
-- [ ] **0.1 The amendment** (task 16.3, a note on 16.4): 16.3's bullet gains the dated sentence (the finding listed by the `kev-synthetic` input, the rescan's half first on the standing exception, the gate's half on the drill pull request's first commit, the correction's one day (four until 2026-10-25) as 16.4's re-decision, the second dispatch for the pass); 16.4's bullet notes that the re-decision is 16.3's correction and names Trivy's midnight rule
-- [ ] **0.2 The track**: this folder, `conductor/tracks.md`, `conductor/index.md`, the todo's 16.3 and 16.4 items
-- [ ] **0.3 The pull request**: title `conductor: track kev-ceiling_20261024, the KEV ceiling on the drill's standing exception (Req 6.50, 6.51; task 16.3)`, a TL;DR; the owner merges (checkpoint)
+- [x] **0.1 The amendment** (task 16.3, a note on 16.4): 16.3's bullet gains the dated sentence (the finding listed by the `kev-synthetic` input, the rescan's half first on the standing exception, the gate's half on the drill pull request's first commit, the correction's one day (four until 2026-10-25) as 16.4's re-decision, the second dispatch for the pass); 16.4's bullet notes that the re-decision is 16.3's correction and names Trivy's midnight rule
+- [x] **0.2 The track**: this folder, `conductor/tracks.md`, `conductor/index.md`, the todo's 16.3 and 16.4 items
+- [x] **0.3 The pull request**: title `conductor: track kev-ceiling_20261024, the KEV ceiling on the drill's standing exception (Req 6.50, 6.51; task 16.3)`, a TL;DR; the owner merges (checkpoint: #318, squash a764a23, 2026-10-25 11:09Z; revised to one day before the merge)
 
 ### Verification (orchestrator)
 
-- [ ] The six FR statements in EARS shape (WHEN/THE ... SHALL); `scripts/lint-live-evidence.sh .` green (no row changes here); no em-dashes in the added lines; no closing keyword before an issue number
+- [x] The six FR statements in EARS shape (WHEN/THE ... SHALL); `scripts/lint-live-evidence.sh .` green (no row changes here); no em-dashes in the added lines; no closing keyword before an issue number
 
 ## Phase 1: the listing, the refusals, the re-decision (one dispatch, one pull request)
 
@@ -29,8 +29,8 @@ Dependency: phase 0 merged. Worktree `kev-ceiling-drill` from main.
 
 ### Tasks
 
-- [ ] **1.1 The listing run** (FR-1): the owner dispatches `rescan.yml` with `drill: kev-synthetic` after the day's scheduled run, told beforehand what the dispatch publishes (today's reports attested with replace, register row M17; the status issue and the page reading KEV yes on the drill definition until the next scheduled run); the run watched: the invariants step red with `triage/accepted-risk/drill-app.yaml: CVE-2025-30204 runs 90 days from 2026-10-18 to 2027-01-16, over its 14-day ceiling (listed in CISA KEV)` and the `1 exception(s) over their tier ... (Req 6.50/6.51)` line, the enrich step and the issue set run (nothing filed), the status published with KEV yes for CVE-2025-30204, the page job green, the summary's drill line; the run id, the job id and the step times recorded (the step's log as the owner reads it, on request)
-- [ ] **1.2 The gate's refusal** (FR-2): the first commit on `kev-ceiling-drill`: `triage.kev_feed` set to `https://raw.githubusercontent.com/mm-weber/dhc-pipeline/main/triage/drills/kev-synthetic.json`, one comment line in `image/drill-app/image.yaml` (`# Drill 16.3, the gate's half (Req 6.50): this line alone puts drill-app in the build matrix; removed before the merge.`); the pull request opened with a TL;DR that says its first run is meant to be red; the build run red at step 19 `exception tiers against KEV (Req 6.50)` with the breach line and the `(Req 6.50/6.51)` annotation after the build and the scan; validate green; the run id recorded
+- [x] **1.1 The listing run** (FR-1): done 2026-10-25, run 40187973579 (job 121152713348; the invariants step red at 11:24:49Z with the breach line, the status published at 11:30:36Z with KEV yes, the page at 11:31:01Z); the owner dispatched at 11:13:41Z, before the day's scheduled run, which had not started by then. As planned: the owner dispatches `rescan.yml` with `drill: kev-synthetic` after the day's scheduled run, told beforehand what the dispatch publishes (today's reports attested with replace, register row M17; the status issue and the page reading KEV yes on the drill definition until the next scheduled run); the run watched: the invariants step red with `triage/accepted-risk/drill-app.yaml: CVE-2025-30204 runs 90 days from 2026-10-18 to 2027-01-16, over its 14-day ceiling (listed in CISA KEV)` and the `1 exception(s) over their tier ... (Req 6.50/6.51)` line, the enrich step and the issue set run (nothing filed), the status published with KEV yes for CVE-2025-30204, the page job green, the summary's drill line; the run id, the job id and the step times recorded (the step's log as the owner reads it, on request)
+- [x] **1.2 The gate's refusal** (FR-2): done 2026-10-25, #319 commit ee48046, build run 40188092683 red at step 19 at 11:20:15Z (job 121153084106), validate run 40188092562 green. As planned: the first commit on `kev-ceiling-drill`: `triage.kev_feed` set to `https://raw.githubusercontent.com/mm-weber/dhc-pipeline/main/triage/drills/kev-synthetic.json`, one comment line in `image/drill-app/image.yaml` (`# Drill 16.3, the gate's half (Req 6.50): this line alone puts drill-app in the build matrix; removed before the merge.`); the pull request opened with a TL;DR that says its first run is meant to be red; the build run red at step 19 `exception tiers against KEV (Req 6.50)` with the breach line and the `(Req 6.50/6.51)` annotation after the build and the scan; validate green; the run id recorded
 - [ ] **1.3 The re-decision** (FR-3): the second commit: `decided_at: D`, `expired_at: D plus one day`, the statement `accept: live-drill fixture, never installed; the finding is the drill (task 16.2), re-decided against the KEV ceiling by drill 16.3 (one day; drill 16.4 watches the lapse), fixed by drill 16.6`, `ref` anchored to the new LOG heading; the LOG entry `## <D>: the drill's HIGH listed as exploited by the synthetic feed, the standing exception refused in both arms, re-decided to one day (task 16.3)` with part one (the listing run, the gate's refusal, the re-decision argued: accept stays the treatment for the reasons of 2026-10-18, one day is within the KEV tier and is 16.4's window, the lapse from D plus one is intended) and the subsection heading the `ref` cites; ledger rows 6.50 and 6.51 `exercised`, dated, with the run ids, inducer `drill input`, the task table row for 16.3 naming the inducers; the feed line and the comment line removed; `scripts/lint-accepted-risk.sh .` green with its one expiry warning; the pull request's build matrix empty on this commit, validate green; the TL;DR updated; the owner merges (checkpoint: the squash sha)
 
 ### Verification (orchestrator)

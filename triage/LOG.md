@@ -3136,3 +3136,79 @@ issue and the page carried the 13:33Z data of 2026-10-23 until 11:29Z, as
 the task text and the track's risk table say. Task 16.8 is done on these
 runs; 16.3, the KEV-listed finding under an exception, is next, and its
 drill reads the `kev-synthetic` value this track shipped.
+
+## 2026-10-25: the drill's HIGH listed as exploited by the synthetic feed, the standing exception refused in both arms, re-decided to one day (task 16.3)
+
+*Image: drill-app. Task 16.3, conductor track `kev-ceiling_20261024` (#318,
+squash a764a23). Every exception's span, decision date to expiry, is held to
+a tier: the severity's ceiling (90 days for a HIGH, 30 for a CRITICAL), or
+14 days once CISA lists the finding as exploited (`triage.kev_ceiling`;
+Req 6.50 on the gate, 6.51 on the rescan). Neither refusal had run live
+(ledger rows 6.50 and 6.51, status `drill 16.3`): no exception had exceeded
+its tier in any run. The drill's object is the standing exception on
+CVE-2025-30204 (golang-jwt `ParseUnverified`, decided 2026-10-18, expiring
+2027-01-16: 90 days, the HIGH tier in full). CISA does not list that CVE, so
+the drill reads the `kev-synthetic` feed task 16.8 shipped,
+`triage/drills/kev-synthetic.json`, one entry naming it: the case of a list
+that grew after the decision was made. Nothing in the code changed, and no
+exception was written over its tier.*
+
+**The rescan's half (2026-10-25, 11:13 to 11:31Z).** The owner
+dispatched `rescan.yml` on main at a764a23 with `drill: kev-synthetic` (run
+40187973579, job 121152713348) at 11:13:41Z, before the day's scheduled run,
+which had not started by then, nor by the time this was written (11:33Z). As on every dispatch, the run
+attested the day's reports and re-attested the OpenVEX documents where they
+changed (register row M17). The invariants step fetched the synthetic feed
+in place of CISA's, the warning annotation naming the substitution, and
+failed at 11:24:49Z (step 14) with `check-exceptions:
+triage/accepted-risk/drill-app.yaml: CVE-2025-30204 runs 90 days from
+2026-10-18 to 2027-01-16, over its 14-day ceiling (listed in CISA KEV)` and
+`check-exceptions: 1 exception(s) over their tier across 11 checked (Req
+6.50/6.51)`, every unexpired exception of the catalogue evaluated: the
+standing exception, 76 days over the KEV tier, refused by name as a failure
+of the run (Req 6.51). The KEV set stayed on disk, so the
+steps behind it ran: the enrich step (11:30:32Z), the issue set with nothing to file (the filing step skipped), the status published to
+#151 at 11:30:36Z with CVE-2025-30204's KEV column reading yes for the
+first time (Req 6.46), the page deployed at 11:31:01Z. The status and
+the page read yes on a drill definition until the next scheduled run reads
+CISA's feed again.
+
+**The gate's half (2026-10-25, 11:15 to 11:20Z).** Pull request #319's first
+commit (ee48046) pointed `triage.kev_feed` at the synthetic feed's address
+and put drill-app in the build matrix with one comment line, the shape of
+#313 (task 16.8). Build run 40188092683 built and scanned drill-app as on
+any drill-app pull request (the Trivy scan green at 11:18:29Z), then step 19
+`exception tiers against KEV (Req 6.50)` failed at 11:20:15Z (job
+121153084106) with the same breach line and `1 exception(s) over their tier across 2
+checked`, the one image's file, the build gate red at 11:20:30Z;
+validate run 40188092562, the render gate and the e2e gate green. Both
+lines leave with the second commit; neither merges.
+
+### RE-DECIDED: the drill's HIGH against the KEV ceiling, one day
+
+The finding, the module and the reachability are those of 2026-10-18, and
+so is the treatment: accept, for the reasons argued there (the finding is
+the drill's reason to exist, its removal is drill 16.6, not_affected is
+forbidden by govulncheck's reach into `ParseUnverified`, transfer has no
+owner but the owner). What changes is the clock: under a feed that lists
+the CVE, the entry's span must sit within the 14-day KEV tier, and the
+standing 90 days do not.
+
+**Decision: accept, re-decided** (owner's call, 2026-10-25; `decided_at`
+2026-10-25, `expired_at` 2026-10-26: one day). The owner's call of
+2026-10-24 was a short expiry with no waiting on an arbitrary timeline; of
+2026-10-25, shorter than the four days task 16.4's text had drafted. One
+day, not zero: Trivy drops an ignore entry once its `expired_at`, read as
+midnight UTC of that date, is before now (`pkg/result/ignore.go`, `Prune`,
+the same line in the pinned 0.75.0), while `lint-accepted-risk.sh` and
+`compile-vex.sh` keep an entry live through its expiry day; with zero days
+the pass dispatch of this drill would also have counted the finding again.
+The lint passes with its one warning, `expires in 1 days (2026-10-26)`.
+
+**Exit condition:** the lapse is intended. From 00:00 UTC on 2026-10-26
+Trivy counts the finding again; from 2026-10-27 the compiler can name the
+lapse in an `under_investigation` statement with the first-seen time
+carried; drill 16.4 observes both days, its track opened today. Drill 16.6
+fixes the finding. The pass of this re-decided entry against the synthetic
+feed, on a second dispatch after this merges, is recorded below once
+observed, never predicted.
