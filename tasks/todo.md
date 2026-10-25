@@ -91,8 +91,13 @@ stay as history.
       16.8's drill input had to exist first; it does since #310 (2026-10-23):
       `drill: kev-synthetic` substitutes `triage/drills/kev-synthetic.json`,
       which names that CVE, for one run.
-- [ ] 16.4 Expiry warning, then lapse (6.9, 6.10, 6.35, 6.41, 6.43): NEXT, its
-      track opens 2026-10-25. The exception is 16.3's re-decision (decided
+- [ ] 16.4 Expiry warning, then lapse (6.9, 6.10, 6.35, 6.41, 6.43): OPENED
+      2026-10-25 as conductor track `exception-lapse_20261025` (phase 0 the
+      track and the task text's amendment; phase 1 the two days, 2026-10-26
+      and 27 UTC, on the scheduled runs plus a drill pull request for the
+      gate, never merged; phase 2 the evidence pull request on 2026-10-27,
+      which removes the lapsed entry so that validation is green and the
+      finding stays undecided for 16.5). The exception is 16.3's re-decision (decided
       2026-10-25, expiring 2026-10-26; no second re-decision). The warning
       half is already observed once: 16.3's second dispatch 40191153604
       warned `expires in 1 days`; the scheduled run of 2026-10-26 warns

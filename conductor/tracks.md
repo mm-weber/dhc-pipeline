@@ -8,6 +8,14 @@
 
 ## Active tracks
 
+### [~] exception-lapse_20261025: The drill's exception expires, the lapse seen on every plane, live
+
+**Description:** The drill definition's HIGH exception, re-decided to one day by task 16.3, expires on 2026-10-26: Trivy counts the finding again from midnight UTC, the rescan recompiles and re-attests the document with the finding `under_investigation` and its first-seen time carried, the status shows it undecided, a cve issue is filed, the gate on a drill pull request refuses the finding as uncovered, and on the second day the lint reports the entry as past and the compiler names the lapse; the entry is then removed for task 16.5; ledger rows 6.9, 6.10 and 6.41 filled (Req 6.9, 6.10, 6.41, 7.11; task 16.4).
+**Priority:** high (the next drill of the live program; 16.5 needs the finding undecided)
+**Folder:** [./tracks/exception-lapse_20261025/](./tracks/exception-lapse_20261025/)
+
+---
+
 ### [~] deliberate-violations_20261025: Deliberate violations, one pull request, every lint refuses by name, live
 
 **Description:** One drill pull request, never merged, twenty-one commits each carrying one deliberate violation of a codified convention and undoing the previous one, so that every lint and gate that has never refused anything live refuses by name: the pin lint, the active set, the compat clock, the proof lint, the accepted-risk lane, the VEX product lint, the LOG anchors, the rendering drift check, the workflow policy, the revocation schema, the kyverno gate; fifteen ledger rows filled, four re-observed (Req 7.4, 7.11; task 16.15).
