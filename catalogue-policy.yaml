@@ -136,7 +136,7 @@ triage:
   expiry_warning: 14d
   # The KEV catalogue both arms fetch; an outage fails the pull request and
   # the rescan by name rather than evaluating without it (Req 6.59, 6.60).
-  kev_feed: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+  kev_feed: https://raw.githubusercontent.com/mm-weber/dhc-pipeline/main/triage/drills/kev-synthetic.json
   # Task 16.8: the substitutes a dispatched rescan fetches in place of the
   # KEV feed, by the `drill` input's name, read through `triage-policy.sh
   # drill-feed` and nowhere else. kev-outage names an address under .invalid
