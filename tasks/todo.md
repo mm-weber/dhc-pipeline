@@ -154,16 +154,25 @@ stay as history.
 - [ ] 16.14 Private report channel (9.2, 9.3). OWNER: a private vulnerability
       report or draft advisory titled as a drill, handled as SECURITY.md
       promises, closed; the ledger records id and elapsed time.
-- [ ] 16.15 Deliberate violations, one pull request, never merged, one commit
-      per rule, each observed failing by name: the task's list (tag pin in a
-      chart overlay, root securityContext, registry outside the namespace,
-      missing checksum, exception without a LOG anchor, hand-edited rendered
-      artifact, cron edited in the workflow only, EARS-invalid criterion, a
-      proof of an unknown kind, a none proof for hardened-app) plus what the
-      ledger found never refused live: 1.11 (no authenticity class), 1.12
-      (off-shape package repository), 5.8 (probe removed), 6.19 (subcomponent
-      with a version), 9.6 (malformed revocation record); candidates 1.18 (a
-      split group) and 4.8 (a past review-by date).
+- [ ] 16.15 Deliberate violations, one pull request, never merged: OPENED
+      2026-10-25 as conductor track `deliberate-violations_20261025` (the
+      owner's call: no clock involved; phase 0 the track and the task text's
+      amendment; phase 1 the drill pull request, twenty-one commits, one
+      violation each with the previous undone, every run red by name;
+      phase 2 the evidence: rows 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10,
+      6.11, 6.12, 6.19, 6.25, 6.39, 7.10, 9.6, 9.18 exercised, 4.2, 4.3,
+      4.6, 7.9 re-observed; the EARS validator item dropped, no validator
+      exists).
+      The plan as written: Deliberate violations, one pull request, never
+      merged, one commit per rule, each observed failing by name: the task's
+      list (tag pin in a chart overlay, root securityContext, registry outside
+      the namespace, missing checksum, exception without a LOG anchor, hand-
+      edited rendered artifact, cron edited in the workflow only, EARS-invalid
+      criterion, a proof of an unknown kind, a none proof for hardened-app)
+      plus what the ledger found never refused live: 1.11 (no authenticity
+      class), 1.12 (off-shape package repository), 5.8 (probe removed), 6.19
+      (subcomponent with a version), 9.6 (malformed revocation record);
+      candidates 1.18 (a split group) and 4.8 (a past review-by date).
 - [ ] 16.16 Retirement: drill-app out of the active set and out of image/ in
       one pull request; its tags keep daily scans outside issue scope; the
       upstream repository archived; every ledger row carries evidence or its
