@@ -39,8 +39,8 @@ Notes: the invariants step fetches the synthetic feed in place of the declared o
 
 **Acceptance criteria:**
 
-- [ ] The run's id recorded; its invariants step red with `triage/accepted-risk/drill-app.yaml: CVE-2025-30204 runs 90 days from 2026-10-18 to 2027-01-16, over its 14-day ceiling (listed in CISA KEV)` and the `(Req 6.50/6.51)` line; the summary's `- drill: kev-synthetic (...)` line
-- [ ] The status issue's body of that run shows CVE-2025-30204 with KEV yes; the page job green; the issue set filed nothing
+- [x] The run's id recorded; its invariants step red with `triage/accepted-risk/drill-app.yaml: CVE-2025-30204 runs 90 days from 2026-10-18 to 2027-01-16, over its 14-day ceiling (listed in CISA KEV)` and the `(Req 6.50/6.51)` line; the summary's `- drill: kev-synthetic (...)` line (run 40187973579, 2026-10-25 11:13Z, job 121152713348, step 14 red at 11:24:49Z; the summary is the owner's to read)
+- [x] The status issue's body of that run shows CVE-2025-30204 with KEV yes; the page job green; the issue set filed nothing (#151 updated 11:30:36Z: drill-app CVE-2025-30204 HIGH, KEV yes, decided (affected); page job 121156288850 green at 11:31:01Z; the filing step skipped, nothing to file)
 
 ### FR-2: The gate refuses the standing exception (Req 6.50)
 
@@ -50,7 +50,7 @@ Notes: the same shape as #313 (task 16.8): the policy edit alone builds nothing,
 
 **Acceptance criteria:**
 
-- [ ] The build run red at `exception tiers against KEV (Req 6.50)` with the breach line and the `(Req 6.50/6.51)` line; validate green; the run id recorded in ledger row 6.50
+- [x] The build run red at `exception tiers against KEV (Req 6.50)` with the breach line and the `(Req 6.50/6.51)` line; validate green; the run id recorded in ledger row 6.50 (#319 commit ee48046: build run 40188092683, job 121153084106, step 19 red at 11:20:15Z; validate run 40188092562 green)
 - [ ] The merged diff carries neither the feed line nor the comment line
 
 ### FR-3: The re-decision, one day (Req 6.7, 6.50; task 16.4's premise)
