@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-10-24
+# Live drills (task group 16): where we are and what is next, as of 2026-10-25
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -72,17 +72,18 @@ stay as history.
       the gate cannot admit (Req 6.1); proposed: both decided within their
       ceilings in 16.2, the HIGH's exception re-decided against the KEV
       ceiling in 16.3.
-- [ ] 16.3 KEV-listed finding under an exception (6.50, 6.51): OPENED 2026-10-24
-      as conductor track `kev-ceiling_20261024` (phase 0 the track and the
-      task text's amendment; phase 1 the owner's dispatch with
-      `drill: kev-synthetic` on the standing 90-day exception, red by name and
-      publishing KEV: yes, then the drill pull request: red at the tiering
-      step on its first commit, the re-decision to one day from its decision
-      date D merged on its second; phase 2 a second dispatch for the pass and
-      the evidence). Trivy counts the finding again from 00:00 UTC of D plus
-      one, the compiler names the lapse from D plus two: 16.4's track opens
-      on D, the day phase 1 merges (one day, not four: the owner's call of
-      2026-10-25). The plan as written on 2026-10-17: the HIGH's
+- [x] 16.3 KEV-listed finding under an exception (6.50, 6.51): DONE 2026-10-25
+      (conductor track `kev-ceiling_20261024`: #318 the track and the task
+      text's amendment, merged as a764a23; the owner's dispatch 40187973579
+      with `drill: kev-synthetic` red by name on the standing 90-day
+      exception and publishing KEV: yes; #319 the drill pull request, red at
+      the tiering step on its first commit (build 40188092683), the
+      re-decision to one day (decided 2026-10-25, expiring 2026-10-26) merged
+      as 714614f; the owner's second dispatch 40191153604 passed it, KEV: yes
+      again; the evidence in #320). One day, not four: the owner's call
+      of 2026-10-25; not zero because Trivy drops an ignore entry at midnight
+      UTC of its expiry date, a day before this repo's lint and compiler do.
+      The plan as written on 2026-10-17: the HIGH's
       exception re-decided with an expiry beyond decision date plus the 14-day
       KEV ceiling fails the gate by name; corrected and merged; the rescan
       evaluates it against today's KEV; status issue and page show KEV: yes.
@@ -90,12 +91,17 @@ stay as history.
       16.8's drill input had to exist first; it does since #310 (2026-10-23):
       `drill: kev-synthetic` substitutes `triage/drills/kev-synthetic.json`,
       which names that CVE, for one run.
-- [ ] 16.4 Expiry warning, then lapse (6.9, 6.10, 6.35, 6.41, 6.43): expiry
-      one day out (16.3's re-decision, 2026-10-24 and 25: no second
-      re-decision; the warning half comes with 16.3's second dispatch and the
-      first scheduled run after its correction merges; Trivy counts the
-      finding again from 00:00 UTC of D plus one, the compiler's lapse note
-      from D plus two); the warning inside the
+- [ ] 16.4 Expiry warning, then lapse (6.9, 6.10, 6.35, 6.41, 6.43): NEXT, its
+      track opens 2026-10-25. The exception is 16.3's re-decision (decided
+      2026-10-25, expiring 2026-10-26; no second re-decision). The warning
+      half is already observed once: 16.3's second dispatch 40191153604
+      warned `expires in 1 days`; the scheduled run of 2026-10-26 warns
+      `0 days` and its scan counts the finding again (Trivy drops the entry at
+      00:00 UTC of the expiry date); from 2026-10-27 the compiler can name the
+      lapse (`expired`: expiry before today), the gate no longer counts the
+      entry, the status shows the finding undecided again. Both days are
+      recorded; whether the day between is a defect is 16.4's finding (Req
+      6.9, 6.41). The plan as written: the warning inside the
       14-day window; the day after,
       under_investigation with first-seen carried, re-attestation, the gate no
       longer counts the exception, the finding undecided again.
