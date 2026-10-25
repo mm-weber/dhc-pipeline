@@ -29,6 +29,7 @@ Navigation for the project context and the work tracks. Context first, then spec
 | retire-grafana_20261019 | completed | high | [spec](./tracks/retire-grafana_20261019/spec.md) | [plan](./tracks/retire-grafana_20261019/plan.md) |
 | kev-drill-input_20261023 | completed | high | [spec](./tracks/kev-drill-input_20261023/spec.md) | [plan](./tracks/kev-drill-input_20261023/plan.md) |
 | kev-ceiling_20261024 | completed | high | [spec](./tracks/kev-ceiling_20261024/spec.md) | [plan](./tracks/kev-ceiling_20261024/plan.md) |
+| exception-lapse_20261025 | in progress | high | [spec](./tracks/exception-lapse_20261025/spec.md) | [plan](./tracks/exception-lapse_20261025/plan.md) |
 | deliberate-violations_20261025 | in progress | high | [spec](./tracks/deliberate-violations_20261025/spec.md) | [plan](./tracks/deliberate-violations_20261025/plan.md) |
 
 ## Recent activity
@@ -46,4 +47,5 @@ Navigation for the project context and the work tracks. Context first, then spec
 | 2026-10-24 | kev-ceiling_20261024 | Track created from spec task 16.3, the KEV ceiling on the drill's standing exception: the `kev-synthetic` drill input lists the HIGH, the rescan reports the 90-day exception over the 14-day tier (Req 6.51) while publishing with KEV yes, the gate refuses it on the drill pull request's first commit (Req 6.50), the re-decision to one day merges and feeds drill 16.4's lapse; the task text amended in the same pull request |
 | 2026-10-25 | kev-ceiling_20261024 | Track revised before confirmation at the owner's call: the re-decision shortened from four days to one; Trivy's midnight reading of the expiry day noted for drill 16.4 |
 | 2026-10-25 | kev-ceiling_20261024 | Track completed: #318 (a764a23) the track; #319 (714614f) the drill, both refusals live by name (dispatch 40187973579, build 40188092683) and the re-decision to one day; the pass on dispatch 40191153604; the evidence and the closure in #320; rows 6.50 and 6.51 exercised |
+| 2026-10-25 | exception-lapse_20261025 | Track created from spec task 16.4, the drill's exception expiring on 2026-10-26: the two clocks (Trivy at midnight UTC, the lint and the compiler a day later), the rescan's recompile carrying the lapse into the attested document, the gate refusing the finding as uncovered, the entry removed at the end for 16.5; the task text amended in the same pull request |
 | 2026-10-25 | deliberate-violations_20261025 | Track created from spec task 16.15 at the owner's call: one drill pull request, never merged, twenty-one commits each carrying one violation, every lint and gate refusing by name; fifteen ledger rows to fill; the EARS validator item dropped from the task text, no validator exists |
