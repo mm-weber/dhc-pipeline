@@ -13,13 +13,13 @@
 
 Every accepted-risk exception carries a decision date and an expiry, and both arms hold the span between them to a tier: the ceiling for the finding's severity (90 days for a HIGH, 30 for a CRITICAL), or 14 days when CISA lists the finding as exploited, whatever its severity (`catalogue-policy.yaml` `triage.kev_ceiling`; `scripts/check-exceptions.sh`). The gate evaluates the one image's exceptions on every pull request build (Req 6.50); the rescan evaluates every unexpired exception daily against today's KEV, because KEV lists grow after decisions are made (Req 6.51). Neither refusal has ever run live: no exception has exceeded its tier in 1,028 runs, and ledger rows 6.50 and 6.51 wait for this drill.
 
-The drill definition's HIGH, CVE-2025-30204 (`github.com/golang-jwt/jwt/v5` v5.2.1, `ParseUnverified` reachable by design), is covered by an accept exception decided on 2026-10-18 and expiring on 2027-01-16: 90 days, the HIGH tier exactly. CISA's catalogue does not list that CVE (measured 2026-10-15), so task 16.8 shipped a feed of this repository that does, `triage/drills/kev-synthetic.json`, and the `drill: kev-synthetic` dispatch value that substitutes it for one run (#310). The moment the feed lists the CVE, the standing 90-day exception is 76 days over the 14-day KEV tier. This track lets both arms meet that exception: the rescan first, on a dispatch with `drill: kev-synthetic`, the realistic case of a list that grew after the decision, reported as a failure of the run while the run publishes its status with the KEV column reading yes; then the gate, on the drill pull request's first commit, which points `triage.kev_feed` at the synthetic feed and names drill-app in the build matrix. The same pull request then re-decides the exception to four days from its decision date, within the KEV tier and the window task 16.4's lapse drill watches, drops the drill lines, and merges. A second dispatch shows the re-decided exception passing the tier against the synthetic feed, with the status reading KEV yes once more; the next scheduled run reads CISA's feed again.
+The drill definition's HIGH, CVE-2025-30204 (`github.com/golang-jwt/jwt/v5` v5.2.1, `ParseUnverified` reachable by design), is covered by an accept exception decided on 2026-10-18 and expiring on 2027-01-16: 90 days, the HIGH tier exactly. CISA's catalogue does not list that CVE (measured 2026-10-15), so task 16.8 shipped a feed of this repository that does, `triage/drills/kev-synthetic.json`, and the `drill: kev-synthetic` dispatch value that substitutes it for one run (#310). The moment the feed lists the CVE, the standing 90-day exception is 76 days over the 14-day KEV tier. This track lets both arms meet that exception: the rescan first, on a dispatch with `drill: kev-synthetic`, the realistic case of a list that grew after the decision, reported as a failure of the run while the run publishes its status with the KEV column reading yes; then the gate, on the drill pull request's first commit, which points `triage.kev_feed` at the synthetic feed and names drill-app in the build matrix. The same pull request then re-decides the exception to one day from its decision date (the owner's call of 2026-10-25: the shortest window that keeps the pass day clean), within the KEV tier, drops the drill lines, and merges; task 16.4's lapse drill follows from the next day. A second dispatch shows the re-decided exception passing the tier against the synthetic feed, with the status reading KEV yes once more; the next scheduled run reads CISA's feed again.
 
 Nothing in the code changes. The drill substitutes declared values (the `kev-synthetic` address, by input and by the policy line) and makes one decision in the exception lane, the owner's, argued in the LOG as every decision is (register row M3).
 
 ### Background
 
-Task 16.3's text (2026-10-01) planned a re-decision beyond the ceiling to make the gate fail, then a correction. With the synthetic feed in hand the standing exception already breaches the KEV tier, so the gate's refusal needs no exception written over its tier: the drill pull request's first commit substitutes the feed, as #313 substituted the outage address (task 16.8, Req 6.59), and the standing entry is refused. The task text is amended by this track to say so, to name the order (the rescan's half first, on the standing exception), and to tie the correction's expiry to 16.4: the four-day window is 16.4's "re-decided with an expiry four days out", so 16.4 needs no re-decision of its own and its first half (the expiry warning inside the 14-day window, Req 6.10) is observed by the first scheduled run after this track's correction merges. The owner's call of 2026-10-24: keep the total expiry short; no waiting on an arbitrary timeline.
+Task 16.3's text (2026-10-01) planned a re-decision beyond the ceiling to make the gate fail, then a correction. With the synthetic feed in hand the standing exception already breaches the KEV tier, so the gate's refusal needs no exception written over its tier: the drill pull request's first commit substitutes the feed, as #313 substituted the outage address (task 16.8, Req 6.59), and the standing entry is refused. The task text is amended by this track to say so, to name the order (the rescan's half first, on the standing exception), and to tie the correction's expiry to 16.4: the correction is 16.4's re-decision, so 16.4 needs no re-decision of its own and its first half (the expiry warning inside the 14-day window, Req 6.10) is observed by this track's second dispatch and by the first scheduled run after the correction merges. The owner's calls: 2026-10-24, keep the total expiry short, no waiting on an arbitrary timeline; 2026-10-25, shorter than the four days drafted from 16.4's text, nothing waits four days. The window is one day: zero days would have Trivy count the finding on the pass day itself (FR-3's notes), one day keeps the pass clean and lets Trivy count the finding again from 00:00 UTC of the next day.
 
 The dispatch path of `rescan.yml` is a release of attestations (register row M17): a dispatched run attests today's scan reports with replace and re-attests the OpenVEX document where it changed. Both dispatches of this track keep that behaviour. Unlike the `kev-outage` drill, a `kev-synthetic` run has its KEV set on disk, so the enrich step, the issue set, the status issue and the page all publish; the run is red only when an exception breaches its tier, by name. Register row M26 and the manual say today that a drill run publishes no issue set, status or page; that sentence is true of `kev-outage` alone and this track corrects it once the behaviour is observed.
 
@@ -53,22 +53,22 @@ Notes: the same shape as #313 (task 16.8): the policy edit alone builds nothing,
 - [ ] The build run red at `exception tiers against KEV (Req 6.50)` with the breach line and the `(Req 6.50/6.51)` line; validate green; the run id recorded in ledger row 6.50
 - [ ] The merged diff carries neither the feed line nor the comment line
 
-### FR-3: The re-decision, four days (Req 6.7, 6.50; task 16.4's premise)
+### FR-3: The re-decision, one day (Req 6.7, 6.50; task 16.4's premise)
 
-THE Repository SHALL re-decide the drill's HIGH on the same pull request's second commit: `decided_at` the decision date D, `expired_at` D plus four days, the statement naming this drill and the lapse drill 16.4 watches, `ref` anchored to a LOG heading that argues the re-decision (register row M3), and THE Repository SHALL flip ledger rows 6.50 and 6.51 to `exercised` in that commit with the run ids of FR-1 and FR-2.
+THE Repository SHALL re-decide the drill's HIGH on the same pull request's second commit: `decided_at` the decision date D, `expired_at` D plus one day, the statement naming this drill and the lapse drill 16.4 watches, `ref` anchored to a LOG heading that argues the re-decision (register row M3), and THE Repository SHALL flip ledger rows 6.50 and 6.51 to `exercised` in that commit with the run ids of FR-1 and FR-2.
 
-Notes: four days is within the 14-day KEV tier and is 16.4's "expiry four days out", so 16.4 re-decides nothing: its warning half (Req 6.10, the expiries step inside the 14-day window, the page listing the entry as lapsing) is observed by the first scheduled run after the merge, its lapse half on D plus five, when the compiler emits `under_investigation` with the first-seen time carried; `lint-accepted-risk.sh` passes with an expiry warning (the window is 14 days). The pull request's final build matrix is empty (no image path changed), so nothing is rebuilt or released by the merge. The LOG entry is the drill's entry, part one: the listing, the two refusals, the re-decision; part two (FR-4) follows in the evidence pull request. The ledger's task table row for 16.3 names the inducers as observed.
+Notes: one day is within the 14-day KEV tier and is 16.4's re-decision (its text said four days out; amended to one on 2026-10-25), so 16.4 re-decides nothing: its warning half (Req 6.10, the expiries step inside the 14-day window, the page listing the entry as lapsing) is observed by this track's second dispatch (`expires in 1 days`) and by the first scheduled run after the merge (`expires in 0 days`); `lint-accepted-risk.sh` passes with that warning (the window is 14 days). The lapse half runs on two clocks, both 16.4's to observe: Trivy drops an ignore entry once its `expired_at`, read as midnight UTC of that date, is before now (`pkg/result/ignore.go`, `Prune`: `ExpiredAt.Before(clock.Now(ctx))`, the same line in the pinned 0.75.0), so the scan counts the finding again from 00:00 UTC of D plus one; this repository's lint and compiler keep the entry live through its expiry day (`expired` in `compile-vex.sh`: `exp < today`), so the compiler's `under_investigation` naming the lapse, with the first-seen time carried, can come no earlier than D plus two. Zero days was considered and refused: Trivy would count the finding on the pass day itself, and FR-4's run would show the lapse and the pass at once. The pull request's final build matrix is empty (no image path changed), so nothing is rebuilt or released by the merge. The LOG entry is the drill's entry, part one: the listing, the two refusals, the re-decision; part two (FR-4) follows in the evidence pull request. The ledger's task table row for 16.3 names the inducers as observed.
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-accepted-risk.sh .` green with the one warning naming CVE-2025-30204 and D plus four; `scripts/lint-log-anchors.sh all .` resolves the new `ref`; `scripts/lint-live-evidence.sh .` green with rows 6.50 and 6.51 `exercised`, inducer `drill input`
+- [ ] `scripts/lint-accepted-risk.sh .` green with the one warning naming CVE-2025-30204 and D plus one (`expires in 1 days`); `scripts/lint-log-anchors.sh all .` resolves the new `ref`; `scripts/lint-live-evidence.sh .` green with rows 6.50 and 6.51 `exercised`, inducer `drill input`
 - [ ] The pull request's validate green and its build matrix empty on the second commit; the owner merges (the squash sha recorded)
 
 ### FR-4: The re-decided exception passes the tier (Req 6.51, 6.46)
 
-WHEN a dispatch of `rescan.yml` carries `drill: kev-synthetic` after FR-3 merges THE Scan Pipeline SHALL evaluate the re-decided exception against the synthetic feed and pass it, the invariants step green with `4 days within the 14-day ceiling (listed in CISA KEV)`, the run green, and SHALL publish the status with that finding's KEV column reading yes.
+WHEN a dispatch of `rescan.yml` carries `drill: kev-synthetic` after FR-3 merges THE Scan Pipeline SHALL evaluate the re-decided exception against the synthetic feed and pass it, the invariants step green with `1 days within the 14-day ceiling (listed in CISA KEV)`, the run green, and SHALL publish the status with that finding's KEV column reading yes.
 
-Notes: the pass is observable on this path alone; the merged pull request's gate reads CISA's feed, where the CVE is not listed, so its green says nothing about the KEV tier. The next scheduled run reads the declared feed again (KEV no) and its expiries step warns of the four-day expiry: 16.4's first half, recorded in 16.4's track. The owner dispatches after the merge, told what the dispatch publishes (M17).
+Notes: the pass is observable on this path alone; the merged pull request's gate reads CISA's feed, where the CVE is not listed, so its green says nothing about the KEV tier. The next scheduled run reads the declared feed again (KEV no); its expiries step warns `expires in 0 days` and its scan counts the finding again (Trivy's midnight rule, FR-3's notes): 16.4's observations, recorded in 16.4's track. The owner dispatches after the merge, told what the dispatch publishes (M17).
 
 **Acceptance criteria:**
 
@@ -89,11 +89,11 @@ Notes: the register's sentence today ("the run is red by name ... and publishes 
 
 THE Repository SHALL add the LOG entry's second part (FR-4's run, the next scheduled run's KEV no), tick task 16.3 in `.specs/dhc-catalogue-mvp/tasks.md`, move `tasks/todo.md`'s program state to 16.4, and close this track, in a pull request opened as a draft until FR-4's run is in.
 
-Notes: the LOG heading `## <D>: the drill's HIGH listed as exploited by the synthetic feed, the standing exception refused in both arms, re-decided to four days (task 16.3)`, part one in FR-3's pull request, part two here; the tick in the house shape `[done <date>, #nnn; conductor track kev-ceiling_20261024]`; the todo names 16.4's lapse date D plus five so its track opens before it.
+Notes: the LOG heading `## <D>: the drill's HIGH listed as exploited by the synthetic feed, the standing exception refused in both arms, re-decided to one day (task 16.3)`, part one in FR-3's pull request, part two here; the tick in the house shape `[done <date>, #nnn; conductor track kev-ceiling_20261024]`; the todo names 16.4's dates, D plus one and D plus two, and its track opens on D.
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` and `scripts/lint-log-anchors.sh all .` green; the tick present; `conductor/tracks.md` lists the track under Completed; 16.4 next in `tasks/todo.md` with D plus five named
+- [ ] `scripts/lint-live-evidence.sh .` and `scripts/lint-log-anchors.sh all .` green; the tick present; `conductor/tracks.md` lists the track under Completed; 16.4 next in `tasks/todo.md` with D plus one and D plus two named
 
 ## Scope
 
@@ -108,7 +108,7 @@ Notes: the LOG heading `## <D>: the drill's HIGH listed as exploited by the synt
 
 - Any change to `check-exceptions.sh`, `rescan.yml`, `build.yml` or the status tool: the drill reads what they do
 - An exception written over its tier: the standing entry already breaches the KEV tier once the feed lists the finding
-- The lapse (task 16.4): its own track, opened before D plus five; the ceiling lowered (16.5) after it
+- The lapse (task 16.4): its own track, opened on D, the day FR-3 merges; the ceiling lowered (16.5) after it
 - A listing in CISA's catalogue: the synthetic feed stands in, recorded as such on every run that reads it
 
 ## Dependencies
@@ -117,7 +117,7 @@ Notes: the LOG heading `## <D>: the drill's HIGH listed as exploited by the synt
 | --- | --- | --- | --- |
 | The `drill` input and `kev-synthetic` (task 16.8) | track | done 2026-10-24 (#310, #314) | The feed file, the declared address, the reader |
 | drill-app published with its two exceptions (task 16.2) | track | done 2026-10-18 (#286) | The standing 90-day exception is the drill's object |
-| The task text amended (16.3, a note on 16.4) | spec | in this pull request | The order, the gate's branch, the four days |
+| The task text amended (16.3, a note on 16.4) | spec | in this pull request | The order, the gate's branch, the one-day expiry (four days until 2026-10-25) |
 
 ## Risks
 
@@ -125,13 +125,14 @@ Notes: the LOG heading `## <D>: the drill's HIGH listed as exploited by the synt
 | --- | --- | --- | --- |
 | The status issue and the page read KEV yes on a finding CISA does not list | certain, by design, twice | a reader of #151 sees yes on the drill definition for part of a day | The definition is named a drill in every place it appears; the run's summary and annotation name the substitution; the next scheduled run reads CISA's feed |
 | The drill pull request's first commit merges with the feed line | low | the scheduled rescan would evaluate against the synthetic feed | FR-2's acceptance checks the merged diff; the second commit removes both lines before the owner is asked to merge |
-| The four-day window lapses before 16.4's track is open | medium | the lapse happens unobserved by a plan (the mechanism runs regardless: `under_investigation`, re-attestation, the gate no longer counts the entry) | The todo names D plus five; 16.4's track opens the day FR-3 merges |
+| The lapse begins before 16.4's track is open | medium | the lapse happens unobserved by a plan (the mechanism runs regardless: Trivy counts the finding again from 00:00 UTC of D plus one, `under_investigation`, re-attestation, the gate no longer counts the entry) | 16.4's track opens on D, the day FR-3 merges, before midnight UTC |
+| Trivy and this repository read the expiry day differently | certain | on D plus one the scan counts the finding while the lint says `expires in 0 days` and the compiler keeps the entry live; the lapse note can follow on D plus two at the earliest | Named in FR-3's notes and in 16.4's task text; 16.4 observes both days and records whether the gap is a defect (Req 6.9, 6.41) |
 | Both dispatches re-attest today's reports | certain (M17) | none: the day's reports, replaced by the day's reports | Named in each request to the owner |
 | `raw.githubusercontent.com` serves a stale copy of the feed | none in practice | the file has not changed since #310 | Noted; the warning annotation carries the address |
 
 ## Open questions (the owner's calls)
 
-- [ ] Four days (16.4's number) or shorter, down to one day (drafted: four, from the decision date; a shorter window moves 16.4's lapse earlier by the same days)
+- [x] Four days (16.4's number) or shorter: the owner's call of 2026-10-25, shorter; one day from the decision date (zero would put Trivy's un-suppression on the pass day; FR-3's notes)
 - [ ] The second dispatch for the pass (FR-4), or the gate's green and the lint alone (drafted: the dispatch; it is the only place the pass against the KEV tier is observable)
 - [ ] Rows 6.50 and 6.51 flipped in the drill pull request rather than in the evidence pull request (drafted: in the drill pull request; their evidence is complete when it merges)
 

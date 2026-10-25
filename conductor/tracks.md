@@ -10,7 +10,7 @@
 
 ### [~] kev-ceiling_20261024: The KEV ceiling on a standing exception, both arms refuse by name, live
 
-**Description:** The drill definition's HIGH enters the KEV set through the `kev-synthetic` drill input and its standing 90-day exception is refused by both arms by name: the rescan on a dispatch (Req 6.51, the run red and publishing with KEV yes), the gate on the drill pull request's first commit (Req 6.50); the same pull request re-decides the exception to four days from its decision date, within the KEV tier and the window drill 16.4 watches lapse, and merges; a second dispatch shows the pass; ledger rows 6.50 and 6.51 filled (Req 6.46, 6.50, 6.51, 7.11; task 16.3)
+**Description:** The drill definition's HIGH enters the KEV set through the `kev-synthetic` drill input and its standing 90-day exception is refused by both arms by name: the rescan on a dispatch (Req 6.51, the run red and publishing with KEV yes), the gate on the drill pull request's first commit (Req 6.50); the same pull request re-decides the exception to one day from its decision date, within the KEV tier and the window drill 16.4 watches lapse, and merges; a second dispatch shows the pass; ledger rows 6.50 and 6.51 filled (Req 6.46, 6.50, 6.51, 7.11; task 16.3)
 **Priority:** high (the next drill of the live program; 16.4 and 16.5 build on its exception)
 **Folder:** [./tracks/kev-ceiling_20261024/](./tracks/kev-ceiling_20261024/)
 
