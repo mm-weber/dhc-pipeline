@@ -51,7 +51,7 @@ Notes: the same shape as #313 (task 16.8): the policy edit alone builds nothing,
 **Acceptance criteria:**
 
 - [x] The build run red at `exception tiers against KEV (Req 6.50)` with the breach line and the `(Req 6.50/6.51)` line; validate green; the run id recorded in ledger row 6.50 (#319 commit ee48046: build run 40188092683, job 121153084106, step 19 red at 11:20:15Z; validate run 40188092562 green)
-- [ ] The merged diff carries neither the feed line nor the comment line
+- [x] The merged diff carries neither the feed line nor the comment line (squash 714614f: the exception file, the LOG, the ledger, the plan, the spec)
 
 ### FR-3: The re-decision, one day (Req 6.7, 6.50; task 16.4's premise)
 
@@ -61,8 +61,8 @@ Notes: one day is within the 14-day KEV tier and is 16.4's re-decision (its text
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-accepted-risk.sh .` green with the one warning naming CVE-2025-30204 and D plus one (`expires in 1 days`); `scripts/lint-log-anchors.sh all .` resolves the new `ref`; `scripts/lint-live-evidence.sh .` green with rows 6.50 and 6.51 `exercised`, inducer `drill input`
-- [ ] The pull request's validate green and its build matrix empty on the second commit; the owner merges (the squash sha recorded)
+- [x] `scripts/lint-accepted-risk.sh .` green with the one warning naming CVE-2025-30204 and D plus one (`expires in 1 days`); `scripts/lint-log-anchors.sh all .` resolves the new `ref`; `scripts/lint-live-evidence.sh .` green with rows 6.50 and 6.51 `exercised`, inducer `drill input` (#319 commit 1c72e48, 2026-10-25)
+- [x] The pull request's validate green and its build matrix empty on the second commit; the owner merges (the squash sha recorded): validate 40189524905 green; the matrix was not empty, `build.yml` names the image a changed exception file belongs to and build run 40189524943 passed (the plan's deviations log); merged 2026-10-25 11:55:37Z as 714614f
 
 ### FR-4: The re-decided exception passes the tier (Req 6.51, 6.46)
 
@@ -72,8 +72,8 @@ Notes: the pass is observable on this path alone; the merged pull request's gate
 
 **Acceptance criteria:**
 
-- [ ] The run's id recorded; the invariants step green (the ok line as the owner reads it, or the step's green with no breach annotation); the status issue's row for CVE-2025-30204 reads KEV yes; the summary's drill line
-- [ ] The next scheduled run's status reads KEV no again (its id recorded in the LOG; the expiry warning belongs to 16.4)
+- [x] The run's id recorded; the invariants step green (the ok line as the owner reads it, or the step's green with no breach annotation); the status issue's row for CVE-2025-30204 reads KEV yes; the summary's drill line (run 40191153604, 2026-10-25 11:59Z, job 121162258991, the invariants step green at 12:08:34Z with no breach annotation; #151 at 12:14:23Z: KEV yes, accepted risk until 2026-10-26)
+- [x] The next scheduled run's status reads KEV no again (its id recorded in the LOG; the expiry warning belongs to 16.4): the day's scheduled run 40189980851 ran between the two dispatches (11:42Z to 11:58Z, before the merge) and read CISA's feed, KEV no at 11:57:19Z; the first scheduled run after the pass is 2026-10-26's, drill 16.4's
 
 ### FR-5: Named where a reader meets it (Req 7.1, 7.11)
 
@@ -83,7 +83,7 @@ Notes: the register's sentence today ("the run is red by name ... and publishes 
 
 **Acceptance criteria:**
 
-- [ ] `grep -c '^| M26 ' docs/CONVENTIONS.md` is 1 and the row names both values' behaviour; the manual's paragraph the same; no em-dashes added
+- [x] `grep -c '^| M26 ' docs/CONVENTIONS.md` is 1 and the row names both values' behaviour; the manual's paragraph the same; no em-dashes added (#320)
 
 ### FR-6: The evidence (Req 7.11)
 
@@ -93,7 +93,7 @@ Notes: the LOG heading `## <D>: the drill's HIGH listed as exploited by the synt
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` and `scripts/lint-log-anchors.sh all .` green; the tick present; `conductor/tracks.md` lists the track under Completed; 16.4 next in `tasks/todo.md` with D plus one and D plus two named
+- [x] `scripts/lint-live-evidence.sh .` and `scripts/lint-log-anchors.sh all .` green; the tick present; `conductor/tracks.md` lists the track under Completed; 16.4 next in `tasks/todo.md` with D plus one and D plus two named (#320)
 
 ## Scope
 
@@ -133,8 +133,8 @@ Notes: the LOG heading `## <D>: the drill's HIGH listed as exploited by the synt
 ## Open questions (the owner's calls)
 
 - [x] Four days (16.4's number) or shorter: the owner's call of 2026-10-25, shorter; one day from the decision date (zero would put Trivy's un-suppression on the pass day; FR-3's notes)
-- [ ] The second dispatch for the pass (FR-4), or the gate's green and the lint alone (drafted: the dispatch; it is the only place the pass against the KEV tier is observable)
-- [ ] Rows 6.50 and 6.51 flipped in the drill pull request rather than in the evidence pull request (drafted: in the drill pull request; their evidence is complete when it merges)
+- [x] The second dispatch for the pass (FR-4), or the gate's green and the lint alone: the dispatch, the owner's call by merging #318 and dispatching run 40191153604
+- [x] Rows 6.50 and 6.51 flipped in the drill pull request rather than in the evidence pull request: in the drill pull request, the owner's call by merging #319
 
 ## References
 

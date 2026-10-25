@@ -608,9 +608,13 @@ rescan's dispatch carries one more knob, `drill`, `none` by default:
 `kev-outage` substitutes an address under `.invalid` for the KEV feed on that
 run alone, so the run fails closed by name (Req 6.60), and `kev-synthetic`
 substitutes this repository's feed of one entry, the drill definition's HIGH,
-for task 16.3. A drill run attests today's reports as any dispatch does and
-publishes no issue set, status or page; the next scheduled run reads the
-declared feed and publishes (register row M26, task 16.8). A
+for task 16.3. A drill run attests today's reports as any dispatch does.
+With `kev-outage` the fetch fails and the run publishes no issue set, status
+or page; with `kev-synthetic` the feed is read, the issue set, the status
+and the page publish with the KEV column from that feed, and the run is red
+only when an exception breaches the 14-day KEV tier, by name. The next
+scheduled run reads the declared feed and publishes (register row M26,
+tasks 16.8 and 16.3). A
 healthy quiet day is: Renovate runs green and opens nothing; rescan runs
 green, files nothing, and its compile report shows every statement applied.
 

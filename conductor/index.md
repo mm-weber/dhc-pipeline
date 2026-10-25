@@ -28,7 +28,7 @@ Navigation for the project context and the work tracks. Context first, then spec
 | drill-definition_20261017 | completed | high | [spec](./tracks/drill-definition_20261017/spec.md) | [plan](./tracks/drill-definition_20261017/plan.md) |
 | retire-grafana_20261019 | completed | high | [spec](./tracks/retire-grafana_20261019/spec.md) | [plan](./tracks/retire-grafana_20261019/plan.md) |
 | kev-drill-input_20261023 | completed | high | [spec](./tracks/kev-drill-input_20261023/spec.md) | [plan](./tracks/kev-drill-input_20261023/plan.md) |
-| kev-ceiling_20261024 | in progress | high | [spec](./tracks/kev-ceiling_20261024/spec.md) | [plan](./tracks/kev-ceiling_20261024/plan.md) |
+| kev-ceiling_20261024 | completed | high | [spec](./tracks/kev-ceiling_20261024/spec.md) | [plan](./tracks/kev-ceiling_20261024/plan.md) |
 
 ## Recent activity
 
@@ -44,3 +44,4 @@ Navigation for the project context and the work tracks. Context first, then spec
 | 2026-10-24 | kev-drill-input_20261023 | Track completed: #308 and #310 merged 2026-10-23 (the spec amendment of 7.7 and 7.10 and the track; the input, the declarations, the lint, the reader); the drill observed in #314: the gate's half red on the drill branch #313 (never merged), the dispatched `kev-outage` run 40024066594 red by name with the issue set, the status and the page withheld, the scheduled run 40088952931 of 2026-10-24 green with `- drill: none` and the status and the page published; ledger rows 6.59 and 6.60 exercised |
 | 2026-10-24 | kev-ceiling_20261024 | Track created from spec task 16.3, the KEV ceiling on the drill's standing exception: the `kev-synthetic` drill input lists the HIGH, the rescan reports the 90-day exception over the 14-day tier (Req 6.51) while publishing with KEV yes, the gate refuses it on the drill pull request's first commit (Req 6.50), the re-decision to one day merges and feeds drill 16.4's lapse; the task text amended in the same pull request |
 | 2026-10-25 | kev-ceiling_20261024 | Track revised before confirmation at the owner's call: the re-decision shortened from four days to one; Trivy's midnight reading of the expiry day noted for drill 16.4 |
+| 2026-10-25 | kev-ceiling_20261024 | Track completed: #318 (a764a23) the track; #319 (714614f) the drill, both refusals live by name (dispatch 40187973579, build 40188092683) and the re-decision to one day; the pass on dispatch 40191153604; the evidence and the closure in #320; rows 6.50 and 6.51 exercised |

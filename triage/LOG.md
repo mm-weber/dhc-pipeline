@@ -3212,3 +3212,32 @@ carried; drill 16.4 observes both days, its track opened today. Drill 16.6
 fixes the finding. The pass of this re-decided entry against the synthetic
 feed, on a second dispatch after this merges, is recorded below once
 observed, never predicted.
+
+**Merged, 2026-10-25 11:55:37Z** (#319, squash 714614f): the re-decided
+entry, the LOG entry above, the ledger rows; neither drill line. The second
+commit's build had named drill-app again, by design: `build.yml` rebuilds the
+image a changed exception file names so that the gate re-runs against the
+exception (run 40189524943, green: the Trivy scan, govulncheck, the tier step
+against CISA's feed and the scan gate), which the track's plan had not
+expected; main's push build reads image paths alone and built nothing.
+
+**Between the two dispatches (11:42 to 11:58Z).** The day's scheduled run,
+40189980851, started at 11:42:20Z on a764a23, before the merge, so it read
+the standing entry and CISA's feed: the invariants step green at 11:51:28Z
+with nothing to report, no expiry warning, the status published to #151 at
+11:57:19Z with CVE-2025-30204's KEV column back to no, the page at
+11:57:43Z. The first run to read the re-decided entry on the declared feed is
+the scheduled run of 2026-10-26, drill 16.4's.
+
+**The pass (2026-10-25, 11:59 to 12:15Z).** The owner's second dispatch
+with `drill: kev-synthetic` (run 40191153604, main at 714614f, job
+121162258991): the invariants step evaluated the re-decided entry against the
+synthetic feed and passed at 12:08:34Z, `check-exceptions: ok drill-app
+CVE-2025-30204: 1 days within the 14-day ceiling (listed in CISA KEV)`
+being the line the step prints on a pass, the step green with no breach annotation; the expiries step warned `CVE-2025-30204 expires in 1 days
+(2026-10-26)` (the warning annotation on `triage/accepted-risk/drill-app.yaml` at 12:14:20Z), 16.4's first observation; the status published
+to #151 at 12:14:23Z with KEV yes once more and "accepted risk until
+2026-10-26"; the page at 12:14:46Z; the run green. Task 16.3 is done on
+these runs: both arms refused the standing exception by name on the feed
+that listed the finding, and passed the re-decided one. Drill 16.4 follows
+from midnight UTC.
