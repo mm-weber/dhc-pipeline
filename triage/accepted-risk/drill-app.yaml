@@ -16,7 +16,6 @@ vulnerabilities:
     purls: ["pkg:golang/github.com/gorilla/handlers"]
     paths: ["usr/local/bin/drill-app"]
     treatment: accept
-    owner: mm-weber
     ref: "LOG.md#accept-the-drills-critical-gorillahandlers-cors-servehttp-reachable-by-design"
     blocked: "fix (1.3.0) and avoidance (drop the CORS middleware) are available
               and declined on purpose: the finding is the drill's reason to exist
