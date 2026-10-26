@@ -78,8 +78,8 @@ active_set:
 # and removes it with the chart.
 proofs:
   hardened-app:
-    kind: smoke
-    reason: "drill 16.15: a kind the pipeline does not implement"
+    kind: none
+    reason: "drill 16.15: a none for a definition its chart deploys and proves"
   drill-app:
     kind: none
     reason: "live-drill fixture, never installed by design (task 16.2)"
