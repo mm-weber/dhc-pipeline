@@ -102,3 +102,4 @@ annotations:
   org.opencontainers.image.licenses: MIT
 entrypoint:
   - drill-app
+# Drill 16.4, the gate's half (Req 6.9): this line alone puts drill-app in the build matrix; never merged.
