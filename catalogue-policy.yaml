@@ -77,6 +77,9 @@ active_set:
 # definition is chart-proved. A fork adds entries here; onboarding adds one
 # and removes it with the chart.
 proofs:
+  hardened-app:
+    kind: smoke
+    reason: "drill 16.15: a kind the pipeline does not implement"
   drill-app:
     kind: none
     reason: "live-drill fixture, never installed by design (task 16.2)"
