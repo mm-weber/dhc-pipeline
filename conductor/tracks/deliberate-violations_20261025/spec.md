@@ -57,8 +57,8 @@ Notes: the message lines are recorded as observed, never predicted; where a run 
 
 **Acceptance criteria:**
 
-- [ ] Twenty-one commits, each with its run id, the refusing check and the line, in the LOG entry's table
-- [ ] Rows 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10, 6.11, 6.12, 6.19, 6.25, 6.39, 7.10, 9.6 and 9.18 `exercised` with their run ids, inducer `pull request`; rows 4.2, 4.3, 4.6 and 7.9 gain the re-observation in their evidence text
+- [x] Twenty-one commits, each with its run id, the refusing check and the line, in the LOG entry's table (thirty shas: nine commits pushed twice, the plan's deviations log; the line for rules 18 to 21 is in the log, the step's failure recorded)
+- [x] Rows 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10, 6.11, 6.12, 6.19, 6.25, 6.39, 7.10, 9.6 and 9.18 `exercised` with their run ids, inducer `pull request`; rows 4.2, 4.3, 4.6 and 7.9 gain the re-observation in their evidence text (#326)
 
 ### FR-2: Never merged, closed with the evidence (Req 7.11)
 
@@ -66,7 +66,7 @@ THE Repository SHALL keep the drill pull request a draft from its opening to its
 
 **Acceptance criteria:**
 
-- [ ] The pull request closed unmerged, its closing comment naming the LOG heading and the evidence pull request
+- [ ] The pull request closed unmerged, its closing comment naming the LOG heading and the evidence pull request (#323, after the evidence merges: the post-merge housekeeping)
 
 ### FR-3: The evidence (Req 7.11)
 
@@ -74,7 +74,7 @@ THE Repository SHALL add the LOG entry `## 2026-10-25: deliberate violations, ev
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` green with the exercised count up by fifteen; `scripts/lint-log-anchors.sh all .` green; the tick `[done <date>, #nnn; conductor track deliberate-violations_20261025]`; `conductor/tracks.md` lists the track under Completed
+- [x] `scripts/lint-live-evidence.sh .` green with the exercised count up by fifteen (136); `scripts/lint-log-anchors.sh all .` green; the tick `[done 2026-10-26, #326; conductor track deliberate-violations_20261025]`; `conductor/tracks.md` lists the track under Completed
 
 ## Scope
 
@@ -107,9 +107,9 @@ THE Repository SHALL add the LOG entry `## 2026-10-25: deliberate violations, ev
 
 ## Open questions (the owner's calls)
 
-- [ ] The two candidates 1.18 and 4.8 included (drafted: yes, two commits, both cheap)
-- [ ] 7.9 and the three chart-gate rules re-observed although their rows are already exercised (drafted: yes, the task text names them; four commits)
-- [ ] Commits pushed as each run starts rather than as each run ends (drafted: as each starts; the runs do not cancel one another, and the evidence is read by sha)
+- [x] The two candidates 1.18 and 4.8 included: yes, the owner's call by merging #322; both refused
+- [x] 7.9 and the three chart-gate rules re-observed although their rows are already exercised: yes, by the same merge; all four refused
+- [x] Commits pushed as each run starts rather than as each run ends: as each starts; thirty commits in twenty-eight minutes of pushing, no run cancelled
 
 ## References
 

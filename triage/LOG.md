@@ -3241,3 +3241,74 @@ to #151 at 12:14:23Z with KEV yes once more and "accepted risk until
 these runs: both arms refused the standing exception by name on the feed
 that listed the finding, and passed the re-decided one. Drill 16.4 follows
 from midnight UTC.
+
+## 2026-10-26: deliberate violations, every lint refuses by name (task 16.15)
+
+*Task 16.15, conductor track `deliberate-violations_20261025` (#322, squash
+c1c8aa6, the owner's call of 2026-10-25). Fifteen conventions of this
+repository were held by lints and gates that had refused nothing live;
+their ledger rows read `drill 16.15`. The drill pull request #323, a draft
+from its opening and never merged, supplied the violations one per commit,
+each commit undoing the previous one so that each run refused one thing and
+named it; every refusal below was read from the commit's own check runs and
+annotations, by its sha. Nothing in the code changed.*
+
+**The first pass, and the nine commits done again.** Twenty-one commits
+went up between 13:23 and 13:37Z. Commit 10 added `.trivyignore.yaml` and
+the drill's own reset script, which checked the base's files out and
+cleaned untracked ones, never removed a file the base lacked: commits 11 to
+21 all carried the ignore file, and since the accepted-risk lint runs early
+in the validate job, which stops at its first failing step, commits 13 to 17
+were refused for the stray file and not for their own violation, while 18
+to 21 were refused twice. Commits 13 to 21 were pushed again with the script
+corrected, between 13:45 and 13:51Z, each carrying its one violation; the
+first attempt's commits stay on the branch. Thirty commits in all.
+
+**What else was red.** The expiry of the drill's HIGH exception fell on the
+same day (task 16.4, the entry expired on 2026-10-26), so every commit that
+built drill-app (the definition commits 1 to 3 and the exception-file
+commits 9, 11 and 12: runs 40330192598, 40330289146, 40330379034,
+40330936640, 40331123924, 40331224851) was also red at the build's scan gate
+with `drill-app: 1 uncovered within the aperture (0 CRITICAL, 1 HIGH; Req
+6.1): CVE-2025-30204 ... An expired exception counts as uncovered.`: task
+16.4's gate half, seen six more times. The chart commits ran the e2e suite,
+red where the chart could not be proved or installed. None of this touched
+the refusals below.
+
+**Two refusals name their cause in the log only.** The revocation record's
+schema check (yamale) and the chart gate (kyverno apply) fail the step and
+print what they refused to the job's log, with no GitHub annotation; the
+step's failure is the evidence here, the lines are the owner's to read.
+Noted as a follow-up in `tasks/todo.md`. The pin lint, as its scope note
+says, does not read a chart's split `repository`/`tag`/`digest` values; the
+Renovate manager fixture step does, and refused the two malformed chart
+pins beside the gate.
+
+| # | Row | Commit | The violation | Refused by | The line |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 1.6 | b15aa92 | the builder image reference without its digest | validate 40330192365, the pin lint | `floating reference 'dhi.io/golang:1.27.3-alpine3.23-dev'`, pin by digest |
+| 2 | 1.11 | e078b9c | the source's authenticity class none | validate 40330289237, the pin lint | `class 'none' declares that nothing verifies this upstream ... (Req 1.11)` |
+| 3 | 1.12 | 3c27e14 | a dhi.io package repository ending in /community | validate 40330379027, the pin lint | `... is not of shape dhi.io/apk/<distro>/<release>/main or dhi.io/deb/<distro>/main (Req 1.12)` |
+| 4 | 1.18 | cd8e24f | valkey-compat out of the active set, valkey in | validate 40330473877, the active-set lint | `the active set splits the source repository group 'valkey-io/valkey' ... (Req 1.18)`, and the published group |
+| 5 | 4.8 | 1e1e194 | the compat decision's review-by in the past | validate 40330564462, the compat lint | `review_by 2026-10-01 has passed (today 2026-10-26); record a dated re-decision ... or retire the variant` |
+| 6 | 5.8 | d2a9f65 | the hardened-app chart's probe line removed | validate 40330655430, the proof lint | `active definition 'hardened-app' is deployed by chart/hardened-app/ which declares no functional probe (probe:) ... (Req 5.8)` |
+| 7 | 5.10 | 12e31ad | a proof of kind smoke for hardened-app | validate 40330753122, the proof lint | `proofs entry 'hardened-app' declares kind 'smoke', which this catalogue does not implement; the kinds are chart and none ... (Req 5.10)` |
+| 8 | 5.10 | 4eccb73 | a none proof for hardened-app | validate 40330843742, the proof lint | `declares a proof of kind none, but chart/hardened-app/ deploys it; one proof per definition ... (Req 5.10)` |
+| 9 | 6.11 | b240b45 | the CRITICAL entry without its owner | validate 40330936728, the accepted-risk lint | `risk treatment (Req 6.11): CVE-2017-20146 is missing 'owner' (who carries this risk)` |
+| 10 | 6.12 | 7f9db6c | `.trivyignore.yaml` at the root | validate 40331030587, the accepted-risk lint | `risk treatment (Req 6.12): Trivy ignore file outside triage/accepted-risk/` |
+| 11 | 6.25 | cab977d | the CRITICAL entry duplicated | validate 40331124035, the accepted-risk lint | `risk treatment (Req 6.25): CVE-2017-20146 claims path 'usr/local/bin/drill-app', already claimed by entry 0` (and the stray file's line) |
+| 12 | 9.18 | 587a249 | the CRITICAL's ref to no heading | validate 40331224975, the accepted-risk lint | `LOG anchor (Req 9.18): CVE-2017-20146 ref 'LOG.md#a-heading-the-log-does-not-carry-drill-1615' resolves to no heading in triage/LOG.md` (and the stray file's line) |
+| 13 | 6.19 | 294c615 | the kin-openapi subcomponent with a version | validate 40333428725, the VEX product lint | `subcomponent 'pkg:golang/github.com/getkin/kin-openapi@v0.133.0' carries version 'v0.133.0'` |
+| 14 | 6.39 | 198ccf6 | the statement's status under_investigation | validate 40333530634, the VEX product lint | `records status 'under_investigation': a source statement may only record not_affected or fixed` |
+| 15 | 9.18 | 6d83606 | the statement's citation to no heading | validate 40333622975, the citations step | `statement CVE-2026-100351 (not_affected) cites 'triage/LOG.md#a-heading-the-log-does-not-carry-drill-1615.', which resolves to no heading` |
+| 16 | 7.9 | f070e46 | `policies/restrict-registries.yaml` edited by hand | validate 40333716431, the renderings drift check | `policies/restrict-registries.yaml differs from its rendered form (Req 7.9); edit catalogue-policy.yaml and re-run scripts/render-verification.sh` |
+| 17 | 7.10 | dff743a | renovate.yml's cron changed, the policy not | validate 40333818457, the workflow policy lint | `renovate.yml: schedule trigger '5 */4 * * *' differs from declared '0 */4 * * *' (Req 7.10)` |
+| 18 | 9.6 | e966e58 | a withdrawn record without its advisory | validate 40333916232, step 5 `revocation record (Req 9.6)` | the step red; yamale's naming of the entry and the field in the log |
+| 19 | 4.2, 4.6 | 06e5fad | the chart image pinned by tag alone | chart gate 40334006281 (require-image-digest); validate 40334006248, the Renovate fixture step | kyverno's lines in the log; the fixture step red |
+| 20 | 4.3, 4.6 | 87c5e88 | the pod's runAsNonRoot false | chart gate 40334100881 (require-nonroot) | kyverno's line in the log; validate green |
+| 21 | 4.2, 4.6 | f1523da | the chart image from docker.io | chart gate 40334200141 (restrict-registries); validate 40334200122, the Renovate fixture step | kyverno's lines in the log; the fixture step red |
+
+Rows 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10, 6.11, 6.12, 6.19, 6.25, 6.39,
+7.10, 9.6 and 9.18 are `exercised` on these runs; 4.2, 4.3, 4.6 and 7.9
+carry the re-observation. The pull request is closed with a comment once
+this evidence merges. Task 16.15 is done.
