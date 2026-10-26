@@ -24,7 +24,7 @@ spec:
                 - Pod
       validate:
         message: >-
-          Only images from ghcr.io/mm-weber/dhc are allowed (Req 4.2), edited by hand for drill 16.15.
+          Only images from ghcr.io/mm-weber/dhc are allowed (Req 4.2).
         pattern:
           spec:
             =(initContainers):
