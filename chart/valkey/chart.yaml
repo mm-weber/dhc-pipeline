@@ -47,7 +47,7 @@ compat:
     triage/upstream/checks/valkey-helm-init-container.sh).
   issue: https://github.com/valkey-io/valkey-helm/issues/247
   decided_at: 2026-08-25
-  review_by: 2026-10-01
+  review_by: 2026-11-24
 #
 # Render (chart CI gate, task 5.5) and install (e2e, phase 6):
 #   helm template dhc-valkey valkey \
