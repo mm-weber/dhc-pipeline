@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-10-25
+# Live drills (task group 16): where we are and what is next, as of 2026-10-26
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -159,15 +159,14 @@ stay as history.
 - [ ] 16.14 Private report channel (9.2, 9.3). OWNER: a private vulnerability
       report or draft advisory titled as a drill, handled as SECURITY.md
       promises, closed; the ledger records id and elapsed time.
-- [ ] 16.15 Deliberate violations, one pull request, never merged: OPENED
-      2026-10-25 as conductor track `deliberate-violations_20261025` (the
-      owner's call: no clock involved; phase 0 the track and the task text's
-      amendment; phase 1 the drill pull request, twenty-one commits, one
-      violation each with the previous undone, every run red by name;
-      phase 2 the evidence: rows 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10,
-      6.11, 6.12, 6.19, 6.25, 6.39, 7.10, 9.6, 9.18 exercised, 4.2, 4.3,
-      4.6, 7.9 re-observed; the EARS validator item dropped, no validator
-      exists).
+- [x] 16.15 Deliberate violations, one pull request, never merged: DONE
+      2026-10-26 (conductor track `deliberate-violations_20261025`: #322 the
+      track; #323 the drill pull request, thirty commits, one violation each
+      with the previous undone, nine redone after the drill's reset script
+      left a stray ignore file, every run red by name; the evidence in
+      #326: rows 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10, 6.11, 6.12, 6.19,
+      6.25, 6.39, 7.10, 9.6, 9.18 exercised, 4.2, 4.3, 4.6, 7.9 re-observed;
+      the EARS validator item dropped, no validator exists).
       The plan as written: Deliberate violations, one pull request, never
       merged, one commit per rule, each observed failing by name: the task's
       list (tag pin in a chart overlay, root securityContext, registry outside
@@ -185,6 +184,14 @@ stay as history.
 
 ## Open items outside the drills (one decision each, the owner's)
 
+- [ ] Req 7.4 messages in the log only (found by 16.15, 2026-10-26): the
+      revocation record's schema check (yamale) and the chart gate (kyverno
+      apply) fail their step and print what they refused to the log, with no
+      GitHub annotation; wrap their output in `::error::` lines naming the
+      entry, the field or the policy. Small; its own pull request. Also
+      noted: the pin lint does not read a chart's split repository/tag/digest
+      values (its scope note says so); the Renovate manager fixture step
+      refused the two malformed chart pins instead.
 - [ ] 6.55 defect: the attested scan reports carry empty `scanner.db.uri` and
       `scanner.db.version` (trivy convert leaves them empty; measured
       2026-09-27 and 2026-10-08). A fix in the attestation step, test-first,
