@@ -31,7 +31,7 @@ contents:
     - ca-certificates-bundle
   builds:
     - name: drill-app
-      uses: dhi.io/golang:1.27.3-alpine3.23-dev
+      uses: dhi.io/golang:1.27.3-alpine3.23-dev@sha256:568da883960cf1ef92931413a4b5f8c424eb05b1b41384343ec54f01f404d721
       work-dir: /go/src/github.com/mm-weber/drill-app
       caches:
         - path: /go/pkg/mod
@@ -40,7 +40,7 @@ contents:
           - ca-certificates-bundle
         files:
           - url: git+https://github.com/mm-weber/drill-app.git#v0.1.0
-            # authenticity: signed-commit, verified v0.1.0 at b7868d7a6f41 (GitHub verification: valid), 2026-10-17
+            # authenticity: none
             checksum: b7868d7a6f41a8dc2181bd874776cf4976d11591
             path: /go/src/github.com/mm-weber/drill-app
             spdx:
