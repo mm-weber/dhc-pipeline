@@ -14,10 +14,4 @@
 #
 # Every entry carries image, digest, reason, advisory (the GHSA on this
 # repository) and date. Nothing is ever removed from this list.
-revocations:
-  - image: ghcr.io/mm-weber/dhc/drill-app
-    digest: sha256:53e0c498140406834754957dd5782279201a5529cda6f00f6cacc5b4685dad83
-    reason: "drill 16.15, row 9.6: a record missing its advisory field, never merged"
-    replacement: none
-    withdrawal: tombstone
-    date: 2026-10-25
+revocations: []
