@@ -21,7 +21,7 @@ vars:
   VERSION: 0.1.0
 contents:
   repositories:
-    - https://dhi.io/apk/alpine/v3.23/main
+    - https://dhi.io/apk/alpine/v3.23/community
     - https://dl-cdn.alpinelinux.org/alpine/v3.23/main
     - https://dl-cdn.alpinelinux.org/alpine/v3.23/community
   keyring:
@@ -40,7 +40,7 @@ contents:
           - ca-certificates-bundle
         files:
           - url: git+https://github.com/mm-weber/drill-app.git#v0.1.0
-            # authenticity: none
+            # authenticity: signed-commit, verified v0.1.0 at b7868d7a6f41 (GitHub verification: valid), 2026-10-17
             checksum: b7868d7a6f41a8dc2181bd874776cf4976d11591
             path: /go/src/github.com/mm-weber/drill-app
             spdx:
