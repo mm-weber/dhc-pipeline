@@ -1,4 +1,0 @@
-# drill 16.15, row 6.12: a Trivy ignore file outside triage/accepted-risk/, never merged
-vulnerabilities:
-  - id: CVE-2017-20146
-    statement: "drill 16.15: a suppression with no owner, no expiry and no review trail"

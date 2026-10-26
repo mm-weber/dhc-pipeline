@@ -3,7 +3,7 @@
 # keeps tag and digest current — before it existed this claim was false, and
 # the pinned digest sat a rebuild behind the registry (issue #64).
 image:
-  repository: docker.io/library/hardened-app
+  repository: ghcr.io/mm-weber/dhc/hardened-app
   tag: 0.1.1-alpine3.23
   digest: sha256:1e0a053f06925108b28c133792c9646951753eabad751a8f37bebccd361e6162
 
