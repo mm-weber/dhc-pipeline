@@ -58,6 +58,7 @@ active_set:
   - cert-manager-webhook
   - cert-manager-cainjector
   - valkey
+  - valkey-compat
   - drill-app
 
 # Req 5.8 to 5.10 (task 17.2; design Decision 14): how each active definition
