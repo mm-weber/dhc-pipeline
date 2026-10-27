@@ -121,9 +121,21 @@ stay as history.
       14-day window; the day after,
       under_investigation with first-seen carried, re-attestation, the gate no
       longer counts the exception, the finding undecided again.
-- [ ] 16.5 Over the ceiling (6.46, 6.47, 6.49): HIGH ceiling lowered to one
-      day for one rescan through a pull request, the only policy value a drill
-      changes; over ceiling: 1; reverted next day.
+- [ ] 16.5 Over the ceiling (6.46, 6.47, 6.49): OPENED 2026-10-27 as
+      conductor track `over-ceiling_20261027` (phase 0 the track and the
+      task text's amendment; phase 1 on 2026-10-27: one pull request lowers
+      `triage.kev_ceiling` to one day, the owner dispatches the rescan with
+      `drill: kev-synthetic`, whose feed lists the finding, the status and the
+      page publish over ceiling: 1 with the row marked, one pull request
+      restores 14d the same day; phase 2 on 2026-10-28: the scheduled run
+      clears it on CISA's feed, the evidence pull request). The KEV ceiling,
+      not the HIGH ceiling: `triage.ceilings` also tiers every unexpired
+      exception (Req 6.50, 6.51) and bounds the lint (Req 6.11), and
+      grafana's nine transfers run 60 days, so a HIGH ceiling under 60 fails
+      the rescan by name and under 30 fails validation on every pull request;
+      the finding is ten days old. The plan as written: HIGH ceiling lowered
+      to one day for one rescan through a pull request, the only policy value
+      a drill changes; over ceiling: 1; reverted next day.
 - [ ] 16.6 The fix, issue-closure half (6.52, 6.56): drill-app bumps the
       modules; the open issues close resolved:fixed on attested SBOMs.
 - [ ] 16.7 Regression and reopen (6.57): the vulnerable pin returns as a new
