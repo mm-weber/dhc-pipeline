@@ -132,11 +132,11 @@ triage:
   # A finding listed in CISA KEV is being exploited: its exception ceiling,
   # whatever the severity (Req 6.50), and the clock an undecided listed
   # finding's age is measured against (Req 6.47). Drill 16.5 (track
-  # over-ceiling_20261027): one day for one dispatched rescan reading the
-  # kev-synthetic feed, so that the drill definition's undecided HIGH is
-  # published over its ceiling; restored to 14d by the next pull request
-  # the same day.
-  kev_ceiling: 1d
+  # over-ceiling_20261027) lowered it to one day for one dispatched rescan
+  # reading the kev-synthetic feed (run 40578319282, 2026-10-27), which
+  # published the drill definition's undecided HIGH over its ceiling; the
+  # value is restored here the same day (LOG 2026-10-27).
+  kev_ceiling: 14d
   # The rescan reports every exception lapsing within this window (Req 6.10).
   expiry_warning: 14d
   # The KEV catalogue both arms fetch; an outage fails the pull request and
