@@ -29,6 +29,7 @@ Navigation for the project context and the work tracks. Context first, then spec
 | retire-grafana_20261019 | completed | high | [spec](./tracks/retire-grafana_20261019/spec.md) | [plan](./tracks/retire-grafana_20261019/plan.md) |
 | kev-drill-input_20261023 | completed | high | [spec](./tracks/kev-drill-input_20261023/spec.md) | [plan](./tracks/kev-drill-input_20261023/plan.md) |
 | kev-ceiling_20261024 | completed | high | [spec](./tracks/kev-ceiling_20261024/spec.md) | [plan](./tracks/kev-ceiling_20261024/plan.md) |
+| over-ceiling_20261027 | in progress | high | [spec](./tracks/over-ceiling_20261027/spec.md) | [plan](./tracks/over-ceiling_20261027/plan.md) |
 | exception-lapse_20261025 | completed | high | [spec](./tracks/exception-lapse_20261025/spec.md) | [plan](./tracks/exception-lapse_20261025/plan.md) |
 | deliberate-violations_20261025 | completed | high | [spec](./tracks/deliberate-violations_20261025/spec.md) | [plan](./tracks/deliberate-violations_20261025/plan.md) |
 
@@ -51,3 +52,4 @@ Navigation for the project context and the work tracks. Context first, then spec
 | 2026-10-25 | deliberate-violations_20261025 | Track created from spec task 16.15 at the owner's call: one drill pull request, never merged, twenty-one commits each carrying one violation, every lint and gate refusing by name; fifteen ledger rows to fill; the EARS validator item dropped from the task text, no validator exists |
 | 2026-10-26 | deliberate-violations_20261025 | Track completed: drill pull request #323, thirty commits (nine redone), every lint and gate refusing by name; fifteen ledger rows exercised, four re-observed; the evidence in #326 |
 | 2026-10-27 | exception-lapse_20261025 | Track completed: the drill's exception expired on both clocks, Trivy's at midnight UTC of 2026-10-26 (the finding counted again, the document re-attested under_investigation, the status undecided, issue #325, the gate on #324 red by name) and the lint's and compiler's on 2026-10-27 (`is in the past`, the page lapsed, the lapse note attested); rows 6.9, 6.10 and 6.41 exercised; the lapsed entry removed in #329, the finding undecided for 16.5 |
+| 2026-10-27 | over-ceiling_20261027 | Track created from spec task 16.5 at the owner's call: the drill's undecided HIGH over its ceiling for one dispatched rescan by a one-day KEV ceiling (the HIGH ceiling cannot go under 60 days without re-tiering grafana's transfers), the alarm read on the status issue and the page, the value restored the same day, the clear on the next scheduled run |
