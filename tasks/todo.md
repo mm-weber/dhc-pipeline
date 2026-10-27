@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-10-26
+# Live drills (task group 16): where we are and what is next, as of 2026-10-27
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -91,7 +91,18 @@ stay as history.
       16.8's drill input had to exist first; it does since #310 (2026-10-23):
       `drill: kev-synthetic` substitutes `triage/drills/kev-synthetic.json`,
       which names that CVE, for one run.
-- [ ] 16.4 Expiry warning, then lapse (6.9, 6.10, 6.35, 6.41, 6.43): OPENED
+- [x] 16.4 Expiry warning, then lapse (6.9, 6.10, 6.35, 6.41, 6.43): DONE
+      2026-10-27 (conductor track `exception-lapse_20261025`: #321 the track
+      and the task text's amendment, merged as a9c55bb; the scheduled run
+      40328859055 of 2026-10-26 counted the finding again, re-attested the
+      document under_investigation, filed #325, warned `0 days`, the page
+      lapsing; #324 the drill pull request, red at the scan gate by name,
+      never merged, validate red on it from day two; the scheduled run
+      40503212074 of 2026-10-27 reported the entry as past, the page lapsed,
+      the compiler's lapse note in the attested document; the evidence in
+      #329 removed the lapsed entry). The day between the two clocks
+      (Trivy's midnight UTC, the lint's and compiler's day after) recorded as
+      the documented difference; the follow-up below. OPENED
       2026-10-25 as conductor track `exception-lapse_20261025` (phase 0 the
       track and the task text's amendment; phase 1 the two days, 2026-10-26
       and 27 UTC, on the scheduled runs plus a drill pull request for the
@@ -184,6 +195,17 @@ stay as history.
 
 ## Open items outside the drills (one decision each, the owner's)
 
+- [ ] The two expiry clocks (found by 16.3, seen live by 16.4 on
+      2026-10-26): Trivy drops an ignore entry at midnight UTC of its
+      `expired_at`; `lint-accepted-risk.sh`, `check-exceptions.sh` and
+      `compile-vex.sh` keep the entry live through that day. For one day the
+      gate and the scan count the finding while the lint warns `0 days`, the
+      page says lapsing and the attested document carries the generic
+      uncovered note instead of the lapse note (run 40328859055). Either
+      align the three scripts to Trivy's clock (the expiry date is the first
+      day without coverage) or document the expiry day as such in the
+      exception lane's notes; test-first, its own pull request, the owner's
+      call.
 - [ ] Req 7.4 messages in the log only (found by 16.15, 2026-10-26): the
       revocation record's schema check (yamale) and the chart gate (kyverno
       apply) fail their step and print what they refused to the log, with no

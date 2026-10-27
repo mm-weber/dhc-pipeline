@@ -66,7 +66,7 @@ THE Repository SHALL keep the drill pull request a draft from its opening to its
 
 **Acceptance criteria:**
 
-- [ ] The pull request closed unmerged, its closing comment naming the LOG heading and the evidence pull request (#323, after the evidence merges: the post-merge housekeeping)
+- [x] The pull request closed unmerged, its closing comment naming the LOG heading and the evidence pull request (#323, closed 2026-10-26 16:59:03Z on #326's merge by a closing keyword in that body, the comment added 17:02:07Z)
 
 ### FR-3: The evidence (Req 7.11)
 

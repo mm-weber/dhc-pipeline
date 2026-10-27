@@ -42,7 +42,7 @@ Dependency: 1.3 complete. Worktree `violations-evidence` from main.
 ### Tasks
 
 - [x] **2.1 The evidence** (#326): the LOG entry `## 2026-10-25: deliberate violations, every lint refuses by name (task 16.15)` with the table (row, commit, run, check, line); ledger rows 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10, 6.11, 6.12, 6.19, 6.25, 6.39, 7.10, 9.6, 9.18 `exercised`, inducer `pull request`; rows 4.2, 4.3, 4.6, 7.9 with the re-observation added; the task table row for 16.15; `tasks.md` 16.15 ticked; `tasks/todo.md`; this plan's ticks; `conductor/tracks.md` to Completed; `metadata.json`; `conductor/index.md`; the owner merges
-- [ ] **2.2 The closure** (after the evidence merges: the post-merge housekeeping): the drill pull request closed with a comment linking the LOG heading and the evidence pull request
+- [x] **2.2 The closure** (2026-10-26, after the evidence merged): the drill pull request #323 closed unmerged at 16:59:03Z, by the words "close" and its number in the evidence pull request's body on the merge rather than by hand (a closing keyword this repository avoids; the lesson recorded), the comment linking the LOG heading and #326 added at 17:02:07Z
 
 ### Verification (orchestrator)
 
@@ -51,7 +51,7 @@ Dependency: 1.3 complete. Worktree `violations-evidence` from main.
 ## Final verification
 
 - [x] FR-1 to FR-3 each have their evidence in the LOG entry, the ledger or this plan
-- [ ] Two pull requests merged by squash (phase 0, the evidence); the drill pull request closed unmerged (after the evidence merges)
+- [x] Two pull requests merged by squash (phase 0 c1c8aa6, the evidence 037b428); the drill pull request closed unmerged (2026-10-26 16:59:03Z, commented 17:02:07Z)
 
 ## Deviations log
 
