@@ -153,8 +153,18 @@ stay as history.
       input; a drill branch does the same on a pull request's tiering step.
       Also the substituted feed naming a CVE, for 16.3 (`kev-synthetic`,
       shipped in #310).
-- [ ] 16.9 Fail-closed release gate (2.11, 2.13): `release.fail_closed` true by
-      pull request; the drill exception allowed to expire; build.yml
+- [ ] 16.9 Fail-closed release gate (2.11, 2.13): OPENED 2026-10-27 as
+      conductor track `fail-closed-release_20261027` (phase 0 the track and
+      the task text's amendment; phase 1 on 2026-10-27: one pull request
+      turns `release.fail_closed` on, the owner dispatches build.yml for
+      drill-app, whose HIGH is uncovered since 16.4, the release-time scan
+      names it per platform manifest, the gate signs, attests and tags
+      nothing, the digest frozen and pullable by digest, one pull request
+      turns the switch off the same day unless the owner keeps it; phase 2
+      the evidence pull request, a draft until the scheduled run of
+      2026-10-28 shows the frozen digest neither enumerated nor re-attested;
+      the way out is 16.6's fix). The plan as written: `release.fail_closed`
+      true by pull request; the drill exception allowed to expire; build.yml
       dispatched for drill-app; the digest frozen, unsigned, untagged,
       pullable by digest; one of the four ways out taken; switch back or kept,
       recorded.

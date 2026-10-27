@@ -8,6 +8,14 @@
 
 ## Active tracks
 
+### [~] fail-closed-release_20261027: The fail-closed release gate refuses a release, the digest frozen, live
+
+**Description:** The fail-closed release switch turned on for one dispatched build of the drill definition, whose HIGH is uncovered since task 16.4: the release-time scan names the finding per platform manifest, the gate signs, attests and tags nothing, the pushed digest stays frozen and pullable by digest, the next scheduled rescan neither enumerates nor re-attests it; the switch back off the same day unless the owner keeps it; the way out is drill 16.6's fix.
+**Priority:** high (the live program; possible today, before 16.6 fixes the finding)
+**Folder:** [./tracks/fail-closed-release_20261027/](./tracks/fail-closed-release_20261027/)
+
+---
+
 ### [~] over-ceiling_20261027: An undecided finding past its ceiling, the alarm raised and cleared, live
 
 **Description:** The drill definition's undecided HIGH, ten days old, put over its ceiling for one rescan: `triage.kev_ceiling` lowered to one day in one pull request, the owner's dispatch with `drill: kev-synthetic` listing the finding, the status issue and the page publishing over ceiling: 1 with the row marked (the first live over-ceiling flag), the value restored the same day, the next scheduled run clearing the alarm on the declared feed. The HIGH ceiling the task text named cannot go under 60 days: `triage.ceilings` also tiers every standing exception and bounds the lint, and grafana's nine transfers run 60 days.
