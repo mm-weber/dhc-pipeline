@@ -31,7 +31,7 @@ Notes: the first half is observed already: task 16.3's second dispatch (run 4019
 
 **Acceptance criteria:**
 
-- [ ] The two runs' ids with their expiries-step annotations recorded in ledger row 6.10; the page's card read on both days
+- [x] The two runs' ids with their expiries-step annotations recorded in ledger row 6.10 (40191153604 `1 days`, 40328859055 `0 days`; a third, 40503212074, `is in the past`); the page's card read on both days (lapsing on 2026-10-26, lapsed on 2026-10-27)
 
 ### FR-2: Trivy's day, the finding reported again (Req 6.38, 6.43, 6.46, 6.3)
 
@@ -41,8 +41,8 @@ Notes: on 2026-10-26 the compiler's note is the plain uncovered note, not the la
 
 **Acceptance criteria:**
 
-- [ ] The run's id; the re-attestation record for drill-app (`reattested: true`); the status issue's row for CVE-2025-30204 undecided with first seen 2026-10-18 and its age over the 90-day ceiling as the status counts it; the new issue's number and title
-- [ ] What the status and the issue plane show on the day between the two clocks, recorded as observed (the first finding)
+- [x] Run 40328859055; the re-attestation read back from the registry (the document's `last_updated` 2026-10-26T13:16:34Z, the statement under_investigation with its timestamp carried, 2026-10-23T14:12:33Z, the digest's release time; the record itself is in the run's summary, not readable through the API); the status row undecided, first seen 2026-10-18, 8 / 90 (under the ceiling, not over: the statement's wording here was wrong, the age is eight days); issue #325 `CVE-2025-30204: HIGH in drill-app@sha256`
+- [x] What the status and the issue plane show on the day between the two clocks, recorded as observed: undecided, an issue filed, the page lapsing, the document's note generic (LOG 2026-10-26, the follow-up item in `tasks/todo.md`)
 
 ### FR-3: The gate counts the expired exception as uncovered (Req 6.9, 6.35)
 
@@ -52,7 +52,7 @@ Notes: the drill pull request carries one comment line in `image/drill-app/image
 
 **Acceptance criteria:**
 
-- [ ] The build run red at the scan gate step (`Scan gate`, the step that fails on uncovered findings within the aperture) with the line naming drill-app, CVE-2025-30204 and the aperture; the run id in ledger row 6.9; validate green on that commit (the entry not yet past on 2026-10-26)
+- [x] Build run 40330306412 red at the scan gate step with the line naming drill-app, CVE-2025-30204 and the aperture; ledger row 6.9; validate run 40330306541 green on 2026-10-26; the rebased commit red on both on 2026-10-27 (40500526734, 40500526721)
 
 ### FR-4: The lapse day (Req 6.10, 6.11, 6.41)
 
@@ -62,7 +62,7 @@ Notes: whether a change of the note alone re-attests the document (Req 6.43 comp
 
 **Acceptance criteria:**
 
-- [ ] The run's id; the expiries-step annotation `expired_at 2026-10-26 is in the past`; the page's lapsed entry; the compiled document's note as the re-attestation record or the attested document shows it; validate red by name on a pull request of that day, if one runs before FR-5 merges
+- [x] Run 40503212074; the expiries annotation `risk treatment (Req 6.11): CVE-2025-30204 expired_at 2026-10-26 is in the past`; the page's lapsed entry; the lapse note in the attested document read back from the registry; validate run 40500526721 red by name on #324's rebased commit
 
 ### FR-5: The entry leaves, the finding stays undecided (Req 6.11; task 16.5's premise)
 
@@ -72,7 +72,7 @@ Notes: re-deciding would end 16.5's premise (an undecided finding past its ceili
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-accepted-risk.sh .` green with no warning for drill-app; `scripts/lint-log-anchors.sh all .` green (the removed entry's `ref` no longer counted)
+- [x] `scripts/lint-accepted-risk.sh .` green with no warning for drill-app; `scripts/lint-log-anchors.sh all .` green, ten refs (eleven before). Not foreseen here: the pull request builds drill-app (a changed exception file names its image, Req 6.9) and its scan gate is red on the now uncovered finding (run 40506336848); the merge is the owner's bypass, recorded in the LOG and the plan's deviations log
 
 ### FR-6: The evidence (Req 7.11)
 
@@ -80,7 +80,7 @@ THE Repository SHALL flip ledger rows 6.9, 6.10 and 6.41 to `exercised` with the
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` green with 124 exercised; `scripts/lint-log-anchors.sh all .` green; the tick `[done <date>, #nnn; conductor track exception-lapse_20261025]`; `conductor/tracks.md` lists the track under Completed; 16.5 next in `tasks/todo.md`
+- [x] `scripts/lint-live-evidence.sh .` green with 139 exercised (124 was written before 16.15's fifteen rows); `scripts/lint-log-anchors.sh all .` green; the tick `[done 2026-10-27, #329; conductor track exception-lapse_20261025]`; `conductor/tracks.md` lists the track under Completed; 16.5 next in `tasks/todo.md`
 
 ## Scope
 
@@ -115,9 +115,9 @@ THE Repository SHALL flip ledger rows 6.9, 6.10 and 6.41 to `exercised` with the
 
 ## Open questions (the owner's calls)
 
-- [ ] A rescan dispatch on the evening of 2026-10-25 (from 00:00 UTC on 2026-10-26) for FR-2, or the scheduled run (drafted: the scheduled run; a dispatch is a release of attestations, M17)
-- [ ] The lapsed entry removed in the evidence pull request rather than re-decided (drafted: removed; 16.5 needs the finding undecided)
-- [ ] The day between the two clocks recorded as a defect row or as the documented difference (drafted: the owner's call after reading FR-2's observation)
+- [x] The scheduled runs, both days (no dispatch)
+- [x] Removed in #329; the finding undecided for 16.5
+- [x] Recorded as the documented difference (LOG 2026-10-26, rows 6.9, 6.10 and 6.41 `exercised`) with a follow-up item in `tasks/todo.md` (align the three scripts to Trivy's clock, or document the expiry day as the first day without coverage); the owner's call stands with the merge of #329
 
 ## References
 

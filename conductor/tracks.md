@@ -8,15 +8,18 @@
 
 ## Active tracks
 
-### [~] exception-lapse_20261025: The drill's exception expires, the lapse seen on every plane, live
+_No active track._
+
+## Completed tracks
+
+### [x] exception-lapse_20261025: The drill's exception expires, the lapse seen on every plane, live
 
 **Description:** The drill definition's HIGH exception, re-decided to one day by task 16.3, expires on 2026-10-26: Trivy counts the finding again from midnight UTC, the rescan recompiles and re-attests the document with the finding `under_investigation` and its first-seen time carried, the status shows it undecided, a cve issue is filed, the gate on a drill pull request refuses the finding as uncovered, and on the second day the lint reports the entry as past and the compiler names the lapse; the entry is then removed for task 16.5; ledger rows 6.9, 6.10 and 6.41 filled (Req 6.9, 6.10, 6.41, 7.11; task 16.4).
 **Priority:** high (the next drill of the live program; 16.5 needs the finding undecided)
+**Completed:** 2026-10-27 (#321 merged 2026-10-25 as a9c55bb, the track and the task text's amendment; the scheduled run 40328859055 of 2026-10-26: Trivy counting the finding again, the document re-attested under_investigation, the status undecided, issue #325 filed, the expiries step at 0 days, the page lapsing; the drill pull request #324, red at the scan gate by name, never merged, validate red on it from day two; the scheduled run 40503212074 of 2026-10-27: the lint's `is in the past`, the page lapsed, the compiler's lapse note in the attested document; the evidence in #329: rows 6.9, 6.10 and 6.41 exercised, the lapsed entry removed, the finding undecided for 16.5)
 **Folder:** [./tracks/exception-lapse_20261025/](./tracks/exception-lapse_20261025/)
 
 ---
-
-## Completed tracks
 
 ### [x] deliberate-violations_20261025: Deliberate violations, one pull request, every lint refuses by name, live
 

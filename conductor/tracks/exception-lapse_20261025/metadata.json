@@ -1,10 +1,11 @@
 {
   "id": "exception-lapse_20261025",
   "type": "chore",
-  "status": "in_progress",
+  "status": "completed",
   "created_at": "2026-10-25T13:30:00Z",
-  "updated_at": "2026-10-25T13:30:00Z",
+  "updated_at": "2026-10-27T12:45:24Z",
   "description": "The drill definition's HIGH exception, re-decided to one day by task 16.3, expires on 2026-10-26: Trivy counts the finding again from midnight UTC, the rescan recompiles and re-attests the document with the finding under_investigation and its first-seen time carried, the status shows it undecided, a cve issue is filed, the gate on a drill pull request refuses the finding as uncovered, and on the second day the lint reports the entry as past and the compiler names the lapse; the entry is then removed for task 16.5; ledger rows 6.9, 6.10 and 6.41 filled (Req 6.9, 6.10, 6.41, 7.11; task 16.4)",
   "spec_path": "conductor/tracks/exception-lapse_20261025/spec.md",
-  "plan_path": "conductor/tracks/exception-lapse_20261025/plan.md"
+  "plan_path": "conductor/tracks/exception-lapse_20261025/plan.md",
+  "completed_at": "2026-10-27T12:45:24Z"
 }

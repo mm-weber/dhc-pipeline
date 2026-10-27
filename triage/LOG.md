@@ -3312,3 +3312,168 @@ Rows 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10, 6.11, 6.12, 6.19, 6.25, 6.39,
 7.10, 9.6 and 9.18 are `exercised` on these runs; 4.2, 4.3, 4.6 and 7.9
 carry the re-observation. The pull request is closed with a comment once
 this evidence merges. Task 16.15 is done.
+
+## 2026-10-26: the drill's exception expires, the lapse on every plane (task 16.4)
+
+*Image: drill-app. Task 16.4, conductor track `exception-lapse_20261025`
+(#321, squash a9c55bb). Task 16.3 re-decided the drill's HIGH,
+CVE-2025-30204 (golang-jwt `ParseUnverified`), to one day: decided
+2026-10-25, expiring 2026-10-26 (#319, squash 714614f). This entry records
+what every plane did with that lapse on the two days it took, each number
+read as it happened: the expiry warning (Req 6.10), Trivy counting the
+finding again from midnight UTC of the expiry day while this repository's
+lint and compiler kept the entry live through that day (the two clocks
+named in the entry of 2026-10-25), the gate refusing the finding as
+uncovered (Req 6.9, first time live), and on the day after, the lint's `is
+in the past`, the page's lapsed entry and the compiler's note naming the
+lapse (Req 6.41, first time live). Nothing in the code changed and no new
+decision was written; the lapsed entry leaves the exception file with this
+entry so that the finding stays undecided for task 16.5.*
+
+**Day one, Trivy's (2026-10-26, 13:14 to 13:37Z).** The scheduled run
+40328859055 (main at a9c55bb, job 121592610063) scanned every supported
+digest with the exception file as Trivy's ignorefile. The entry's
+`expired_at`, 2026-10-26, read as midnight UTC of that date, was before now,
+so Trivy dropped it (`pkg/result/ignore.go`, `Prune`, the pinned 0.75.0)
+and the scan step reported CVE-2025-30204 on drill-app again (13:18:38Z).
+The re-attestation step (Req 6.42, 6.43; 13:28:41Z) recompiled drill-app's
+document from the day's reports. For the compiler the entry was still live
+(`expired` means an expiry before today, and today was the expiry day), but
+the report listed the finding plain, so the statement moved from `affected`
+to `under_investigation` with the compiler's generic note, `uncovered at
+release time in this digest's attested release-time scan report
+(drill-app__0c61394798b5__linux-amd64.json); awaiting a triage decision`,
+not the lapse note; its `timestamp` was carried from the previous document,
+2026-10-23T14:12:33Z, the digest's release time (run 39966412724, the dhi.io
+build-layer update #266; Req 6.38, 6.40), and `last_updated` became
+2026-10-26T13:16:34Z, the day's report time. The statement set differed, so
+the document was re-attested on the index and on both platform manifests
+(read back from the registry with `cosign download attestation` on
+2026-10-27, the index `drill-app@sha256:0c61394798b5...`, the manifests
+`c45b99fafdfe...` and `e93535e38c24...`). The expiries step (13:37:06Z)
+warned `risk treatment: CVE-2025-30204 expires in 0 days (2026-10-26)` on
+`triage/accepted-risk/drill-app.yaml` line 29, the second observation of
+Req 6.10 after 16.3's `1 days`. The issue step filed #325, `CVE-2025-30204:
+HIGH in drill-app@sha256`, at 13:37:10Z (Req 6.3): no cve issue had existed,
+the finding having arrived decided with task 16.2. The status, published to
+#151 at 13:37:14Z, read the re-attested document and showed the finding
+undecided, `drill-app | CVE-2025-30204 | HIGH | no | undecided | 2026-10-18 |
+n/a | 8 / 90 | undecided, awaiting a triage decision`, with `undecided: 2
+(oldest 8 days); decided: 11`; the first-seen date is the status's own,
+carried from its previous data across the definition's digests, where the
+document's `timestamp` is this digest's. The page (job 121604249709,
+13:37:41Z) listed the entry on drill-app's card as lapsing, `exception
+lapsing: CVE-2025-30204 expires in 0 days (2026-10-26)`, next to `undecided
+1, over ceiling 0`, read on the published page that day.
+
+**The gate (2026-10-26, 13:24 to 13:29Z).** Pull request #324 (commit
+2fac0b0) put drill-app in the build matrix with one comment line in
+`image/drill-app/image.yaml`, the shape of #313 and #319's first commit, and
+was opened as a draft, meant to be red and never merged. Build run
+40330306412 (job 121597733598) built and scanned drill-app with the same
+ignorefile: the Trivy scan green at 13:27:44Z (a scan step fails on nothing),
+govulncheck green, step 19 `exception tiers against KEV (Req 6.50)` green
+at 13:29:25Z (the entry's one-day span within its tier), then step 20, the
+scan gate, failed at 13:29:25Z with `drill-app: 1 uncovered within the
+aperture (0 CRITICAL, 1 HIGH; Req 6.1): CVE-2025-30204 (HIGH
+github.com/golang-jwt/jwt/v5@v5.2.1, fixed: 5.2.2). Four ways out,
+strongest first: avoid (drop the component) · fix (version bump, Req 6.5) ·
+prove it does not apply (OpenVEX in triage/vex/, Req 6.4) · accept or
+transfer for a bounded time (triage/accepted-risk/drill-app.yaml, Req 6.7).
+An expired exception counts as uncovered.`, the build gate red; validate run
+40330306541 green, the lint's warning at 0 days. Req 6.9, first time live.
+The same line refused the six drill-app builds of #323 that day (task 16.15,
+runs 40330192598, 40330289146, 40330379034, 40330936640, 40331123924 and
+40331224851): every commit of that drill that put drill-app in the matrix
+was uncovered on this expired entry, alongside the violation it carried.
+
+**Day two, the lint's and the compiler's (2026-10-27, 12:22 to 12:42Z).**
+The scheduled run 40503212074 (main at 037b428, job 122185846822) started
+at 12:22:14Z, six hours after its cron (GitHub's delay: the four runs before
+it had started between 11:12 and 13:14Z). The scan reported the finding as
+on day one (12:25:18Z). The re-attestation step (12:34:03Z) recompiled the
+document with the entry now expired for the compiler too: the statement
+stayed `under_investigation`, its `timestamp` unchanged at
+2026-10-23T14:12:33Z, and its note became `accepted-risk exception (accept,
+decided 2026-10-25) expired on 2026-10-26; the finding is still listed in
+this digest's attested scan report
+(drill-app__0c61394798b5__linux-amd64.json); awaiting a new decision;
+tracked in https://github.com/mm-weber/dhc-pipeline/issues/325`, the issue
+link appended because #325 existed by then (day one had filed it after its
+own re-attestation step, which runs before the issue step). The statement
+set differed by that note alone, so the document was re-attested with
+`last_updated` 2026-10-27T12:23:46Z, the day's report time, on the index
+and on both platform manifests, one OpenVEX attestation on each (read back
+with `cosign download attestation` at 12:44Z): Req 6.41 first time live,
+and Req 6.43 on a change of note alone. The expiries step (12:41:25Z)
+reported `risk treatment (Req 6.11): CVE-2025-30204 expired_at 2026-10-26
+is in the past` as an error annotation on line 29 of the exception file;
+the step hands the lint's lines to the summary and the page and does not
+fail the run, which stayed green. The status published to #151 at
+12:41:31Z counted on: `drill-app | CVE-2025-30204 | HIGH | no | undecided |
+2026-10-18 | n/a | 9 / 90 | undecided, awaiting a triage decision
+(dhc-pipeline#325)`, `undecided: 2 (over ceiling: 0, oldest: 9 days)`. The
+page (job 122194608341, 12:42:09Z) listed the entry on drill-app's card as
+lapsed, `exception lapsed: CVE-2025-30204 expired_at 2026-10-26 is in the
+past`, above the finding's row with its issue, read on the published page
+at 12:44Z.
+
+**The gate on day two (12:01 to 12:07Z).** The drill pull request's commit
+was rebased onto main that morning (83b8fb3) so that validation ran on the
+lapse day: validate run 40500526721 failed at step 9, the accepted-risk lint
+(12:01:36Z), with the same `is in the past` line on line 29, Req 6.11
+refusing a past expiry on a pull request for the first time; build run
+40500526734 (job 122176816331) built and scanned drill-app again, the tier
+step green, the scan gate red at 12:07:10Z with the line of day one. Until
+the entry leaves, every pull request's validation is red on it, by design;
+the Renovate pull requests of the evening before (#327, #328) had run on
+day one and did not meet it.
+
+**The entry leaves (2026-10-27).** The evidence pull request (#329)
+removes CVE-2025-30204's entry from `triage/accepted-risk/drill-app.yaml`
+and leaves the CRITICAL's (CVE-2017-20146, expiring 2026-11-17); the file's
+header says where the HIGH went. No new decision is written: re-deciding
+would end task 16.5's premise, an undecided finding carried past a lowered
+ceiling. `lint-accepted-risk.sh` is green with no warning, ten refs resolve
+where eleven did, validation is green again on every pull request. The next
+scheduled run reads no expired entry for the finding, so its recompile
+carries the generic uncovered note once more, the statement's timestamp
+unchanged; the status keeps the finding undecided with its first-seen date
+of 2026-10-18 and counts its age on. The drill pull request #324 is closed
+unmerged with a comment after this merges; issue #325 stays open as the
+finding's issue until drill 16.6 fixes it or the owner decides it.
+
+**The gate on this pull request (2026-10-27, 12:48 to 12:51Z).** A changed
+exception file names its image in the build matrix so that the gate
+re-runs against it (Req 6.9), and this pull request changes drill-app's:
+build run 40506336848 (job 122196521100) built and scanned drill-app with the
+entry gone and its scan gate failed at 12:51:09Z with the line of day one,
+the finding uncovered by nothing now rather than by an expired entry;
+validate run 40506336887 green, the lint satisfied. The track's spec had not
+seen this: an undecided HIGH in the drill definition refuses every pull
+request that builds the definition, this one included, until drill 16.6
+fixes the finding or the owner decides it, and a pull request that only
+removes the lapsed entry cannot be green at that gate without deciding the
+finding, which would end task 16.5's premise. The owner merges this pull
+request over the red gate by the ruleset's bypass for the repository's
+admin role, the one bypass this program has needed, recorded here as the
+reason; the pull requests that follow (16.5's track and its policy change)
+build nothing and stay green.
+
+**The two clocks, as observed.** The entry of 2026-10-25 named the
+difference from the sources; these two days showed it on every plane. On
+the expiry day Trivy no longer honoured the entry: the gate refused the
+finding as uncovered, the scan counted it, the document was re-attested
+`under_investigation`, the status showed it undecided and an issue was
+filed, while the lint warned `0 days`, the page said lapsing, the tier check
+still evaluated the entry and the compiler's note did not name the lapse.
+On the day after, the lint said `is in the past`, the page said lapsed and
+the note named the lapse. Every component did what its own source says;
+what differs is the meaning of `expired_at`: for Trivy the first day
+without coverage, for this repository's three scripts the last day with it.
+The difference is recorded here as the documented one, not as a defect row:
+the day it costs is one of mismatched notes, not of coverage, since the
+gate and the scan read Trivy's clock, the stricter. A follow-up item in
+`tasks/todo.md` leaves the owner the call between aligning the three
+scripts to Trivy's reading and documenting the expiry day as the first day
+without coverage.
