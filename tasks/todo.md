@@ -142,8 +142,17 @@ stay as history.
       the finding is ten days old. The plan as written: HIGH ceiling lowered
       to one day for one rescan through a pull request, the only policy value
       a drill changes; over ceiling: 1; reverted next day.
-- [ ] 16.6 The fix, issue-closure half (6.52, 6.56): drill-app bumps the
-      modules; the open issues close resolved:fixed on attested SBOMs.
+- [ ] 16.6 The fix, issue-closure half (6.52, 6.56): OPENED 2026-10-28 as
+      conductor track `drill-fix_20261028` (phase 0 the track and the task
+      text's amendment; phase 1 one pull request adds a `go/bump@v2` step to
+      drill-app's fetch phase bumping gorilla/handlers to 1.3.0 and
+      golang-jwt/jwt/v5 to 5.2.2, green at the gate by the fix, main releases;
+      phase 2 the next scheduled rescan closes the HIGH's issue (#325) as
+      resolved:fixed on the attested SBOMs and publishes both findings fixed
+      with their days to fix from 2026-10-18, the evidence pull request
+      retires the CRITICAL's exception as moot). The plan as written:
+      drill-app bumps the modules; the open issues close resolved:fixed on
+      attested SBOMs.
 - [ ] 16.7 Regression and reopen (6.57): the vulnerable pin returns as a new
       release; the closed issues reopen with the original first-seen.
 - [x] 16.8 KEV feed outage fails closed (6.59, 6.60): DONE 2026-10-24
