@@ -12,11 +12,11 @@ release:
   public: true
   # Req 2.12/2.13: off = an uncovered finding releases as under_investigation;
   # on = sign nothing, tag nothing, red run. Drill 16.9 (track
-  # fail-closed-release_20261027): on for one dispatched build of drill-app,
-  # whose HIGH is uncovered since 2026-10-26, so that the gate refuses the
-  # release by name and the digest stays frozen; off again by the next pull
-  # request the same day.
-  fail_closed: true
+  # fail-closed-release_20261027) turned it on for one dispatched build of
+  # drill-app, whose HIGH was uncovered (run 40691384018, 2026-10-28): the
+  # gate refused the release by name and the digest stays frozen; off again
+  # here the same day (LOG 2026-10-27).
+  fail_closed: false
   # Req 2.15/2.17: on-change discards a scheduled rebuild whose package set
   # equals the published one; always publishes every rebuild.
   publish_policy: on-change
