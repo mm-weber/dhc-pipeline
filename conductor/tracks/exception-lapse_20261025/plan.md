@@ -43,8 +43,8 @@ Dependency: 1.3 observed. Worktree `exception-lapse-evidence` from main.
 
 - [x] **2.1 The entry leaves** (FR-5): done in #329, the lint green with ten refs resolving. As planned: CVE-2025-30204's entry removed from `triage/accepted-risk/drill-app.yaml`, the header comment updated; `scripts/lint-accepted-risk.sh .` green
 - [x] **2.2 The evidence** (FR-6): #329; the drill pull request's closure after the merge is the box below. As planned: the LOG entry `## 2026-10-26: the drill's exception expires, the lapse on every plane (task 16.4)` (day one, the gate, day two, the removal, the two clocks as observed); ledger rows 6.9, 6.10, 6.41 `exercised` with the run ids, inducer `drill definition`; the task table row for 16.4; `tasks.md` 16.4 ticked; `tasks/todo.md` to 16.5; this plan's ticks; `conductor/tracks.md` to Completed; `metadata.json`; `conductor/index.md`; the owner merges; the drill pull request closed with a comment
-- [ ] **2.2b The closure** (after the evidence merges): the drill pull request #324 closed unmerged with a comment naming the LOG heading and #329
-- [ ] **2.3 The hand-over to 16.5** (asked of the owner on 2026-10-27 with #329; opened on their word): 16.5's track opened the day this merges (the HIGH ceiling lowered to one day for one rescan through a pull request, the finding undecided since 2026-10-18 reported over its ceiling)
+- [x] **2.2b The closure** (2026-10-27 13:02:28Z, after #329 merged at 13:01:50Z): the drill pull request #324 closed unmerged with the comment naming the LOG heading and #329
+- [x] **2.3 The hand-over to 16.5** (opened 2026-10-27 as track over-ceiling_20261027, #330, on the owner's word; the KEV ceiling, not the HIGH ceiling, for the reason in that track's spec): 16.5's track opened the day this merges (the HIGH ceiling lowered to one day for one rescan through a pull request, the finding undecided since 2026-10-18 reported over its ceiling)
 
 ### Verification (orchestrator)
 
@@ -53,7 +53,7 @@ Dependency: 1.3 observed. Worktree `exception-lapse-evidence` from main.
 ## Final verification
 
 - [x] FR-1 to FR-6 each have their evidence in the LOG entry, the ledger or this plan
-- [ ] Three pull requests: phase 0 (a9c55bb) and the evidence (#329) merged by squash, the drill pull request closed unmerged (after the evidence merges)
+- [x] Three pull requests: phase 0 (a9c55bb) and the evidence (#329, 1a43a5a, merged over its red build gate by the owner's bypass) merged by squash, the drill pull request #324 closed unmerged (2026-10-27 13:02:28Z)
 - [x] Task 16.5's track is next in `tasks/todo.md`
 
 ## Deviations log

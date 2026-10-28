@@ -31,7 +31,7 @@ THE Repository SHALL set `triage.kev_ceiling` to `1d` in `catalogue-policy.yaml`
 
 **Acceptance criteria:**
 
-- [ ] The pull request's number and squash; `scripts/triage-policy.sh . kev-ceiling` printing `1` on that commit; validate green
+- [x] #331, squash 16727ab (merged 2026-10-27 20:27:46Z); the reader printed `1` on 9e49b2c; validate green
 
 ### FR-2: The breach (Req 6.46, 6.47)
 
@@ -41,7 +41,7 @@ Notes: a dispatch attests the day's reports and re-attests changed documents as 
 
 **Acceptance criteria:**
 
-- [ ] The run's id and time; the status issue's row (`age / 1`, KEV yes, over ceiling), the aggregates line `over ceiling: 1`, the summary line; the page's lead, card and row read on the published page; the invariants step green and the run green
+- [x] Run 40578319282 (20:28:12Z to 20:45:00Z); the row `**9 / 1**`, KEV yes, `over_ceiling: true`; `undecided: 2 (over ceiling: 1, oldest: 9 days)`; the summary line is in the job summary (not readable through the API; the status outputs carry the same count); the page's lead `KEV 1 days`, the card `over ceiling 1`, the row `class="over"`; the invariants step green at 20:40:09Z, the run green
 
 ### FR-3: The revert (Req 6.49)
 
@@ -51,7 +51,7 @@ Notes: a scheduled run reads CISA's feed; a one-day KEV ceiling would re-tier an
 
 **Acceptance criteria:**
 
-- [ ] The pull request's number and squash; the scheduled runs between the two merges, if any, listed with what they read (expected: none)
+- [x] #332, squash ebd0f65 (merged 20:52:45Z); no scheduled run between 20:27:46Z and 20:52:45Z
 
 ### FR-4: The clear (Req 6.47)
 
@@ -61,7 +61,7 @@ Notes: the clear is read on the scheduled run, the declared feed. A second dispa
 
 **Acceptance criteria:**
 
-- [ ] The run's id; the status row (`age / 90`, KEV no), the aggregates line `over ceiling: 0`; the page read
+- [x] Run 40693681245; `10 / 90`, KEV no; `over ceiling: 0`; the page unmarked, `KEV 14 days`
 
 ### FR-5: The evidence (Req 7.11)
 
@@ -69,7 +69,7 @@ THE Repository SHALL add the LOG entry `## 2026-10-27: the drill's finding over 
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` green (139 exercised, unchanged: the rows were exercised already); `scripts/lint-log-anchors.sh all .` green; the tick `[done <date>, #nnn; conductor track over-ceiling_20261027]`; `conductor/tracks.md` lists the track under Completed; 16.6 next in `tasks/todo.md`
+- [x] `scripts/lint-live-evidence.sh .` green (139 exercised); `scripts/lint-log-anchors.sh all .` green; the tick `[done 2026-10-28, #339; conductor track over-ceiling_20261027]`; `conductor/tracks.md` lists the track under Completed; 16.6 next in `tasks/todo.md`
 
 ## Scope
 
@@ -104,9 +104,9 @@ THE Repository SHALL add the LOG entry `## 2026-10-27: the drill's finding over 
 
 ## Open questions (the owner's calls)
 
-- [ ] The KEV ceiling lowered rather than the HIGH ceiling the task text named (drafted: the KEV ceiling; a HIGH ceiling under 60 days re-tiers grafana's nine transfers and, under 30, fails the lint on every pull request)
-- [ ] A second dispatch with `drill: kev-synthetic` after the revert, to show the alarm cleared by the value alone under the same feed (drafted: not required; the scheduled run's clear suffices)
-- [ ] Whether the three uses of `triage.ceilings` get a follow-up item (drafted: yes, one line in `tasks/todo.md`, in the evidence pull request)
+- [x] The KEV ceiling (the owner's call by merging #330 and #331)
+- [x] No second dispatch; the clear read on the scheduled run of 2026-10-28
+- [x] The follow-up item added to `tasks/todo.md` in #339
 
 ## References
 
