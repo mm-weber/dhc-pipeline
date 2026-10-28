@@ -33,6 +33,7 @@ Navigation for the project context and the work tracks. Context first, then spec
 | over-ceiling_20261027 | in progress | high | [spec](./tracks/over-ceiling_20261027/spec.md) | [plan](./tracks/over-ceiling_20261027/plan.md) |
 | exception-lapse_20261025 | completed | high | [spec](./tracks/exception-lapse_20261025/spec.md) | [plan](./tracks/exception-lapse_20261025/plan.md) |
 | deliberate-violations_20261025 | completed | high | [spec](./tracks/deliberate-violations_20261025/spec.md) | [plan](./tracks/deliberate-violations_20261025/plan.md) |
+| slsa-build-l2_20261028 | pending | high | [spec](./tracks/slsa-build-l2_20261028/spec.md) | [plan](./tracks/slsa-build-l2_20261028/plan.md) |
 
 ## Recent activity
 
@@ -55,3 +56,4 @@ Navigation for the project context and the work tracks. Context first, then spec
 | 2026-10-27 | exception-lapse_20261025 | Track completed: the drill's exception expired on both clocks, Trivy's at midnight UTC of 2026-10-26 (the finding counted again, the document re-attested under_investigation, the status undecided, issue #325, the gate on #324 red by name) and the lint's and compiler's on 2026-10-27 (`is in the past`, the page lapsed, the lapse note attested); rows 6.9, 6.10 and 6.41 exercised; the lapsed entry removed in #329, the finding undecided for 16.5 |
 | 2026-10-27 | over-ceiling_20261027 | Track created from spec task 16.5 at the owner's call: the drill's undecided HIGH over its ceiling for one dispatched rescan by a one-day KEV ceiling (the HIGH ceiling cannot go under 60 days without re-tiering grafana's transfers), the alarm read on the status issue and the page, the value restored the same day, the clear on the next scheduled run |
 | 2026-10-27 | fail-closed-release_20261027 | Track created from spec task 16.9 at the owner's call: the fail-closed switch on for one dispatched build of drill-app, whose HIGH is uncovered since 16.4; the gate refuses the release by name, the digest frozen, the switch off the same day; the way out is 16.6's fix |
+| 2026-10-28 | slsa-build-l2_20261028 | Track created with spec task group 18 at the owner's call: SLSA Build L2 measured against v1.2; GitHub's provenance service at release, the policy rule, the consumer step and a daily coverage report; required from the successor's first release; the spec amendment (2.9, 2.10, 2.23, 2.25, 7.7 amended; 2.27 to 2.29, 9.19 added; Decision 15) in the same pull request |

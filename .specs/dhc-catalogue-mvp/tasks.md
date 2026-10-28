@@ -337,7 +337,8 @@
     - The successor's epoch date is its first release; its README, `docs/user-manual.md` and `SECURITY.md` (cluster D) state it, and the archived repository's README names the successor
     - Depends on the final requirements cleanup: owner, repository and registry names parameterized as declared values; Req 1.1's four-component list restated as a reference set, so an adopter carries only the definitions it wants
     - The successor's seed renumbers the rulebook contiguously once, with a recorded old-to-new mapping in its first commit, retiring this repository's stable-ID gaps (primitives pass, 2026-08-26)
-    - _Requirements: Req 2.11, Req 2.24_
+    - SLSA Build L2 from the first release (design Decision 15, owner's call of 2026-10-28): the successor's policy file names SLSA provenance among the required attestations from its seed, so the rendered policy demands it (Req 2.28) and the first daily proof applies it; its SECURITY.md claims Build L2 measured against SLSA v1.2 for every digest from its epoch (Req 9.19); ledger row 2.28 is exercised by that first proof. Depends on task group 18
+    - _Requirements: Req 2.11, Req 2.24, Req 2.28, Req 9.19_
 
 - [x] 13. Production readiness, cluster D: catalogue posture (review F1, F11, F12, F7, F13 register; spec amendment landed before any of these)
   - [x] 13.1 SECURITY.md, notice, attribution, trust-boundary table
@@ -510,18 +511,41 @@
     - An image-level functional test on the candidate inside the pull request build: first the frontend's `tests:` block (verify in CI whether `dhi.io/build` executes it; no public DHI definition uses it as of 2026-10-15), else a `docker run` step against the local-registry image with a per-definition check; registered like the e2e probes, so a declared name must exist; for the base and dev images no chart will deploy
     - _Requirements: none yet; a new criterion when scheduled_
 
+- [ ] 18. SLSA Build L2: provenance generated from the platform's signed claims, attested at release, verifiable by consumers, demanded from the successor's epoch (Req 2.9, 2.10, 2.23, 2.25, 2.27 to 2.29, 7.7, 9.19; design Decision 15; SLSA v1.2, `releases/v1.2` at ae7fc76; owner's calls of 2026-10-28: GitHub's provenance service, binding from the successor's epoch). Executes before task 12; one pull request per task; conductor track slsa-build-l2_20261028
+  - [ ] 18.1 Spec amendment
+    - requirements.md: 2.9, 2.10, 2.23, 2.25 and 7.7 amended, 2.27 to 2.29 and 9.19 added; design.md: Decision 15 (the v1.2 gap, the history, options A to E, the decision, the consequences); this group; 12.1's SLSA bullet; ledger rows 2.27, 2.28, 2.29 and 9.19 (unexercised, each with its reason) and notes on rows 2.10 and 2.25 naming the 2026-09-09 review's finding 2.4, which no disposition carried
+    - _Requirements: Req 2.9, Req 2.10, Req 2.23, Req 2.25, Req 2.27, Req 2.28, Req 2.29, Req 7.7, Req 9.19_
+  - [ ] 18.2 Measure the verifier, ADR 0005 [OPERATOR: one dispatch of a spike workflow on a branch, pushing a scratch image outside the catalogue namespace]
+    - One scratch image pushed outside `verification.registry` (never a catalogue repository), attested by `actions/attest-build-provenance` with `push-to-registry`, pinned by commit; measured and recorded in `data/slsa-provenance-spike-<date>.md`: the predicate's builder id, build type and external parameters as emitted, where the bundle lands (OCI referrer, its artifact type), anonymous readability, and which of the pinned tools verify it with the identity and the expectations: Kyverno 1.19.1 (`kyverno apply`, the 2.28 rule), cosign 2.6.5 `verify-attestation`, `gh attestation verify --bundle-from-oci` (whether it needs a login), Trivy 0.72.0 if it reads it; one index and one platform manifest as subjects. ADR 0005 names the verifier for 2.28, the consumer command for 2.25 and the expectations' exact values; if only cosign v3 reads the bundle, ADR 0003's major gate goes to the owner and 18.4 to 18.5 wait for that call
+    - _Requirements: Req 2.27, Req 2.28_
+  - [ ] 18.3 Provenance in the release path
+    - `build.yml`: after criterion 2.9's attestations and before the tags, one provenance attestation per index and per platform manifest through the action pinned by commit (Renovate's github-actions manager, the three-day age rule), `push-to-registry` into the declared namespace; the release job gains `attestations: write`, held by `lint-workflow-policy.sh` against the policy file's workflows section; a failed attestation applies no tag and names the digest (the 2.5 and 2.26 shape); the rescan never attests provenance; the PR path unchanged. A release-time self-check verifies each attestation with ADR 0005's verifier before the tags. TDD for every script and lint touched, one test per slice
+    - _Requirements: Req 2.9, Req 2.27, Req 7.7_
+  - [ ] 18.4 Coverage reported daily
+    - `scripts/check-provenance.sh` (verify one digest against the declared identity and expectations; `report` mode prints each supported digest's state and exits 0, `require` mode, used from the successor's epoch, fails by name): the rescan runs `report` over the supported set and the status data and issue gain one line (covered n of m, the uncovered digests named), never failing the run while the requirement is not declared (2.29); a suite first, one test per slice
+    - _Requirements: Req 2.29_
+  - [ ] 18.5 The declaration and its renderings
+    - `catalogue-policy.yaml` `verification.provenance`: the expectations (builder identity, build type, source repository, workflow path, ref) and the predicate type, read by `render-verification.sh`; SLSA provenance named in `required.attestations` renders the 2.28 rule into `policies/verify-catalogue-images.yaml` (absent in this repository, present in the successor's seed), the drift check covering both shapes; the README and manual verification block gains the provenance step and the sentence naming which digests carry it (2.25), BuildKit's inspect line kept as supplementary; `consumer-smoke.sh` runs the step against a digest that carries provenance and asserts a verified result, never exit 0 on a null (finding 2.4 of the 2026-09-09 review); suites first, one test per slice
+    - _Requirements: Req 2.10, Req 2.23, Req 2.25, Req 2.28, Req 7.7_
+  - [ ] 18.6 The claim, stated truthfully
+    - `SECURITY.md`: the SLSA section (9.19): this repository claims Build L1 and attests L2-grade provenance for digests released from 18.3's merge, verifiable by the published step; the claim of Build L2 starts at the successor's epoch, where the policy demands it; measured against SLSA v1.2. `docs/concepts.md`: the "L2-ish" sentence replaced by the measured state, the trust-boundary table gaining GitHub's provenance service in the GitHub row with option D as the L3 path and A as the other-forge seam; `docs/user-manual.md`'s provenance paragraphs; design.md's Security Considerations
+    - _Requirements: Req 9.19, Req 2.25_
+  - [ ] 18.7 Evidence
+    - The first release after 18.3 read: each digest's provenance verified with ADR 0005's verifier and the declared expectations, the predicate's fields recorded; the first rescan after 18.4 read (the coverage line); an offline must-reject: the rendered policy with provenance required, applied locally (`kyverno apply`) to one pre-18.3 supported digest, rejecting it by name, and to one post-18.3 digest, admitting it; ledger rows 2.27 and 2.29 exercised, 9.19 measured present, 2.28 left to the successor's first proof (12.1); the LOG entry
+    - _Requirements: Req 2.27, Req 2.28, Req 2.29, Req 7.11, Req 9.19_
+
 ## Requirements Coverage
 
 | Requirement | Covered By Tasks |
 |-------------|------------------|
 | Req 1: Image Definition Catalogue | 2.1, 2.2, 3.1, 3.2, 5.1, 5.2, 1.2, 8.1, 8.4, 9.7, 11.2, 14.1, 14.2, 14.4 |
-| Req 2: Image Build and Release | 3.3, 8.2, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 10.1, 14.1, 14.2 |
+| Req 2: Image Build and Release | 3.3, 8.2, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 10.1, 14.1, 14.2, 18.1 to 18.5, 18.7 |
 | Req 3: Upstream Version Tracking | 3.2, 4.1, 4.2, 4.3, 5.1, 5.2, 11.1, 11.2, 11.3, 11.4, 11.6, 11.7, 14.2 |
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4, 8.7, 11.3, 11.4, 14.4 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7, 14.3, 17.1, 17.2, 17.3, 17.4 |
 | Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5, 9.1, 9.3, 10.1, 10.2, 10.3, 10.4, 10.6, 10.7 |
-| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5, 14.1, 16.1 to 16.16, 17.1, 17.2, 17.4 |
-| Req 9: Catalogue Posture | 13.1, 13.2, 13.3, 13.4, 13.5, 13.6 |
+| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5, 14.1, 16.1 to 16.16, 17.1, 17.2, 17.4, 18.1, 18.3, 18.5, 18.7 |
+| Req 9: Catalogue Posture | 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 18.1, 18.6, 18.7 |
 
 Requirement 8 was retired whole on 2026-08-26 (primitives pass, finding 5.8): its guidance
 lives in CLAUDE.md, design.md and CONVENTIONS.md, and its coverage row went with it.
@@ -530,6 +554,8 @@ Task group 16 (live drills) adds one criterion, 7.11; its other tasks exercise m
 
 Task group 17 (proof kinds) amends 5.8 and 7.7 and adds 5.9 and 5.10; 16.2 and 16.15 exercise the new criteria live, so their rows in the ledger read drill 16.2 and drill 16.15.
 
+Task group 18 (SLSA Build L2) amends 2.9, 2.10, 2.23, 2.25 and 7.7 and adds 2.27 to 2.29 and 9.19; 2.28 is declared required only from the successor's first release, so its ledger row waits for task 12.1.
+
 Task group 12 (greenfield successor) adds no new criterion: it executes the dated F9
 re-decision of 2026-08-25 (revised the same day to the successor mechanism) rather than
-adding standing behaviour; Req 2.11 and 2.24 are the criteria it touches.
+adding standing behaviour; Req 2.11 and 2.24 are the criteria it touches, and since 2026-10-28 Req 2.28 and 9.19, which it switches on from its first release (task group 18).
