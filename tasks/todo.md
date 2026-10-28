@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-10-27
+# Live drills (task group 16): where we are and what is next, as of 2026-10-28
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -121,7 +121,13 @@ stay as history.
       14-day window; the day after,
       under_investigation with first-seen carried, re-attestation, the gate no
       longer counts the exception, the finding undecided again.
-- [ ] 16.5 Over the ceiling (6.46, 6.47, 6.49): OPENED 2026-10-27 as
+- [x] 16.5 Over the ceiling (6.46, 6.47, 6.49): DONE 2026-10-28 (conductor
+      track `over-ceiling_20261027`: #330 the track; #331 `kev_ceiling` to
+      one day; the owner's dispatch 40578319282 with `drill: kev-synthetic`
+      published the drill's finding over its ceiling, `9 / 1`, over ceiling:
+      1, the row and the card marked; #332 the revert the same day; the
+      scheduled run 40693681245 of 2026-10-28 cleared it; the evidence in
+      #339). OPENED 2026-10-27 as
       conductor track `over-ceiling_20261027` (phase 0 the track and the
       task text's amendment; phase 1 on 2026-10-27: one pull request lowers
       `triage.kev_ceiling` to one day, the owner dispatches the rescan with
@@ -217,6 +223,16 @@ stay as history.
 
 ## Open items outside the drills (one decision each, the owner's)
 
+- [ ] One ceiling, three readers (found by 16.5, 2026-10-27):
+      `triage.ceilings` is the clock undecided findings are measured against
+      (status, Req 6.47), the tier every unexpired exception's span must fit
+      (`check-exceptions.sh`, Req 6.50, 6.51) and the lint's outer bound
+      (`lint-accepted-risk.sh`, Req 6.11), so the decision clock cannot be
+      tightened without re-tiering every standing exception (grafana's nine
+      transfers run 60 days). Either declare a separate decision ceiling per
+      severity for the status, or accept the coupling and say so in the
+      policy file's comment; a requirements amendment either way, the owner's
+      call.
 - [ ] The two expiry clocks (found by 16.3, seen live by 16.4 on
       2026-10-26): Trivy drops an ignore entry at midnight UTC of its
       `expired_at`; `lint-accepted-risk.sh`, `check-exceptions.sh` and

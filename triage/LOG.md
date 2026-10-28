@@ -3477,3 +3477,90 @@ gate and the scan read Trivy's clock, the stricter. A follow-up item in
 `tasks/todo.md` leaves the owner the call between aligning the three
 scripts to Trivy's reading and documenting the expiry day as the first day
 without coverage.
+
+## 2026-10-27: the drill's finding over its ceiling, the alarm raised by a one-day KEV ceiling and cleared (task 16.5)
+
+*Image: drill-app. Task 16.5, conductor track `over-ceiling_20261027`
+(#330, squash 0d3eae5). The drill definition's HIGH, CVE-2025-30204, has
+been undecided since task 16.4 removed its lapsed exception (#329): the
+status counts its age from 2026-10-18 against the HIGH ceiling of 90 days.
+No published status had ever flagged a finding over its ceiling (`over
+ceiling: 0` on every run since the clocks were first published on
+2026-09-06), and the page had never marked a row. The task text lowered the
+HIGH ceiling to one day; that value cannot move far, because
+`triage.ceilings` is read three times: as the clock undecided findings are
+measured against (Req 6.47), as the tier every unexpired exception's span
+must fit (`check-exceptions.sh`, Req 6.50, 6.51) and as the lint's outer
+bound (`lint-accepted-risk.sh`, Req 6.11). Grafana's nine standing
+transfers run 60 days each, so a HIGH ceiling under 60 days fails the daily
+rescan on all nine by name and, under 30, validation on every pull request;
+a ceiling of 60 puts nothing over, the finding being nine days old. The one
+value this drill changed is the policy's second ceiling, `triage.kev_ceiling`
+(Req 6.49), which the status applies in place of the severity's to an
+undecided finding the day's KEV set lists (`status.go`, `ceilingFor`): CISA
+does not list the finding, the `kev-synthetic` drill input of task 16.8
+does. Nothing in the code changed; no decision was written.*
+
+**The one-day ceiling (2026-10-27, 20:27Z).** Pull request #331 (squash
+16727ab) set `kev_ceiling: 1d`, one line with a comment naming the drill
+and the revert; validation green, the reader printing `1`, nothing built.
+No exception covers a finding either feed lists, so no tier moved.
+
+**The breach (2026-10-27, 20:28 to 20:45Z).** The owner dispatched
+`rescan.yml` on main at 16727ab with `drill: kev-synthetic` (run
+40578319282, job 122450634752) at 20:28:12Z, after the day's scheduled run
+(40503212074, 12:22Z). As on every dispatch, the run attested the day's
+reports and re-attested the documents that changed (register row M17):
+drill-app's among them, its statement for the finding recompiled with the
+generic uncovered note in place of the lapse note, the lapsed entry having
+left the exception file with #329 at 13:01Z; the statement's `timestamp`
+and `last_updated` unchanged (2026-10-23T14:12:33Z and
+2026-10-27T12:23:46Z: `last_updated` records a change of status, action
+statement, package or issue link, not of a note's wording, `compile-vex.sh`
+`carry_forward`), read back from the registry at 20:50Z. The invariants
+step fetched the synthetic feed in place of CISA's, the warning annotation
+naming the substitution, evaluated every unexpired exception against it and
+passed at 20:40:09Z: none covers the one finding that feed lists. The
+status, published to #151 at 20:44:30Z, read the finding as listed and
+measured it against the KEV ceiling: `drill-app | CVE-2025-30204 | HIGH |
+yes | undecided | 2026-10-18 | n/a | **9 / 1** | undecided, awaiting a
+triage decision (dhc-pipeline#325)`, the first row of the table, the
+aggregates `findings: 42; undecided: 2 (over ceiling: 1, oldest: 9 days);
+decided: 11; fixed: 29`, the JSON block carrying `kev_ceiling_days: 1`
+and, on the finding, `age_days: 9`, `ceiling_days: 1`, `over_ceiling:
+true`. The page (job 122459124884, 20:44:57Z) read `Decision aperture
+CRITICAL, HIGH; exception ceilings CRITICAL 30 days, HIGH 90 days, KEV 1
+days` in its lead, `Findings 42, undecided 2 (over ceiling 1, oldest 9
+days)`, drill-app's card `undecided 1, over ceiling 1` in red, and the
+finding's row marked (`class="over"`, `9 / 1`), read on the published page
+at 20:50Z. Req 6.47's over-ceiling flag, first time live; the alarm is the
+published number and the marked row, nothing fails on it. The status and
+the page read KEV yes on the drill definition until the next scheduled run
+reads CISA's feed again (M26).
+
+**The revert (2026-10-27, 20:52Z).** Pull request #332 (squash
+ebd0f65) restored `kev_ceiling: 14d` the same day, the comment
+recording the run; no scheduled run read the one-day value.
+
+**The clear (2026-10-28, 13:08 to 13:35Z).** The scheduled run
+40693681245 (main at 8ea59f4, job 122834693772) read CISA's feed, which does not
+list the finding, and measured it against the HIGH ceiling again: the
+status published to #151 at 13:35:20Z read `drill-app | CVE-2025-30204
+| HIGH | no | undecided | 2026-10-18 | n/a | 10 / 90 | undecided,
+awaiting a triage decision (dhc-pipeline#325)`, the aggregates `undecided:
+2 (over ceiling: 0, oldest: 10 days)`, the policy block
+`kev_ceiling_days: 14`; the page (13:35:50Z) read `KEV 14 days` in its
+lead, `over ceiling 0` on the card, the row unmarked. The alarm was the
+value's and left with it. The window in which the one-day value stood,
+20:27:46Z to 20:52:45Z on 2026-10-27, held the dispatch and no scheduled
+run.
+
+**What the drill found.** One policy value, `triage.ceilings`, is read
+three ways, and the drill could not use it: a HIGH ceiling that puts a
+ten-day-old finding over it re-tiers every standing exception and refuses
+the lint's bound. The follow-up item in `tasks/todo.md` leaves the owner the
+call on separating the decision clock from the exception tier. Read on the
+same evening: the re-attestation of 2026-10-27 12:34Z recorded in the entry
+above differed from the attested document by the lapse note and the
+appended issue link together, and `last_updated` moved for the link, which
+the compiler counts as decision-bearing content, not for the note.
