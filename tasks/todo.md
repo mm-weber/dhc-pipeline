@@ -217,6 +217,15 @@ stay as history.
 
 ## Open items outside the drills (one decision each, the owner's)
 
+- [ ] SLSA Build L2, task group 18 (opened 2026-10-28, conductor track
+      slsa-build-l2_20261028): measured against SLSA v1.2, provenance is
+      attached but neither signed nor verified, and BuildKit writes it from
+      the job's own values. Owner's calls of 2026-10-28: GitHub's provenance
+      service (`actions/attest-build-provenance`), the requirement binding
+      from the successor's first release. Next after the spec pull request:
+      18.2, the verifier spike (one dispatch, a scratch image outside the
+      catalogue namespace), whose ADR 0005 may put ADR 0003's cosign major
+      gate before the owner.
 - [ ] The two expiry clocks (found by 16.3, seen live by 16.4 on
       2026-10-26): Trivy drops an ignore entry at midnight UTC of its
       `expired_at`; `lint-accepted-risk.sh`, `check-exceptions.sh` and
