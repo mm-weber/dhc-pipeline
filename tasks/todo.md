@@ -159,7 +159,14 @@ stay as history.
       input; a drill branch does the same on a pull request's tiering step.
       Also the substituted feed naming a CVE, for 16.3 (`kev-synthetic`,
       shipped in #310).
-- [ ] 16.9 Fail-closed release gate (2.11, 2.13): OPENED 2026-10-27 as
+- [x] 16.9 Fail-closed release gate (2.11, 2.13): DONE 2026-10-28 (conductor
+      track `fail-closed-release_20261027`: #333 the track; #334 the switch
+      on; the owner's dispatch 40691384018 refused at the fail-closed gate by
+      name, the digest `sha256:925dd22c2ead...` frozen, pullable by digest,
+      unsigned, unattested, untagged; #335 the switch off the same day; the
+      evidence in #336; a first dispatch before the switch released the
+      definition instead, recorded). The way out is 16.6's fix. OPENED
+      2026-10-27 as
       conductor track `fail-closed-release_20261027` (phase 0 the track and
       the task text's amendment; phase 1 on 2026-10-27: one pull request
       turns `release.fail_closed` on, the owner dispatches build.yml for
@@ -223,6 +230,16 @@ stay as history.
 
 ## Open items outside the drills (one decision each, the owner's)
 
+- [ ] A rebuilt digest's statements restart their clock (seen by 16.9,
+      2026-10-28): the release-time compile in build.yml reads no previous
+      document, so the document of a rebuilt digest carries the release
+      scan's time as every statement's `timestamp`, while the status carries
+      the finding's first-seen date across the definition's digests from its
+      own data (drill-app: 2026-10-28T11:43:23Z in the document, 2026-10-18
+      on the status). Req 6.40 names the timestamp as first seen for life;
+      either hand the previous digest's attested document to the release
+      compile or state that the document's clock is per digest; the owner's
+      call.
 - [ ] One ceiling, three readers (found by 16.5, 2026-10-27):
       `triage.ceilings` is the clock undecided findings are measured against
       (status, Req 6.47), the tier every unexpired exception's span must fit
