@@ -16,15 +16,17 @@
 
 ---
 
-### [~] over-ceiling_20261027: An undecided finding past its ceiling, the alarm raised and cleared, live
+
+## Completed tracks
+
+### [x] over-ceiling_20261027: An undecided finding past its ceiling, the alarm raised and cleared, live
 
 **Description:** The drill definition's undecided HIGH, ten days old, put over its ceiling for one rescan: `triage.kev_ceiling` lowered to one day in one pull request, the owner's dispatch with `drill: kev-synthetic` listing the finding, the status issue and the page publishing over ceiling: 1 with the row marked (the first live over-ceiling flag), the value restored the same day, the next scheduled run clearing the alarm on the declared feed. The HIGH ceiling the task text named cannot go under 60 days: `triage.ceilings` also tiers every standing exception and bounds the lint, and grafana's nine transfers run 60 days.
 **Priority:** high (the next drill of the live program; 16.6 fixes the finding after it)
+**Completed:** 2026-10-28 (#330 merged 2026-10-27 as 0d3eae5, the track and the task text's amendment; #331 as 16727ab, `kev_ceiling` to one day; the owner's dispatch 40578319282 with `drill: kev-synthetic`: the finding listed, `9 / 1`, `over ceiling: 1` on the status issue and the page, the row and the card marked, the run green; #332 as ebd0f65, the value restored the same day; the scheduled run 40693681245 of 2026-10-28 clearing it on CISA's feed; the evidence in #339: rows 6.46, 6.47 and 6.49 re-observed, the follow-up item on the three readers of `triage.ceilings`)
 **Folder:** [./tracks/over-ceiling_20261027/](./tracks/over-ceiling_20261027/)
 
 ---
-
-## Completed tracks
 
 ### [x] exception-lapse_20261025: The drill's exception expires, the lapse seen on every plane, live
 
