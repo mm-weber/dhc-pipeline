@@ -8,16 +8,18 @@
 
 ## Active tracks
 
-### [~] fail-closed-release_20261027: The fail-closed release gate refuses a release, the digest frozen, live
-
-**Description:** The fail-closed release switch turned on for one dispatched build of the drill definition, whose HIGH is uncovered since task 16.4: the release-time scan names the finding per platform manifest, the gate signs, attests and tags nothing, the pushed digest stays frozen and pullable by digest, the next scheduled rescan neither enumerates nor re-attests it; the switch back off the same day unless the owner keeps it; the way out is drill 16.6's fix.
-**Priority:** high (the live program; possible today, before 16.6 fixes the finding)
-**Folder:** [./tracks/fail-closed-release_20261027/](./tracks/fail-closed-release_20261027/)
-
----
 
 
 ## Completed tracks
+
+### [x] fail-closed-release_20261027: The fail-closed release gate refuses a release, the digest frozen, live
+
+**Description:** The fail-closed release switch turned on for one dispatched build of the drill definition, whose HIGH is uncovered since task 16.4: the release-time scan names the finding per platform manifest, the gate signs, attests and tags nothing, the pushed digest stays frozen and pullable by digest, the next scheduled rescan neither enumerates nor re-attests it; the switch back off the same day unless the owner keeps it; the way out is drill 16.6's fix.
+**Priority:** high (the live program; possible today, before 16.6 fixes the finding)
+**Completed:** 2026-10-28 (#333 merged as 06c9b6e, the track and the task text's amendment; #334 as 8ea59f4, the switch on; the owner's dispatch 40691384018 refused at the fail-closed release gate by name, the digest `sha256:925dd22c2ead...` frozen, pullable by digest, unsigned, unattested, untagged; #335 the switch off the same day; the evidence in #336: rows 2.11 and 2.13 exercised; a first dispatch before the switch released the definition instead, recorded)
+**Folder:** [./tracks/fail-closed-release_20261027/](./tracks/fail-closed-release_20261027/)
+
+---
 
 ### [x] over-ceiling_20261027: An undecided finding past its ceiling, the alarm raised and cleared, live
 

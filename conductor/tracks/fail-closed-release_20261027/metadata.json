@@ -1,10 +1,11 @@
 {
   "id": "fail-closed-release_20261027",
   "type": "chore",
-  "status": "in_progress",
+  "status": "completed",
   "created_at": "2026-10-27T21:30:00Z",
-  "updated_at": "2026-10-27T21:30:00Z",
+  "updated_at": "2026-10-28T13:15:00Z",
   "description": "The fail-closed release switch turned on for one dispatched build of the drill definition, whose HIGH is uncovered since task 16.4: the release-time scan names the finding per platform manifest, the gate signs, attests and tags nothing, the pushed digest stays frozen and pullable by digest, the next scheduled rescan neither enumerates nor re-attests it; the switch back off the same day unless the owner keeps it; the way out is drill 16.6's fix (Req 2.8, 2.11, 2.13, 7.11; task 16.9)",
   "spec_path": "conductor/tracks/fail-closed-release_20261027/spec.md",
-  "plan_path": "conductor/tracks/fail-closed-release_20261027/plan.md"
+  "plan_path": "conductor/tracks/fail-closed-release_20261027/plan.md",
+  "completed_at": "2026-10-28T13:15:00Z"
 }

@@ -3564,3 +3564,85 @@ same evening: the re-attestation of 2026-10-27 12:34Z recorded in the entry
 above differed from the attested document by the lapse note and the
 appended issue link together, and `last_updated` moved for the link, which
 the compiler counts as decision-bearing content, not for the note.
+
+## 2026-10-27: the fail-closed release gate refuses the drill's release, the digest frozen (task 16.9)
+
+*Image: drill-app. Task 16.9, conductor track `fail-closed-release_20261027`
+(#333, squash 06c9b6e). The release path pushes an image by digest, scans
+every platform manifest of the pushed digest with the compiled VEX
+documents and the unexpired exceptions (Req 2.8) and only then signs,
+attests and tags (Req 2.9). With `release.fail_closed` off, an uncovered
+finding releases as an `under_investigation` statement (Req 2.12); with it
+on, the gate step names the finding per platform manifest and exits, so
+nothing is signed, attested or tagged and the digest, referenced by no tag,
+is frozen (Req 2.11, 2.13). The switch had been off since the criteria
+landed and the gate step skipped in every build job. The drill definition
+supplied the uncovered finding: CVE-2025-30204 on drill-app, without an
+exception since task 16.4 removed the lapsed entry (#329) and without a
+decision. Nothing in the code changed; no decision was written; the way
+out the gate offers is drill 16.6's fix.*
+
+**The switch on (2026-10-28, 12:47Z).** Pull request #334 (squash 8ea59f4)
+set `fail_closed: true`, one line with a comment naming the drill and the
+revert; validation green (`release-policy.sh . check` accepts the text),
+nothing built.
+
+**A release before the switch (2026-10-28, 11:35 to 11:45Z).** The owner's
+first dispatch of `build.yml` for drill-app (run 40681096763, main at
+06c9b6e, the track's squash) started before the switch existed on main,
+on a step list of mine that had put two of the owner's actions under one
+number. The pull request gate runs on pull requests only, so the run took
+the switch-off path as the policy prescribes: the image pushed by digest,
+the release-time scan reporting the finding on both platform manifests,
+the gate step skipped, the reports attested (11:43:38Z), the document
+compiled with CVE-2025-30204 `under_investigation` and the release-time
+note (Req 2.12), signed (11:45:15Z) and the three tags moved to the new
+digest `sha256:bfe9a515ce9a...` at 11:45:21Z. Two things that release
+showed, read back from the registry: the compiled document's timestamps
+for both findings are the release scan's, 2026-10-28T11:43:23Z, since the
+release-time compile reads no previous document and a rebuilt digest's
+statements start their clock at its release, while the status carries the
+finding's first-seen date, 2026-10-18, from its own data across the
+definition's digests; and the digest the tags left, `sha256:0c61394798b5...`,
+is now referenced by no catalogue tag and so frozen by nature (Req 2.11),
+the first digest of this catalogue to be. Both are recorded, neither was
+the drill.
+
+**The refusal (2026-10-28, 12:52 to 13:01Z).** The owner's second dispatch
+of `build.yml` for drill-app (run 40691384018, main at 8ea59f4, job
+122826840522) met the switch. The image was pushed by digest at 13:00:17Z,
+`sha256:925dd22c2ead334b193b82447e994142be241714883d0c99e832700869ba1736`,
+an index of two platform manifests (amd64 `sha256:b6abf5bfb3db...`, arm64
+`sha256:77f25853638b...`); the release-time scan (13:00:34Z) reported the
+finding on each; the gate step failed at 13:00:34Z with `drill-app: 2
+uncovered finding(s) in the release-time scan of sha256:925dd22c2ead...:
+CVE-2025-30204 (HIGH github.com/golang-jwt/jwt/v5@v5.2.1, fixed: 5.2.2).
+The declared fail-closed setting is enabled, so this digest is signed by
+nothing, attested by nothing and carries no tag (Req 2.13). It stays
+frozen and pullable by digest; the ways out are the same four the gate
+offers.`, the count being one per platform manifest and the summary
+carrying the table; the steps that attest the reports, compile the
+document, sign and tag did not run, and the build gate was red at
+13:00:54Z. Req 2.13, first time live. The registry, read at 13:01Z: the
+manifest is served by its digest (an OCI index, HTTP 200), `cosign
+download signature` answers `no signatures associated`, `cosign download
+attestation` returns nothing, and of the repository's 51 tags none
+references the digest, the three catalogue tags still on
+`sha256:bfe9a515ce9a...`: frozen as Req 2.11 defines it, by the gate's
+hand this time.
+
+**The switch off (2026-10-28, 13:52Z).** Pull request #335
+(46353ef) restored `fail_closed: false` the same day, the comment
+recording the run. No scheduled rebuild ran while the switch was on: the
+day's had published at 10:50Z, before #334.
+
+**The frozen half (2026-10-28, 13:08 to 13:35Z).** The scheduled rescan
+40693681245 (main at 8ea59f4) enumerated drill-app's catalogue tags and
+the one digest they reference, `sha256:bfe9a515ce9a...` (released that
+morning), scanned and attested that one and listed it alone in the status
+data; the frozen digest `sha256:925dd22c2ead...` appeared nowhere, neither
+scanned nor re-attested (Req 2.11), nor did `sha256:0c61394798b5...`, the
+digest the tags had left. The way out the gate named is drill 16.6's fix;
+until then every release of the definition under the switch would be
+refused the same way, and with the switch off, published as
+`under_investigation` as the first dispatch was.
