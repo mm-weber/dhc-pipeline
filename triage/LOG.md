@@ -3715,3 +3715,49 @@ fix clock on this definition is the program's: two findings first seen on
 2026-10-18, decided the same day, one lapsed on 2026-10-26, both fixed on
 2026-10-28 by the lane the catalogue uses for its real images. Drill 16.7
 drops the bump step and brings them back.
+
+## 2026-10-29: the drill's HIGH brought back for a day, the issue reopened on the lapse (task 16.7)
+
+*Image: drill-app. Task 16.7, conductor track `drill-regression_20261029`.
+Task 16.6 fixed the drill definition's two findings in its fetch phase and
+the rescan closed CVE-2025-30204's issue #325 as `resolved:fixed` on the
+attested SBOMs (entry of 2026-10-28). No fixed finding has ever returned to
+this catalogue, so the lifecycle's reopen (Req 6.57) has never run. This
+entry brings the HIGH back, one module, the CRITICAL staying fixed, and
+records what the rescan does with a finding it had seen leave.*
+
+**The way back.** A regression is a pull request that builds the definition
+with the vulnerable module again, and the pull request gate refuses an
+uncovered finding by name (Req 6.1), as it should; merging over it would
+be a bypass of the gate, which no maintainer does to a catalogue. The
+maintainer's move when a vulnerable module must ship for a while is a
+bounded acceptance (Req 6.7), and that is the path this drill takes: the
+pull request removes `github.com/golang-jwt/jwt/v5` from the bump step and
+accepts the finding for one day, the entry below. From midnight UTC on the
+expiry day Trivy no longer honours the entry (task 16.4's first clock), the
+daily report lists the finding as reported, and the lifecycle reopens the
+issue; the entry leaves the file that day, before the lint's second clock.
+
+### ACCEPT: the drill's HIGH brought back for one day, the regression drill
+
+The finding, the module and the reachability are those of 2026-10-18
+(govulncheck reaches `ParseUnverified` in the binary), and the fix is
+known and was in place from 2026-10-28; it is removed on purpose, for one
+day, so that the finding returns to the supported digest's report and its
+closed issue reopens, the observation task 16.7 exists for. The other
+treatments do not fit: `not_affected` is forbidden by the reach, a fix
+would end the drill before it starts, and transfer has no owner but the
+owner.
+
+**Decision: accept** (owner's call, 2026-10-29, confirmed by merging the
+pull request that carries this entry; `decided_at` 2026-10-29, `expired_at`
+2026-10-30: one day, the shortest span that keeps the release's own gate
+green, the shape of the re-decision of 2026-10-25). The entry is written in
+`triage/accepted-risk/drill-app.yaml` with its reasoning here.
+
+**Exit condition:** the lapse is intended. On 2026-10-30 the scheduled
+rescan reads the finding as reported again, reopens #325 and publishes it
+undecided with first seen 2026-10-18 carried; the evidence pull request of
+that day removes the lapsed entry and records the run. The finding then
+stays undecided, with no second fix and no second exception, until the
+definition retires with task 16.16.
