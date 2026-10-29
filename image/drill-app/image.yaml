@@ -57,17 +57,17 @@ contents:
         # the catalogue's fix lane on the drill's two findings, decided
         # 2026-10-18 and lapsed 2026-10-26 (triage/LOG.md). The source keeps
         # its vulnerable go.mod on purpose; the bump happens here, in the
-        # fetch phase, the cert-manager shape. Dropped by drill 16.7, the
-        # regression, which brings the findings back.
-        - name: bump gorilla/handlers (CVE-2017-20146) and golang-jwt (CVE-2025-30204)
+        # fetch phase, the cert-manager shape. Drill 16.7 (track
+        # drill-regression_20261029) removed the golang-jwt bump on
+        # 2026-10-29 to bring CVE-2025-30204 back, accepted for one day in
+        # triage/accepted-risk/drill-app.yaml; the handlers bump stays.
+        - name: bump gorilla/handlers (CVE-2017-20146)
           uses: go/bump@v2
           work-dir: /go/src/github.com/mm-weber/drill-app
           with:
             deps:
               # renovate: datasource=go depName=github.com/gorilla/handlers
               - github.com/gorilla/handlers@v1.3.0
-              # renovate: datasource=go depName=github.com/golang-jwt/jwt/v5
-              - github.com/golang-jwt/jwt/v5@v5.2.2
             download: true
             tidy: true
         # No test step: the build sandbox has no egress (docs/CONVENTIONS.md,
