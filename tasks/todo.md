@@ -158,8 +158,19 @@ stay as history.
       retires the CRITICAL's exception as moot). The plan as written:
       drill-app bumps the modules; the open issues close resolved:fixed on
       attested SBOMs.
-- [ ] 16.7 Regression and reopen (6.57): the vulnerable pin returns as a new
-      release; the closed issues reopen with the original first-seen.
+- [ ] 16.7 Regression and reopen (6.57): OPENED 2026-10-29 as conductor
+      track `drill-regression_20261029` (phase 0 the track and the task
+      text's amendment; phase 1 one pull request removes the HIGH's bump and
+      accepts the finding for one day with its LOG decision, green at the
+      gate by the exception, main releases with an `affected` statement;
+      phase 2 the scheduled rescan of 2026-10-30 lists the finding as
+      reported again once Trivy drops the entry at midnight UTC and reopens
+      the closed issue (#325) with first seen 2026-10-18 carried, the
+      evidence pull request removes the lapsed entry the same day; the
+      finding stays undecided until 16.16). Not a bypass of the gate: the
+      bounded acceptance is the maintainer's real path back. The plan as
+      written: the vulnerable pin returns as a new release; the closed
+      issues reopen with the original first-seen.
 - [x] 16.8 KEV feed outage fails closed (6.59, 6.60): DONE 2026-10-24
       (conductor track `kev-drill-input_20261023`: #308 the spec amendment of
       7.7 and 7.10 and the track, #310 the input, the declarations, the lint
