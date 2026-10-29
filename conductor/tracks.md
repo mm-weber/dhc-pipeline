@@ -8,15 +8,18 @@
 
 ## Active tracks
 
-### [~] drill-fix_20261028: The drill's findings fixed, the issue closed on the attested SBOMs, the fix clock, live
+_No active track._
+
+## Completed tracks
+
+### [x] drill-fix_20261028: The drill's findings fixed, the issue closed on the attested SBOMs, the fix clock, live
 
 **Description:** The drill definition's two findings fixed by a `go/bump@v2` step in its fetch phase (the catalogue's fix lane, M10): the pull request green at the gate by the fix, the release on main, the next scheduled rescan closing issue #325 as `resolved:fixed` on the attested SBOMs and publishing both findings as fixed with their fix times, the CRITICAL's exception retired as moot. The way out the fail-closed gate named, and the fixed finding drill 16.7 brings back.
 **Priority:** high (the live program; 16.7 needs a fixed finding)
+**Completed:** 2026-10-28 (#341 merged as a403884, the track; #342 as 57ebed4, the bump, green at the gate by the fix; main's release 40769247657 to `sha256:5cacd03bc770...` with no statement and the fixed versions in the SBOMs; the owner's dispatch 40788144199 closing #325 `resolved:fixed` and publishing both findings fixed 10 days after first seen; the evidence in #344 with the CRITICAL's exception retired as moot)
 **Folder:** [./tracks/drill-fix_20261028/](./tracks/drill-fix_20261028/)
 
 ---
-
-## Completed tracks
 
 ### [x] fail-closed-release_20261027: The fail-closed release gate refuses a release, the digest frozen, live
 

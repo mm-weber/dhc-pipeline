@@ -3646,3 +3646,72 @@ digest the tags had left. The way out the gate named is drill 16.6's fix;
 until then every release of the definition under the switch would be
 refused the same way, and with the switch off, published as
 `under_investigation` as the first dispatch was.
+
+## 2026-10-28: the drill's findings fixed, the issue closed on the attested SBOMs, the fix clock (task 16.6)
+
+*Image: drill-app. Task 16.6, conductor track `drill-fix_20261028` (#341,
+squash a403884). The drill definition carried two findings on purpose
+(entry of 2026-10-18): CVE-2017-20146, CRITICAL, `github.com/gorilla/handlers`
+v1.2.1, accepted under an exception until 2026-11-17, and CVE-2025-30204,
+HIGH, `github.com/golang-jwt/jwt/v5` v5.2.1, undecided since its lapsed
+exception left the file (task 16.4), its issue #325 open since 2026-10-26,
+named by the fail-closed gate on 2026-10-28 as a finding with four ways
+out (task 16.9). This entry takes the fix, the catalogue's lane between
+upstream releases (register row M10, the cert-manager entries of 2026-09-02
+and 2026-10-12): the modules bumped in the definition's fetch phase, the
+drill's source keeping its go.mod on purpose. Nothing in the code changed;
+no VEX statement was written; the drop of the bump step is drill 16.7's.*
+
+**The bump (2026-10-28, 20:51 to 21:07Z).** Pull request #342 (commit
+987fa12, squash 57ebed4) added one `go/bump@v2` step before the build step
+in `image/drill-app/image.yaml`, in the drill's work directory, bumping
+`github.com/gorilla/handlers` to v1.3.0 and `github.com/golang-jwt/jwt/v5`
+to v5.2.2, each with its Renovate marker. The pull request's build of
+drill-app (run 40766991968, job 123093855402) was green by the fix: the
+Trivy scan at 20:55:24Z with nothing uncovered, govulncheck at 20:57:08Z
+reaching no vulnerable symbol, the Grype second opinion skipped for want
+of a CRITICAL, the tier step and the scan gate green at 20:57:09Z with no
+annotation at all, the first green gate on this definition since it joined
+the catalogue. Validation green. The owner merged at 21:07:13Z.
+
+**The release (2026-10-28, 21:07 to 21:18Z).** Main's push build (run
+40769247657, job 123101712904) pushed the image by digest at 21:16:03Z,
+scanned both platform manifests at 21:16:10Z with nothing within the
+aperture (the fail-closed gate step skipped, nothing to refuse), attested
+the reports (21:16:31Z), compiled the digest's OpenVEX document, signed
+(21:18:26Z) and moved the three catalogue tags at 21:18:31Z to
+`sha256:5cacd03bc770fd5374674ce3c8b0e7fd4d4342a66438668f78d1cbe7dcb00d77`.
+Read back from the registry at 21:22Z: the OpenVEX attestation carries no
+statement at all, the CRITICAL's unexpired exception publishing nothing
+because the report lists nothing to suppress (Req 6.38), and the two SPDX
+SBOMs attested to the index list `github.com/golang-jwt/jwt/v5 v5.2.2` and
+`github.com/gorilla/handlers v1.3.0`, the evidence the lifecycle grades a
+closure on (Req 6.56). The digest the tags left, `sha256:bfe9a515ce9a...`
+of that morning, is referenced by no tag any more and frozen (Req 2.11),
+the third of the drill's digests to be.
+
+**The closure and the clock (2026-10-28 23:33Z to 2026-10-29 00:03Z).** The
+owner dispatched `rescan.yml` on main at 57ebed4 (run 40788144199, job
+123166403693) rather than wait for the next scheduled run, a release of
+attestations as every dispatch is (register row M17), with nothing else on
+main to attest. The scan step read the new supported digest; the lifecycle
+step found CVE-2025-30204 in no supported digest's attested report and
+closed the issue, #325, at 23:49:53Z with the comment naming every
+supported digest examined, seven repositories with their platform
+manifests, and the reports' scanner and database versions, trivy 0.75.0
+and the database of 2026-10-28T19:18Z (Req 6.52), the label
+`resolved:fixed` (Req 6.56): the attested SPDX SBOMs of the supported digest list `github.com/golang-jwt/jwt/v5 v5.2.2`, the fixed version. The status, published to #151 at
+00:02:32Z and dated 2026-10-28, the run's day, listed both findings as
+fixed on 2026-10-28, 10 days
+after their first-seen date of 2026-10-18 (Req 6.46), the aggregates
+`findings: 45; undecided: 4 (over ceiling: 0, oldest: 7 days); decided: 10; fixed: 31`, the median days to fix unchanged at 4 (two tens among thirty-one fixed findings); the page (00:03:09Z) showed
+drill-app's card with `CRITICAL 0 · HIGH 0; undecided 0, over ceiling 0; fixed 3`, the three fixed findings listed beneath (the drill's two and CVE-2026-111943, fixed by the rebuild of 2026-10-24). One reading to know: the status keeps the CRITICAL's decision text, `accept, accepted risk until 2026-11-17`, on the fixed row until the entry leaves the file, which this entry's pull request does.
+
+**The exception retired (2026-10-28).** The evidence pull request (#344)
+removes CVE-2017-20146's entry from `triage/accepted-risk/drill-app.yaml`
+as moot, the file kept with an empty list for drill 16.7's re-decision;
+the lint accepts the empty lane (nine refs resolve where ten did). The
+fix clock on this definition is the program's: two findings first seen on
+2026-10-18, decided the same day, one lapsed on 2026-10-26, both fixed on
+2026-10-28 by the lane the catalogue uses for its real images. Drill 16.7
+drops the bump step and brings them back.
