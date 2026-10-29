@@ -142,7 +142,12 @@ stay as history.
       the finding is ten days old. The plan as written: HIGH ceiling lowered
       to one day for one rescan through a pull request, the only policy value
       a drill changes; over ceiling: 1; reverted next day.
-- [ ] 16.6 The fix, issue-closure half (6.52, 6.56): OPENED 2026-10-28 as
+- [x] 16.6 The fix, issue-closure half (6.52, 6.56): DONE 2026-10-28 (conductor
+      track `drill-fix_20261028`: #341 the track; #342 the bump, green at the
+      gate by the fix; main's release 40769247657; the owner's dispatch
+      40788144199 closing #325 `resolved:fixed` and publishing both findings
+      fixed 10 days after first seen; the evidence in #344 with the
+      CRITICAL's exception retired as moot). OPENED 2026-10-28 as
       conductor track `drill-fix_20261028` (phase 0 the track and the task
       text's amendment; phase 1 one pull request adds a `go/bump@v2` step to
       drill-app's fetch phase bumping gorilla/handlers to 1.3.0 and

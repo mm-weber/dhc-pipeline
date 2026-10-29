@@ -29,7 +29,7 @@ Navigation for the project context and the work tracks. Context first, then spec
 | retire-grafana_20261019 | completed | high | [spec](./tracks/retire-grafana_20261019/spec.md) | [plan](./tracks/retire-grafana_20261019/plan.md) |
 | kev-drill-input_20261023 | completed | high | [spec](./tracks/kev-drill-input_20261023/spec.md) | [plan](./tracks/kev-drill-input_20261023/plan.md) |
 | kev-ceiling_20261024 | completed | high | [spec](./tracks/kev-ceiling_20261024/spec.md) | [plan](./tracks/kev-ceiling_20261024/plan.md) |
-| drill-fix_20261028 | in progress | high | [spec](./tracks/drill-fix_20261028/spec.md) | [plan](./tracks/drill-fix_20261028/plan.md) |
+| drill-fix_20261028 | completed | high | [spec](./tracks/drill-fix_20261028/spec.md) | [plan](./tracks/drill-fix_20261028/plan.md) |
 | fail-closed-release_20261027 | completed | high | [spec](./tracks/fail-closed-release_20261027/spec.md) | [plan](./tracks/fail-closed-release_20261027/plan.md) |
 | over-ceiling_20261027 | completed | high | [spec](./tracks/over-ceiling_20261027/spec.md) | [plan](./tracks/over-ceiling_20261027/plan.md) |
 | exception-lapse_20261025 | completed | high | [spec](./tracks/exception-lapse_20261025/spec.md) | [plan](./tracks/exception-lapse_20261025/plan.md) |
@@ -59,3 +59,4 @@ Navigation for the project context and the work tracks. Context first, then spec
 | 2026-10-27 | fail-closed-release_20261027 | Track created from spec task 16.9 at the owner's call: the fail-closed switch on for one dispatched build of drill-app, whose HIGH is uncovered since 16.4; the gate refuses the release by name, the digest frozen, the switch off the same day; the way out is 16.6's fix |
 | 2026-10-28 | fail-closed-release_20261027 | Track completed: the switch on, the owner's dispatch refused at the fail-closed release gate by name (the first live refusal), the digest frozen in the registry, the switch off the same day; the evidence in #336; a first dispatch before the switch released the definition instead |
 | 2026-10-28 | drill-fix_20261028 | Track created from spec task 16.6 at the owner's call: the drill's two modules bumped in the definition's fetch phase, the release, the next scheduled rescan closing issue #325 as fixed on the attested SBOMs and publishing the fix clock, the moot exception retired |
+| 2026-10-28 | drill-fix_20261028 | Track completed: the drill's two modules bumped in the fetch phase, the gate green by the fix, the release, the owner's dispatch closing #325 `resolved:fixed` on the attested SBOMs and publishing both findings fixed 10 days after first seen; the moot exception retired; the evidence in #344 |

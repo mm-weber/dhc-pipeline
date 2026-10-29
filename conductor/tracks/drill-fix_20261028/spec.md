@@ -29,7 +29,7 @@ Notes: the drill's source repository keeps its go.mod on purpose; the bump happe
 
 **Acceptance criteria:**
 
-- [ ] The pull request's number and squash; build run green at the scan gate (`0 uncovered`), govulncheck reporting no finding, the tier step green; validate green
+- [x] #342, squash 57ebed4; build run 40766991968 green at the scan gate with no annotation, govulncheck clean, the tier step green; validate 40766992134 green
 
 ### FR-2: The release (Req 2.7, 2.9)
 
@@ -37,7 +37,7 @@ WHEN the bump merges THE CI Pipeline SHALL release a new drill-app digest on mai
 
 **Acceptance criteria:**
 
-- [ ] The push build's run id, the new digest, the tags on it (registry read), the attested OpenVEX read back with no statement for either finding
+- [x] Run 40769247657; `sha256:5cacd03bc770fd5374674ce3c8b0e7fd4d4342a66438668f78d1cbe7dcb00d77`, the three tags on it; the OpenVEX attestation with no statement at all; the SBOMs listing v5.2.2 and v1.3.0
 
 ### FR-3: The closure (Req 6.52, 6.56)
 
@@ -47,7 +47,7 @@ Notes: the CRITICAL has no issue; it was decided at onboarding. A dispatch after
 
 **Acceptance criteria:**
 
-- [ ] The run's id; the closing comment's text; the label; the lifecycle step's annotation if any
+- [x] Run 40788144199 (the owner's dispatch); the comment quoted in the LOG; `resolved:fixed`; no annotation on the job
 
 ### FR-4: The fix clock (Req 6.46)
 
@@ -55,7 +55,7 @@ WHEN that rescan publishes the status THE Scan Pipeline SHALL list both findings
 
 **Acceptance criteria:**
 
-- [ ] The status issue's rows and aggregates (`fixed: N`, `median days to fix`), the JSON block's `fixed` and `days_to_fix` for both findings; the page's card and lead read
+- [x] `findings: 45; undecided: 4 (over ceiling: 0, oldest: 7 days); decided: 10; fixed: 31`, median days to fix unchanged at 4 (two tens among thirty-one fixed findings); both findings `fixed` 2026-10-28 with `days_to_fix` 10; the page's card `CRITICAL 0 · HIGH 0; undecided 0, over ceiling 0; fixed 3`, the three fixed findings listed beneath (the drill's two and CVE-2026-111943, fixed by the rebuild of 2026-10-24)
 
 ### FR-5: The exception retired (Req 6.11)
 
@@ -65,7 +65,7 @@ Notes: the file stays (empty `vulnerabilities:`) so that the gate's exception re
 
 **Acceptance criteria:**
 
-- [ ] The entry gone, the lints green, the header comment saying where the CRITICAL went
+- [x] The entry gone (`vulnerabilities: []`), the lints green with nine refs, the header saying so
 
 ### FR-6: The evidence (Req 7.11)
 
@@ -73,7 +73,7 @@ THE Repository SHALL append the drill's observation to ledger rows 6.46, 6.52 an
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` green (141 exercised, unchanged); `scripts/lint-log-anchors.sh all .` green; the tick `[done <date>, #nnn; conductor track drill-fix_20261028]`; `conductor/tracks.md` lists the track under Completed; 16.7 next in `tasks/todo.md`
+- [x] `scripts/lint-live-evidence.sh .` green (141 exercised); `scripts/lint-log-anchors.sh all .` green; the tick `[done 2026-10-28, #344; conductor track drill-fix_20261028]`; `conductor/tracks.md` lists the track under Completed; 16.7 next in `tasks/todo.md`
 
 ## Scope
 
@@ -107,9 +107,9 @@ THE Repository SHALL append the drill's observation to ledger rows 6.46, 6.52 an
 
 ## Open questions (the owner's calls)
 
-- [ ] The scheduled run or a dispatch after the release for the closure (drafted: the scheduled run; a dispatch is a release of attestations, M17)
-- [ ] The CRITICAL's exception retired as moot in the evidence pull request (drafted: yes; 16.7 re-decides on its own evidence)
-- [ ] Renovate markers on the bump deps (drafted: yes, M10)
+- [x] The owner's dispatch the same evening (run 40788144199)
+- [x] Retired in #344
+- [x] Markers on both deps
 
 ## References
 

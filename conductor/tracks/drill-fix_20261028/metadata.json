@@ -1,10 +1,11 @@
 {
   "id": "drill-fix_20261028",
   "type": "chore",
-  "status": "in_progress",
+  "status": "completed",
   "created_at": "2026-10-28T14:20:00Z",
-  "updated_at": "2026-10-28T14:20:00Z",
+  "updated_at": "2026-10-29T00:05:20Z",
   "description": "The drill definition's two findings fixed by a go/bump step in its fetch phase (the catalogue's fix lane, M10): the pull request green at the gate by the fix, the release on main, the next scheduled rescan closing issue #325 as resolved:fixed on the attested SBOMs and publishing both findings as fixed with their fix times, the CRITICAL's exception retired as moot; the way out the fail-closed gate named, and the fixed finding drill 16.7 brings back (Req 6.5, 6.46, 6.52, 6.56, 7.11; task 16.6)",
   "spec_path": "conductor/tracks/drill-fix_20261028/spec.md",
-  "plan_path": "conductor/tracks/drill-fix_20261028/plan.md"
+  "plan_path": "conductor/tracks/drill-fix_20261028/plan.md",
+  "completed_at": "2026-10-29T00:05:20Z"
 }
