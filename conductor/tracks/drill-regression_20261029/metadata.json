@@ -1,10 +1,11 @@
 {
   "id": "drill-regression_20261029",
   "type": "chore",
-  "status": "in_progress",
+  "status": "completed",
   "created_at": "2026-10-29T17:10:00Z",
-  "updated_at": "2026-10-29T17:10:00Z",
+  "updated_at": "2026-10-30T13:28:20Z",
   "description": "The drill definition's HIGH brought back by removing its bump, accepted for one day rather than merged over the red gate, released with an affected statement; from midnight UTC Trivy drops the entry, the scheduled rescan lists the finding as reported again and reopens its closed issue #325 by name, the status carrying first seen 2026-10-18; the lapsed entry removed the same day, the finding undecided until the definition retires (Req 6.57, 6.46, 7.11; task 16.7)",
   "spec_path": "conductor/tracks/drill-regression_20261029/spec.md",
-  "plan_path": "conductor/tracks/drill-regression_20261029/plan.md"
+  "plan_path": "conductor/tracks/drill-regression_20261029/plan.md",
+  "completed_at": "2026-10-30T13:28:20Z"
 }
