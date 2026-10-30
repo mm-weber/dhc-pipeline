@@ -29,6 +29,7 @@ Navigation for the project context and the work tracks. Context first, then spec
 | retire-grafana_20261019 | completed | high | [spec](./tracks/retire-grafana_20261019/spec.md) | [plan](./tracks/retire-grafana_20261019/plan.md) |
 | kev-drill-input_20261023 | completed | high | [spec](./tracks/kev-drill-input_20261023/spec.md) | [plan](./tracks/kev-drill-input_20261023/plan.md) |
 | kev-ceiling_20261024 | completed | high | [spec](./tracks/kev-ceiling_20261024/spec.md) | [plan](./tracks/kev-ceiling_20261024/plan.md) |
+| active-set-entry_20261030 | in progress | high | [spec](./tracks/active-set-entry_20261030/spec.md) | [plan](./tracks/active-set-entry_20261030/plan.md) |
 | drill-regression_20261029 | completed | high | [spec](./tracks/drill-regression_20261029/spec.md) | [plan](./tracks/drill-regression_20261029/plan.md) |
 | drill-fix_20261028 | completed | high | [spec](./tracks/drill-fix_20261028/spec.md) | [plan](./tracks/drill-fix_20261028/plan.md) |
 | fail-closed-release_20261027 | completed | high | [spec](./tracks/fail-closed-release_20261027/spec.md) | [plan](./tracks/fail-closed-release_20261027/plan.md) |
@@ -63,3 +64,4 @@ Navigation for the project context and the work tracks. Context first, then spec
 | 2026-10-28 | drill-fix_20261028 | Track completed: the drill's two modules bumped in the fetch phase, the gate green by the fix, the release, the owner's dispatch closing #325 `resolved:fixed` on the attested SBOMs and publishing both findings fixed 10 days after first seen; the moot exception retired; the evidence in #344 |
 | 2026-10-29 | drill-regression_20261029 | Track created from spec task 16.7 at the owner's call: the drill's HIGH brought back by removing its bump, accepted for one day instead of a bypass of the gate, the scheduled rescan of 2026-10-30 reopening its closed issue on the lapse with first seen carried, the entry removed the same day |
 | 2026-10-30 | drill-regression_20261029 | Track completed: the HIGH brought back under a one-day acceptance, released with an `affected` statement, the issue reopened by name on the lapse with first seen carried (the first reopen live); the entry removed; the evidence in #351 |
+| 2026-10-30 | active-set-entry_20261030 | Track created from spec task 16.11 at the owner's call: the drill definition's directory removed on a never-merged branch with its active-set entry kept, validation refusing the entry by name in two commits (the lane's guard, then the Req 1.19 line) |

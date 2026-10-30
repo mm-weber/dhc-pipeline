@@ -1,0 +1,10 @@
+{
+  "id": "active-set-entry_20261030",
+  "type": "chore",
+  "status": "in_progress",
+  "created_at": "2026-10-30T14:30:00Z",
+  "updated_at": "2026-10-30T14:30:00Z",
+  "description": "The drill definition's directory removed on a drill branch never merged while its active-set entry stays: validation refuses the entry by name (Req 1.19, the one refusal of task 16.11 nobody had seen live), read in two commits so that the lane's own guard and the active-set line are both recorded; ledger row 1.19 exercised (Req 1.19, 7.11; task 16.11)",
+  "spec_path": "conductor/tracks/active-set-entry_20261030/spec.md",
+  "plan_path": "conductor/tracks/active-set-entry_20261030/plan.md"
+}
