@@ -8,7 +8,13 @@
 
 ## Active tracks
 
-_No active track._
+### [~] active-set-entry_20261030: The drill definition's directory removed, its active-set entry refused by name, live
+
+**Description:** The drill definition's directory removed on a drill branch never merged while its active-set entry stays: validation refuses the entry by name (Req 1.19, the one refusal of task 16.11 nobody had seen live), read in two commits so that the lane's own guard and the active-set line are both recorded; ledger row 1.19 exercised.
+**Priority:** high (the live program; no clock, no switch)
+**Folder:** [./tracks/active-set-entry_20261030/](./tracks/active-set-entry_20261030/)
+
+---
 
 ## Completed tracks
 

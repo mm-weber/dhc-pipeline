@@ -215,13 +215,19 @@ stay as history.
       pinned tag of drill-app to a commit signed by no key, or re-sign with
       another key; the daily re-verification files the first true mismatch
       issue; owner decides and restores; the issue closes with the reason.
-- [ ] 16.11 Deactivation (1.13 to 1.16, 1.19): 1.13, 1.14 and 1.16 exercised
-      on 2026-10-19 by grafana's deactivation (#290; the bump refused on drill
-      #291; track `retire-grafana_20261019`), 1.15's detective half by the
-      first rescan after it (run 39417467219, 2026-10-20). What the drill keeps: drill-app's proofs entry
-      leaves in the same pull request (the reader refuses an entry for an
-      inactive name, Req 5.10), and a removed directory with the policy entry
-      kept (1.19), a drill branch never merged.
+- [ ] 16.11 Deactivation (1.13 to 1.16, 1.19): OPENED 2026-10-30 as conductor
+      track `active-set-entry_20261030` for the one row left, 1.19: a drill
+      pull request, never merged, removes image/drill-app/ and keeps the
+      active-set entry, in two commits (the directory alone, then the empty
+      lane file too) so that the first refusing step and the Req 1.19 line
+      are both read; the evidence the same day; the proofs entry stays. The
+      rest was exercised on 2026-10-19 by grafana's deactivation (#290; the
+      bump refused on drill #291; track `retire-grafana_20261019`), 1.15's
+      detective half by the first rescan after it (run 39417467219,
+      2026-10-20). The plan as written: drill-app's proofs entry leaves in the
+      same pull request (the reader refuses an entry for an inactive name,
+      Req 5.10), and a removed directory with the policy entry kept (1.19), a
+      drill branch never merged.
 - [ ] 16.12 Revocation, advisory, runbook (9.4, 9.5, 9.7, M14): the drill
       digest in triage/revocations.yaml with reason "drill" while a tag still
       references it; the posture step fails by name; the runbook executed as
