@@ -3808,3 +3808,41 @@ has now seen the drill's HIGH decided, re-decided against the KEV ceiling,
 lapsed, over its ceiling, refused at the release gate, fixed with its clock
 published, and brought back with its issue reopened, each on the catalogue's
 real machinery.
+
+## 2026-10-30: the drill definition's directory removed, its active-set entry refused by name (task 16.11)
+
+*Image: drill-app. Task 16.11, conductor track `active-set-entry_20261030`
+(#353, squash af626ea). The task's deactivation half ran for real on
+2026-10-19, when grafana left the active set by the documented switch
+(#290): the matrices and the tracking scope excluded it, no digest or tag
+followed, and the replayed bump was refused by name (entry of 2026-10-19).
+One refusal of the task had never run: an active-set entry naming a
+definition with no directory under `image/` (Req 1.19). This entry records
+it on a drill branch, never merged, in two commits, because the tree's
+guards meet a removed directory in an order worth reading.*
+
+**Commit 1, the directory alone (2026-10-30, 22:00Z).** Pull request
+#354, a draft, removed `image/drill-app/` and nothing else, the active set
+and the exception lane's filename still naming drill-app. Validation
+(run 41135094891) failed at step 9, the accepted-risk lint (22:00:25Z) with `risk treatment (Req 6.11): no image definition 'image/drill-app/image.yaml'`:
+the lane file names a definition that does not exist, the filename being what ties its exceptions to an image, so the lane's own guard spoke before the active set was read. The build (run 41135094902): its affected-definitions job failed at its first step, reading the active set through the same reader, with `active_definitions: active_set entry 'drill-app' has no definition: image/drill-app/image.yaml does not exist (Req 1.19) (Req 1.13)`, the build gate red at 22:00:30Z; the e2e workflow's affected-components job (run 41135094774) failed on the same line, the e2e gate red at 22:00:27Z. The Req 1.19 line therefore appeared on the first commit already, in the two matrix jobs, while validation had stopped one step short of its own.
+
+**Commit 2, the lane removed as well (2026-10-30, 22:02Z).** The
+second commit removed `triage/accepted-risk/drill-app.yaml` too, empty since
+task 16.7. Validation (run 41135329824) passed the accepted-risk lint and
+failed at the active-set step (22:02:18Z) with `active_definitions: active_set entry 'drill-app' has no definition: image/drill-app/image.yaml does not exist (Req 1.19) (Req 1.13)`, the
+reader's refusal surfaced by `lint-active-set: the active set is malformed
+(Req 1.19); nothing else checked`: Req 1.19, first time live. The build
+(run 41135329854): the affected-definitions job red on the same line again, the build gate red at 22:02:21Z, the e2e gate (run 41135329816) likewise at 22:02:22Z. The proofs entry for drill-app
+(`catalogue-policy.yaml`, kind none) stayed; the probe lint runs after the
+active-set step and was not reached.
+
+**What the drill found.** The guards stand in an order: a lane file for a
+definition that does not exist is refused before the active set is read,
+so a pull request that forgets the policy entry hears first about the
+exception file it also forgot, and about the entry only once that is
+gone; both name the definition, and neither lets the tree pass. The
+retirement (task 16.16) removes the directory, the entry, the lane and the
+proofs entry together, through the switch, and this entry is the record
+of what refuses a retirement done by halves. The drill pull request is
+closed unmerged with a comment after the evidence merges.
