@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-10-28
+# Live drills (task group 16): where we are and what is next, as of 2026-10-30
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -158,7 +158,12 @@ stay as history.
       retires the CRITICAL's exception as moot). The plan as written:
       drill-app bumps the modules; the open issues close resolved:fixed on
       attested SBOMs.
-- [ ] 16.7 Regression and reopen (6.57): OPENED 2026-10-29 as conductor
+- [x] 16.7 Regression and reopen (6.57): DONE 2026-10-30 (conductor track
+      `drill-regression_20261029`: #347 the track; #348 the regression under
+      a one-day acceptance, released with an `affected` statement; the scheduled
+      run 41060449312 of 2026-10-30 reopened #325 by name once Trivy dropped the
+      lapsed entry, first seen 2026-10-18 carried; the evidence in #351
+      removed the entry). OPENED 2026-10-29 as conductor
       track `drill-regression_20261029` (phase 0 the track and the task
       text's amendment; phase 1 one pull request removes the HIGH's bump and
       accepts the finding for one day with its LOG decision, green at the

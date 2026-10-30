@@ -29,7 +29,7 @@ THE Repository SHALL remove `github.com/golang-jwt/jwt/v5` from the drill defini
 
 **Acceptance criteria:**
 
-- [ ] The pull request's number and squash; the build run green at the gate (the finding suppressed by the exception, the tier step within 90 days), govulncheck naming the symbol; validate green with the lint's `expires in 1 days` warning
+- [x] #348, squash ec90a95; build run 40974710663 green at the gate, the tier step green, govulncheck naming `ParseUnverified`; validate green with the `expires in 1 days` warning
 
 ### FR-2: The release (Req 2.9, 6.38)
 
@@ -37,7 +37,7 @@ WHEN the regression merges THE CI Pipeline SHALL release a new drill-app digest 
 
 **Acceptance criteria:**
 
-- [ ] The push build's run id, the new digest and its tags (registry read), the document and the SBOMs read back
+- [x] Run 40975473407; `sha256:d5d9bb51146f8dc60bc0c5fc44166a2b266484c75c2b3363dfc44e7dad771fa4`, the three tags on it; one `affected` statement (action statement timestamp 2026-10-29); the SBOMs with v5.2.1 and v1.3.0
 
 ### FR-3: The reopen (Req 6.57, 6.46)
 
@@ -47,7 +47,7 @@ Notes: the first clock of task 16.4; a dispatch after midnight UTC would do the 
 
 **Acceptance criteria:**
 
-- [ ] The run's id; the reopen comment's text; the label removed; the status row (`undecided`, first seen 2026-10-18, the age); the page's card
+- [x] Run 41060449312; `Reopened by the rescan (Req 6.57): CVE-2025-30204 is reported again on a supported digest.`; `resolved:fixed` removed; `drill-app | CVE-2025-30204 | HIGH | no | undecided | 2026-10-18 | n/a | 12 / 90 | undecided, awaiting a triage decision`; the card `CRITICAL 0 · HIGH 1; undecided 1, over ceiling 0; fixed 2`
 
 ### FR-4: The entry leaves (Req 6.11)
 
@@ -55,7 +55,7 @@ THE Repository SHALL remove the lapsed entry from `triage/accepted-risk/drill-ap
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-accepted-risk.sh .` green with no warning; `scripts/lint-log-anchors.sh all .` green
+- [x] `scripts/lint-accepted-risk.sh .` green with no warning; `scripts/lint-log-anchors.sh all .` green, nine refs. Not foreseen here: the pull request builds drill-app (a changed exception file names its image, Req 6.9) and its scan gate is red on the uncovered finding (run 41063600623); the merge is the owner's bypass, as for #329
 
 ### FR-5: The evidence (Req 7.11)
 
@@ -63,7 +63,7 @@ THE Repository SHALL flip ledger row 6.57 to `exercised` with the run id (induce
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` green with 142 exercised; `scripts/lint-log-anchors.sh all .` green; the tick `[done <date>, #nnn; conductor track drill-regression_20261029]`; `conductor/tracks.md` lists the track under Completed; 16.11 next in `tasks/todo.md`
+- [x] `scripts/lint-live-evidence.sh .` green with 142 exercised; `scripts/lint-log-anchors.sh all .` green; the tick `[done 2026-10-30, #351; conductor track drill-regression_20261029]`; `conductor/tracks.md` lists the track under Completed; 16.11 next in `tasks/todo.md`
 
 ## Scope
 
@@ -97,9 +97,9 @@ THE Repository SHALL flip ledger row 6.57 to `exercised` with the run id (induce
 
 ## Open questions (the owner's calls)
 
-- [ ] The regression accepted for a day rather than merged over the red gate (drafted: the acceptance; the gate stays honest and the lapse is the realistic path back)
-- [ ] The reopen read on the scheduled run of 2026-10-30, or on a dispatch after midnight UTC (drafted: the scheduled run)
-- [ ] The finding left undecided after the reopen until task 16.16 (drafted: yes; no second fix, no second exception)
+- [x] The acceptance (the owner's call by merging #347 and #348)
+- [x] The scheduled run (41060449312), which started at 13:06Z before any dispatch
+- [x] Left undecided, its issue open, until 16.16
 
 ## References
 

@@ -8,9 +8,10 @@
 # by drill 16.6 on 2026-10-28 (gorilla/handlers bumped to 1.3.0 in the
 # definition's fetch phase) and its entry, moot, was retired here the same
 # day (LOG 2026-10-28). Drill 16.7 brought the HIGH back on 2026-10-29 and
-# accepted it for one day (LOG 2026-10-29): the entry below lapses on
-# 2026-10-30, when the rescan reopens its issue, and leaves this file the
-# same day; the CRITICAL stays fixed.
+# accepted it for one day (LOG 2026-10-29); the entry lapsed on 2026-10-30,
+# the rescan reopened its issue, and the entry left this file the same day.
+# The finding stays undecided until drill 16.16 retires the definition; the
+# CRITICAL stays fixed. The lane is kept, empty, for that retirement.
 #
 # A native Trivy ignorefile, handed to the same scan as --ignorefile; every
 # unexpired entry is published in the image's OpenVEX document as an `affected`
@@ -18,18 +19,4 @@
 # the ceiling clock (Req 6.7, 6.50): 30 days for a CRITICAL, 90 for a HIGH, 14
 # for anything CISA lists as exploited. purls are versionless, as in the other
 # files of this lane; paths name the one binary.
-vulnerabilities:
-  - id: CVE-2025-30204
-    purls: ["pkg:golang/github.com/golang-jwt/jwt/v5"]
-    paths: ["usr/local/bin/drill-app"]
-    treatment: accept
-    owner: mm-weber
-    ref: "LOG.md#accept-the-drills-high-brought-back-for-one-day-the-regression-drill"
-    blocked: "fix (5.2.2) is available and was in place from 2026-10-28; removed on
-              purpose for one day so that the finding returns to the supported
-              digest and the rescan reopens its issue (drill 16.7); not_affected
-              is forbidden, govulncheck reaches ParseUnverified in the binary
-              (Req 6.14); transfer has no owner but the owner"
-    statement: "accept: live-drill fixture, never installed; the finding brought back for one day by drill 16.7 so that its closed issue reopens on the lapse; the entry leaves on 2026-10-30"
-    decided_at: 2026-10-29
-    expired_at: 2026-10-30
+vulnerabilities: []

@@ -8,15 +8,18 @@
 
 ## Active tracks
 
-### [~] drill-regression_20261029: The drill's HIGH brought back, the closed issue reopened on the lapse, live
+_No active track._
+
+## Completed tracks
+
+### [x] drill-regression_20261029: The drill's HIGH brought back, the closed issue reopened on the lapse, live
 
 **Description:** The drill definition's HIGH brought back by removing its bump, accepted for one day rather than merged over the red gate, released with an `affected` statement; from midnight UTC Trivy drops the entry, the scheduled rescan lists the finding as reported again and reopens its closed issue #325 by name, the status carrying first seen 2026-10-18; the lapsed entry removed the same day, the finding undecided until the definition retires.
 **Priority:** high (the live program; the last drill on the drill definition's findings)
+**Completed:** 2026-10-30 (#347 merged as c0c8850, the track; #348 as ec90a95, the regression under a one-day acceptance, released 2026-10-29 23:55Z with an `affected` statement; the scheduled run 41060449312 of 2026-10-30 reopening #325 by name once Trivy dropped the lapsed entry, first seen 2026-10-18 carried; the evidence in #351 with the entry removed, the finding undecided until 16.16)
 **Folder:** [./tracks/drill-regression_20261029/](./tracks/drill-regression_20261029/)
 
 ---
-
-## Completed tracks
 
 ### [x] drill-fix_20261028: The drill's findings fixed, the issue closed on the attested SBOMs, the fix clock, live
 

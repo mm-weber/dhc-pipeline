@@ -3761,3 +3761,50 @@ undecided with first seen 2026-10-18 carried; the evidence pull request of
 that day removes the lapsed entry and records the run. The finding then
 stays undecided, with no second fix and no second exception, until the
 definition retires with task 16.16.
+
+**The regression released (2026-10-29, 23:39 to 23:55Z).** The track
+merged at 23:39Z (#347, squash c0c8850) and the regression pull request
+#348 (commit db12bd7, squash ec90a95) at 23:47Z: the HIGH's bump removed
+from the step, the CRITICAL's kept, the entry above in the exception file.
+The pull request's build of drill-app (run 40974710663) was green at the
+gate by the exception, the tier step within the 90-day ceiling, govulncheck
+naming `ParseUnverified` again. Main's push build (run 40975473407, job
+123802336198) pushed the image by digest at 23:53:31Z and scanned it at
+23:53:38Z, before midnight, so the exception was honoured: the compiled
+document carries one statement, CVE-2025-30204 `affected` with the action
+statement timestamp of 2026-10-29, signed at 23:55:01Z, the three tags
+moved to `sha256:d5d9bb51146f8dc60bc0c5fc44166a2b266484c75c2b3363dfc44e7dad771fa4`
+at 23:55:04Z; the SBOMs list `github.com/golang-jwt/jwt/v5 v5.2.1` and
+`github.com/gorilla/handlers v1.3.0` (read back from the registry at
+00:05Z). The fixed digest of 2026-10-28, `sha256:5cacd03bc770...`, is
+referenced by no tag any more and frozen (Req 2.11).
+
+**The reopen (2026-10-30, 13:06 to 13:27Z).** The scheduled run
+41060449312 (main at ec90a95, job 124078557157) scanned the supported digest with
+the exception file as Trivy's ignorefile; the entry's `expired_at`,
+2026-10-30, read as midnight UTC, was before now, so Trivy dropped it and
+the report listed CVE-2025-30204 as reported. The lifecycle found the
+finding named by a closed cve issue reported again on a supported digest
+and reopened #325 at 13:19:27Z with the comment `Reopened by the rescan (Req 6.57): CVE-2025-30204 is reported again on a supported digest.` naming `ghcr.io/mm-weber/dhc/drill-app@sha256:d5d9bb51146f...` with its three tags and both platform manifests (`sha256:b0baea633a16...`, `sha256:d1ae8a0ae416...`), each HIGH, and `scanner trivy 0.75.0, vulnerability database updated 2026-10-30T07:16:25Z`, removing
+`resolved:fixed` (Req 6.57, first time live). The status, published to
+#151 at 13:26:29Z, listed the finding undecided again with first seen
+2026-10-18 carried, `drill-app | CVE-2025-30204 | HIGH | no | undecided | 2026-10-18 | n/a | 12 / 90 | undecided, awaiting a triage decision`, its age 12 days, the fixed date gone
+from the row; the aggregates `findings: 45; undecided: 4 (over ceiling: 0, oldest: 12 days); decided: 10; fixed: 31`; the page (13:26:50Z) showed
+drill-app's card with `CRITICAL 0 · HIGH 1; undecided 1, over ceiling 0; fixed 2`. The expiries step warned `expires in 0 days (2026-10-30)` and the page listed the entry as lapsing, the day between the two clocks as on task 16.4's first day.
+
+**The entry leaves (2026-10-30).** The evidence pull request (#351)
+removes the lapsed entry from `triage/accepted-risk/drill-app.yaml` the same
+day, before the lint's second clock turns validation red; the lane stays,
+empty, for task 16.16. A changed exception file puts its image in the
+build matrix (Req 6.9), so this pull request built drill-app and its scan
+gate refused the finding by name (run 41063600623, 13:33:42Z), nothing
+covering it now; validation green. As with task 16.4's evidence (#329), the
+only green way out would decide or fix the finding, which the program
+keeps undecided for its retirement, so the owner merges over the red gate
+by the ruleset's admin bypass, the second such merge, recorded here; the
+track's plan had not named it in advance, the deviations log does. No second fix and no second exception: the finding
+stays undecided, its issue open, until the definition retires. The program
+has now seen the drill's HIGH decided, re-decided against the KEV ceiling,
+lapsed, over its ceiling, refused at the release gate, fixed with its clock
+published, and brought back with its issue reopened, each on the catalogue's
+real machinery.
