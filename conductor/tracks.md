@@ -8,7 +8,13 @@
 
 ## Active tracks
 
-_No active track._
+### [~] switches_20261030: The switches, one run each: the page off, every rebuild published, live
+
+**Description:** Two declared switches flipped for one day through one pull request and flipped back through another: `release.publish_policy` always, so the scheduled rebuild publishes every active definition whatever the comparator says (seven releases, the chart digest pull request following), and `release.page` false, so the scheduled rescan skips the page and the served page keeps the previous day's data; Req 6.62's failure branch by the owner disabling Pages for one run, their call.
+**Priority:** high (the live program; two rows no other drill reaches)
+**Folder:** [./tracks/switches_20261030/](./tracks/switches_20261030/)
+
+---
 
 ## Completed tracks
 

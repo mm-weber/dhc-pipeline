@@ -237,11 +237,21 @@ stay as history.
       references it; the posture step fails by name; the runbook executed as
       written; the advisory as a repository security advisory titled as a
       drill (draft or published, the owner's call, the ledger says which).
-- [ ] 16.13 The switches (2.17, 6.61, 6.62): `release.page` false for one
-      rescan (the page job skips, the served page keeps yesterday's data and
-      says so); `release.publish_policy` always for one nightly (every active
-      definition publishes, the chart digest pulls follow); costs stated.
-      `release.public` stays true.
+- [ ] 16.13 The switches (2.17, 6.61, 6.62): OPENED 2026-10-30 as conductor
+      track `switches_20261030` (phase 0 the track and the task text's
+      amendment; phase 1 one pull request flips `publish_policy` to always
+      and `page` to false for 2026-10-31: the nightly publishes all seven
+      active definitions, the rescan skips the page and the served page keeps
+      the previous day's data; one pull request flips both back the same
+      day; phase 2 the hardened-app chart's digest pull request read as it
+      automerges (3.12), Req 6.62's failure branch by the owner disabling
+      Pages for one run if they choose, the evidence). Costs: seven
+      releases, the old digests frozen, one Renovate digest pull request.
+      `release.public` stays true. The plan as written: `release.page` false
+      for one rescan (the page job skips, the served page keeps yesterday's
+      data and says so); `release.publish_policy` always for one nightly
+      (every active definition publishes, the chart digest pulls follow);
+      costs stated.
 - [ ] 16.14 Private report channel (9.2, 9.3). OWNER: a private vulnerability
       report or draft advisory titled as a drill, handled as SECURITY.md
       promises, closed; the ledger records id and elapsed time.
