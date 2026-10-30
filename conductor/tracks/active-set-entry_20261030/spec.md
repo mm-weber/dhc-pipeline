@@ -31,7 +31,7 @@ Notes: the pull request is opened as a draft, meant to be red, never merged, and
 
 **Acceptance criteria:**
 
-- [ ] Commit 1: validate run red, the failing step and its annotation recorded; commit 2: validate run red at the active-set step with `active_set entry 'drill-app' has no definition: image/drill-app/image.yaml does not exist (Req 1.19)`; the build gate's outcome on each commit recorded as observed
+- [x] Commit 1 (e1e5808): validate run 41135094891 red at step 9, the accepted-risk lint with `risk treatment (Req 6.11): no image definition 'image/drill-app/image.yaml'`; commit 2 (5ed2421): validate run 41135329824 red at the active-set step with `active_definitions: active_set entry 'drill-app' has no definition: image/drill-app/image.yaml does not exist (Req 1.19) (Req 1.13)`; the builds: the build and e2e matrix jobs red on both commits with the Req 1.19 line from the shared reader
 
 ### FR-2: The evidence (Req 7.11)
 
@@ -39,7 +39,7 @@ THE Repository SHALL flip ledger row 1.19 to `exercised` with the run id and the
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` green with 143 exercised; `scripts/lint-log-anchors.sh all .` green; the tick `[done <date>, #nnn; conductor track active-set-entry_20261030]`; `conductor/tracks.md` lists the track under Completed; 16.13 next in `tasks/todo.md`
+- [x] `scripts/lint-live-evidence.sh .` green with 143 exercised; `scripts/lint-log-anchors.sh all .` green; the tick `[done 2026-10-30, #355; conductor track active-set-entry_20261030]`; `conductor/tracks.md` lists the track under Completed; 16.13 next in `tasks/todo.md`
 
 ## Scope
 
@@ -72,8 +72,8 @@ THE Repository SHALL flip ledger row 1.19 to `exercised` with the run id and the
 
 ## Open questions (the owner's calls)
 
-- [ ] Two commits rather than one (drafted: two; the first shows the lane's own guard on a missing definition, the second reaches the active-set line)
-- [ ] The drill pull request closed after the evidence merges, the branch kept on origin (drafted: yes, the precedent)
+- [x] Two commits (the owner's call by merging #353)
+- [ ] The drill pull request #354 closed after the evidence merges, the branch kept on origin (the post-merge housekeeping)
 
 ## References
 

@@ -215,7 +215,11 @@ stay as history.
       pinned tag of drill-app to a commit signed by no key, or re-sign with
       another key; the daily re-verification files the first true mismatch
       issue; owner decides and restores; the issue closes with the reason.
-- [ ] 16.11 Deactivation (1.13 to 1.16, 1.19): OPENED 2026-10-30 as conductor
+- [x] 16.11 Deactivation (1.13 to 1.16, 1.19): DONE 2026-10-30 (conductor track
+      `active-set-entry_20261030`: #353 the track; #354 the drill, never
+      merged, two commits refused by name, the second at the active-set step
+      with the Req 1.19 line (run 41135329824); the evidence in #355).
+      OPENED 2026-10-30 as conductor
       track `active-set-entry_20261030` for the one row left, 1.19: a drill
       pull request, never merged, removes image/drill-app/ and keeps the
       active-set entry, in two commits (the directory alone, then the empty

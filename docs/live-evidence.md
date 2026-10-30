@@ -55,7 +55,7 @@ evidence obligation, and a retired one cannot keep a row.
 | 1.16 | A bump of an inactive definition fails validation naming it | exercised | 2026-10-19 | Grafana deactivated by the switch (#290, 2026-10-19); drill #291 replayed Renovate's 13.1.8 bump (#279, commit f6f89f8) onto main and validate run 39289979209 failed at the active-set step naming `image/grafana/image.yaml` and Req 1.16; the same pull request's build run 39289978981 left grafana out of the matrix by name with the gate green. Never merged. | pull request |
 | 1.17 | A builder contract per archetype is documented | exercised | 2026-10-08 | `docs/concepts.md` "The builder contract per archetype" (present 2026-10-08). | nature |
 | 1.18 | An active set splitting an enforced group fails validation | exercised | 2026-10-26 | Drill #323 (task 16.15, never merged), commit cd8e24f: valkey-compat out of the active set while valkey stays; validate run 40330473877 red at the active-set lint with two lines, `lint-active-set: the active set splits the source repository group 'valkey-io/valkey': active image/valkey/; inactive image/valkey-compat/. A bump moves the whole group, so activate or deactivate all of them (Req 1.18)` and the same for the published repository group `ghcr.io/mm-weber/dhc/valkey`. LOG 2026-10-26. | pull request |
-| 1.19 | An active-set entry without a directory fails validation | drill 16.11 | | Never refused live. 16.11's second drill branch removes a directory and keeps the entry. | pull request |
+| 1.19 | An active-set entry without a directory fails validation | exercised | 2026-10-30 | Drill #354 (task 16.11, never merged), commit 5ed2421: `image/drill-app/` and its empty exception lane removed, the active-set entry kept; validate run 41135329824 red at the active-set step with `active_definitions: active_set entry 'drill-app' has no definition: image/drill-app/image.yaml does not exist (Req 1.19) (Req 1.13)`. The commit before it (e1e5808, the directory alone) was refused first by the accepted-risk lint, `risk treatment (Req 6.11): no image definition 'image/drill-app/image.yaml'` (run 41135094891). LOG 2026-10-30. | pull request |
 
 ## Requirement 2: Image Build and Release
 
@@ -247,6 +247,7 @@ evidence obligation, and a retired one cannot keep a row.
 | Task 16.12 | 9.4, 9.5, 9.7 | the drill digest revoked |
 | Task 16.13 | 2.17, 6.62 | the page and publish switches |
 | Task 16.14 | 9.2 | the owner's drill report |
+| Task 16.11 | 1.19 (1.13 to 1.16 by grafana's deactivation, 2026-10-19) | drill pull request #354, never merged: the drill definition's directory removed with its active-set entry kept, two commits |
 | Task 16.15 | 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10, 6.11, 6.12, 6.19, 6.25, 6.39, 7.10, 9.6, 9.18 | drill pull request #323, never merged: thirty commits, one violation each, nine of them redone after a stray file of the drill's own script masked the first attempt; 4.2, 4.3, 4.6 and 7.9 re-observed |
 
 Rows no drill reaches, with their reason: 1.18 (no split group), 2.26 (no scanner failure at
