@@ -8,6 +8,14 @@
 
 ## Active tracks
 
+### [~] private-report_20261031: A report through the private channel, handled as the policy promises, live
+
+**Description:** One private vulnerability report filed by the owner, titled as a drill, received through the channel SECURITY.md names, acknowledged, examined against the catalogue's records, answered and closed as a drill, the elapsed times recorded against no promised window; ledger row 9.2 exercised.
+**Priority:** high (the live program; runs beside the switches drill, no scheduled run involved)
+**Folder:** [./tracks/private-report_20261031/](./tracks/private-report_20261031/)
+
+---
+
 ### [~] switches_20261030: The switches, one run each: the page off, every rebuild published, live
 
 **Description:** Two declared switches flipped for one day through one pull request and flipped back through another: `release.publish_policy` always, so the scheduled rebuild publishes every active definition whatever the comparator says (seven releases, the chart digest pull request following), and `release.page` false, so the scheduled rescan skips the page and the served page keeps the previous day's data; Req 6.62's failure branch by the owner disabling Pages for one run, their call.
