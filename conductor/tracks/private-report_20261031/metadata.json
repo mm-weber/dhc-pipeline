@@ -1,0 +1,10 @@
+{
+  "id": "private-report_20261031",
+  "type": "chore",
+  "status": "in_progress",
+  "created_at": "2026-10-31T15:00:00Z",
+  "updated_at": "2026-10-31T15:00:00Z",
+  "description": "One private vulnerability report filed by the owner, titled as a drill, received through the channel SECURITY.md names, acknowledged, examined against the catalogue's records, answered and closed as a drill, the elapsed times recorded against no promised window; ledger row 9.2 exercised (Req 9.2, 7.11; task 16.14)",
+  "spec_path": "conductor/tracks/private-report_20261031/spec.md",
+  "plan_path": "conductor/tracks/private-report_20261031/plan.md"
+}

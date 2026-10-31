@@ -252,9 +252,15 @@ stay as history.
       data and says so); `release.publish_policy` always for one nightly
       (every active definition publishes, the chart digest pulls follow);
       costs stated.
-- [ ] 16.14 Private report channel (9.2, 9.3). OWNER: a private vulnerability
-      report or draft advisory titled as a drill, handled as SECURITY.md
-      promises, closed; the ledger records id and elapsed time.
+- [ ] 16.14 Private report channel (9.2, 9.3): OPENED 2026-10-31 as conductor
+      track `private-report_20261031` (the owner files one private
+      vulnerability report titled as a drill; the maintainer acknowledges it
+      in its thread, examines the subject against the records, answers and
+      closes it as a drill; the evidence records the advisory id and the
+      elapsed times, no window being promised). The plan as written: OWNER: a
+      private vulnerability report or draft advisory titled as a drill,
+      handled as SECURITY.md promises, closed; the ledger records id and
+      elapsed time.
 - [x] 16.15 Deliberate violations, one pull request, never merged: DONE
       2026-10-26 (conductor track `deliberate-violations_20261025`: #322 the
       track; #323 the drill pull request, thirty commits, one violation each
