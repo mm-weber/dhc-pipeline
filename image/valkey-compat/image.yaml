@@ -20,18 +20,18 @@ variant: compat
 tags:
   - 9-alpine3.23-compat
   - 9.1-alpine3.23-compat
-  - 9.1.2-alpine3.23-compat
+  - 9.1.3-alpine3.23-compat
 platforms:
   - linux/amd64
   - linux/arm64
 dates:
   release: "2026-07-21"
 vars:
-  COMMIT_SHA: 7f1dffedff6de73058b2c2a389422b6ecd56c8fb
+  COMMIT_SHA: 29173b67508b2de4c0f0ed551f3b47cf19fc3ca8
   SEMVER_MAJOR_MINOR_VERSION: "9.1"
   SEMVER_MAJOR_VERSION: "9"
-  SEMVER_VERSION: 9.1.2
-  VERSION: 9.1.2
+  SEMVER_VERSION: 9.1.3
+  VERSION: 9.1.3
 contents:
   repositories:
     - https://dhi.io/apk/alpine/v3.23/main
@@ -68,16 +68,16 @@ contents:
           - openssl-dev
           - pkgconf
         files:
-          - url: git+https://github.com/valkey-io/valkey.git#9.1.2
-            # authenticity: signed-commit
-            checksum: 7f1dffedff6de73058b2c2a389422b6ecd56c8fb
+          - url: git+https://github.com/valkey-io/valkey.git#9.1.3
+            # authenticity: signed-commit, verified 9.1.3 at 29173b67508b (GitHub verification: valid), 2026-10-31
+            checksum: 29173b67508b2de4c0f0ed551f3b47cf19fc3ca8
             path: ${source.dir}/valkey
             spdx:
               name: valkey
-              version: 9.1.2
+              version: 9.1.3
               packages:
                 - name: valkey
-                  purl: pkg:github/valkey-io/valkey@9.1.2
+                  purl: pkg:github/valkey-io/valkey@9.1.3
                   license: BSD-3-Clause
             uid: 0
             gid: 0
