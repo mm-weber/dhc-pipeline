@@ -71,7 +71,7 @@ CT_SHA256="467561730f25fe09d5e6cd09a3e1f6aa759871c657a57602947c716d9be2c583"
 
 # renovate: datasource=github-releases depName=anchore/syft
 SYFT_VERSION="1.55.0"
-SYFT_SHA256="c069905b391cc4c20a5ba65ad5c10be2a7ba074f8ea6ad203e24d14e303dad47"
+SYFT_SHA256="bb65249542db5fedeeb4d3f9b018b75e7264dbfbbb10486f044581a92f90490d"
 
 # renovate: datasource=github-releases depName=google/go-containerregistry
 CRANE_VERSION="0.22.1"
