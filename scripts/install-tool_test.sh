@@ -39,12 +39,12 @@ KYVERNO_DEP=kyverno/kyverno
 # helm's binaries live on get.helm.sh (the GitHub release carries source
 # only), so its fixture sits at the served root; ct is a github tarball whose
 # archive also ships the lint configs ct needs at runtime.
-HELM_VER=4.3.0
+HELM_VER=4.3.1
 CT_VER=3.15.0
 HELM_ASSET="helm-v${HELM_VER}-linux-amd64.tar.gz"
 CT_ASSET="chart-testing_${CT_VER}_linux_amd64.tar.gz"
 CT_URLDIR="helm/chart-testing/releases/download/v${CT_VER}"
-HELM_PIN=86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb
+HELM_PIN=0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b
 CT_PIN=467561730f25fe09d5e6cd09a3e1f6aa759871c657a57602947c716d9be2c583
 HELM_DEP=helm/helm
 CT_DEP=helm/chart-testing
