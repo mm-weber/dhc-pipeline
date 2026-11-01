@@ -19,19 +19,19 @@ release:
   fail_closed: false
   # Req 2.15/2.17: on-change discards a scheduled rebuild whose package set
   # equals the published one; always publishes every rebuild. Drill 16.13
-  # (track switches_20261030): always for the scheduled rebuild of
-  # 2026-10-31, every active definition published whatever the comparator
-  # says; back to on-change by the next pull request the same day.
-  publish_policy: always
+  # (track switches_20261030) set it to always for one scheduled rebuild,
+  # run 41302227631 of 2026-11-01, which published every active definition
+  # whatever the comparator said; on-change again here (LOG 2026-11-01).
+  publish_policy: on-change
   # Req 6.61/6.62: on = the rescan renders the catalogue page and deploys it
   # with the day's status JSON to this repository's GitHub Pages site, an
   # artifact deployment (no commit), and fails by name when Pages is off or
   # the served data is not the run's. A fork without Pages turns it off and
   # its rescan stays green (design Decision 12; register row M23). Drill
-  # 16.13 (track switches_20261030): off for the scheduled rescan of
-  # 2026-10-31, the page job skipped and the served page left with the
-  # previous day's data; back to true by the next pull request the same day.
-  page: false
+  # 16.13 (track switches_20261030) turned it off for one scheduled rescan,
+  # run 41311884446 of 2026-11-01, the page job skipped and the served page
+  # left with the previous day's data; on again here (LOG 2026-11-01).
+  page: true
   # Req 2.14's daily rebuild cron; task 9.2 wires it into build.yml as the
   # literal GitHub requires, and lint-workflow-policy keeps the two equal.
   # Before the 06:17 rescan so the rescan sees fresh digests.
