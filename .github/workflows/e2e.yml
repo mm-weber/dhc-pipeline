@@ -100,7 +100,12 @@ jobs:
     name: e2e ${{ matrix.component }}
     needs: affected
     if: needs.affected.outputs.any == 'true'
-    runs-on: ubuntu-latest
+    # Pinned on 2026-11-02 while ubuntu-latest moves to Ubuntu 26.04 (Docker
+    # 29, the containerd image store): kind 0.33.0's `load docker-image`
+    # cannot import what that Docker saves (kind issue 3795), and the probe
+    # load below failed on every run from 2026-10-28. The lift condition is
+    # a todo item.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
