@@ -28,19 +28,24 @@ expect() { # name, expected rc, actual rc, output, needles...
   pass "$name"
 }
 
-# The docker shim answers each format string the guard may ask for; anything
+# A docker shim answers each format string the guard may ask for; anything
 # else is a refusal, so the guard cannot learn facts by another route.
-SB=$(mktemp -d); mkdir -p "$SB/bin"
-cat >"$SB/bin/docker" <<'EOF'
+# shim <dir> <driver status> <server version> <driver>
+SB=$(mktemp -d)
+shim() {
+  mkdir -p "$1"
+  cat >"$1/docker" <<EOF
 #!/usr/bin/env bash
-case "$*" in
-  *'{{range .DriverStatus}}'*) echo "Backing Filesystem=extfs;Supports d_type=true;" ;;
-  *'{{.Server.Version}}'*)     echo "28.0.4" ;;
-  *'{{.Driver}}'*)             echo "overlay2" ;;
-  *) echo "docker shim: unexpected arguments: $*" >&2; exit 1 ;;
+case "\$*" in
+  *'{{range .DriverStatus}}'*) echo "$2" ;;
+  *'{{.Server.Version}}'*)     echo "$3" ;;
+  *'{{.Driver}}'*)             echo "$4" ;;
+  *) echo "docker shim: unexpected arguments: \$*" >&2; exit 1 ;;
 esac
 EOF
-chmod +x "$SB/bin/docker"
+  chmod +x "$1/docker"
+}
+shim "$SB/bin" "Backing Filesystem=extfs;Supports d_type=true;" 28.0.4 overlay2
 export ImageOS=ubuntu24 ImageVersion=20261101.360.1
 run() { PATH="$SB/bin:$PATH" "$CHECK" 2>&1; }
 
@@ -52,17 +57,7 @@ expect "graph driver: passes and names the image" 0 "$rc" "$out" "::notice::" "u
 # daemon running the containerd snapshotter does (`{{.Driver}}` is overlayfs,
 # the DriverStatus names io.containerd.snapshotter); this test's runner image
 # is set on its one command line, so test 1's exported values stay as they are.
-mkdir -p "$SB/bin2"
-cat >"$SB/bin2/docker" <<'EOF'
-#!/usr/bin/env bash
-case "$*" in
-  *'{{range .DriverStatus}}'*) echo "driver-type=io.containerd.snapshotter.v1;" ;;
-  *'{{.Server.Version}}'*)     echo "29.4.2" ;;
-  *'{{.Driver}}'*)             echo "overlayfs" ;;
-  *) echo "docker shim: unexpected arguments: $*" >&2; exit 1 ;;
-esac
-EOF
-chmod +x "$SB/bin2/docker"
+shim "$SB/bin2" "driver-type=io.containerd.snapshotter.v1;" 29.4.2 overlayfs
 out=$(ImageOS=ubuntu26 ImageVersion=20261026.180.1 PATH="$SB/bin2:$PATH" "$CHECK" 2>&1); rc=$?
 expect "containerd image store: fails by name" 1 "$rc" "$out" "::error::" "ubuntu26/20261026.180.1" "29.4.2" "containerd image store" "kind issue 3795"
 

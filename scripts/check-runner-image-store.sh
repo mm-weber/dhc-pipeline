@@ -27,6 +27,6 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
 fi
 
 if [[ "$DRIVER_STATUS" == *io.containerd.snapshotter* ]]; then
-  echo "::error::e2e runner image ${IMAGE_OS}/${IMAGE_VERSION}, Docker ${SERVER_VERSION}, runs the containerd image store; kind's load docker-image cannot import its docker save output (kind issue 3795). Pin the runner to an image with the graph driver, or move the probe step to docker save --platform linux/amd64 and kind load image-archive."
+  echo "::error::${IMAGE_LINE}: the containerd image store, whose docker save output kind's load docker-image cannot import (kind issue 3795). Pin the runner to an image with the graph driver, or move the probe step to docker save --platform linux/amd64 and kind load image-archive."
   exit 1
 fi
