@@ -244,7 +244,7 @@ stay as history.
       active definitions on new digests, the scheduled rescan 41311884446
       skipped the page and the served page kept 2026-10-31's data; #359 the
       revert the same day; Renovate's digest pull requests #360, #361 and
-      #362 followed, #360 and #361 automerged on 2026-11-03 once the e2e gate
+      #362 followed, #360, #361 and #362 automerged on 2026-11-03 once the e2e gate
       was repaired (#363 the runner pin, #364 the guard); row 2.17 exercised,
       2.15, 3.12 and 6.61 appended, 6.62 the owner's call; the evidence in
       #365). OPENED 2026-10-30 as conductor

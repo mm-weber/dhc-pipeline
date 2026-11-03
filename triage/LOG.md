@@ -3925,8 +3925,9 @@ merge per pass: the ruleset's up-to-date rule puts the remaining branches
 behind main after every merge, and Renovate rebases them on its next pass.
 GitHub's scheduler had dropped Renovate's passes of 22:00Z on 2026-11-02
 and 06:00Z and 10:00Z on 2026-11-03 (the one of 11:44Z rebased, run
-41629967221). #362 was rebased and waiting for the next pass when this
-entry was written.
+41629967221). #362 merged at 19:19:31Z (squash 741bebe) inside the scheduled pass
+41701850184, the first scheduled pass GitHub ran after the two dispatches,
+three digest pull requests in three passes.
 
 **What the drill found.** The policy is read at run time, so a day's
 switch runs from the flip's merge to the revert's merge, and a flip merged
