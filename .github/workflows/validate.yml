@@ -160,6 +160,9 @@ jobs:
       - name: install-tool unit tests (Req 7.5)
         run: scripts/install-tool_test.sh
 
+      - name: runner image-store guard unit tests (e2e, kind issue 3795)
+        run: scripts/check-runner-image-store_test.sh
+
       - name: VEX product identity lint (Req 6.17, 6.19, 6.20)
         run: scripts/lint-vex-product.sh
       # Req 9.18 (task 13.6): every source statement's log citation resolves

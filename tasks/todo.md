@@ -330,9 +330,13 @@ stay as history.
       the containerd image store), whose `docker save` kind 0.33.0's
       `load docker-image` cannot import (kind issue 3795): the probe load
       failed on every chart-deploying run from 2026-10-28 04:57Z, last pass
-      2026-10-27 20:33Z, nothing in the repo changed between. Lift the pin
-      when a kind release loads from that store, or move the step to
-      `docker save --platform linux/amd64` + `kind load image-archive`
+      2026-10-27 20:33Z, nothing in the repo changed between. A label pins
+      the OS line, not the image (no hash exists for a hosted runner), so
+      `scripts/check-runner-image-store.sh` runs before the load: it names
+      the image the job got (`ImageOS`/`ImageVersion`) in a notice and the
+      step summary, and fails by name on the containerd image store. Lift
+      the pin when a kind release loads from that store, or move the step
+      to `docker save --platform linux/amd64` + `kind load image-archive`
       (verified locally to produce a single-manifest archive); its own pull
       request, the owner's call.
 - [ ] 6.55 defect: the attested scan reports carry empty `scanner.db.uri` and
