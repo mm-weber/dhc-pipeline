@@ -6,7 +6,10 @@
 # image from the ImageOS and ImageVersion variables GitHub-hosted runners set,
 # joined as <ImageOS>/<ImageVersion>. Under the classic graph driver
 # (overlay2) it exits 0 and prints one ::notice:: line naming the runner
-# image, the Docker server version and the storage driver.
+# image, the Docker server version and the storage driver. Under Docker's
+# containerd image store (DriverStatus carries io.containerd.snapshotter) it
+# exits 1 and prints one ::error:: line naming the runner image, the Docker
+# server version, the phrase "containerd image store" and "kind issue 3795".
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CHECK="$HERE/check-runner-image-store.sh"
@@ -41,6 +44,24 @@ run() { PATH="$SB/bin:$PATH" "$CHECK" 2>&1; }
 # 1: the classic graph driver passes, the notice names image, version, driver
 out=$(run); rc=$?
 expect "graph driver: passes and names the image" 0 "$rc" "$out" "::notice::" "ubuntu24/20261101.360.1" "28.0.4" "overlay2"
+
+# 2: the containerd image store fails by name. A second shim answers as a
+# daemon running the containerd snapshotter does (`{{.Driver}}` is overlayfs,
+# the DriverStatus names io.containerd.snapshotter); this test's runner image
+# is set on its one command line, so test 1's exported values stay as they are.
+mkdir -p "$SB/bin2"
+cat >"$SB/bin2/docker" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  *'{{range .DriverStatus}}'*) echo "driver-type=io.containerd.snapshotter.v1;" ;;
+  *'{{.Server.Version}}'*)     echo "29.4.2" ;;
+  *'{{.Driver}}'*)             echo "overlayfs" ;;
+  *) echo "docker shim: unexpected arguments: $*" >&2; exit 1 ;;
+esac
+EOF
+chmod +x "$SB/bin2/docker"
+out=$(ImageOS=ubuntu26 ImageVersion=20261026.180.1 PATH="$SB/bin2:$PATH" "$CHECK" 2>&1); rc=$?
+expect "containerd image store: fails by name" 1 "$rc" "$out" "::error::" "ubuntu26/20261026.180.1" "29.4.2" "containerd image store" "kind issue 3795"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
