@@ -3846,3 +3846,100 @@ retirement (task 16.16) removes the directory, the entry, the lane and the
 proofs entry together, through the switch, and this entry is the record
 of what refuses a retirement done by halves. The drill pull request is
 closed unmerged with a comment after the evidence merges.
+
+## 2026-11-01: the switches, one run each: every rebuild published, the page off (task 16.13)
+
+*Images: the seven active definitions. Task 16.13, conductor track
+`switches_20261030` (#356, squash c0177f6). Two declared switches flipped
+for one day through #357 (merged 2026-10-31, 14:28Z, squash 438d456) and
+back through #359 (merged 2026-11-01, 21:25Z, squash 2338535):
+`release.publish_policy` always, so the scheduled rebuild publishes every
+active definition whatever the comparator says (Req 2.17), and
+`release.page` false, so the scheduled rescan skips the page and the served
+page keeps the previous day's data (Req 6.61's disabled branch). The track's
+heading named 2026-10-31; the flip merged after that day's scheduled runs,
+so the runs fell on 2026-11-01, the policy being read at run time, and this
+entry carries that date. The heading's third clause, the deployment refused
+(Req 6.62), is the owner's Pages action and is recorded at the end as their
+call.*
+
+**The rebuild (2026-11-01, 11:31Z to 12:49Z).** Run 41302227631, the
+scheduled build. Seven build jobs green, every one of them through the
+release path with its tags step run: drill-app (11:46Z), valkey (11:54Z),
+hardened-app (11:54Z), valkey-compat (12:08Z), cert-manager-webhook
+(12:10Z), cert-manager-cainjector (12:22Z), cert-manager-controller
+(12:49Z); the gate green at 12:49:56Z. The registry read after the run:
+every full-release tag on a new digest, the previous one frozen and
+pullable by digest. hardened-app 0.1.1 from sha256:1e0a053f0692 to
+sha256:a3b9fe126a6b (0.1.0 stays on sha256:c559928e156c, a frozen
+release); cert-manager-controller 1.21.2 from sha256:cad69ac59c4c to
+sha256:063e4628ce11, cert-manager-webhook from sha256:ad4f03f116fd to
+sha256:14a467e50b51, cert-manager-cainjector from sha256:14bdbed1a189 to
+sha256:b9db8a1d2edb; valkey 9.1.2 to sha256:430ad9dcbb67 and its compat
+variant from sha256:50d00b8eafab to sha256:d41927dda080; drill-app 0.1.0
+from sha256:d5d9bb51146f to sha256:cf147012fad2. Grafana, inactive,
+untouched on sha256:89c5680a868b. The new drill digest's attested OpenVEX
+document (compiled 2026-11-01, 11:43:53Z) carries CVE-2025-30204
+`under_investigation`, the undecided HIGH of #325 republished as the costs
+named before the merge said it would be; its statement clock restarted with
+the digest, the follow-up item seen by 16.9. The jobs' summaries, where the
+comparator's verdict and the policy are printed side by side, were not read
+from here: the logs and summaries sit behind a host this environment cannot
+reach, and the tags step's run in all seven jobs is the policy's effect
+that the API shows.
+
+**The rescan (2026-11-01, 13:34Z to 13:58Z).** Run 41311884446, the
+scheduled rescan, green. Step 29, "upload the catalogue page (Req 6.61)",
+skipped; the job "publish the catalogue page" skipped with it, the
+read-back step (Req 6.62) never reached. The served page, read on
+2026-11-01 after the run: "generated 2026-10-31", the previous day's run,
+with that day's numbers. The status issue and the attestations of the day
+unaffected: the page is the one artifact the switch withholds, and the page
+says its own date, which is how a withheld page is told from a current one.
+
+**The revert and the days after.** #359 set both switches back with their
+lines' comments naming the two runs. The scheduled rebuild of 2026-11-02
+(run 41448321935, 12:53Z) built all seven locally and published none, the
+comparator's verdict kept under on-change: Req 2.15 re-observed the day
+after its counterpart. The scheduled rescan of 2026-11-02 (run 41478864444,
+16:10Z) uploaded and deployed the page and its read-back passed, the page
+generated 2026-11-02 (Req 6.61 again, 6.62's passing branch).
+
+**The chart digests (Req 3.12).** Renovate's runs of 2026-11-01 opened #360
+(cert-manager's three pins, 14:52Z), #361 (hardened-app's pin, 14:52Z) and
+#362 (valkey's compat pin, 20:22Z), every digest in them the one the
+rebuild had published. Their automerge waited on the e2e gate, which had
+been red on every chart-deploying job since 2026-10-28 (last pass run
+40579021551 of 2026-10-27, first failure run 40635146998) for a cause
+outside the repository: GitHub's `ubuntu-latest` moving to Ubuntu 26.04,
+whose Docker 29 saves images from the containerd image store in a shape
+kind 0.33.0's loader cannot import (kind issue 3795). Nothing had merged
+through that lane in the six days, so the gate's state went unread until
+these pull requests arrived. #363 (merged 2026-11-02, squash d9ad1f2)
+pinned the suite's job to `ubuntu-24.04`; #364 (merged 2026-11-03, squash
+d38c61f) names the runner image in every run and fails by name on that
+store. With the gate green again, #360 merged 2026-11-03 at 12:02:47Z
+(squash a612686) and #361 at 14:19:23Z (squash e1643ae), each inside a
+Renovate pass the owner dispatched (runs 41632269872 and 41652365223), one
+merge per pass: the ruleset's up-to-date rule puts the remaining branches
+behind main after every merge, and Renovate rebases them on its next pass.
+GitHub's scheduler had dropped Renovate's passes of 22:00Z on 2026-11-02
+and 06:00Z and 10:00Z on 2026-11-03 (the one of 11:44Z rebased, run
+41629967221). #362 was rebased and waiting for the next pass when this
+entry was written.
+
+**What the drill found.** The policy is read at run time, so a day's
+switch runs from the flip's merge to the revert's merge, and a flip merged
+after the day's scheduled runs reaches the next day's: the entry's date
+follows the runs, not the plan. The always policy costs seven digests and
+freezes seven; Renovate's digest pull requests follow within hours and
+merge behind every required check, so a red gate anywhere in the chart
+lane holds Req 3.12 without a word, and here the digest pull requests were
+what made a six-day failure of the e2e gate visible (#363, #364). The page
+switch withholds the page alone and the served page carries its own date,
+the one signal a reader has. Several green Renovate pull requests under the
+up-to-date rule land one per pass; a merge queue would land them in
+sequence without the passes, a candidate for the register.
+
+**The deployment refused (Req 6.62).** The owner's call: pending at the
+time of writing; the ledger row states the outcome.

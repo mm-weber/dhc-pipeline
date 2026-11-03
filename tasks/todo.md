@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-10-30
+# Live drills (task group 16): where we are and what is next, as of 2026-11-03
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -232,12 +232,22 @@ stay as history.
       same pull request (the reader refuses an entry for an inactive name,
       Req 5.10), and a removed directory with the policy entry kept (1.19), a
       drill branch never merged.
-- [ ] 16.12 Revocation, advisory, runbook (9.4, 9.5, 9.7, M14): the drill
+- [ ] 16.12 Revocation, advisory, runbook (9.4, 9.5, 9.7, M14): NEXT after
+      16.13 (done 2026-11-03), its track on the owner's word. The drill
       digest in triage/revocations.yaml with reason "drill" while a tag still
       references it; the posture step fails by name; the runbook executed as
       written; the advisory as a repository security advisory titled as a
       drill (draft or published, the owner's call, the ledger says which).
-- [ ] 16.13 The switches (2.17, 6.61, 6.62): OPENED 2026-10-30 as conductor
+- [x] 16.13 The switches (2.17, 6.61, 6.62): DONE 2026-11-03 (conductor
+      track `switches_20261030`: #356 the track; #357 both switches for one
+      day; the scheduled rebuild 41302227631 of 2026-11-01 published all seven
+      active definitions on new digests, the scheduled rescan 41311884446
+      skipped the page and the served page kept 2026-10-31's data; #359 the
+      revert the same day; Renovate's digest pull requests #360, #361 and
+      #362 followed, #360 and #361 automerged on 2026-11-03 once the e2e gate
+      was repaired (#363 the runner pin, #364 the guard); row 2.17 exercised,
+      2.15, 3.12 and 6.61 appended, 6.62 the owner's call; the evidence in
+      #365). OPENED 2026-10-30 as conductor
       track `switches_20261030` (phase 0 the track and the task text's
       amendment; phase 1 one pull request flips `publish_policy` to always
       and `page` to false for 2026-10-31: the nightly publishes all seven

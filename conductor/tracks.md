@@ -16,15 +16,14 @@
 
 ---
 
-### [~] switches_20261030: The switches, one run each: the page off, every rebuild published, live
+## Completed tracks
+
+### [x] switches_20261030: The switches, one run each: the page off, every rebuild published, live
 
 **Description:** Two declared switches flipped for one day through one pull request and flipped back through another: `release.publish_policy` always, so the scheduled rebuild publishes every active definition whatever the comparator says (seven releases, the chart digest pull request following), and `release.page` false, so the scheduled rescan skips the page and the served page keeps the previous day's data; Req 6.62's failure branch by the owner disabling Pages for one run, their call.
 **Priority:** high (the live program; two rows no other drill reaches)
+**Completed:** 2026-11-03 (#356 merged as c0177f6, the track; #357 the flip, 438d456; the scheduled rebuild 41302227631 of 2026-11-01 publishing all seven active definitions and the scheduled rescan 41311884446 skipping the page; #359 the revert, 2338535; Renovate's digest pull requests #360 and #361 automerged on 2026-11-03 once the e2e gate was repaired; the evidence in #365: row 2.17 exercised, 2.15, 3.12 and 6.61 appended, 6.62 the owner's call)
 **Folder:** [./tracks/switches_20261030/](./tracks/switches_20261030/)
-
----
-
-## Completed tracks
 
 ### [x] active-set-entry_20261030: The drill definition's directory removed, its active-set entry refused by name, live
 
