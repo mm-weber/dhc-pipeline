@@ -10,6 +10,9 @@
 # containerd image store (DriverStatus carries io.containerd.snapshotter) it
 # exits 1 and prints one ::error:: line naming the runner image, the Docker
 # server version, the phrase "containerd image store" and "kind issue 3795".
+# When GITHUB_STEP_SUMMARY names a writable file, it also appends one Markdown
+# line naming the runner image, the Docker server version and the storage
+# driver to that file, keeping what the file already held.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CHECK="$HERE/check-runner-image-store.sh"
@@ -62,6 +65,14 @@ EOF
 chmod +x "$SB/bin2/docker"
 out=$(ImageOS=ubuntu26 ImageVersion=20261026.180.1 PATH="$SB/bin2:$PATH" "$CHECK" 2>&1); rc=$?
 expect "containerd image store: fails by name" 1 "$rc" "$out" "::error::" "ubuntu26/20261026.180.1" "29.4.2" "containerd image store" "kind issue 3795"
+
+# 3: the step summary gets the image line appended. The summary file holds one
+# line already, which must survive: the guard appends, it does not overwrite.
+# The needles are checked against the file's content, not the guard's stdout.
+printf 'existing line\n' >"$SB/summary.md"
+GITHUB_STEP_SUMMARY="$SB/summary.md" PATH="$SB/bin:$PATH" "$CHECK" >/dev/null 2>&1; rc=$?
+out=$(cat "$SB/summary.md")
+expect "step summary: the image line is appended" 0 "$rc" "$out" "existing line" "- e2e runner image ubuntu24/20261101.360.1, Docker 28.0.4, storage driver overlay2"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
