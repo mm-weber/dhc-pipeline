@@ -43,7 +43,7 @@ Dependency: 1.4 merged. Worktree `switches-evidence` from main.
 ### Tasks
 
 - [x] **2.1 The chart digest pull request** (Req 3.12): Renovate's digest-only update of the hardened-app chart read: its number, its checks, its automerge
-- [ ] **2.2 The deployment refused** (FR-4, the owner's call): Pages disabled before one scheduled rescan, the run red at the page job by name, Pages enabled again, the next run deploying; or the owner's word that the branch stays unexercised
+- [x] **2.2 The deployment refused** (FR-4, the owner's call): Pages disabled before one scheduled rescan, the run red at the page job by name, Pages enabled again, the next run deploying; or the owner's word that the branch stays unexercised
 - [x] **2.3 The evidence** (FR-5): the LOG entry; rows 2.17 (and 6.62) `exercised`, rows 2.15, 3.12 and 6.61 appended; the task table row for 16.13; `tasks.md` 16.13 ticked; `tasks/todo.md` to 16.12; this plan's ticks; `conductor/tracks.md` to Completed; `metadata.json`; `conductor/index.md`; the owner merges
 - [x] **2.4 The hand-over to 16.12**: 16.12's track on the owner's word (a revocation of a tagged drill digest, its advisory and the runbook)
 

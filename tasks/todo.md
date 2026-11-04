@@ -246,7 +246,8 @@ stay as history.
       revert the same day; Renovate's digest pull requests #360, #361 and
       #362 followed, #360, #361 and #362 automerged on 2026-11-03 once the e2e gate
       was repaired (#363 the runner pin, #364 the guard); row 2.17 exercised,
-      2.15, 3.12 and 6.61 appended, 6.62 the owner's call; the evidence in
+      6.62 exercised by the owner's Pages action around two dispatched rescans
+      of 2026-11-04, 2.15, 3.12 and 6.61 appended; the evidence in
       #365). OPENED 2026-10-30 as conductor
       track `switches_20261030` (phase 0 the track and the task text's
       amendment; phase 1 one pull request flips `publish_policy` to always

@@ -3847,7 +3847,7 @@ proofs entry together, through the switch, and this entry is the record
 of what refuses a retirement done by halves. The drill pull request is
 closed unmerged with a comment after the evidence merges.
 
-## 2026-11-01: the switches, one run each: every rebuild published, the page off (task 16.13)
+## 2026-11-01: the switches, one run each: every rebuild published, the page off, the deployment refused (task 16.13)
 
 *Images: the seven active definitions. Task 16.13, conductor track
 `switches_20261030` (#356, squash c0177f6). Two declared switches flipped
@@ -3860,8 +3860,8 @@ page keeps the previous day's data (Req 6.61's disabled branch). The track's
 heading named 2026-10-31; the flip merged after that day's scheduled runs,
 so the runs fell on 2026-11-01, the policy being read at run time, and this
 entry carries that date. The heading's third clause, the deployment refused
-(Req 6.62), is the owner's Pages action and is recorded at the end as their
-call.*
+(Req 6.62), is the owner's Pages action, taken on 2026-11-03 and 2026-11-04
+and recorded at the end.*
 
 **The rebuild (2026-11-01, 11:31Z to 12:49Z).** Run 41302227631, the
 scheduled build. Seven build jobs green, every one of them through the
@@ -3942,5 +3942,27 @@ the one signal a reader has. Several green Renovate pull requests under the
 up-to-date rule land one per pass; a merge queue would land them in
 sequence without the passes, a candidate for the register.
 
-**The deployment refused (Req 6.62).** The owner's call: pending at the
-time of writing; the ledger row states the outcome.
+**The deployment refused (Req 6.62), 2026-11-03 to 2026-11-04.** The
+owner's action, in two steps. An unpublish of the site in the Pages settings
+at 21:22Z on 2026-11-03 would not have done: GitHub keeps the site's
+configuration and the next successful workflow run creates a new deployment
+(its documentation says so), so the owner deleted the site at 21:30Z by
+setting the source to "Deploy from a branch" and the branch to "None", the
+Pages API answering 404 from then on and the page URL with it. The owner's
+rule, stated that evening and recorded: a drill dispatches its runs, the
+scheduler being exercised daily for months, so both runs below are
+dispatched where the track's text said scheduled. The dispatched rescan
+41748083578 (2026-11-04, 00:36:23Z) ran its rescan job green through the
+page artifact's upload (00:55:22Z) and failed in the page job at "deploy
+the catalogue page (Req 6.61)" at 00:55:33Z with `Error: Failed to create
+deployment (status: 404) with build version
+21a5240c9982f9435ec9bb237e902add4a44235d. Ensure GitHub Pages has been
+enabled`, the read-back step skipped behind it, the run a failure, the site
+404: the disabled site and the failed deployment of the row's wording, by
+name, for the first time. The owner set the source back to GitHub Actions
+(the API showed the site again at 01:24:01Z, no deployment yet) and
+dispatched the rescan 41753888464 (01:24:54Z): the page job deployed at
+01:45:21Z, the read-back passed (step 3, Req 6.62), the page served with
+"generated 2026-11-04" naming that run. Two dispatched rescans on
+2026-11-04 before 02:00Z, two attestation releases (register row M17), the
+cost of the branch.
