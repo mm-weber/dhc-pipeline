@@ -277,7 +277,13 @@ stay as history.
       data and says so); `release.publish_policy` always for one nightly
       (every active definition publishes, the chart digest pulls follow);
       costs stated.
-- [ ] 16.14 Private report channel (9.2, 9.3): OPENED 2026-10-31 as conductor
+- [x] 16.14 Private report channel (9.2, 9.3): DONE 2026-11-05 (conductor
+      track `private-report_20261031`: #358 the track; the owner's own
+      attempt refused with 403 on 2026-11-02, the channel taking no report
+      from the repository's admin; the report GHSA-6xgw-5wvx-p8xx filed from
+      a non-collaborator account at 13:29Z, acknowledged 13:55Z, answered and
+      closed as a drill 13:59Z, nothing published; the evidence in #370; row
+      9.2 exercised). OPENED 2026-10-31 as conductor
       track `private-report_20261031` (the owner files one private
       vulnerability report titled as a drill; the maintainer acknowledges it
       in its thread, examines the subject against the records, answers and

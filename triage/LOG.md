@@ -4026,3 +4026,74 @@ also refused by the build's fetch on the pinned commit, so the catalogue
 holds a moved upstream twice: in the daily report and at the next build.
 The window ran 25 minutes; the restore is one push of a known object, which
 is why this entry names it.
+
+## 2026-11-05: a report through the private channel, handled and closed as a drill (task 16.14)
+
+*Image: drill-app, the report's subject. Task 16.14, conductor track
+`private-report_20261031` (#358, squash dcda06f). SECURITY.md names one
+channel for vulnerability reports, GitHub private vulnerability reporting on
+this repository, and the rescan asserts daily that the channel is enabled
+(Req 9.3, exercised 2026-09-08). No report had ever arrived, so the
+receiving half (Req 9.2) and the handling the policy implies had never run.
+The track's heading named 2026-10-31, the day it was opened; the report was
+filed on 2026-11-05, and this entry carries that date.*
+
+**The channel cannot be self-tested (2026-11-02).** The owner's first
+attempt, from the repository's own account: the Security tab offered the
+admin's "Open a draft security advisory" form, not the report form, and the
+REST report endpoint answered 403, "You are not authorized to report
+advisories in this repository via private vulnerability reporting"
+(21:20:31Z). GitHub's documentation confirms it: anyone may report, and an
+admin is directed to a draft advisory instead, which starts in state draft,
+with no reporter and no triage step. A report in state triage, the shape the
+policy promises to handle, needs an account that is not a collaborator. The
+owner found one.
+
+**The report (2026-11-05, 13:29Z).** Filed from that account through the
+Security tab: GHSA-6xgw-5wvx-p8xx, "Drill 16.14: drill-app ships
+golang-jwt/jwt v5.2.1 (CVE-2025-30204) on every current tag, undecided for
+18 days", severity high, package ghcr.io/mm-weber/dhc/drill-app at digest
+sha256:cf147012fad2, all three current tags. Its subject is real and of the
+shape SECURITY.md names as reportable, a published status the reporter
+believes wrong: the finding undecided at 18 of 90 days under a signed,
+attested digest re-released on 2026-11-01; three questions, whether the
+digest is safe behind an ingress that accepts tokens, why it was
+re-released with the finding open, and what the 90 commits the catalogue
+to; the last paragraph naming the drill. The pipeline's token cannot read a
+report in triage (the single read 403, the triage listing empty), so the
+thread's times are the owner's, posted as the maintainer and reported here.
+
+**The handling (13:55Z to 13:59Z).** Acknowledged in the thread at 13:55Z,
+26 minutes after filing. Examined against the records: the finding tracked
+as #325, first seen 2026-10-18, undecided, 18 of 90 days; the digest's
+attested OpenVEX document saying `under_investigation`, the statement
+behind the page's word; the admission clause of 2026-10-28 (README "What a
+signature means here", SECURITY.md "What a signature does not say"),
+saying that a signature means the pipeline built the digest and attested
+what it found, releases publishing under the fail-open default with an
+undecided finding inside its ceiling attested as such; govulncheck's
+symbol-level verdict of 2026-10-18 that `ParseUnverified` is reachable in
+the binary, so a deployment parsing untrusted tokens would be exposed, the
+image being a fixture never installed by design, its fix applied on
+2026-10-28 and reverted on 2026-10-29 to exercise the reopen; the
+re-release of 2026-11-01 by the switches drill; the ceiling's end,
+2027-01-16, and what follows it. Answered at 13:59Z with that examination,
+30 minutes after filing, and closed as a drill at 13:59Z with the closing
+note: nothing published, the finding keeping its tracked status. The owner
+asked whether to publish the advisory instead; no: SECURITY.md reserves a
+published advisory for a revoked digest, a wrong published status or a
+compromised input, none of which the examination found, and the first
+published advisory is task 16.12's, for a revoked digest through the
+runbook. Confidential comments were not used: the answer is for the
+reporter.
+
+**What the drill found.** The policy's channel accepts a report from anyone
+but its own maintainer, so it cannot be exercised from inside; its daily
+evidence is the enabled flag (Req 9.3), and a report from outside is the
+only way to see the receiving half, which is why this entry records one.
+The pipeline's token sees nothing of a report in triage, so the handling's
+record rests on the maintainer's word and the thread, as the track's risk
+table said it might. The examination took thirty minutes because every
+fact it needed was already written down: the issue, the attested document,
+the log entries of 16.2, 16.6, 16.7 and 16.13, and the admission clause. No
+response window is promised; the numbers are recorded as numbers.

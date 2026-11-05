@@ -8,15 +8,16 @@
 
 ## Active tracks
 
-### [~] private-report_20261031: A report through the private channel, handled as the policy promises, live
+_No active track._
+
+## Completed tracks
+
+### [x] private-report_20261031: A report through the private channel, handled as the policy promises, live
 
 **Description:** One private vulnerability report filed by the owner, titled as a drill, received through the channel SECURITY.md names, acknowledged, examined against the catalogue's records, answered and closed as a drill, the elapsed times recorded against no promised window; ledger row 9.2 exercised.
 **Priority:** high (the live program; runs beside the switches drill, no scheduled run involved)
+**Completed:** 2026-11-05 (#358 merged as dcda06f, the track; the owner's own attempt refused with 403 on 2026-11-02; the report GHSA-6xgw-5wvx-p8xx filed from a non-collaborator account at 13:29Z, acknowledged 13:55Z, answered and closed as a drill 13:59Z, nothing published; the evidence in #370: row 9.2 exercised)
 **Folder:** [./tracks/private-report_20261031/](./tracks/private-report_20261031/)
-
----
-
-## Completed tracks
 
 ### [x] auth-mismatch_20261105: A true authenticity mismatch, the drill definition's tag moved by its maintainer, live
 
