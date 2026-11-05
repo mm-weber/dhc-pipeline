@@ -1,0 +1,10 @@
+{
+  "id": "revocation_20261105",
+  "type": "chore",
+  "status": "in_progress",
+  "created_at": "2026-11-05T15:00:00Z",
+  "updated_at": "2026-11-05T15:00:00Z",
+  "description": "The drill definition's current digest recorded as revoked with reason drill while its three tags still reference it (a withdrawal, Move B1, the one entry the schema admits before the move), the advisory drafted first, the dispatched rescan red at the posture step naming the three tags, the package version deleted by the owner, the next dispatched rescan green with the entry listed, the advisory published or kept at the owner's call; ledger rows 9.4, 9.5 and 9.7 exercised (Req 9.4, 9.5, 9.7, 7.11; register M14; task 16.12)",
+  "spec_path": "conductor/tracks/revocation_20261105/spec.md",
+  "plan_path": "conductor/tracks/revocation_20261105/plan.md"
+}

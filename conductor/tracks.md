@@ -8,7 +8,13 @@
 
 ## Active tracks
 
-_No active track._
+### [~] revocation_20261105: A revocation, its advisory and the runbook, the drill digest withdrawn, live
+
+**Description:** The drill definition's current digest recorded as revoked with reason drill while its three tags still reference it (a withdrawal, Move B1, the one entry the schema admits before the move), the advisory drafted first, the dispatched rescan red at the posture step naming the three tags, the package version deleted by the owner, the next dispatched rescan green with the entry listed, the advisory published or kept at the owner's call; ledger rows 9.4, 9.5 and 9.7 exercised.
+**Priority:** high (the live program; the last three drill rows)
+**Folder:** [./tracks/revocation_20261105/](./tracks/revocation_20261105/)
+
+---
 
 ## Completed tracks
 
