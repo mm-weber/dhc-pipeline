@@ -246,8 +246,17 @@ stay as history.
       same pull request (the reader refuses an entry for an inactive name,
       Req 5.10), and a removed directory with the policy entry kept (1.19), a
       drill branch never merged.
-- [ ] 16.12 Revocation, advisory, runbook (9.4, 9.5, 9.7, M14): NEXT after
-      16.13 (done 2026-11-03), its track on the owner's word. The drill
+- [ ] 16.12 Revocation, advisory, runbook (9.4, 9.5, 9.7, M14): OPENED
+      2026-11-05 as conductor track `revocation_20261105` (phase 0 the track
+      and the task text's amendment; phase 1: the owner drafts the advisory,
+      one pull request records the drill digest as withdrawn (Move B1, the
+      one shape the schema admits before the move) and merges while the
+      three tags still reference it, the dispatched rescan is red at the
+      posture step naming them, the owner deletes the package version, the
+      next dispatched rescan is green with the entry listed, the advisory
+      published or kept a draft at the owner's call, the evidence; 16.16
+      follows at once, before a scheduled rebuild republishes the withdrawn
+      definition). The plan as written: the drill
       digest in triage/revocations.yaml with reason "drill" while a tag still
       references it; the posture step fails by name; the runbook executed as
       written; the advisory as a repository security advisory titled as a
@@ -277,7 +286,13 @@ stay as history.
       data and says so); `release.publish_policy` always for one nightly
       (every active definition publishes, the chart digest pulls follow);
       costs stated.
-- [ ] 16.14 Private report channel (9.2, 9.3): OPENED 2026-10-31 as conductor
+- [x] 16.14 Private report channel (9.2, 9.3): DONE 2026-11-05 (conductor
+      track `private-report_20261031`: #358 the track; the owner's own
+      attempt refused with 403 on 2026-11-02, the channel taking no report
+      from the repository's admin; the report GHSA-6xgw-5wvx-p8xx filed from
+      a non-collaborator account at 13:29Z, acknowledged 13:55Z, answered and
+      closed as a drill 13:59Z, nothing published; the evidence in #370; row
+      9.2 exercised). OPENED 2026-10-31 as conductor
       track `private-report_20261031` (the owner files one private
       vulnerability report titled as a drill; the maintainer acknowledges it
       in its thread, examines the subject against the records, answers and
