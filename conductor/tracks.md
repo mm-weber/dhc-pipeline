@@ -16,15 +16,14 @@
 
 ---
 
-### [~] auth-mismatch_20261105: A true authenticity mismatch, the drill definition's tag moved by its maintainer, live
+## Completed tracks
+
+### [x] auth-mismatch_20261105: A true authenticity mismatch, the drill definition's tag moved by its maintainer, live
 
 **Description:** The drill definition's pinned tag moved by its maintainer to an unsigned commit, the daily re-verification reporting the first true mismatch by name and filing the supply-chain issue, the owner deciding what the signal means (M18) and restoring the original tag object, the rescan verifying again, the issue closed with the reason; ledger row 3.10 exercised, 3.13 kept with its reason.
 **Priority:** high (the live program; the one row that needs an upstream signal to move)
+**Completed:** 2026-11-05 (#367 merged as ec04bfd, the track; the owner's tag move at 10:29Z and restore at 10:54Z; the dispatched rescans 42011386908, red at the authenticity step and filing #368, and 42014582733, green; #368 closed by the owner with the decision; the evidence in #369: row 3.10 exercised, 3.13 kept)
 **Folder:** [./tracks/auth-mismatch_20261105/](./tracks/auth-mismatch_20261105/)
-
----
-
-## Completed tracks
 
 ### [x] switches_20261030: The switches, one run each: the page off, every rebuild published, live
 

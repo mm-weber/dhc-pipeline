@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-11-03
+# Live drills (task group 16): where we are and what is next, as of 2026-11-05
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -211,7 +211,14 @@ stay as history.
       dispatched for drill-app; the digest frozen, unsigned, untagged,
       pullable by digest; one of the four ways out taken; switch back or kept,
       recorded.
-- [ ] 16.10 True authenticity mismatch (3.10, 3.13, M18): OPENED 2026-11-05 as
+- [x] 16.10 True authenticity mismatch (3.10, 3.13, M18): DONE 2026-11-05
+      (conductor track `auth-mismatch_20261105`: #367 the track; the owner
+      moved drill-app's tag `v0.1.0` to an unsigned commit at 10:29Z; the
+      dispatched rescan 42011386908 failed the authenticity step by name and
+      filed #368, every later step running (D1); the original tag object
+      pushed back at 10:54Z, the dispatched rescan 42014582733 green; #368
+      closed by the owner with the decision (M18); the evidence in #369;
+      row 3.10 exercised, 3.13 kept with its reason). OPENED 2026-11-05 as
       conductor track `auth-mismatch_20261105` (phase 0 the track and the
       task text's amendment; phase 1 the same day: the owner moved the tag
       `v0.1.0` to an unsigned commit at 10:29Z, the dispatched rescan files

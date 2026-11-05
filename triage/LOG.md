@@ -3966,3 +3966,63 @@ dispatched the rescan 41753888464 (01:24:54Z): the page job deployed at
 "generated 2026-11-04" naming that run. Two dispatched rescans on
 2026-11-04 before 02:00Z, two attestation releases (register row M17), the
 cost of the branch.
+
+## 2026-11-05: the drill definition's tag moved by its maintainer, the first true mismatch, decided and restored (task 16.10)
+
+*Image: drill-app. Task 16.10, conductor track `auth-mismatch_20261105`
+(#367, squash ec04bfd). Every active definition's authenticity signal is
+re-verified once a day inside the rescan (Req 3.10, task 11.3): drill-app
+declares `signed-commit`, its pinned tag `v0.1.0` at commit b7868d7a whose
+signature GitHub reports as valid. The check had run daily since
+2026-09-07 and fired only on unreadable reads (2026-09-16, six issues from a
+rate-limited API, the incident Req 3.13 corrects); no signal had ever moved.
+This entry records the first true mismatch, induced by the definition's own
+maintainer, and what the catalogue did with it. By the owner's rule of
+2026-11-03 the runs are dispatched; each is a release of attestations
+(register row M17).*
+
+**The tag moved (2026-11-05, 10:29Z).** In `mm-weber/drill-app`, from a
+detached checkout of the pinned commit, the owner created an unsigned empty
+commit d273710 (10:29:00Z) and moved `v0.1.0` onto it as an annotated,
+unsigned tag (object 726afc2, tagger 10:29:12Z), pushed with force; the
+branch `main` untouched, the repository's three rulesets being branch rules
+with no word on tags. One push, both of the check's conditions: the tag no
+longer at the pinned commit, and no valid signature on what it points at.
+The owner's action preceded the track's pull request by the hour; the plan
+logs it.
+
+**The mismatch reported (10:31Z to 10:46Z).** The dispatched rescan
+42011386908 (10:31:18Z) failed at step 15, "authenticity signals (Req 3.10,
+3.13, 4.9)", with `check-authenticity: drill-app (signed-commit, v0.1.0):
+tag v0.1.0 now points at d27371001ef9, the definition pins b7868d7a6f41: the
+tag moved (Req 3.10)`; the rescan job ended red at 10:45:59Z, and every step
+after the check still ran, the status compiled and published to the status
+issue, the page uploaded, deployed at 10:46:19Z with its read-back green:
+review disposition D1, a supply-chain signal suspends nothing else. The step
+filed #368 at 10:39:51Z, "Supply-chain signal: drill-app (signed-commit,
+v0.1.0) failed re-verification", label `supply-chain`, its body naming the
+definition, the class, the ref and the finding, and saying what the design
+says: evidence, not a decision; the pinned content unchanged; every
+published image still verifying against its own signature; the rescan
+failing daily and the issue open until someone decides. No build of
+drill-app fell inside the window (the scheduled rebuild of the day had not
+run), so the build's own refusal of a moved tag, the fetch's checksum being
+the pinned commit, stayed unexercised today.
+
+**The decision and the restore (10:54Z).** The owner's decision, register
+row M18: a drill, the tag moved by its own maintainer, no key rotated, no
+upstream publishing changed, nothing compromised. The original tag object
+ca6144e6 (signed, valid, at b7868d7a) was pushed back at 10:54Z with force
+(`+ 726afc2...ca6144e v0.1.0`), the API reading the tag at that object and
+the object at the pinned commit, verified. The dispatched rescan 42014582733
+(10:54:35Z) passed the authenticity step, filed nothing, and ended green at 11:14:56Z, the status and the page published as on any day. #368 was closed by the owner at 11:55:39Z with the decision as
+its reason.
+
+**What the drill found.** The signal measures exactly what it says, a tag
+and a signature, and reports the two shas side by side; the issue it files
+reads as a question to a human, and nothing closes that question but a
+human, which is the register's row M18 working as written. A moved tag is
+also refused by the build's fetch on the pinned commit, so the catalogue
+holds a moved upstream twice: in the daily report and at the next build.
+The window ran 25 minutes; the restore is one push of a known object, which
+is why this entry names it.
