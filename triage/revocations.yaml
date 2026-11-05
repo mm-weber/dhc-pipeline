@@ -14,4 +14,16 @@
 #
 # Every entry carries image, digest, reason, advisory (the GHSA on this
 # repository) and date. Nothing is ever removed from this list.
-revocations: []
+revocations:
+  # Drill 16.12 (track revocation_20261105): the drill definition's published
+  # digest withdrawn by its own maintainer to execute docs/revocation-runbook.md
+  # as written, Move B1; nothing was compromised. Recorded while the three tags
+  # still referenced the digest, so that the posture step's refusal was read
+  # (Req 9.7, LOG 2026-11-05); the version deleted afterwards.
+  - image: ghcr.io/mm-weber/dhc/drill-app
+    digest: sha256:cf147012fad2c088997e4142b5c21abc386a716501f6440efb05efb0d0a8792f
+    reason: "drill: task 16.12 executes the revocation runbook on the drill fixture; nothing was compromised"
+    replacement: none
+    withdrawal: delete-version
+    advisory: https://github.com/mm-weber/dhc-pipeline/security/advisories/GHSA-mxcv-w9jx-vj6j
+    date: 2026-11-05
