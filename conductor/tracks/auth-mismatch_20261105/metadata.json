@@ -1,0 +1,10 @@
+{
+  "id": "auth-mismatch_20261105",
+  "type": "chore",
+  "status": "in_progress",
+  "created_at": "2026-11-05T10:45:00Z",
+  "updated_at": "2026-11-05T10:45:00Z",
+  "description": "The drill definition's pinned tag moved by its maintainer to an unsigned commit, the daily re-verification reporting the first true mismatch by name and filing the supply-chain issue, the owner deciding what the signal means (M18) and restoring the original tag object, the rescan verifying again, the issue closed with the reason; ledger row 3.10 exercised, 3.13 kept with its reason (Req 3.10, 3.13, 7.11; task 16.10)",
+  "spec_path": "conductor/tracks/auth-mismatch_20261105/spec.md",
+  "plan_path": "conductor/tracks/auth-mismatch_20261105/plan.md"
+}

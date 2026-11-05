@@ -211,7 +211,14 @@ stay as history.
       dispatched for drill-app; the digest frozen, unsigned, untagged,
       pullable by digest; one of the four ways out taken; switch back or kept,
       recorded.
-- [ ] 16.10 True authenticity mismatch (3.10, 3.13, M18). OWNER: move the
+- [ ] 16.10 True authenticity mismatch (3.10, 3.13, M18): OPENED 2026-11-05 as
+      conductor track `auth-mismatch_20261105` (phase 0 the track and the
+      task text's amendment; phase 1 the same day: the owner moved the tag
+      `v0.1.0` to an unsigned commit at 10:29Z, the dispatched rescan files
+      the first true supply-chain issue, the owner decides (M18) and pushes
+      the original tag object back, the second dispatched rescan verifies,
+      the owner closes the issue with the reason, the evidence; 3.13 keeps
+      its reason). The plan as written: OWNER: move the
       pinned tag of drill-app to a commit signed by no key, or re-sign with
       another key; the daily re-verification files the first true mismatch
       issue; owner decides and restores; the issue closes with the reason.
