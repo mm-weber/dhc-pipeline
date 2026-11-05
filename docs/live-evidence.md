@@ -212,7 +212,7 @@ evidence obligation, and a retired one cannot keep a row.
 | Criterion | Mechanism | Status | First live exercise | Evidence | Induced by |
 |---|---|---|---|---|---|
 | 9.1 | A security policy stating the published promise | exercised | 2026-10-08 | `SECURITY.md` (present 2026-10-08). | nature |
-| 9.2 | Vulnerability reports accepted through private reporting | drill 16.14 | | The channel is enabled (9.3 checks it daily); no report has arrived. 16.14 files one. | owner |
+| 9.2 | Vulnerability reports accepted through private reporting | exercised | 2026-11-05 | Drill 16.14 (track private-report_20261031): one report filed by the owner from a non-collaborator account at 13:29Z, GHSA-6xgw-5wvx-p8xx (the repository's own admin cannot file one: 403 on 2026-11-02); acknowledged in its thread at 13:55Z, examined against the records and answered at 13:59Z, closed as a drill at 13:59Z, nothing published; 26 minutes to the acknowledgement, 30 to the closure (LOG 2026-11-05). The channel enabled daily (9.3). | owner |
 | 9.3 | Private reporting verified daily, a disabled state reported | exercised | 2026-09-08 | Run 34220645771 reported "private vulnerability reporting is disabled (Req 9.3)"; the owner enabled it. | nature |
 | 9.4 | Catalogue advisories as repository security advisories | drill 16.12 | | None published. 16.12 writes the drill advisory. | owner |
 | 9.5 | Every revoked digest recorded in `triage/revocations.yaml` | drill 16.12 | | The record exists with no entry; its lint runs on every validate run. 16.12 records the drill digest. | pull request |
@@ -249,6 +249,7 @@ evidence obligation, and a retired one cannot keep a row.
 | Task 16.13 | 2.17, 6.62 | the page and publish switches |
 | Task 16.13 | 2.17 and 6.62 (2.15, 3.12 and 6.61 re-observed) | the always policy and the page switch off for one day (#357, runs 41302227631 and 41311884446 of 2026-11-01, #359); Renovate's digest pull requests #360, #361 and #362 automerged on 2026-11-03 once the e2e gate was repaired (#363, #364); the Pages site deleted and recreated by the owner around two dispatched rescans of 2026-11-04 (41748083578 red at the deploy, 41753888464 deploying) |
 | Task 16.14 | 9.2 | the owner's drill report |
+| Task 16.14 | 9.2 | the drill report GHSA-6xgw-5wvx-p8xx, filed from a non-collaborator account on 2026-11-05 after the admin's own attempt was refused with 403, acknowledged, answered and closed as a drill in 30 minutes, nothing published |
 | Task 16.11 | 1.19 (1.13 to 1.16 by grafana's deactivation, 2026-10-19) | drill pull request #354, never merged: the drill definition's directory removed with its active-set entry kept, two commits |
 | Task 16.15 | 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10, 6.11, 6.12, 6.19, 6.25, 6.39, 7.10, 9.6, 9.18 | drill pull request #323, never merged: thirty commits, one violation each, nine of them redone after a stray file of the drill's own script masked the first attempt; 4.2, 4.3, 4.6 and 7.9 re-observed |
 
