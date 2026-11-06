@@ -67,7 +67,7 @@ contents:
           with:
             deps:
               # renovate: datasource=go depName=github.com/gorilla/handlers
-              - github.com/gorilla/handlers@v1.3.0
+              - github.com/gorilla/handlers@v1.5.2
             download: true
             tidy: true
         # No test step: the build sandbox has no egress (docs/CONVENTIONS.md,
