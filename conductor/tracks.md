@@ -8,7 +8,13 @@
 
 ## Active tracks
 
-_No active track._
+### [~] retirement_20261107: The drill definition retired, the drill program closed, the ledger complete
+
+**Description:** The drill definition retired at level 2 of the retirement table: its active-set line, proofs entry, directory and empty lane removed in one pull request with the live-state case moved to six, test-first; the record completed (the LOG entry, the eight drill entries given their findings paragraph, the README and manual rows, the ledger complete); the upstream repository archived by the owner; the first dispatched rescan after read for the issues closing on evidence and the definition leaving the status; task group 16 closed.
+**Priority:** high (the live program's last task; a scheduled rebuild republishes the withdrawn definition every day until this merges)
+**Folder:** [./tracks/retirement_20261107/](./tracks/retirement_20261107/)
+
+---
 
 ## Completed tracks
 

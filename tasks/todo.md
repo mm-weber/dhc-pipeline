@@ -327,8 +327,17 @@ stay as history.
       class), 1.12 (off-shape package repository), 5.8 (probe removed), 6.19
       (subcomponent with a version), 9.6 (malformed revocation record);
       candidates 1.18 (a split group) and 4.8 (a past review-by date).
-- [ ] 16.16 Retirement: NEXT, at once (a scheduled rebuild republishes the
-      withdrawn definition on a new digest until it is retired); drill-app
+- [ ] 16.16 Retirement: OPENED 2026-11-07 as conductor track
+      `retirement_20261107` (phase 0 the track and the task text's
+      amendment; phase 1 the retirement pull request: the live-state case to
+      six test-first, the line, the proofs entry, the directory and the lane
+      out, the LOG entry, the eight findings paragraphs, the README and
+      manual rows; the owner merges and archives mm-weber/drill-app; phase 2
+      the dispatched rescan read, #325 closed as absent on evidence, the
+      evidence pull request closing the track and task group 16). The
+      scheduled rebuild of 2026-11-07 republished the withdrawn definition on
+      sha256:daeef9400b83, as the 16.12 entry said it would. The plan as
+      written: drill-app
       out of the active set and out of image/ in
       one pull request; its tags keep daily scans outside issue scope; the
       upstream repository archived; every ledger row carries evidence or its
