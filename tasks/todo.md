@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-11-05
+# Live drills (task group 16): where we are and what is next, as of 2026-11-07
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -246,8 +246,16 @@ stay as history.
       same pull request (the reader refuses an entry for an inactive name,
       Req 5.10), and a removed directory with the policy entry kept (1.19), a
       drill branch never merged.
-- [ ] 16.12 Revocation, advisory, runbook (9.4, 9.5, 9.7, M14): OPENED
-      2026-11-05 as conductor track `revocation_20261105` (phase 0 the track
+- [x] 16.12 Revocation, advisory, runbook (9.4, 9.5, 9.7, M14): DONE
+      2026-11-07 (conductor track `revocation_20261105`: #371 the track; the
+      advisory GHSA-mxcv-w9jx-vj6j drafted first; #374 the entry, merged
+      while the three tags still referenced the digest; the dispatched rescan
+      42130207670 and the scheduled rescan 42233459314 red at the posture
+      step by name; the version deleted by the owner on 2026-11-07, the
+      dispatched rescan 42362729195 green with the entry listed; the
+      evidence in #376; rows 9.4, 9.5, 9.7 exercised; the withdrawn
+      definition returns at the next scheduled rebuild, so 16.16 is next).
+      OPENED 2026-11-05 as conductor track `revocation_20261105` (phase 0 the track
       and the task text's amendment; phase 1: the owner drafts the advisory,
       one pull request records the drill digest as withdrawn (Move B1, the
       one shape the schema admits before the move) and merges while the
@@ -319,7 +327,9 @@ stay as history.
       class), 1.12 (off-shape package repository), 5.8 (probe removed), 6.19
       (subcomponent with a version), 9.6 (malformed revocation record);
       candidates 1.18 (a split group) and 4.8 (a past review-by date).
-- [ ] 16.16 Retirement: drill-app out of the active set and out of image/ in
+- [ ] 16.16 Retirement: NEXT, at once (a scheduled rebuild republishes the
+      withdrawn definition on a new digest until it is retired); drill-app
+      out of the active set and out of image/ in
       one pull request; its tags keep daily scans outside issue scope; the
       upstream repository archived; every ledger row carries evidence or its
       reason; the LOG's drill entries name what each one found.

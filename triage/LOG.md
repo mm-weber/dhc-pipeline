@@ -4097,3 +4097,99 @@ table said it might. The examination took thirty minutes because every
 fact it needed was already written down: the issue, the attested document,
 the log entries of 16.2, 16.6, 16.7 and 16.13, and the admission clause. No
 response window is promised; the numbers are recorded as numbers.
+
+## 2026-11-05: the drill digest withdrawn, the posture step red by name, the runbook executed as written (task 16.12)
+
+*Image: drill-app. Task 16.12, conductor track `revocation_20261105`
+(#371, squash 62918cf). A revocation is the decision that a published
+digest must not be pulled any more (register row M14); the record,
+`triage/revocations.yaml`, drives the mechanics (Req 9.5 to 9.7), and the
+advisory is a repository security advisory (Req 9.4). The record was empty
+and no advisory had been published. This entry records the first entry,
+the first refusal of the posture step, the first withdrawal and the first
+advisory, all on the drill definition's current digest,
+sha256:cf147012fad2, the one the switches drill published on 2026-11-01
+and the private report of 16.14 named. By the owner's rule of 2026-11-03
+the runs are dispatched, each a release of attestations (register row
+M17); one scheduled run fell inside the window as well.*
+
+**What the schema decided.** The record admits two shapes, `replaced`,
+which needs the replacement digest, and `withdrawn`, and no shape for an
+entry whose move has not happened. The runbook's Move A publishes the
+replacement through the release path, and the release that produces it
+moves the definition's three tags in the same run, so a `replaced` entry
+can only ever name a digest no tag references: Move A cannot show Req 9.7.
+Move B2, a tombstone, is not built. The one entry that can be recorded
+while the tags still reference the digest is a withdrawal, Move B1, which
+the task text names as well; the drill took it, with the advisory drafted
+first because the entry's `advisory` field requires its URL.
+
+**The advisory and the entry (2026-11-05).** The owner drafted the
+advisory GHSA-mxcv-w9jx-vj6j on this repository: the affected package
+`ghcr.io/mm-weber/dhc/drill-app`, the affected version the digest, the
+patched version "withdrawn", the description the reason, a draft. #374
+(merged 23:32:28Z, squash 77c435e) added the entry: image, digest, reason
+`drill: task 16.12 executes the revocation runbook on the drill fixture;
+nothing was compromised`, `replacement: none`, `withdrawal:
+delete-version`, the advisory's URL, the date; validate's schema check
+(Req 9.6) green; rehearsed before the merge against an enumeration
+carrying the three tags, the posture script refused each by name and
+exited 1. Merged while the tags 0.1.0-alpine3.23, 0.1-alpine3.23 and
+0-alpine3.23 still referenced the digest, on purpose.
+
+**The tag reported (2026-11-05, 23:32Z to 23:53Z; 2026-11-06, 14:23Z to
+14:41Z).** The dispatched rescan 42130207670 (23:32:58Z) failed at step
+30, "posture invariants (Req 9.3, 9.7, 9.9)", with one line per tag:
+`ghcr.io/mm-weber/dhc/drill-app:0.1.0-alpine3.23 references revoked digest
+sha256:cf147012fad2c088997e4142b5c21abc386a716501f6440efb05efb0d0a8792f as
+its index (revoked 2026-11-05,
+https://github.com/mm-weber/dhc-pipeline/security/advisories/GHSA-mxcv-w9jx-vj6j);
+the tag must move or the version go (Req 9.7)`, and the same for
+0.1-alpine3.23 and 0-alpine3.23; the rescan job ended red at 23:52:52Z and
+every step after the scan had run, the status issue published with
+`revocations: 1 (Req 9.5), listed below` and the entry's row, the page
+deployed with its read-back green (D1). Each line appears twice in the
+check's annotations: the run reads the record twice, once for the status
+data and once in the posture step. The scheduled rescan of 2026-11-06
+(42233459314, 14:23:17Z) failed the same way with the same three lines:
+the design's "fails daily while any catalogue tag still references a
+recorded digest", seen on the scheduler's own run. Req 9.7, first time
+live, twice.
+
+**The withdrawal (2026-11-07, 10:07Z).** The owner deleted the package
+version carrying the digest in the package's web page, the version whose
+tags were the three above, the catalogue's one deliberate exception to "nothing
+is deleted" (runbook, Move B1). Read after it: no catalogue tag on
+drill-app, the digest answering 404 by digest, and 72 manifests left under
+cosign's `sha256-<digest>.sig` and `.att` tags, the signatures and
+attestations of the digests and platform manifests the definition ever
+published, this one's among them: the runbook names only the version, and the signature and
+attestation manifests of a deleted digest outlive it. The dispatched
+rescan 42362729195 (10:09:16Z) passed the posture step, `1 recorded, 0
+referenced by a catalogue tag`, the run green, the status issue listing
+the entry under `revocations: 1`, the page saying of drill-app `declared,
+no digest today: 0-alpine3.23, 0.1-alpine3.23, 0.1.0-alpine3.23`, and the
+finding CVE-2025-30204 still listed undecided at 20 of 90 days, carried
+from the previous data (Req 6.46) against a digest nobody can pull any
+more. Today's scheduled rebuild had not run; under on-change it
+republishes the definition on a new digest with its tags the day it does,
+which is why the retirement (task 16.16) follows at once. The scheduled
+build of 2026-11-06 (42218250310) failed in cert-manager-webhook's local
+rebuild on a buildx layer write, unrelated to the drill and read on its
+own.
+
+**The advisory's state.** Published by the owner on 2026-11-07 at 11:59:02Z, once the entry had merged, as the runbook says. It went public with the wrong text: the draft had been saved with the 16.14 report's title, severity and description, and was published so; corrected in place at 13:37:38Z, the id unchanged, to the withdrawal's title (Drill 16.12: ghcr.io/mm-weber/dhc/drill-app at sha256:cf147012fad2 withdrawn, the revocation runbook, Move B1), severity low, the affected version naming the digest and its three tags, and a description saying what was withdrawn and why; the patched-versions field left empty. Ninety-eight minutes in which the repository's one published advisory said the wrong thing, on a drill, which is what a drill is for: the runbook's next edit has the advisory's text read back before it is published.
+
+**What the drill found.** The record has no shape for "revoked, the move
+pending", so a replacement release can never be recorded before it moves
+the tags, and the posture step's refusal belongs to the half-executed
+withdrawal alone; a third shape is a follow-up candidate, not a change
+made here. A deleted version leaves its cosign signature and attestation
+manifests behind, 72 of them on this definition; the runbook's next edit
+names them. An active definition with nothing published is a state the
+page has words for, "declared, no digest today", while the status keeps
+the withdrawn digest's finding and its clock, which only a decision or
+the retirement ends. And a withdrawn definition comes back at the next
+scheduled rebuild unless it is retired or deactivated: a withdrawal is two
+moves, the version's and the definition's, and the runbook says only the
+first.
