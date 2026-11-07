@@ -3,7 +3,7 @@
 **Track ID:** revocation_20261105
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-11-05
-**Status:** [x] completed 2026-11-07 (phase 0 #371, the entry #374, the evidence #375)
+**Status:** [x] completed 2026-11-07 (phase 0 #371, the entry #374, the evidence #376)
 
 ## Overview
 

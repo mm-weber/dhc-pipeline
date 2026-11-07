@@ -253,7 +253,7 @@ stay as history.
       42130207670 and the scheduled rescan 42233459314 red at the posture
       step by name; the version deleted by the owner on 2026-11-07, the
       dispatched rescan 42362729195 green with the entry listed; the
-      evidence in #375; rows 9.4, 9.5, 9.7 exercised; the withdrawn
+      evidence in #376; rows 9.4, 9.5, 9.7 exercised; the withdrawn
       definition returns at the next scheduled rebuild, so 16.16 is next).
       OPENED 2026-11-05 as conductor track `revocation_20261105` (phase 0 the track
       and the task text's amendment; phase 1: the owner drafts the advisory,
