@@ -4178,7 +4178,7 @@ build of 2026-11-06 (42218250310) failed in cert-manager-webhook's local
 rebuild on a buildx layer write, unrelated to the drill and read on its
 own.
 
-**The advisory's state.** Kept a draft at the time of writing; the owner's call, publish or keep, is recorded here and in row 9.4 once given.
+**The advisory's state.** Published by the owner on 2026-11-07 at 11:59:02Z, once the entry had merged, as the runbook says. It went public with the wrong text: the draft had been saved with the 16.14 report's title, severity and description, and was published so; corrected in place at 13:37:38Z, the id unchanged, to the withdrawal's title (Drill 16.12: ghcr.io/mm-weber/dhc/drill-app at sha256:cf147012fad2 withdrawn, the revocation runbook, Move B1), severity low, the affected version naming the digest and its three tags, and a description saying what was withdrawn and why; the patched-versions field left empty. Ninety-eight minutes in which the repository's one published advisory said the wrong thing, on a drill, which is what a drill is for: the runbook's next edit has the advisory's text read back before it is published.
 
 **What the drill found.** The record has no shape for "revoked, the move
 pending", so a replacement release can never be recorded before it moves
