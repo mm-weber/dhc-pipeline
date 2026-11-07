@@ -8,15 +8,16 @@
 
 ## Active tracks
 
-### [~] revocation_20261105: A revocation, its advisory and the runbook, the drill digest withdrawn, live
+_No active track._
+
+## Completed tracks
+
+### [x] revocation_20261105: A revocation, its advisory and the runbook, the drill digest withdrawn, live
 
 **Description:** The drill definition's current digest recorded as revoked with reason drill while its three tags still reference it (a withdrawal, Move B1, the one entry the schema admits before the move), the advisory drafted first, the dispatched rescan red at the posture step naming the three tags, the package version deleted by the owner, the next dispatched rescan green with the entry listed, the advisory published or kept at the owner's call; ledger rows 9.4, 9.5 and 9.7 exercised.
 **Priority:** high (the live program; the last three drill rows)
+**Completed:** 2026-11-07 (#371 merged as 62918cf, the track; the advisory GHSA-mxcv-w9jx-vj6j drafted; #374 the entry, merged while the three tags still referenced the digest; the dispatched rescan 42130207670 and the scheduled rescan 42233459314 red at the posture step by name; the version deleted by the owner on 2026-11-07; the dispatched rescan 42362729195 green with the entry listed; the evidence in #375: rows 9.4, 9.5 and 9.7 exercised)
 **Folder:** [./tracks/revocation_20261105/](./tracks/revocation_20261105/)
-
----
-
-## Completed tracks
 
 ### [x] private-report_20261031: A report through the private channel, handled as the policy promises, live
 
