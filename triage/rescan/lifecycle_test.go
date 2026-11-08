@@ -137,6 +137,23 @@ func TestLifecycle_GradeReadsOnlyTheIssuesImages_NoSupportedDigest(t *testing.T)
 	}
 }
 
+func TestLifecycle_GradeReadsOnlyTheIssuesImages_RemovedFromItsOwnImage(t *testing.T) {
+	in := baseLifecycle()
+	in.Issues = []CVEIssue{{Number: 51, ID: "CVE-2026-50002", State: "open", Images: []string{cmRepo + ":1.21.1-alpine3.23"},
+		Packages: []Package{{Name: "google.golang.org/grpc", Installed: "v1.82.1", Fixed: "1.83.0"}}}}
+	a := Lifecycle(in)
+	c := closeFor(t, a, 51)
+	if c.Label != "resolved:removed" {
+		t.Errorf("the issue names cert-manager, whose supported SBOM lists no grpc at all today, so the package left the issue's own image: removed; got %+v", c)
+	}
+	if !strings.Contains(c.Comment, "in no supported manifest's SBOM now") {
+		t.Errorf("comment lacks %q:\n%s", "in no supported manifest's SBOM now", c.Comment)
+	}
+	if strings.Contains(c.Comment, "v1.83.1") {
+		t.Errorf("grafana's grpc v1.83.1 is not evidence for a cert-manager issue and must not be read:\n%s", c.Comment)
+	}
+}
+
 func TestLifecycle_AbsentEverywhere_RemovedAndAbsentGrades(t *testing.T) {
 	in := baseLifecycle()
 	in.Issues = []CVEIssue{
