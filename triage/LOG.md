@@ -2191,6 +2191,8 @@ opened the fourteen-day expiry warnings for the grafana exceptions of
 nothing to do with the drill. Task 16.2 ends here; 16.4 is the first drill
 that moves these two entries.
 
+**What the drill found.** The gate refuses what the fixture carries: the first scanned run named both seeded findings with their fixed versions and the four ways out (Req 6.1), and govulncheck's binary mode placed each at symbol level, which forbids a `not_affected` statement (Req 6.14) and leaves accept within the ceilings (30 days for the CRITICAL, 90 for the HIGH, CISA listing neither). The release compiled the two entries as `affected` statements and signed them, the package came out public on its first publish with nothing for the owner to flip, and Renovate listed the definition by the next morning (Req 1.14). The first rescan filed no issue, both findings having arrived decided, so Req 6.3's mechanism is exercised by nature, not by this drill. One deviation: build-stage steps have no egress, so the archetype's `go test` step was dropped, the cert-manager precedent.
+
 ## 2026-10-19: grafana deactivated, the switch exercised live; twelve moot exceptions retired
 
 *Image: grafana. The owner's call of 2026-10-19, pull request #290, conductor
@@ -3137,6 +3139,8 @@ the task text and the track's risk table say. Task 16.8 is done on these
 runs; 16.3, the KEV-listed finding under an exception, is next, and its
 drill reads the `kev-synthetic` value this track shipped.
 
+**What the drill found.** Both arms fail closed by name on an unreachable feed: the gate's tier step stopped in one second and every release step behind it was skipped (Req 6.59); the rescan's invariants step failed the run, the enrich and status steps refused, each naming the step that reports why (Req 6.60), and the status issue and the page kept their 13:33Z data until the next scheduled run. An outage is a non-evaluation, never an evaluation against an empty KEV set, which would hand every exploited finding the widest tier. The dispatch attested the day's reports and applied the lifecycle before the fetch. An address under `.invalid` makes the outage certain and harmless. Ledger rows 6.59 and 6.60 are exercised; the job summary is not readable through the API from the devcontainer, the warning annotation carrying the same input and address.
+
 ## 2026-10-25: the drill's HIGH listed as exploited by the synthetic feed, the standing exception refused in both arms, re-decided to one day (task 16.3)
 
 *Image: drill-app. Task 16.3, conductor track `kev-ceiling_20261024` (#318,
@@ -3242,6 +3246,8 @@ these runs: both arms refused the standing exception by name on the feed
 that listed the finding, and passed the re-decided one. Drill 16.4 follows
 from midnight UTC.
 
+**What the drill found.** The tier check holds on both arms: under a feed that lists the finding, the rescan refused the standing 90-day exception by name, 76 days over the 14-day KEV tier (Req 6.51), and the gate refused the same entry (Req 6.50); the re-decided one-day entry passed the rescan's step against the synthetic feed. With the KEV set on disk, the steps behind the failed step ran, and the status and the page read KEV yes for the first time (Req 6.46) until the scheduled run read CISA's feed again. One day, not zero, follows from the two clocks: Trivy drops an entry from midnight UTC of its expiry day, the lint and the compiler keep it live through that day. Unplanned: a changed exception file puts its image in the build matrix, so the gate re-ran against the entry.
+
 ## 2026-10-26: deliberate violations, every lint refuses by name (task 16.15)
 
 *Task 16.15, conductor track `deliberate-violations_20261025` (#322, squash
@@ -3312,6 +3318,8 @@ Rows 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10, 6.11, 6.12, 6.19, 6.25, 6.39,
 7.10, 9.6 and 9.18 are `exercised` on these runs; 4.2, 4.3, 4.6 and 7.9
 carry the re-observation. The pull request is closed with a comment once
 this evidence merges. Task 16.15 is done.
+
+**What the drill found.** The fifteen conventions held: twenty-one violations were each refused by the lint or gate that holds them, so rows 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10, 6.11, 6.12, 6.19, 6.25, 6.39, 7.10, 9.6 and 9.18 are exercised and 4.2, 4.3, 4.6 and 7.9 re-observed. The validate job stops at its first failing step, and the drill's own method met that: a reset script that never removed a file the base lacked let a stray `.trivyignore.yaml` ride on eleven commits, so nine were pushed again, thirty in all. Two refusals, the revocation record's schema check and the chart gate, name their cause in the job's log only, with no annotation, a follow-up noted in `tasks/todo.md`. The pin lint does not read a chart's split pin values; the Renovate fixture step does, and refused the two malformed chart pins beside the gate.
 
 ## 2026-10-26: the drill's exception expires, the lapse on every plane (task 16.4)
 
@@ -3477,6 +3485,8 @@ gate and the scan read Trivy's clock, the stricter. A follow-up item in
 `tasks/todo.md` leaves the owner the call between aligning the three
 scripts to Trivy's reading and documenting the expiry day as the first day
 without coverage.
+
+**What the drill found.** Three refusals live for the first time: the gate refused the expired entry as uncovered (Req 6.9), the lint refused a past expiry on a pull request (Req 6.11) and the compiler's note named the lapse (Req 6.41), re-attested on that change of note alone (Req 6.43). The two clocks showed: on the expiry day the gate, the scan, the statement, the status and the issue step treated the finding as uncovered while the lint, the page and the note kept the entry live; the day after, every plane agreed. The day costs mismatched notes, not coverage, so it is the documented difference, not a defect row, a `tasks/todo.md` item leaving the owner the call. Unforeseen: an undecided HIGH refuses every pull request that builds the definition, the evidence one included, merged by the ruleset's admin bypass, the first such merge of this program.
 
 ## 2026-10-27: the drill's finding over its ceiling, the alarm raised by a one-day KEV ceiling and cleared (task 16.5)
 
@@ -3647,6 +3657,8 @@ until then every release of the definition under the switch would be
 refused the same way, and with the switch off, published as
 `under_investigation` as the first dispatch was.
 
+**What the drill found.** The release gate under the switch does what Req 2.13 says, first time live: the release-time scan named the finding per platform manifest, the gate exited before the attest, compile, sign and tag steps, and the digest stayed pullable with no signature, no attestation and no tag, frozen by the gate's hand (Req 2.11); the scheduled rescan listed it nowhere. With the switch off, the same finding released as an `under_investigation` statement (Req 2.12). Two readings came from that release: a rebuilt digest's statements start their clock at its release, while the status carries the first-seen date from its own data; and the digest the tags left is frozen by nature, the first of this catalogue. One deviation: the first dispatch started before the switch existed on main, two of the owner's actions having been put under one step number.
+
 ## 2026-10-28: the drill's findings fixed, the issue closed on the attested SBOMs, the fix clock (task 16.6)
 
 *Image: drill-app. Task 16.6, conductor track `drill-fix_20261028` (#341,
@@ -3715,6 +3727,8 @@ fix clock on this definition is the program's: two findings first seen on
 2026-10-18, decided the same day, one lapsed on 2026-10-26, both fixed on
 2026-10-28 by the lane the catalogue uses for its real images. Drill 16.7
 drops the bump step and brings them back.
+
+**What the drill found.** The fix lane between upstream releases (register row M10) clears the drill's findings as it does the real images': one `go/bump@v2` step in the fetch phase, and the gate on this definition was green for the first time since it joined the catalogue, with no annotation at all. The closure runs on evidence: the lifecycle found CVE-2025-30204 in no supported digest's attested report, and the issue, #325, closed as `resolved:fixed` with every digest examined and the scanner and database versions in the comment (Req 6.52, 6.56), the attested SBOMs listing the fixed versions. An unexpired exception publishes nothing when the report lists nothing to suppress (Req 6.38), and the status keeps the CRITICAL's decision text on the fixed row until the entry leaves the file. The fix clock is the program's: first seen 2026-10-18, both fixed 2026-10-28, ten days (Req 6.46).
 
 ## 2026-10-29: the drill's HIGH brought back for a day, the issue reopened on the lapse (task 16.7)
 
@@ -3808,6 +3822,8 @@ has now seen the drill's HIGH decided, re-decided against the KEV ceiling,
 lapsed, over its ceiling, refused at the release gate, fixed with its clock
 published, and brought back with its issue reopened, each on the catalogue's
 real machinery.
+
+**What the drill found.** The lifecycle reopens what it closed: the rescan found a finding named by a closed cve issue reported again on a supported digest and reopened the issue, #325, naming the digest and the scanner and database versions, the `resolved:fixed` label removed (Req 6.57, first time live); the status carried the first-seen date of 2026-10-18 through the fix and the return. A regression enters by a bounded acceptance (Req 6.7), since the gate refuses an uncovered finding by name (Req 6.1); the one-day entry kept the release green, and the day between the two clocks showed as on task 16.4's first day. The evidence pull request, building drill-app on its changed exception file (Req 6.9), was refused at the scan gate and merged by the ruleset's admin bypass, the second such merge, recorded in the deviations log. The finding stays undecided until the definition retires.
 
 ## 2026-10-30: the drill definition's directory removed, its active-set entry refused by name (task 16.11)
 
@@ -4193,3 +4209,73 @@ the retirement ends. And a withdrawn definition comes back at the next
 scheduled rebuild unless it is retired or deactivated: a withdrawal is two
 moves, the version's and the definition's, and the runbook says only the
 first.
+
+## 2026-11-07: the drill definition retired, the drill program closed (task 16.16)
+
+*Image: drill-app. Task 16.16, conductor track `retirement_20261107`
+(#377, squash ea59ee1). The drill definition joined the catalogue on
+2026-10-18 to carry two findings on purpose (task 16.2) and was the
+fixture of every live drill since: the KEV tier (16.3), the lapse (16.4),
+the ceiling (16.5), the fix (16.6), the regression (16.7), the fail-closed
+gate (16.9), the active-set entry (16.11), the switches (16.13), the
+private report (16.14), the authenticity mismatch (16.10) and the
+withdrawal (16.12), with the KEV outage (16.8) and the deliberate
+violations (16.15) around it. Fourteen drills done, every ledger row that
+waited for one exercised, this entry retires the fixture at level 2 of the
+retirement table (track `retire-grafana_20261019`): the definition leaves
+the catalogue, not only the active set.*
+
+**What leaves (#378).** The active-set line and the proofs entry in
+`catalogue-policy.yaml`, the directory `image/drill-app/`, and the lane
+`triage/accepted-risk/drill-app.yaml`, empty since task 16.7 and kept for
+this day, in one pull request; Req 1.19 is satisfied by the line and the
+directory leaving together, the shape the 2026-10-30 drill showed is the
+only one validation admits. The probe lint's live-state case moved first:
+six active definitions, six chart-proved, none declared, red on the
+repository as it stood and green on the removal. The tracking block did
+not change, a removed directory needing no ignore glob. Renovate's #346,
+the fixture's gorilla/handlers bump, lost its file. The README's and the
+manual's definition rows name the fixture retired.
+
+**What stays and what stops.** Nothing published is deleted: every digest
+the fixture published stays pullable by digest, its tags where they were
+left, its last attestations in place, cosign's signature and attestation
+manifests under the package, and the withdrawn digest's entry in
+`triage/revocations.yaml`, which nothing is ever removed from. What stops
+is the catalogue's daily attention: the enumeration reads repositories
+from the definitions, so the fixture's tags are not enumerated, scanned or
+re-attested from the first rescan after the merge, a correction of the
+task's wording that assumed the scans would continue, which the retirement
+table of 2026-10-19 had already noted. The scheduled rebuild of 2026-11-07
+(run 42367838163, 11:37Z) had republished the withdrawn definition on
+sha256:daeef9400b83 that morning, as the 16.12 entry said it would; it is
+the last digest the fixture will publish, and its tags stay on it. The
+upstream repository, `mm-weber/drill-app`, is archived by the owner
+(ARCHIVETIME).
+
+**The first rescan after.** RESCANPARA
+
+**The record complete.** The ledger reads 150 criteria exercised, one
+defect (6.55, the attested reports' empty database fields, its fix a todo
+item) and four unexercised with their reasons (2.26, 3.13, 3.15, 4.9), no
+row waiting for a drill. Eight of the fourteen drill entries closed
+without a "What the drill found" paragraph; each has one as of this pull
+request, written from its own text, so that every drill names what it
+found. The authenticity table of SECURITY.md never listed the fixture's
+class; it listed the catalogue's images, and the fixture was never one, a
+reading recorded here rather than corrected. The drill program's
+follow-ups stand in `tasks/todo.md`: the two expiry clocks, the one
+ceiling read three ways, a rebuilt digest's restarted statement clock, the
+log-only refusals of Req 7.4, the record's missing shape for a revocation
+whose move is pending, cosign's manifests outliving a deleted version, and
+the runbook's text read back before an advisory is published.
+
+**What the drill found.** A definition that carries findings on purpose
+costs what any definition costs, a daily scan, an issue per finding, a
+clock, and buys every mechanism's first live run at a known address; the
+catalogue treated it as it treats the rest, which is the point. Retiring
+it is two moves, the version's and the definition's, and only the second
+ends the catalogue's attention; the first, taken alone on 2026-11-07,
+lasted until the next rebuild. What the fixture leaves behind is the
+record: fourteen entries, each naming what its drill found, and a ledger
+with no row that waits.
