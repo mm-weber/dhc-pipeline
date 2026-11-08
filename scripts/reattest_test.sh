@@ -4,7 +4,8 @@
 #
 # cosign, trivy, crane, vexctl and curl are stubbed; the compiler is real. What
 # the suite pins is the contract: every report attested with --replace before
-# compiling; the previous document read only through verify-attestation against
+# compiling, its predicate naming the vulnerability database it was matched
+# against; the previous document read only through verify-attestation against
 # the policy's role identities; nothing written when the statement set is
 # unchanged and every count is one; --replace on the digest AND every platform
 # manifest when it differs or a count is wrong; several previous documents
@@ -22,6 +23,11 @@ INDEX="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 M1="sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
 BUILD_ID="https://github.com/acme/dhc/.github/workflows/build.yml@refs/heads/main"
 RESCAN_ID="https://github.com/acme/dhc/.github/workflows/rescan.yml@refs/heads/main"
+# The two facts that name the vulnerability database (Req 6.55): the repository
+# the rescan declares, which trivy records nowhere itself, and the UpdatedAt
+# that only `trivy version --format json` reports.
+DB_REPO="ghcr.io/aquasecurity/trivy-db:2"
+DB_UPDATED="2026-10-15T07:10:08.755380281Z"
 
 att() { # <digest> <openvex layers> [<logIndex>...] -> the stub's .att manifest
   local d="$1" n="$2"; shift 2
@@ -89,6 +95,13 @@ STUB
   cat > "$SB/bin/trivy" <<'STUB'
 #!/usr/bin/env bash
 printf 'trivy %s\n' "$*" >> "${STUB_ARGV}"
+# The one query that is not a conversion: the vulnerability database's
+# UpdatedAt (Req 6.55). Matched on that exact argument shape, so every other
+# invocation stays the conversion below, which copies its input to --output.
+if [ "$*" = "version --format json" ]; then
+  printf '{"Version":"0.75.0","VulnerabilityDB":{"Version":2,"UpdatedAt":"%s"}}\n' "$STUB_DB_UPDATED"
+  exit 0
+fi
 out=""; while [ $# -gt 0 ]; do case "$1" in --output) out="$2"; shift;; esac; last="$1"; shift; done
 cp "$last" "$out"
 STUB
@@ -110,7 +123,10 @@ printf 'curl %s\n' "$*" >> "${STUB_ARGV}"
 exit 0
 STUB
   chmod +x "$SB"/bin/*
-  export STUB_ARGV="$SB/argv" STUB_DIR="$SB"; : > "$STUB_ARGV"
+  export STUB_ARGV="$SB/argv" STUB_DIR="$SB" STUB_DB_UPDATED="$DB_UPDATED"; : > "$STUB_ARGV"
+  # What the rescan workflow declares for trivy, and the only source for the
+  # database's origin (Req 6.55).
+  export TRIVY_DB_REPOSITORY="$DB_REPO"
   report
   att "$INDEX" 1 4242; att "$M1" 1 4243
 }
@@ -211,6 +227,21 @@ out=$(REATTEST_RETRY_DELAY=0 run); rc=$?
 grep -q "::warning::reattest: cosign attest --type vuln --replace failed for ghcr.io/acme/dhc/grafana@${M1} (attempt 1 of 3)" <<<"$out" && pass "and the failed attempt is named" || fail "warning" "$out"
 [ "$(rec '.retries')" = "1" ] && [ "$(rec '.reattested')" = "true" ] && pass "counted in the record, which is otherwise a normal one" || fail "record" "$(cat "$SB/out/reattest.jsonl")"
 grep -q '0 failed, 1 retried' <<<"$out" && pass "and in the summary line" || fail "summary" "$out"
+
+# 11: the re-attested report names the database it matched against (Req 6.55).
+#     `trivy convert --format cosign-vuln` leaves scanner.db empty, so the
+#     predicate attested today names the scanner but not the vulnerability
+#     database, and a consumer cannot tell a finding from a week-old database
+#     apart from one from today's. The predicate read here is the very file the
+#     cosign stub was handed.
+fresh
+out=$(run); rc=$?
+pred=$(sed -n 's/^cosign attest --yes --type vuln --replace --predicate \([^ ]*\) .*/\1/p' "$STUB_ARGV" | head -n1)
+db=$([ -n "$pred" ] && [ -f "$pred" ] && jq -c '.scanner.db // "the predicate carries no scanner.db"' "$pred" \
+      || echo '"no predicate was handed to cosign attest --type vuln"')
+[ "$(jq -r '.uri? // ""' <<<"$db")" = "$DB_REPO" ] && [ "$(jq -r '.version? // ""' <<<"$db")" = "$DB_UPDATED" ] \
+  && pass "the re-attested predicate names the vulnerability database" \
+  || fail "the re-attested predicate names the vulnerability database" "predicate: ${pred:-none}" "scanner.db: $db" "$out"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "all reattest tests passed"
