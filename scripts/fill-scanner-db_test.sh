@@ -159,6 +159,46 @@ $report" \
   "db.version = \"$DB_UPDATED\"" \
   "the rest of the document is unchanged"
 
+# 2: a database origin that was never declared stops the step by name, and the
+#    predicate is left exactly as it was. An absent TRIVY_DB_REPOSITORY lands
+#    as an empty db.uri, which attests a claim about the database's origin that
+#    says nothing while looking filled, so the missing fact has to refuse by
+#    name rather than be written as emptiness (Req 6.55). Unset and set-to-empty
+#    are the same missing fact and are refused alike; the file is compared with
+#    cmp here, not as parsed JSON, because nothing should have been rewritten at
+#    all, not even reformatted.
+report=""
+accepted=0
+for shape in unset empty; do
+  fresh
+  if [ "$shape" = unset ]; then
+    out=$(env -u TRIVY_DB_REPOSITORY PATH="$SB/bin:$PATH" "$FILL" "$SB/vuln.json" 2>&1); rc=$?
+  else
+    out=$(TRIVY_DB_REPOSITORY="" PATH="$SB/bin:$PATH" "$FILL" "$SB/vuln.json" 2>&1); rc=$?
+  fi
+  if [ "$rc" -ne 0 ]; then verdict="refused (exit $rc)"; else verdict="accepted (exit 0)"; accepted=$((accepted+1)); fi
+  if grep -qF -- "TRIVY_DB_REPOSITORY" <<<"$out"; then named_var=yes; else named_var=no; fi
+  if grep -qF -- "Req 6.55" <<<"$out"; then named_req=yes; else named_req=no; fi
+  if cmp -s "$SB/vuln.json" "$SB/pristine.json"; then state=untouched; else state=rewritten; fi
+  report="$report
+$shape: $verdict
+$shape: names TRIVY_DB_REPOSITORY: $named_var
+$shape: names Req 6.55: $named_req
+$shape: predicate $state
+$shape: said: $out"
+done
+# The exit slot carries how many of the two invocations the script accepted: a
+# fact it was never given must stop the step both times, so that count is 0.
+expect "an undeclared database origin is refused by name, the predicate untouched" 0 "$accepted" "$report" \
+  "unset: refused" \
+  "unset: names TRIVY_DB_REPOSITORY: yes" \
+  "unset: names Req 6.55: yes" \
+  "unset: predicate untouched" \
+  "empty: refused" \
+  "empty: names TRIVY_DB_REPOSITORY: yes" \
+  "empty: names Req 6.55: yes" \
+  "empty: predicate untouched"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all fill-scanner-db tests passed"
