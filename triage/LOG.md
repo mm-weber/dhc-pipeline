@@ -4250,10 +4250,14 @@ table of 2026-10-19 had already noted. The scheduled rebuild of 2026-11-07
 (run 42367838163, 11:37Z) had republished the withdrawn definition on
 sha256:daeef9400b83 that morning, as the 16.12 entry said it would; it is
 the last digest the fixture will publish, and its tags stay on it. The
-upstream repository, `mm-weber/drill-app`, is archived by the owner
-(ARCHIVETIME).
+upstream repository, `mm-weber/drill-app`, is archived by the owner once
+this merges; the time is added here by the evidence pull request.
 
-**The first rescan after.** RESCANPARA
+**The first rescan after.** Dispatched by the owner after the merge and
+read by the evidence pull request, which adds it here: the enumeration
+without the definition, the fixture's issue closed on evidence, the
+revocation entry with no referenced tag, the status and the page without
+the definition.
 
 **The record complete.** The ledger reads 150 criteria exercised, one
 defect (6.55, the attested reports' empty database fields, its fix a todo
