@@ -199,6 +199,72 @@ expect "an undeclared database origin is refused by name, the predicate untouche
   "empty: names Req 6.55: yes" \
   "empty: predicate untouched"
 
+# 3: a scanner that cannot say when its database was updated stops the step by
+#    name, and the predicate is left exactly as it was. Req 6.55 wants the
+#    database named, and a timestamp trivy did not report cannot be had from
+#    anywhere else, since the version output is the only source for it. Today
+#    the missing fact surfaces as a KeyError out of the embedded python: the
+#    step does fail, which is right, but it fails as a crash rather than as a
+#    named refusal, so a reader of the run sees a traceback instead of a
+#    sentence saying which fact was missing. That is why the absence of
+#    "Traceback" is pinned here next to the refusal. Both shapes of the same
+#    missing fact that a real trivy can produce are exercised: a version output
+#    with no VulnerabilityDB block at all, and one whose VulnerabilityDB
+#    carries no UpdatedAt. The file is compared with cmp, not as parsed JSON,
+#    because nothing should have been rewritten at all, not even reformatted.
+report=""
+off_exit=0
+for shape in no-db-key no-updated-at; do
+  fresh
+  case "$shape" in
+    no-db-key)
+      VERSION_OUT='{"Version":"0.72.0"}' ;;
+    no-updated-at)
+      VERSION_OUT='{"Version":"0.72.0","VulnerabilityDB":{"Version":2,"NextUpdate":"2026-10-15T13:10:08.755380281Z","DownloadedAt":"2026-10-15T08:02:41.418203117Z"}}' ;;
+  esac
+  # The same stub as fresh builds, answering the one allowed question without
+  # the database timestamp in it.
+  cat > "$SB/bin/trivy" <<STUB
+#!/usr/bin/env bash
+if [ "\$*" = "version --format json" ]; then
+  cat <<'JSON'
+$VERSION_OUT
+JSON
+  exit 0
+fi
+echo "stub trivy: unexpected arguments: \$*" >&2
+exit 1
+STUB
+  chmod +x "$SB/bin/trivy"
+  out=$(TRIVY_DB_REPOSITORY="$DB_REPO" PATH="$SB/bin:$PATH" "$FILL" "$SB/vuln.json" 2>&1); rc=$?
+  if [ "$rc" -eq 2 ]; then verdict="refused by name (exit 2)"; else verdict="ended otherwise (exit $rc)"; off_exit=$((off_exit+1)); fi
+  if grep -qF -- "trivy version" <<<"$out"; then named_cmd=yes; else named_cmd=no; fi
+  if grep -qF -- "Req 6.55" <<<"$out"; then named_req=yes; else named_req=no; fi
+  if grep -qF -- "Traceback" <<<"$out"; then traced=yes; else traced=no; fi
+  if cmp -s "$SB/vuln.json" "$SB/pristine.json"; then state=untouched; else state=rewritten; fi
+  report="$report
+$shape: $verdict
+$shape: names trivy version: $named_cmd
+$shape: names Req 6.55: $named_req
+$shape: traceback printed: $traced
+$shape: predicate $state
+$shape: said: $out"
+done
+# The exit slot carries how many of the two invocations ended on anything other
+# than exit 2: a fact trivy did not report has to stop the step the same way a
+# fact the runner never declared does, so that count is 0.
+expect "a scanner that cannot name its database timestamp is refused by name" 0 "$off_exit" "$report" \
+  "no-db-key: refused by name" \
+  "no-db-key: names trivy version: yes" \
+  "no-db-key: names Req 6.55: yes" \
+  "no-db-key: traceback printed: no" \
+  "no-db-key: predicate untouched" \
+  "no-updated-at: refused by name" \
+  "no-updated-at: names trivy version: yes" \
+  "no-updated-at: names Req 6.55: yes" \
+  "no-updated-at: traceback printed: no" \
+  "no-updated-at: predicate untouched"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all fill-scanner-db tests passed"
