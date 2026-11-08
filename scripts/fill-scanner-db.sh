@@ -19,8 +19,9 @@
 # place, so a failure never leaves a truncated predicate where an attestable
 # one was.
 #
-# Exits 0 once both fields are filled, 2 with no argument, 2 when no database
-# origin is declared and 2 when trivy reports no database timestamp.
+# Exits 0 once both fields are filled, 0 when the predicate already carries
+# them and nothing is written, 2 with no argument, 2 when no database origin is
+# declared and 2 when trivy reports no database timestamp.
 set -euo pipefail
 
 PRED="${1:-}"
@@ -58,6 +59,22 @@ pred_path, uri, version = sys.argv[1:4]
 with open(pred_path) as fh:
     doc = json.load(fh)
 db = doc.setdefault("scanner", {}).setdefault("db", {})
+
+# What the conversion already wrote about the scanner's own database wins: a
+# trivy that fills these fields knows which repository it actually pulled the
+# database from, while TRIVY_DB_REPOSITORY only names the one the run was
+# configured with. Both facts are still required before this point, so a
+# predicate that needs no filling is not a way around the refusals. Decided
+# before the dump and the replace, so the file is not even reformatted, and
+# said out loud, so a reader of the run can tell a field this script filled
+# from one it declined to touch.
+if db.get("uri") and db.get("version"):
+    print(
+        f"fill-scanner-db: {pred_path} left alone, the scanner already names "
+        f"its database: {db['uri']} (updated {db['version']})"
+    )
+    raise SystemExit(0)
+
 db["uri"] = uri
 db["version"] = version
 
