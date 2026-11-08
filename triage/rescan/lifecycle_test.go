@@ -120,6 +120,23 @@ func TestLifecycle_AbsentEverywhere_FixedWhenThePackageBumped(t *testing.T) {
 	}
 }
 
+func TestLifecycle_GradeReadsOnlyTheIssuesImages_NoSupportedDigest(t *testing.T) {
+	in := baseLifecycle()
+	in.Issues = []CVEIssue{{Number: 50, ID: "CVE-2026-50001", State: "open",
+		Images:   []string{"ghcr.io/mm-weber/dhc/drill-app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		Packages: []Package{{Name: "stdlib", Installed: "v1.26.3", Fixed: "1.26.4"}}}}
+	a := Lifecycle(in)
+	c := closeFor(t, a, 50)
+	if c.Label != "resolved:absent" {
+		t.Errorf("the issue names drill-app only, which holds no supported digest today, so the stdlib bumps in grafana's and cert-manager's SBOMs are not its evidence: absent; got %+v", c)
+	}
+	for _, want := range []string{"ghcr.io/mm-weber/dhc/drill-app", "holds a supported digest today"} {
+		if !strings.Contains(c.Comment, want) {
+			t.Errorf("comment lacks %q:\n%s", want, c.Comment)
+		}
+	}
+}
+
 func TestLifecycle_AbsentEverywhere_RemovedAndAbsentGrades(t *testing.T) {
 	in := baseLifecycle()
 	in.Issues = []CVEIssue{
