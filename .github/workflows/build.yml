@@ -1035,6 +1035,9 @@ jobs:
           for m in "${manifests[@]}"; do
             report="trivy-${m#sha256:}.json"
             trivy convert --format cosign-vuln --output "vuln-${m#sha256:}.json" "$report"
+            # Req 6.55: the conversion leaves scanner.db empty, so the database
+            # this report matched against is written in beside the scanner.
+            scripts/fill-scanner-db.sh "vuln-${m#sha256:}.json"
             cosign attest --yes --type vuln \
               --predicate "vuln-${m#sha256:}.json" "${IMAGE}@${m}"
           done
