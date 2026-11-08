@@ -19,11 +19,22 @@
 # place, so a failure never leaves a truncated predicate where an attestable
 # one was.
 #
-# Exits 0 once both fields are filled, 2 with no argument.
+# Exits 0 once both fields are filled, 2 with no argument and 2 when no
+# database origin is declared.
 set -euo pipefail
 
 PRED="${1:-}"
 [ -n "$PRED" ] || { echo "usage: fill-scanner-db.sh <predicate.json>" >&2; exit 2; }
+
+# Refused before the predicate is read and before trivy is asked anything: an
+# undeclared origin would land as an empty db.uri, which attests a claim about
+# where the database came from that says nothing while looking filled. Trivy
+# records nowhere which repository it pulled the database from, so there is no
+# second source to fall back on.
+[ -n "${TRIVY_DB_REPOSITORY:-}" ] || {
+  echo "::error::fill-scanner-db: TRIVY_DB_REPOSITORY is unset or empty, so the database origin is not declared; trivy records nowhere which repository it pulled the database from, and an empty scanner.db.uri would attest a claim about the origin that says nothing (Req 6.55)" >&2
+  exit 2
+}
 
 VERSION_JSON=$(trivy version --format json)
 
