@@ -1,4 +1,4 @@
-# Live drills (task group 16): where we are and what is next, as of 2026-11-07
+# Live drills (task group 16): where we are and what is next, as of 2026-11-08
 
 The owner's call of 2026-10-01: hit everything this repository offers live at
 least once (Req 7.11, design Decision 13, tasks 16.1 to 16.16). This section is
@@ -9,6 +9,14 @@ and revisited on 2026-10-17, when the proof-kinds track unblocked 16.2. From
 here, each drill runs as its own conductor track (`conductor/tracks.md`), and
 this section keeps the program's order and calendar. The older plans below it
 stay as history.
+
+**Task group 16 complete, 2026-11-08.** Sixteen tasks done; the drill
+definition retired (#378) and its upstream archived; the ledger reads 149
+criteria exercised, two defects (6.55, 6.56) with their fixes todo items
+below, four
+unexercised (2.26, 3.13, 3.15, 4.9) with their reasons, no row waiting for a
+drill; every drill entry in `triage/LOG.md` names what it found. What is
+left of the program is the follow-up list below, one decision each.
 
 ## State
 
@@ -327,7 +335,12 @@ stay as history.
       class), 1.12 (off-shape package repository), 5.8 (probe removed), 6.19
       (subcomponent with a version), 9.6 (malformed revocation record);
       candidates 1.18 (a split group) and 4.8 (a past review-by date).
-- [ ] 16.16 Retirement: OPENED 2026-11-07 as conductor track
+- [x] 16.16 Retirement: DONE 2026-11-08 (conductor track `retirement_20261107`:
+      #377 the track; #378 the retirement, the live-state case to six
+      test-first, the line, the proofs entry, the directory and the lane out,
+      the LOG entry and the eight findings paragraphs; the upstream archived
+      at 08:07Z; the dispatched rescan after read; the evidence in #379).
+      OPENED 2026-11-07 as conductor track
       `retirement_20261107` (phase 0 the track and the task text's
       amendment; phase 1 the retirement pull request: the live-state case to
       six test-first, the line, the proofs entry, the directory and the lane
@@ -398,6 +411,23 @@ stay as history.
       to `docker save --platform linux/amd64` + `kind load image-archive`
       (verified locally to produce a single-manifest archive); its own pull
       request, the owner's call.
+- [ ] 6.56 defect (found by 16.12 and 16.16, 2026-11-07 and 2026-11-08):
+      `sbomGrade` in `triage/rescan/lifecycle.go` reads every supported
+      manifest's SBOM, so a package bumped in another image grades an issue
+      `resolved:fixed` (#325 twice, on cert-manager-controller's and grafana's
+      golang-jwt v5.3.1). Scope the grade to the issue's own images and grade
+      `removed` or `absent` when none of them is examined; test-first, its own
+      pull request.
+- [ ] The status keeps a retired definition's rows (found by 16.16,
+      2026-11-08): drill-app's three finding rows and the HIGH's clock
+      (21 / 90) stay in the status issue and the page, carried from the
+      previous data, after the definition left the catalogue. Drop or mark
+      rows whose repository no definition declares; its own pull request.
+- [ ] The governance read before the run's API budget is spent (found by
+      16.16, 2026-11-08): the posture step runs last and its two governance
+      reads met GitHub's primary rate limit (run 42461602452), which the
+      reader does not wait out by design; read them early in the run, or
+      retry after the limit's reset; its own pull request.
 - [ ] 6.55 defect: the attested scan reports carry empty `scanner.db.uri` and
       `scanner.db.version` (trivy convert leaves them empty; measured
       2026-09-27 and 2026-10-08). A fix in the attestation step, test-first,
