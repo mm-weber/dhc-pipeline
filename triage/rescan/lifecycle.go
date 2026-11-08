@@ -489,13 +489,19 @@ func closeCovered(is CVEIssue, covered []sighting, examined []digestRef, scanner
 // closeAbsent: Req 6.52, graded by the attested SBOMs (Req 6.56): `fixed`
 // only when every occurrence of every recorded package moved to a fixed
 // version, `removed` when the packages left every SBOM, `absent` otherwise,
-// and never a claim without every examined manifest's SBOM in hand.
+// and never a claim without every examined manifest's SBOM in hand. The
+// SBOMs read are those of the images the issue names; an issue naming none
+// is read over every supported digest's (Req 6.56).
 func closeAbsent(is CVEIssue, examined []digestRef, outside []string, scanner Scanner, in LifecycleInputs) (string, string) {
-	var manifests []string
-	for _, d := range examined {
-		manifests = append(manifests, d.manifests...)
+	manifests, sboms, named := issueManifests(is, examined, in.SBOMs)
+	var grade string
+	var evidence []string
+	if len(is.Images) > 0 && len(manifests) == 0 {
+		grade = "absent"
+		evidence = []string{fmt.Sprintf("- none of the issue's images (%s) holds a supported digest today; no bump is claimed, the finding is absent from every report", strings.Join(named, ", "))}
+	} else {
+		grade, evidence = sbomGrade(is, manifests, sboms)
 	}
-	grade, evidence := sbomGrade(is, manifests, in.SBOMs)
 	var b strings.Builder
 	fmt.Fprintf(&b, "Closed by the rescan on evidence, not a decision (Req 6.52, 6.54): %s appears, reported or suppressed, in no supported digest's attested scan report today.\n\n", is.ID)
 	b.WriteString(filedAgainst(is))
@@ -506,6 +512,49 @@ func closeAbsent(is CVEIssue, examined []digestRef, outside []string, scanner Sc
 	b.WriteString("\nSBOM evidence, attested CycloneDX read through verification (Req 6.56):\n" + strings.Join(evidence, "\n") + "\n")
 	fmt.Fprintf(&b, "\nLabel: %s\n", in.labelFor(grade))
 	return in.labelFor(grade), b.String()
+}
+
+// issueManifests picks the manifests whose SBOMs grade the issue: those of
+// the examined digests in the repositories the issue's images name, or every
+// examined manifest when the issue names no image (Req 6.56). The SBOM map
+// is cut to the same manifests, so a bump in another image's SBOM is never
+// read. named lists the repositories the issue names, in order.
+func issueManifests(is CVEIssue, examined []digestRef, all map[string][]SBOMComponent) (manifests []string, sboms map[string][]SBOMComponent, named []string) {
+	if len(is.Images) == 0 {
+		for _, d := range examined {
+			manifests = append(manifests, d.manifests...)
+		}
+		return manifests, all, nil
+	}
+	repos := map[string]bool{}
+	for _, img := range is.Images {
+		if r := imageRepo(img); !repos[r] {
+			repos[r] = true
+			named = append(named, r)
+		}
+	}
+	sboms = map[string][]SBOMComponent{}
+	for _, d := range examined {
+		if !repos[d.repo] {
+			continue
+		}
+		manifests = append(manifests, d.manifests...)
+		for _, m := range d.manifests {
+			sboms[m] = all[m]
+		}
+	}
+	return manifests, sboms, named
+}
+
+// imageRepo is the repository of an image as the issue names it, `repo:tag`
+// or `repo@sha256:...`; a colon before the last slash is a registry port,
+// not a tag.
+func imageRepo(image string) string {
+	repo, _, _ := strings.Cut(image, "@")
+	if i := strings.LastIndex(repo, ":"); i > strings.LastIndex(repo, "/") {
+		repo = repo[:i]
+	}
+	return repo
 }
 
 func sbomGrade(is CVEIssue, manifests []string, sboms map[string][]SBOMComponent) (string, []string) {

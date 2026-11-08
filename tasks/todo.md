@@ -411,13 +411,15 @@ left of the program is the follow-up list below, one decision each.
       to `docker save --platform linux/amd64` + `kind load image-archive`
       (verified locally to produce a single-manifest archive); its own pull
       request, the owner's call.
-- [ ] 6.56 defect (found by 16.12 and 16.16, 2026-11-07 and 2026-11-08):
-      `sbomGrade` in `triage/rescan/lifecycle.go` reads every supported
-      manifest's SBOM, so a package bumped in another image grades an issue
+- [x] 6.56 defect (found by 16.12 and 16.16, 2026-11-07 and 2026-11-08):
+      `sbomGrade` in `triage/rescan/lifecycle.go` read every supported
+      manifest's SBOM, so a package bumped in another image graded an issue
       `resolved:fixed` (#325 twice, on cert-manager-controller's and grafana's
-      golang-jwt v5.3.1). Scope the grade to the issue's own images and grade
-      `removed` or `absent` when none of them is examined; test-first, its own
-      pull request.
+      golang-jwt v5.3.1). FIXED 2026-11-08 in #380, test-first (Req 6.56
+      amended): the grade reads the SBOMs of the images the issue names, none
+      of them supported grades absent by name, an issue naming no image keeps
+      the old reading. The ledger row stays `defect` until a live closure shows
+      the grade read on the issue's own images; that run flips it.
 - [ ] The status keeps a retired definition's rows (found by 16.16,
       2026-11-08): drill-app's three finding rows and the HIGH's clock
       (21 / 90) stay in the status issue and the page, carried from the
