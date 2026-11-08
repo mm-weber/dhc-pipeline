@@ -15,18 +15,29 @@
 # which would publish the digest anyway. Steps before the scan are the
 # producers (metadata, build, manifest enumeration) and are not judged.
 #
-# Reads the workflow as YAML (PyYAML, the validate job's dependency).
+# Reads the workflow as YAML (PyYAML, the validate job's dependency); a
+# missing `relscan` step or an unreadable file is a refusal, not a vacuous
+# pass, because a lint that cannot find the boundary it measures from has
+# judged no step at all.
 # Exit 1 on any violation.
 set -euo pipefail
 
 WF="${1:-$(cd "$(dirname "$0")/.." && pwd)/.github/workflows/build.yml}"
+[ -f "$WF" ] || { echo "::error::lint-release-steps: ${WF} does not exist; the rule needs the workflow it is measured in (Req 2.26)"; exit 1; }
 
 python3 - "$WF" <<'PY'
 import sys, yaml
 path = sys.argv[1]
-wf = yaml.safe_load(open(path))
+try:
+    wf = yaml.safe_load(open(path))
+except Exception as e:  # noqa: BLE001
+    print(f"::error file={path}::lint-release-steps: not parseable YAML: {e} (Req 2.26)")
+    sys.exit(1)
 jobs = (wf or {}).get("jobs") or {}
-scan_job = next(n for n, j in jobs.items() if any(s.get("id") == "relscan" for s in ((j or {}).get("steps") or [])))
+scan_job = next((n for n, j in jobs.items() if any(s.get("id") == "relscan" for s in ((j or {}).get("steps") or []))), None)
+if scan_job is None:
+    print(f"::error file={path}::lint-release-steps: no step with `id: relscan` in any job; the rule needs the boundary it is measured from, so a workflow whose release job never scans the pushed digest is refused and no step count is reported (Req 2.26)")
+    sys.exit(1)
 steps = jobs[scan_job].get("steps") or []
 scan = next(i for i, s in enumerate(steps) if s.get("id") == "relscan")
 # Each of these escapes the default success() condition, so the step would run
