@@ -1,9 +1,9 @@
 {
   "id": "retirement_20261107",
   "type": "chore",
-  "status": "in_progress",
+  "status": "completed",
   "created_at": "2026-11-07T14:45:00Z",
-  "updated_at": "2026-11-07T14:45:00Z",
+  "updated_at": "2026-11-08T08:29:21Z",
   "description": "The drill definition retired at level 2 of the retirement table: its active-set line, proofs entry, directory and empty lane removed in one pull request with the live-state case moved to six, test-first; the record completed (the LOG entry, the eight drill entries given their findings paragraph, the README and manual rows, the ledger complete); the upstream repository archived by the owner; the first dispatched rescan after read for the issues closing on evidence and the definition leaving the status; task group 16 closed (Req 1.19, 6.52, 7.11; task 16.16)",
   "spec_path": "conductor/tracks/retirement_20261107/spec.md",
   "plan_path": "conductor/tracks/retirement_20261107/plan.md"

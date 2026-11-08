@@ -4187,7 +4187,10 @@ the entry under `revocations: 1`, the page saying of drill-app `declared,
 no digest today: 0-alpine3.23, 0.1-alpine3.23, 0.1.0-alpine3.23`, and the
 finding CVE-2025-30204 still listed undecided at 20 of 90 days, carried
 from the previous data (Req 6.46) against a digest nobody can pull any
-more. Today's scheduled rebuild had not run; under on-change it
+more; the issue itself, #325, that run had closed at 10:21:26Z, graded
+`resolved:fixed` on other images' SBOMs (the grade's defect, read on
+2026-11-08 and recorded in the retirement entry), and the scheduled rescan
+of 13:29Z reopened it on the republished digest. Today's scheduled rebuild had not run; under on-change it
 republishes the definition on a new digest with its tags the day it does,
 which is why the retirement (task 16.16) follows at once. The scheduled
 build of 2026-11-06 (42218250310) failed in cert-manager-webhook's local
@@ -4250,18 +4253,16 @@ table of 2026-10-19 had already noted. The scheduled rebuild of 2026-11-07
 (run 42367838163, 11:37Z) had republished the withdrawn definition on
 sha256:daeef9400b83 that morning, as the 16.12 entry said it would; it is
 the last digest the fixture will publish, and its tags stay on it. The
-upstream repository, `mm-weber/drill-app`, is archived by the owner once
-this merges; the time is added here by the evidence pull request.
+upstream repository, `mm-weber/drill-app`, was archived by the owner at
+08:07:14Z on 2026-11-08, ten minutes after the merge; its tags and commits,
+cited by this log, stay readable.
 
-**The first rescan after.** Dispatched by the owner after the merge and
-read by the evidence pull request, which adds it here: the enumeration
-without the definition, the fixture's issue closed on evidence, the
-revocation entry with no referenced tag, the status and the page without
-the definition.
+**The first rescan after (2026-11-08).** The dispatched rescan 42461602452 (08:07:54Z to 08:24:04Z) read the registry without the definition: six definitions and grafana's frozen digest examined, no drill-app tag enumerated. The fixture's issue, #325, closed at 08:16:24Z by name, "CVE-2025-30204 appears, reported or suppressed, in no supported digest's attested scan report today", the rule of Req 6.52 doing what the retirement expected; but it closed graded `resolved:fixed`, the SBOM grade having found golang-jwt/jwt/v5 at v5.3.1 in cert-manager-controller's and grafana's platform manifests, images the issue never named, and called that "every occurrence bumped". The grade reads every supported manifest's SBOM, not the issue's own images, and had done the same at 10:21:26Z on 2026-11-07 after the withdrawal, before the scheduled rescan of 13:29Z reopened the issue on the republished digest, an omission of the 16.12 entry corrected there today. Ledger row 6.56 turns to `defect` on that evidence; its fix is a todo item. The posture step printed `revocations: 1 recorded, 0 referenced by a catalogue tag`, the withdrawn digest's entry listed with nothing referencing it, and in the same step `rulesets: unreadable (HTTP Error 403: rate limit exceeded)` and `private vulnerability reporting: unreadable (HTTP Error 403: rate limit exceeded)`: the governance half's two reads refused by GitHub's primary rate limit, which the reader does not wait out by design, the step red by name and no issue filed, the first unreadable governance read, the owner's token reading the flag enabled minutes later; the run was red for that alone. The status issue and the page published without the definition among the catalogue's images and with its three finding rows still carried from the previous data, the HIGH's clock at 21 of 90 days on a digest the catalogue no longer stands behind: the status keeps a retired definition's rows until something drops them, a todo item. The page deployed, its read-back green.
 
-**The record complete.** The ledger reads 150 criteria exercised, one
-defect (6.55, the attested reports' empty database fields, its fix a todo
-item) and four unexercised with their reasons (2.26, 3.13, 3.15, 4.9), no
+**The record complete.** The ledger reads 149 criteria exercised, two
+defects (6.55, the attested reports' empty database fields; 6.56, the
+closure grade read on this day's run, below), each with its fix a todo
+item, and four unexercised with their reasons (2.26, 3.13, 3.15, 4.9), no
 row waiting for a drill. Eight of the fourteen drill entries closed
 without a "What the drill found" paragraph; each has one as of this pull
 request, written from its own text, so that every drill names what it
@@ -4282,4 +4283,7 @@ it is two moves, the version's and the definition's, and only the second
 ends the catalogue's attention; the first, taken alone on 2026-11-07,
 lasted until the next rebuild. What the fixture leaves behind is the
 record: fourteen entries, each naming what its drill found, and a ledger
-with no row that waits.
+with no row that waits. Its last run found two more things: the closure
+grade reads SBOMs the issue never named, a defect now on the ledger's row
+6.56, and the status carries a retired definition's rows with their clocks
+until something drops them.
