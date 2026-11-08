@@ -265,6 +265,46 @@ expect "a scanner that cannot name its database timestamp is refused by name" 0 
   "no-updated-at: traceback printed: no" \
   "no-updated-at: predicate untouched"
 
+# 4: a predicate that already carries the scanner's own database values is left
+#    exactly as it arrived. Today trivy writes scanner.db empty, which is the
+#    whole reason this script exists, but a later trivy may fill those fields
+#    itself, and then what the scanner says about its own database is the better
+#    evidence: trivy knows which repository it actually pulled the database
+#    from, while TRIVY_DB_REPOSITORY only says which one the run was configured
+#    with. So a value the conversion already wrote wins, and the step has to say
+#    it left that value alone rather than pass in silence, or a reader of the run
+#    cannot tell a field this script filled from one it declined to touch. The
+#    pre-filled shape is deliberately unlike anything the stub and
+#    TRIVY_DB_REPOSITORY would produce, a digest-pinned repository and a
+#    timestamp weeks later, so an overwrite cannot hide behind matching values.
+#    The file is compared with cmp, not as parsed JSON, because nothing should
+#    have been rewritten at all, not even reformatted. The phrase asserted on the
+#    output is "left alone".
+FUTURE_DB_URI="ghcr.io/aquasecurity/trivy-db:2@sha256:9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a39281706f5e4d3c2b1a0"
+FUTURE_DB_UPDATED="2026-11-07T06:11:02.113498217Z"
+fresh
+# The shape a future trivy might write, put into the converted predicate in
+# place of the two empty fields; the pristine copy is refreshed from the result,
+# so it is this document that the run has to leave byte for byte.
+python3 - "$SB/vuln.json" "$FUTURE_DB_URI" "$FUTURE_DB_UPDATED" <<'PY'
+import json, sys
+
+path, uri, version = sys.argv[1:4]
+with open(path) as fh:
+    doc = json.load(fh)
+doc["scanner"]["db"] = {"uri": uri, "version": version}
+with open(path, "w") as fh:
+    json.dump(doc, fh, indent=2)
+    fh.write("\n")
+PY
+cp "$SB/vuln.json" "$SB/pristine.json"
+out=$(TRIVY_DB_REPOSITORY="$DB_REPO" PATH="$SB/bin:$PATH" "$FILL" "$SB/vuln.json" 2>&1); rc=$?
+if cmp -s "$SB/vuln.json" "$SB/pristine.json"; then state=untouched; else state=rewritten; fi
+expect "the scanner's own database values are left alone" 0 "$rc" "$out
+predicate $state" \
+  "left alone" \
+  "predicate untouched"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all fill-scanner-db tests passed"
