@@ -19,8 +19,8 @@
 # place, so a failure never leaves a truncated predicate where an attestable
 # one was.
 #
-# Exits 0 once both fields are filled, 2 with no argument and 2 when no
-# database origin is declared.
+# Exits 0 once both fields are filled, 2 with no argument, 2 when no database
+# origin is declared and 2 when trivy reports no database timestamp.
 set -euo pipefail
 
 PRED="${1:-}"
@@ -38,11 +38,22 @@ PRED="${1:-}"
 
 VERSION_JSON=$(trivy version --format json)
 
-python3 - "$PRED" "${TRIVY_DB_REPOSITORY:-}" "$VERSION_JSON" <<'PY'
+# Read before the predicate is opened, so a timestamp trivy did not report is
+# refused here and the rewrite's python only ever receives a value that exists:
+# a missing fact then cannot be mistaken for a failure to write. The version
+# output is the only source for the timestamp, so there is nothing to fall back
+# on; an empty scanner.db.version would attest a claim about which database
+# matched that says nothing while looking filled.
+DB_UPDATED=$(python3 -c 'import json,sys; print(((json.loads(sys.argv[1]) or {}).get("VulnerabilityDB") or {}).get("UpdatedAt") or "")' "$VERSION_JSON")
+[ -n "$DB_UPDATED" ] || {
+  echo "::error::fill-scanner-db: trivy version --format json carries no vulnerability database timestamp (no VulnerabilityDB.UpdatedAt), so there is no timestamp to attest, and an empty scanner.db.version would attest a claim about which database matched that says nothing (Req 6.55)" >&2
+  exit 2
+}
+
+python3 - "$PRED" "${TRIVY_DB_REPOSITORY:-}" "$DB_UPDATED" <<'PY'
 import json, os, sys
 
-pred_path, uri, version_json = sys.argv[1:4]
-version = json.loads(version_json)["VulnerabilityDB"]["UpdatedAt"]
+pred_path, uri, version = sys.argv[1:4]
 
 with open(pred_path) as fh:
     doc = json.load(fh)
