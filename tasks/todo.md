@@ -439,9 +439,11 @@ left of the program is the follow-up list below, one decision each.
       pulled the database from; it refuses by name when either fact is
       missing, leaves a value the scanner itself wrote alone, and runs after
       the conversion on the release path and in the rescan's re-attestation.
-      The ledger row stays `defect` until an attested report read back from a
-      published digest carries both fields; the next release or dispatched
-      rescan supplies that.
+      Verified live on 2026-11-09: the dispatched rescan 42609293392
+      re-attested every supported digest, and the predicates read back from
+      the registry for hardened-app and cert-manager-controller carry the
+      declared origin and the database's timestamp. Ledger row 6.55 is
+      `exercised`; one defect row is left, 6.56.
 - [x] The twelve grafana exceptions of 2026-09-03, moot since 13.1.7: retired
       on 2026-10-19 with grafana's deactivation (#290, LOG 2026-10-19); the
       expiry warnings stopped with the merge.
