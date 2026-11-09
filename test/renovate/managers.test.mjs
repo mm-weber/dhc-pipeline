@@ -699,16 +699,29 @@ check(
   for (const role of ["controller", "webhook", "cainjector"]) {
     const live = extract(goBumpMgr, read(`image/cert-manager-${role}/image.yaml`));
     check(
-      `go-bump pins: cert-manager-${role} carries the x/net pin of 2026-10-12 (CVE-2026-78669), tracked via the go datasource at v0.60.0`,
+      `go-bump pins: cert-manager-${role} carries the x/net pin of 2026-10-12, moved to v0.62.0 on 2026-11-09 (CVE-2026-78669, CVE-2026-78661), tracked via the go datasource`,
       has(live, { depName: "golang.org/x/net", datasource: "go" }) &&
-        dep(live, { depName: "golang.org/x/net" })?.currentValue === "v0.60.0",
+        dep(live, { depName: "golang.org/x/net" })?.currentValue === "v0.62.0",
       JSON.stringify(live),
     );
-    check(
-      `go-bump pins: cert-manager-${role} carries that one pin and no other (x/crypto and grpc went with 1.21.2, LOG 2026-09-18)`,
-      live.length === 1,
-      JSON.stringify(live),
-    );
+    // The controller gained a second pin on 2026-11-09, go-jose v4.1.6 for
+    // CVE-2026-116587 (LOG 2026-11-09); the other two roles carry the x/net
+    // pin alone, x/crypto and grpc having gone with 1.21.2 (LOG 2026-09-18).
+    if (role === "controller") {
+      check(
+        `go-bump pins: cert-manager-${role} carries the go-jose pin of 2026-11-09 (CVE-2026-116587) at v4.1.6, and those two pins only`,
+        live.length === 2 &&
+          dep(live, { depName: "github.com/go-jose/go-jose/v4" })?.currentValue === "v4.1.6" &&
+          dep(live, { depName: "github.com/go-jose/go-jose/v4" })?.datasource === "go",
+        JSON.stringify(live),
+      );
+    } else {
+      check(
+        `go-bump pins: cert-manager-${role} carries that one pin and no other (x/crypto and grpc went with 1.21.2, LOG 2026-09-18)`,
+        live.length === 1,
+        JSON.stringify(live),
+      );
+    }
   }
   check(
     "go-bump pins: manager reads definition files",
