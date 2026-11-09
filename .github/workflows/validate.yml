@@ -167,6 +167,9 @@ jobs:
       - name: install-tool unit tests (Req 7.5)
         run: scripts/install-tool_test.sh
 
+      - name: scanner-database filler unit tests (Req 6.55)
+        run: scripts/fill-scanner-db_test.sh
+
       - name: runner image-store guard unit tests (e2e, kind issue 3795)
         run: scripts/check-runner-image-store_test.sh
 

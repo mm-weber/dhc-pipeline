@@ -430,10 +430,18 @@ left of the program is the follow-up list below, one decision each.
       reads met GitHub's primary rate limit (run 42461602452), which the
       reader does not wait out by design; read them early in the run, or
       retry after the limit's reset; its own pull request.
-- [ ] 6.55 defect: the attested scan reports carry empty `scanner.db.uri` and
+- [x] 6.55 defect: the attested scan reports carried empty `scanner.db.uri` and
       `scanner.db.version` (trivy convert leaves them empty; measured
-      2026-09-27 and 2026-10-08). A fix in the attestation step, test-first,
-      then the ledger row flips from `defect` to `exercised`.
+      2026-09-27 and 2026-10-08). FIXED 2026-11-08 in #382, test-first in four
+      slices: `scripts/fill-scanner-db.sh` writes the database's `UpdatedAt`
+      from `trivy version --format json` and its origin from the declared
+      `TRIVY_DB_REPOSITORY`, since trivy records nowhere which repository it
+      pulled the database from; it refuses by name when either fact is
+      missing, leaves a value the scanner itself wrote alone, and runs after
+      the conversion on the release path and in the rescan's re-attestation.
+      The ledger row stays `defect` until an attested report read back from a
+      published digest carries both fields; the next release or dispatched
+      rescan supplies that.
 - [x] The twelve grafana exceptions of 2026-09-03, moot since 13.1.7: retired
       on 2026-10-19 with grafana's deactivation (#290, LOG 2026-10-19); the
       expiry warnings stopped with the merge.
