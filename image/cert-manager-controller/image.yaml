@@ -74,6 +74,25 @@ contents:
               - golang.org/x/net@v0.60.0
             download: true
             tidy: true
+        # Added 2026-11-09 for CVE-2026-116587, a denial of service in Go JOSE
+        # when parsing JWKs that carry RSA keys: v1.21.2's cmd/controller
+        # go.mod pins github.com/go-jose/go-jose/v4 v4.1.4 (indirect), fixed
+        # in v4.1.6. Upstream pinned v4.1.6 on master and release-1.21 (read
+        # 2026-11-09) and no release carries it, v1.21.3's go.mod still
+        # pinning v4.1.4. Nothing in this repository named go-jose, so no
+        # Renovate bump could ever have been offered for it; the marker below
+        # makes it tracked from here on. Exit condition: drop the step when an
+        # upstream release pins v4.1.6 or newer, the Renovate release pull
+        # request being the reminder (triage/LOG.md 2026-11-09).
+        - name: bump go-jose (CVE-2026-116587)
+          uses: go/bump@v2
+          work-dir: /go/src/github.com/cert-manager/cert-manager/cmd/controller
+          with:
+            deps:
+              # renovate: datasource=go depName=github.com/go-jose/go-jose/v4
+              - github.com/go-jose/go-jose/v4@v4.1.6
+            download: true
+            tidy: true
         # No test step: cmd/* submodules share the monorepo's suite, which
         # needs upstream's make tooling; functional verification is the e2e
         # suite's job (Req 5.5). Upstream ldflags recipe: make/00_mod.mk.

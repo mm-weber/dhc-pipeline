@@ -4287,3 +4287,45 @@ with no row that waits. Its last run found two more things: the closure
 grade reads SBOMs the issue never named, a defect now on the ledger's row
 6.56, and the status carries a retired definition's rows with their clocks
 until something drops them.
+
+## 2026-11-09: fix by fetch-phase module bump, CVE-2026-116587, go-jose v4.1.4 in the controller (#385)
+
+*Image: cert-manager-controller. grafana's half of #338 is a repackaged
+upstream binary and is decided separately; the issue stays open until every
+repository on it is fixed or covered.*
+
+Go JOSE spends unbounded work parsing a JWK that carries an RSA key: HIGH,
+EPSS 0.0037 (30th percentile), not in CISA KEV, filed by the rescan on
+2026-10-28 as #338 against cert-manager-controller and grafana. The
+controller carries the vulnerable code through its own module: v1.21.2's
+`cmd/controller/go.mod` pins `github.com/go-jose/go-jose/v4` v4.1.4,
+indirect, fixed in v4.1.6 of 2026-10-14, so only a pin move retires it.
+Upstream has made that move, master and release-1.21 both pinning v4.1.6
+(read 2026-11-09), and no release carries it: v1.21.3's go.mod still pins
+v4.1.4, which is why the 1.21.3 bump is no fix lane here.
+
+**Why no bump was ever offered.** Nothing in this repository named go-jose.
+The fetch phase's bump steps list the modules a finding made us pin, each
+with its `# renovate:` marker (Req 7.6), and the gomod manager sees this
+repository's own two modules alone, `test/` and `triage/rescan/`. Renovate
+bumps what the repository names, so a transitive module of an upstream built
+from source is invisible to it until a step names it, and the vulnerability
+alerts it does read are Dependabot's on those two modules, not the scanners'
+findings on the images. The marker added with the step makes it tracked from
+here on, the way x/net has been since 2026-10-12.
+
+**Decision: fix** (the owner's call, 2026-11-09). The reach order's first
+rung, through the lane the 2026-10-12 entry re-established: a `go/bump@v2`
+step in the definition's fetch phase, work-dir the cmd submodule the binary
+resolves through, `github.com/go-jose/go-jose/v4@v4.1.6` with its marker,
+`download: true`, `tidy: true`. Minimal version selection makes the pin a
+floor that a later upstream requirement wins over. Exit condition: drop the
+step when an upstream release pins v4.1.6 or newer.
+
+**What it unblocks.** The scan gate on every pull request that builds the
+controller named this finding as the one uncovered thing in its aperture
+(Req 6.1), so Renovate's x/net bump (#270), the build-layer digest (#349) and
+the cert-manager 1.21.3 pair (#327, #328) were all red at it while nothing
+covered go-jose. With the fix merged, the release republishes the controller
+and those bumps can pass the gate on their own merits. The issue itself waits
+on grafana's half.

@@ -704,11 +704,24 @@ check(
         dep(live, { depName: "golang.org/x/net" })?.currentValue === "v0.60.0",
       JSON.stringify(live),
     );
-    check(
-      `go-bump pins: cert-manager-${role} carries that one pin and no other (x/crypto and grpc went with 1.21.2, LOG 2026-09-18)`,
-      live.length === 1,
-      JSON.stringify(live),
-    );
+    // The controller gained a second pin on 2026-11-09, go-jose v4.1.6 for
+    // CVE-2026-116587 (LOG 2026-11-09); the other two roles carry the x/net
+    // pin alone, x/crypto and grpc having gone with 1.21.2 (LOG 2026-09-18).
+    if (role === "controller") {
+      check(
+        `go-bump pins: cert-manager-${role} carries the go-jose pin of 2026-11-09 (CVE-2026-116587) at v4.1.6, and those two pins only`,
+        live.length === 2 &&
+          dep(live, { depName: "github.com/go-jose/go-jose/v4" })?.currentValue === "v4.1.6" &&
+          dep(live, { depName: "github.com/go-jose/go-jose/v4" })?.datasource === "go",
+        JSON.stringify(live),
+      );
+    } else {
+      check(
+        `go-bump pins: cert-manager-${role} carries that one pin and no other (x/crypto and grpc went with 1.21.2, LOG 2026-09-18)`,
+        live.length === 1,
+        JSON.stringify(live),
+      );
+    }
   }
   check(
     "go-bump pins: manager reads definition files",
