@@ -699,9 +699,9 @@ check(
   for (const role of ["controller", "webhook", "cainjector"]) {
     const live = extract(goBumpMgr, read(`image/cert-manager-${role}/image.yaml`));
     check(
-      `go-bump pins: cert-manager-${role} carries the x/net pin of 2026-10-12 (CVE-2026-78669), tracked via the go datasource at v0.60.0`,
+      `go-bump pins: cert-manager-${role} carries the x/net pin of 2026-10-12, moved to v0.62.0 on 2026-11-09 (CVE-2026-78669, CVE-2026-78661), tracked via the go datasource`,
       has(live, { depName: "golang.org/x/net", datasource: "go" }) &&
-        dep(live, { depName: "golang.org/x/net" })?.currentValue === "v0.60.0",
+        dep(live, { depName: "golang.org/x/net" })?.currentValue === "v0.62.0",
       JSON.stringify(live),
     );
     // The controller gained a second pin on 2026-11-09, go-jose v4.1.6 for
