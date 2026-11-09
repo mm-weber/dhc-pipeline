@@ -868,6 +868,40 @@ check(
   check(`markers: every # renovate: marker resolves to a manager dep (${markers} markers)`, markers > 0 && unresolved.length === 0, unresolved.join("; "));
 }
 
+// --- a dismissed alert opens no fix PR (Req 3.15; ledger row 3.15) ----------
+// The refusal itself is upstream's: Renovate decides what to open, this
+// repository only supplies the input. So what is pinned here is that input:
+// alerts are enabled at all, and the pinned Renovate's GitHub platform reads
+// them from the open-alert endpoint alone, so an alert a maintainer dismissed
+// (state `dismissed`) is never in the input a fix PR could come from.
+{
+  check(
+    "dismissed alerts: the config enables vulnerability alerts, so alerts are an input",
+    config.vulnerabilityAlerts?.enabled === true,
+    `vulnerabilityAlerts=${JSON.stringify(config.vulnerabilityAlerts)}`,
+  );
+
+  const pinnedRenovate = /RENOVATE_VERSION:\s*(\S+)/.exec(read(".github/workflows/validate.yml"))?.[1];
+  try {
+    const { getVulnerabilityAlerts } = require("renovate/dist/modules/platform/github/index.js");
+    const src = String(getVulnerabilityAlerts);
+    check(
+      `dismissed alerts: the github platform reads alerts from the open-alert endpoint alone (pinned renovate ${pinnedRenovate})`,
+      src.includes("dependabot/alerts?state=open") && (src.match(/dependabot\/alerts/g) ?? []).length === 1,
+      JSON.stringify(src.match(/dependabot\/alerts[^\s"']*/g)),
+    );
+  } catch (e) {
+    check("dismissed alerts: renovate github platform module loadable", false, `${e.message}: path moved on a renovate major?`);
+  }
+
+  const otherAlertKeys = Object.keys(config).filter((k) => /vulnerabilityalert/i.test(k) && k !== "vulnerabilityAlerts");
+  check(
+    "dismissed alerts: the config declares no second alert source that would bypass it",
+    config.osvVulnerabilityAlerts === undefined && otherAlertKeys.length === 0,
+    `osvVulnerabilityAlerts=${config.osvVulnerabilityAlerts}, other keys=${JSON.stringify(otherAlertKeys)}`,
+  );
+}
+
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed`);
   process.exit(1);
