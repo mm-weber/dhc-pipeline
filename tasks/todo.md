@@ -511,6 +511,16 @@ left of the program is the follow-up list below, one decision each.
       finding fixable only outside the lane and two resting on prebuilt plugin
       binaries nobody here can rebuild, the question is whether this image keeps
       its tags or takes a step down the retirement table. The owner's call.
+- [ ] Transient external failures need a human to re-run (three on 2026-11-10):
+      a GitHub release-asset 504, a buildx cache 503 on the valkey build of
+      #349, and a CISA KEV feed outage on the grafana build of #394 each failed
+      a run that nothing in the change had caused. The rerun-failed-jobs
+      endpoint answers 403 to this repository's token, so each one needs the
+      owner, and an empty commit does not re-trigger a pull request's checks:
+      GitHub registered no synchronize for one on 2026-11-10. Read what the KEV
+      fetch's retry actually does before adding another (Req 6.59, 6.60), and
+      decide whether a documented re-run path or a narrower retry is the answer.
+      Its own pull request.
 - [ ] The tool-pin lane stalls silently (found 2026-11-10): a pinned-executable
       bump needs a hand-added checksum commit, which Renovate reads as an edit
       and stops rebasing, so the pull request sits behind main until someone
