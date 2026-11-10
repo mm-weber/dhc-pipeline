@@ -4505,3 +4505,93 @@ scan after the merge covers both platforms of all three images, and the
 `chart/cert-manager/config/values-hardened.yaml` tags follow publication in
 Renovate's own pull request, as they did for 1.21.2. The upstream chart pin to
 v1.21.3 is #328 and stays separate.
+
+## 2026-11-10: grafana's three findings, one bounded round
+
+*Image: grafana, the digest sha256:a9540c499384 published by the dispatched
+build of 2026-11-10 under all three tags. The owner's calls of 2026-11-10,
+taken together because the gate names all seven instances at once and because
+one re-decision date serves them better than three.*
+
+**Why now, and why this is new.** Deactivation had kept the pull request gate
+off this definition: an inactive definition is never built, so its undecided
+findings published as under investigation and stopped nothing. Reactivation
+(#388) turned the gate back on, and the first change to touch every definition,
+the build-layer round, went red on grafana naming seven uncovered findings
+within the aperture. From here every pull request that builds this image waits
+on these decisions, which is the reactivation's first real cost and the reason
+the fix rung was worth reopening.
+
+**What was measured, per binary, on the published digest.** Read from the
+attested cosign-vuln predicate of its amd64 manifest sha256:6d5db40a9ddc, and
+matched against the gate's own report:
+
+| Binary | CVE-2026-111943 | CVE-2026-78661 | CVE-2026-116587 |
+|---|---|---|---|
+| `bin/grafana` | stdlib v1.26.6 | x/net v0.58.0 | go-jose v4.1.4 |
+| elasticsearch plugin, built 2026-09-16 | stdlib v1.26.7 | x/net v0.58.0 | absent |
+| zipkin plugin, built 2026-09-10 | stdlib v1.26.7 | x/net v0.58.0 | absent |
+
+Seven instances, three findings, three binaries. The five kin-openapi findings
+do not appear: their statements, scoped to `13.1.7-alpine3.23`, matched the
+republished digest and suppressed them, which is the carry-forward working
+across a rebuild.
+
+**What the releases carry.** Read the same day from each tag's own go.mod:
+13.1.9 and 13.2.5 carry Go 1.26.10 and x/net v0.60.0 with go-jose still v4.1.4;
+13.3.0 carries Go 1.27.3, x/net v0.61.0 and go-jose v4.1.6; upstream main
+carries x/net v0.62.0 and go-jose v4.1.8. So one finding has a released in-lane
+fix, one has a fix only outside the lane, and one has no release at all.
+
+**The lane, stated by the owner.** A new grafana minor is a different image.
+This definition tracks 13.1.x and never moves to 13.2.x or 13.3.x; a fix counts
+for it only when a 13.1.x release carries it. That is what makes the go-jose
+decision an acceptance rather than a deferred bump, and it is worth writing
+down because the measurement above would otherwise read as an argument for
+13.3.0.
+
+**The seven decisions.** One per binary per finding, because one entry per
+binary stops one plugin's upstream covering another's (Req 6.23).
+
+- **CVE-2026-111943, `bin/grafana`: accept**, and the shortest-lived of the
+  seven. Remediation is available in this lane: 13.1.9 carries Go 1.26.10 and
+  the repackage bump is queued, so the entry covers the interval until that
+  bump lands and is retired by it rather than re-decided.
+- **CVE-2026-111943, both plugins: transfer**, against the tickets the
+  2026-10-13 round already opened on each plugin repository. The ask is the one
+  those tickets carry, a rebuild on a fixed toolchain, with the Go floor now
+  reading 1.26.10. No grafana release reaches a prebuilt plugin binary without
+  rebundling a newer build of it.
+- **CVE-2026-116587, `bin/grafana`: accept.** The fix reaches grafana in
+  13.3.0, outside this lane by the lane's own definition. The module arrived
+  there transitively rather than through a security bump, no 13.1.x release
+  carries it, and no upstream ticket asks for a backport, so there is no
+  external owner to transfer to. An acceptance with no upstream is the honest
+  shape, and if the owner opens a backport request it becomes a transfer.
+- **CVE-2026-78661, all three binaries: transfer.** Upstream merged x/net
+  v0.62.0 to main on 2026-10-28 (grafana/grafana#136276) and no release carries
+  it; the exit is a backport into 13.1.x, which grafana has done for this module
+  before, v0.60.0 reaching 13.1.9. The plugin halves transfer to their own
+  repositories' tickets, whose x/net floor now reads v0.62.0.
+
+**Why not_affected is written for none of them.** For the toolchain finding the
+verify call is reachable in every outbound TLS call, the image's 121-root bundle
+trusts four sibling eMudhra roots, and the issuers of five of the eight
+distrusted intermediates could not be established from this environment. For
+the network finding the plugins do link x/net/http2 only for Framer and hpack,
+with none of the server, client or flow-control receivers present, which is the
+measurement the 2026-10-13 round took; but a statement scopes by package and
+`bin/grafana` carries the same package with the code present (Req 6.19), so the
+claim cannot be written for the image. For go-jose the JWK parsing path is
+unmeasured in a server that serves JWT and OAuth logins.
+
+**One date.** Every entry expires 2026-12-12, the date the nine transfers of
+2026-10-13 already carry, so grafana's whole open set comes due in one sitting.
+That sitting is where the lane's end state belongs: with one finding fixable
+only outside the lane and two resting on prebuilt binaries nobody here can
+rebuild, the question on 2026-12-12 is whether this image keeps its tags or
+takes a step down the retirement table.
+
+**What this unblocks.** The build-layer round, #393, can go green with grafana
+included once these entries are on main. The 13.1.9 bump follows and retires the
+first entry. Neither waits on the other.
