@@ -58,20 +58,20 @@ KIND_VERSION="0.33.0"
 KIND_SHA256="aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d"
 
 # renovate: datasource=github-releases depName=kyverno/kyverno
-KYVERNO_VERSION="1.19.1"
-KYVERNO_SHA256="b38228f367fc0fdc2b08f4c83ea50ac5f16c60ff8d62d76a66157c33c47b70ae"
+KYVERNO_VERSION="1.19.2"
+KYVERNO_SHA256="357eaf1df8bc24ddd5a73979fadeaae6a032e8710f11af264229756e4956bf4a"
 
 # renovate: datasource=github-releases depName=helm/helm
-HELM_VERSION="4.3.0"
-HELM_SHA256="86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb"
+HELM_VERSION="4.3.1"
+HELM_SHA256="0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b"
 
 # renovate: datasource=github-releases depName=helm/chart-testing
 CT_VERSION="3.15.0"
 CT_SHA256="467561730f25fe09d5e6cd09a3e1f6aa759871c657a57602947c716d9be2c583"
 
 # renovate: datasource=github-releases depName=anchore/syft
-SYFT_VERSION="1.54.1"
-SYFT_SHA256="c069905b391cc4c20a5ba65ad5c10be2a7ba074f8ea6ad203e24d14e303dad47"
+SYFT_VERSION="1.55.0"
+SYFT_SHA256="bb65249542db5fedeeb4d3f9b018b75e7264dbfbbb10486f044581a92f90490d"
 
 # renovate: datasource=github-releases depName=google/go-containerregistry
 CRANE_VERSION="0.22.1"
