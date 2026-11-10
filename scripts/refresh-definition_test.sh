@@ -167,7 +167,10 @@ assert "cert minor: major alias tag"          "$F" "- 1-alpine3.23"
 assert "cert minor: ldflags AppVersion (v)"   "$F" "AppVersion=v1.21.0"
 assert_line "cert minor: display name"        "$F" "name: cert-manager controller 1.21.x"
 refute "cert minor: no stale 1.20.x name"     "$F" "1.20.x"
-refute "cert minor: no stale 1.20.3"          "$F" "1.20.3"
+# the old version survives in a history comment by design (case 1b), so the
+# refutation reads the FIELDS: the file with its comment lines taken out.
+grep -v '^[[:space:]]*#' "$F" > "$SB/fields.yaml"
+refute "cert minor: no stale 1.20.3 in any field" "$SB/fields.yaml" "1.20.3"
 refute "cert minor: no stale old sha"         "$F" "$OLD_SHA"
 
 # 1b: a comment that records history is not a version field: the refresh must

@@ -97,10 +97,15 @@ ov=$(esc "$old_ver"); osha=$(esc "$old_sha")
 omm=$(esc "$old_majmin"); omaj=$(esc "$old_maj")
 
 # 1) full semver + sha wherever they literally appear (VERSION, SEMVER_VERSION,
-#    full tag, ldflags version+commit, checksum, COMMIT_SHA).
+#    full tag, url ref, ldflags version+commit, checksum, COMMIT_SHA, purl).
+#    Both expressions skip comment lines (first non-whitespace char '#'): a
+#    comment is prose, not a derived field, and a sentence recording when a fix
+#    landed ("until v1.21.2 carried both fixes") must keep the version it
+#    names. The authenticity comment is the one comment that does move, and
+#    step 3 rewrites it deliberately.
 sed -i -E \
-  -e "s/${osha}/${new_sha}/g" \
-  -e "s/${ov}/${new_ver}/g" \
+  -e "/^[[:space:]]*#/!s/${osha}/${new_sha}/g" \
+  -e "/^[[:space:]]*#/!s/${ov}/${new_ver}/g" \
   "$f"
 
 # 2) truncated fields the full-semver pass can't reach: major.minor + major
