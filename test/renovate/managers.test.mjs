@@ -696,6 +696,21 @@ check(
     has(deps, { depName: "google.golang.org/grpc", datasource: "go" }),
     JSON.stringify(deps),
   );
+  // A fix-lane floor is the lowest version a go/bump pin allows under minimal
+  // version selection: the one that fixes the finding (M10, docs/CONVENTIONS.md).
+  // Renovate keeps raising it, so the comparison is asserted, not an equality.
+  const atLeast = () => false; // stub, replaced in the green phase
+  check(
+    "go-bump pins: a floor holds at or above its fixing version and refuses anything below it",
+    atLeast("v4.1.9", "v4.1.6") &&
+      atLeast("v4.1.6", "v4.1.6") &&
+      !atLeast("v4.1.5", "v4.1.6") &&
+      !atLeast("v4.0.9", "v4.1.6") &&
+      atLeast("v0.62.0", "v0.60.0") &&
+      !atLeast("v0.58.0", "v0.60.0") &&
+      !atLeast(undefined, "v4.1.6"),
+    JSON.stringify(["v4.1.9", "v4.1.6", "v4.1.5", "v4.0.9"].map((v) => atLeast(v, "v4.1.6"))),
+  );
   for (const role of ["controller", "webhook", "cainjector"]) {
     const live = extract(goBumpMgr, read(`image/cert-manager-${role}/image.yaml`));
     check(
