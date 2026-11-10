@@ -699,7 +699,20 @@ check(
   // A fix-lane floor is the lowest version a go/bump pin allows under minimal
   // version selection: the one that fixes the finding (M10, docs/CONVENTIONS.md).
   // Renovate keeps raising it, so the comparison is asserted, not an equality.
-  const atLeast = () => false; // stub, replaced in the green phase
+  const atLeast = (got, floor) => {
+    // "v4.1.6" -> [4, 1, 6]; anything else is not a version we can compare.
+    const parts = (v) => {
+      const s = String(v ?? "");
+      return /^v?\d+(\.\d+)*$/.test(s) ? s.replace(/^v/, "").split(".").map(Number) : null;
+    };
+    const [g, f] = [parts(got), parts(floor)];
+    if (!g || !f) return false;
+    for (let i = 0; i < Math.max(g.length, f.length); i++) {
+      const d = (g[i] ?? 0) - (f[i] ?? 0);
+      if (d !== 0) return d > 0;
+    }
+    return true;
+  };
   check(
     "go-bump pins: a floor holds at or above its fixing version and refuses anything below it",
     atLeast("v4.1.9", "v4.1.6") &&
@@ -714,9 +727,9 @@ check(
   for (const role of ["controller", "webhook", "cainjector"]) {
     const live = extract(goBumpMgr, read(`image/cert-manager-${role}/image.yaml`));
     check(
-      `go-bump pins: cert-manager-${role} carries the x/net pin of 2026-10-12, moved to v0.62.0 on 2026-11-09 (CVE-2026-78669, CVE-2026-78661), tracked via the go datasource`,
+      `go-bump pins: cert-manager-${role} carries the x/net pin of 2026-10-12 (CVE-2026-78669, CVE-2026-78661) at or above its floor of v0.62.0, the version fixing CVE-2026-78661, tracked via the go datasource`,
       has(live, { depName: "golang.org/x/net", datasource: "go" }) &&
-        dep(live, { depName: "golang.org/x/net" })?.currentValue === "v0.62.0",
+        atLeast(dep(live, { depName: "golang.org/x/net" })?.currentValue, "v0.62.0"),
       JSON.stringify(live),
     );
     // The controller gained a second pin on 2026-11-09, go-jose v4.1.6 for
@@ -724,9 +737,9 @@ check(
     // pin alone, x/crypto and grpc having gone with 1.21.2 (LOG 2026-09-18).
     if (role === "controller") {
       check(
-        `go-bump pins: cert-manager-${role} carries the go-jose pin of 2026-11-09 (CVE-2026-116587) at v4.1.6, and those two pins only`,
+        `go-bump pins: cert-manager-${role} carries the go-jose pin of 2026-11-09 (CVE-2026-116587) at or above its floor of v4.1.6, the version fixing that finding, and those two pins only`,
         live.length === 2 &&
-          dep(live, { depName: "github.com/go-jose/go-jose/v4" })?.currentValue === "v4.1.6" &&
+          atLeast(dep(live, { depName: "github.com/go-jose/go-jose/v4" })?.currentValue, "v4.1.6") &&
           dep(live, { depName: "github.com/go-jose/go-jose/v4" })?.datasource === "go",
         JSON.stringify(live),
       );
