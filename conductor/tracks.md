@@ -8,15 +8,44 @@
 
 ## Active tracks
 
-### [~] switches_20261030: The switches, one run each: the page off, every rebuild published, live
+_No active track._
+
+## Completed tracks
+
+### [x] retirement_20261107: The drill definition retired, the drill program closed, the ledger complete
+
+**Description:** The drill definition retired at level 2 of the retirement table: its active-set line, proofs entry, directory and empty lane removed in one pull request with the live-state case moved to six, test-first; the record completed (the LOG entry, the eight drill entries given their findings paragraph, the README and manual rows, the ledger complete); the upstream repository archived by the owner; the first dispatched rescan after read for the issues closing on evidence and the definition leaving the status; task group 16 closed.
+**Priority:** high (the live program's last task; a scheduled rebuild republishes the withdrawn definition every day until this merges)
+**Completed:** 2026-11-08 (#377 merged as ea59ee1, the track; #378 the retirement, merged as b90900f; the upstream archived 08:07Z; the dispatched rescan after read; the evidence in #379; task group 16 complete)
+**Folder:** [./tracks/retirement_20261107/](./tracks/retirement_20261107/)
+
+### [x] revocation_20261105: A revocation, its advisory and the runbook, the drill digest withdrawn, live
+
+**Description:** The drill definition's current digest recorded as revoked with reason drill while its three tags still reference it (a withdrawal, Move B1, the one entry the schema admits before the move), the advisory drafted first, the dispatched rescan red at the posture step naming the three tags, the package version deleted by the owner, the next dispatched rescan green with the entry listed, the advisory published or kept at the owner's call; ledger rows 9.4, 9.5 and 9.7 exercised.
+**Priority:** high (the live program; the last three drill rows)
+**Completed:** 2026-11-07 (#371 merged as 62918cf, the track; the advisory GHSA-mxcv-w9jx-vj6j drafted; #374 the entry, merged while the three tags still referenced the digest; the dispatched rescan 42130207670 and the scheduled rescan 42233459314 red at the posture step by name; the version deleted by the owner on 2026-11-07; the dispatched rescan 42362729195 green with the entry listed; the evidence in #376: rows 9.4, 9.5 and 9.7 exercised)
+**Folder:** [./tracks/revocation_20261105/](./tracks/revocation_20261105/)
+
+### [x] private-report_20261031: A report through the private channel, handled as the policy promises, live
+
+**Description:** One private vulnerability report filed by the owner, titled as a drill, received through the channel SECURITY.md names, acknowledged, examined against the catalogue's records, answered and closed as a drill, the elapsed times recorded against no promised window; ledger row 9.2 exercised.
+**Priority:** high (the live program; runs beside the switches drill, no scheduled run involved)
+**Completed:** 2026-11-05 (#358 merged as dcda06f, the track; the owner's own attempt refused with 403 on 2026-11-02; the report GHSA-6xgw-5wvx-p8xx filed from a non-collaborator account at 13:29Z, acknowledged 13:55Z, answered and closed as a drill 13:59Z, nothing published; the evidence in #370: row 9.2 exercised)
+**Folder:** [./tracks/private-report_20261031/](./tracks/private-report_20261031/)
+
+### [x] auth-mismatch_20261105: A true authenticity mismatch, the drill definition's tag moved by its maintainer, live
+
+**Description:** The drill definition's pinned tag moved by its maintainer to an unsigned commit, the daily re-verification reporting the first true mismatch by name and filing the supply-chain issue, the owner deciding what the signal means (M18) and restoring the original tag object, the rescan verifying again, the issue closed with the reason; ledger row 3.10 exercised, 3.13 kept with its reason.
+**Priority:** high (the live program; the one row that needs an upstream signal to move)
+**Completed:** 2026-11-05 (#367 merged as ec04bfd, the track; the owner's tag move at 10:29Z and restore at 10:54Z; the dispatched rescans 42011386908, red at the authenticity step and filing #368, and 42014582733, green; #368 closed by the owner with the decision; the evidence in #369: row 3.10 exercised, 3.13 kept)
+**Folder:** [./tracks/auth-mismatch_20261105/](./tracks/auth-mismatch_20261105/)
+
+### [x] switches_20261030: The switches, one run each: the page off, every rebuild published, live
 
 **Description:** Two declared switches flipped for one day through one pull request and flipped back through another: `release.publish_policy` always, so the scheduled rebuild publishes every active definition whatever the comparator says (seven releases, the chart digest pull request following), and `release.page` false, so the scheduled rescan skips the page and the served page keeps the previous day's data; Req 6.62's failure branch by the owner disabling Pages for one run, their call.
 **Priority:** high (the live program; two rows no other drill reaches)
+**Completed:** 2026-11-03 (#356 merged as c0177f6, the track; #357 the flip, 438d456; the scheduled rebuild 41302227631 of 2026-11-01 publishing all seven active definitions and the scheduled rescan 41311884446 skipping the page; #359 the revert, 2338535; Renovate's digest pull requests #360, #361 and #362 automerged on 2026-11-03 once the e2e gate was repaired; the evidence in #365: rows 2.17 and 6.62 exercised, the latter by the owner's Pages action around two dispatched rescans of 2026-11-04; 2.15, 3.12 and 6.61 appended)
 **Folder:** [./tracks/switches_20261030/](./tracks/switches_20261030/)
-
----
-
-## Completed tracks
 
 ### [x] active-set-entry_20261030: The drill definition's directory removed, its active-set entry refused by name, live
 

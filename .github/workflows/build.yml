@@ -39,6 +39,17 @@ on:
         required: false
         type: string
 
+# Req 6.55: the attested cosign-vuln predicate names the scanner and the
+# vulnerability database it matched against. trivy records nowhere which
+# repository it pulled that database from, so the origin is declared here and
+# scripts/fill-scanner-db.sh writes this value, with the database's UpdatedAt,
+# into each predicate after the conversion. Pinned to one repository rather
+# than trivy's default pair (mirror.gcr.io/aquasec/trivy-db:2 first, this one
+# second): the mirror bought availability alone, and every catalogue image
+# lives on ghcr.io already, so an outage there stops the run either way.
+env:
+  TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+
 permissions:
   contents: read
 
@@ -1024,6 +1035,9 @@ jobs:
           for m in "${manifests[@]}"; do
             report="trivy-${m#sha256:}.json"
             trivy convert --format cosign-vuln --output "vuln-${m#sha256:}.json" "$report"
+            # Req 6.55: the conversion leaves scanner.db empty, so the database
+            # this report matched against is written in beside the scanner.
+            scripts/fill-scanner-db.sh "vuln-${m#sha256:}.json"
             cosign attest --yes --type vuln \
               --predicate "vuln-${m#sha256:}.json" "${IMAGE}@${m}"
           done
