@@ -748,8 +748,8 @@ check(
   check("tracking scope: the committed block is an ignorePaths array", Array.isArray(config.ignorePaths), JSON.stringify(config.ignorePaths));
   const chk = spawnSync(join(root, "scripts/render-tracking.sh"), ["--check", root], { encoding: "utf8" });
   check("tracking scope: the committed block matches the active set (render-tracking --check)", chk.status === 0, `${chk.stdout}${chk.stderr}`);
-  // The reference instance activates everything but grafana, deactivated on 2026-10-19 (design Decision 11; triage/LOG.md 2026-10-19), so it ignores exactly grafana's directory and the chart deploying only it.
-  check("tracking scope: the reference instance ignores grafana's directory and chart, nothing else", JSON.stringify(config.ignorePaths ?? []) === JSON.stringify(["image/grafana/**", "chart/grafana/**"]), JSON.stringify(config.ignorePaths));
+  // The reference instance activates everything again, grafana returned to the set on 2026-11-10 (design Decision 11; triage/LOG.md 2026-10-19, 2026-11-10), so it ignores no path at all.
+  check("tracking scope: the reference instance ignores no path", JSON.stringify(config.ignorePaths ?? []) === JSON.stringify([]), JSON.stringify(config.ignorePaths));
 
   const sb = mkdtempSync(join(tmpdir(), "dhc-tracking-"));
   for (const d of ["image", "chart"]) cpSync(join(root, d), join(sb, d), { recursive: true });
@@ -766,18 +766,18 @@ check(
   } catch (e) {
     check("tracking scope: the rendered block is JSON5 the config loader reads", false, e.message);
   }
-  const want = ["image/grafana/**", "image/hardened-app/**", "chart/grafana/**", "chart/hardened-app/**"];
+  const want = ["image/hardened-app/**", "chart/hardened-app/**"];
   check(
-    "tracking scope: the inactive definitions' directories and the charts deploying only them are ignored (grafana since 2026-10-19, hardened-app in the fixture)",
+    "tracking scope: the inactive definition's directory and the chart deploying only it are ignored (hardened-app in the fixture)",
     !!rendered && JSON.stringify(rendered.ignorePaths) === JSON.stringify(want),
     JSON.stringify(rendered?.ignorePaths),
   );
   try {
     const fm = require("renovate/dist/workers/repository/extract/file-match.js");
     const files = [
-      "image/grafana/image.yaml",
-      "chart/grafana/chart.yaml",
-      "chart/grafana/config/values-hardened.yaml",
+      "image/hardened-app/image.yaml",
+      "chart/hardened-app/chart.yaml",
+      "chart/hardened-app/values.yaml",
       "image/valkey/image.yaml",
       "chart/valkey/config/values-hardened.yaml",
       "scripts/install-tool.sh",

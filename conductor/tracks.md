@@ -8,7 +8,13 @@
 
 ## Active tracks
 
-_No active track._
+### [~] reactivate-grafana_20261110: Grafana returns to the active set, the fix rung reopened
+
+**Description:** Grafana returns to `active_set` by the same switch that removed it on 2026-10-19: the line back, the tracking block re-rendered, the live-state case moved to seven by four test-first, the README and manual rows and the LOG entry in the same pull request; the fix rung reopens for the three undecided HIGH findings on the frozen digest and for the nine transfers of 2026-10-13, whose exit the released 13.1.x line now carries; the first active day and the bot's bump read in a second pull request.
+**Priority:** high (three undecided HIGH findings on the frozen digest are waiting on this decision; the oldest has been undecided for 20 days)
+**Folder:** [./tracks/reactivate-grafana_20261110/](./tracks/reactivate-grafana_20261110/)
+
+---
 
 ## Completed tracks
 

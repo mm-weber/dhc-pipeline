@@ -4345,3 +4345,105 @@ repackaged upstream binary, which no pin of ours can move, and its half is
 decided separately. The stdlib finding of #300 was not named by the gate on
 these builds, so a fresh build no longer reports it; what the published
 digests carry is read from the next release's reports.
+
+## 2026-11-10: grafana returns to the active set, the fix rung reopened (#388)
+
+*Image: grafana, the frozen 13.1.7 digest sha256:89c5680a868b, inactive since
+2026-10-19. The owner's call of 2026-11-10, conductor track
+`reactivate-grafana_20261110`: the line goes back into `active_set` by the same
+switch that removed it, and nothing more.*
+
+**Why the call changed.** The deactivation did what it was opened to do, which
+was to exercise the documented switch live on a real definition, and the
+ledger holds that evidence on rows 1.15 and 1.16. What it also did was close
+the fix rung on a digest the catalogue keeps enumerating, scanning, clocking
+and re-attesting every day. Three undecided HIGH findings accumulated on it
+with no treatment left but a bounded acceptance and no exit but a second one,
+and the nine transfers of 2026-10-13 lost the build that was to end them. The
+evidence for the oldest of the three was prepared for a decision on 2026-11-10
+and the measurement moved the question rather than answering it: a released
+13.1.x now carries the toolchain that finding needs, so the honest first rung
+was no longer closed.
+
+**What was measured.** On the frozen digest, pulled and extracted, and against
+upstream's dependency manifests at the relevant tags. The server binary's own
+build information reads go1.26.6, `golang.org/x/net` v0.58.0 and
+`github.com/go-jose/go-jose/v4` v4.1.4.
+
+| Finding | Needs | Frozen 13.1.7 | Released 13.1.9 |
+|---|---|---|---|
+| CVE-2026-111943 (#300) | Go 1.26.10 | go1.26.6 | go 1.26.10 |
+| the nine transfers of 2026-10-13 | Go 1.26.9, x/net 0.60.0 | go1.26.6, v0.58.0 | go 1.26.10, v0.60.0 |
+| the five kin-openapi statements | 0.146.0 | v0.144.0 | v0.151.0 |
+| CVE-2026-116587 (#338) | go-jose 4.1.6 | v4.1.4 | v4.1.4 |
+| CVE-2026-78661 (#375) | x/net 0.62.0 | v0.58.0 | v0.60.0 |
+
+Upstream's main branch carries Go 1.27.3, x/net v0.62.0 and go-jose v4.1.8, so
+the two newest findings have a real exit in a release grafana has not cut yet.
+The two bundled plugin binaries, measured at go1.26.7 in the round of
+2026-10-13 and built on 2026-09-10 and 2026-09-16, are prebuilt artifacts of
+their own repositories: what a 13.1.9 tarball bundles is not measurable from
+this environment, whose allowlist does not reach the download host. The gate of
+the first bump is that measurement, which is an argument for proposing one.
+
+**What the three findings now wait on.** Nothing is decided here and the
+exception file is untouched. CVE-2026-111943 waits on the finding set the first
+bump's gate reports, with the fix rung as its first option; its acceptance
+proposal of this morning is withdrawn. CVE-2026-116587 and CVE-2026-78661 wait
+on a grafana release carrying what upstream's main already has, which makes a
+transfer with a dated exit the honest treatment rather than an acceptance. All
+three sit inside their ninety-day ceilings, which fall on 2027-01-19,
+2027-01-26 and 2027-02-05.
+
+**The nine transfers.** Their planned exit is restored. A 13.1.9 build clears
+the stdlib half of all three findings, Go 1.26.10 being past the 1.26.9 wave,
+and moves x/net to v0.60.0, the version CVE-2026-78669 names as fixed. What the
+two plugin halves carry depends on what that tarball bundles. The re-decision
+date stays 2026-12-12, and the 2026-10-19 entry's reading of it, accept because
+no build will fix this image, is no longer the only reading available.
+
+**The five not-affected statements.** Each is scoped to 13.1.7-alpine3.23, so a
+rebuild at the same version stays inside their scope and the claims keep
+matching. A 13.1.9 build makes them moot instead: the module they excuse moves
+to v0.151.0, past the 0.146.0 to 0.149.0 the five advisories name as fixed.
+
+**What changes on the merge.** `grafana` returns to `active_set` between
+`cert-manager-cainjector` and `valkey` and the comment recording the
+deactivation is amended; nothing under `image/grafana/` or `chart/grafana/`
+moves. `renovate.json5`'s tracking block is re-rendered with no grafana glob,
+so the bot extracts the definition again and `scripts/refresh-grafana.sh`, the
+postUpgradeTask of ADR 0002, is what will rewrite the per-build tarball URL and
+both per-arch checksums on a bump. The live-state case of
+`scripts/lint-probes_test.sh` moves to seven active definitions, seven covered
+by four probe registrations and none declared, test-first. The end-to-end
+suite's affected-components job reads the active set to know which charts may
+run at all, and then selects on a pull request the components whose chart or
+whose active definition changed. This change touches neither, so no grafana
+suite runs here; the chart is installed again on the first pull request that
+moves the definition, which is the bot's bump, and on a dispatch of every
+component. `test/e2e/probes_test.go` has kept its `http-health` registration,
+an in-cluster request for `/api/health`, throughout.
+
+**What this pull request does not do.** It builds nothing: a pull request's
+matrix is derived from changed `image/<name>/image.yaml` paths and from the
+images a changed statement names, and this change touches neither, so the scan
+gate scans nothing here. It moves no tag and it decides no finding.
+`release.fail_closed` is false, so an uncovered finding in a release-time scan
+is published as under investigation rather than stalling the release, which is
+why the three open findings do not block the return;
+`release.publish_policy` is on-change, so the first scheduled rebuild publishes
+only if its package set differs from the published digest's.
+
+**What the first active day is expected to show**, named here so it can be
+checked rather than assumed: a build run with grafana in its matrix, a package
+set three weeks newer than the published digest's, a new digest under
+`13-alpine3.23`, `13.1-alpine3.23` and `13.1.7-alpine3.23`, a release-time scan
+naming three uncovered findings, a status issue that carries them with their
+first-seen dates unchanged, and a daily authenticity re-check that covers the
+definition's two tarball origins again, its class being cross-origin-checksum,
+dormant since 2026-10-19. The build also runs `scripts/verify-arch-pins.sh`
+over the definition again, which fetches both per-arch tarballs and checks the
+pinned checksums against the bytes upstream serves. The end-to-end component and the gate's full
+finding set arrive with the bump instead, which is the next pull request and
+not this one. The track's second pull request reads both and adds the
+addendum.
