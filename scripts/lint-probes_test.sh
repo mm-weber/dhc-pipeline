@@ -113,9 +113,9 @@ proofs 'app:' '  kind: smoke'
 out=$("$LINT" "$SB" 2>&1); rc=$?
 expect "a reader refusal surfaces by name and stops the lint" 1 "$rc" "$out" "app" "smoke" "Req 5.10" "nothing checked"
 
-# 13: this repository: six definitions chart-proved, the drill declared none and grafana inactive, the lint green (the live state the reference instance ships since the deactivation of 2026-10-19)
+# 13: this repository: seven definitions chart-proved, none declared and grafana active again, the lint green (the live state the reference instance ships since grafana's return to the active set)
 out=$("$LINT" "$HERE/.." 2>&1); rc=$?
-expect "the repository passes with six chart-proved, one declared none and grafana inactive" 0 "$rc" "$out" "7 active definition(s)" "6 covered by 3 probe registration(s)" "1 declared none" "drill-app: proof none"
+expect "the repository passes with seven chart-proved, none declared and grafana active again" 0 "$rc" "$out" "7 active definition(s)" "7 covered by 4 probe registration(s)" "0 declared none"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi

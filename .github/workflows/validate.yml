@@ -90,6 +90,13 @@ jobs:
       - name: rescan steps run regardless of earlier failures (D1)
         run: scripts/lint-rescan-steps.sh
 
+      # The mirror rule for the release path (Req 2.26): every step after the
+      # release-time scan keeps GitHub's default success() condition, so a scan
+      # that produced no report signs nothing, attests nothing and tags
+      # nothing. An always() on any of them would publish the digest anyway.
+      - name: release steps stay stopped by a failed scan (Req 2.26)
+        run: scripts/lint-release-steps.sh
+
       # The active set (task 14.2): well-formed (Req 1.19), splitting no
       # byte-equal pair or grouped monorepo (Req 1.18), every chart directory
       # naming the definitions it deploys; on a pull request, a change under
@@ -159,6 +166,12 @@ jobs:
 
       - name: install-tool unit tests (Req 7.5)
         run: scripts/install-tool_test.sh
+
+      - name: scanner-database filler unit tests (Req 6.55)
+        run: scripts/fill-scanner-db_test.sh
+
+      - name: runner image-store guard unit tests (e2e, kind issue 3795)
+        run: scripts/check-runner-image-store_test.sh
 
       - name: VEX product identity lint (Req 6.17, 6.19, 6.20)
         run: scripts/lint-vex-product.sh
@@ -237,6 +250,9 @@ jobs:
 
       - name: rescan step-condition lint unit tests (D1)
         run: scripts/lint-rescan-steps_test.sh
+
+      - name: release step-condition lint unit tests (Req 2.26)
+        run: scripts/lint-release-steps_test.sh
 
       - name: release-policy reader unit tests (D3)
         run: scripts/release-policy_test.sh

@@ -42,6 +42,17 @@ on:
         options: [none, kev-outage, kev-synthetic]
         default: none
 
+# Req 6.55: the attested cosign-vuln predicate names the scanner and the
+# vulnerability database it matched against. trivy records nowhere which
+# repository it pulled that database from, so the origin is declared here and
+# scripts/fill-scanner-db.sh writes this value, with the database's UpdatedAt,
+# into each predicate after the conversion. Pinned to one repository rather
+# than trivy's default pair (mirror.gcr.io/aquasec/trivy-db:2 first, this one
+# second): the mirror bought availability alone, and every catalogue image
+# lives on ghcr.io already, so an outage there stops the run either way.
+env:
+  TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+
 permissions:
   contents: read
   # Task 10.3 (Req 6.42, 6.43): the rescan attests today's scan reports and,
