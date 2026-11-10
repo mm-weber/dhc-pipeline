@@ -4447,3 +4447,61 @@ pinned checksums against the bytes upstream serves. The end-to-end component and
 finding set arrive with the bump instead, which is the next pull request and
 not this one. The track's second pull request reads both and adds the
 addendum.
+
+## 2026-11-10: cert-manager 1.21.3, the three statements carried, both fix-lane pins re-checked
+
+*Images: cert-manager-controller, cert-manager-webhook, cert-manager-cainjector.
+Renovate proposed the release in #327, which is red at the statement lint
+because a statement may only pin a tag its definition publishes. This pull
+request carries what a release bump has to carry with it, so #327 is subsumed.*
+
+**What the release brings.** v1.21.3's go.mod, read on 2026-11-10 at the root
+and in each of the three cmd submodules: `golang.org/x/crypto` v0.57.0, up from
+v0.56.0; `golang.org/x/net` v0.60.0, up from v0.58.0;
+`google.golang.org/grpc` v1.83.2, unchanged; `github.com/go-jose/go-jose/v4`
+v4.1.4, unchanged. The upstream tag is signed and its commit is
+925c22283de556172d48d96a165dc2fa27f7a6ff.
+
+**Both fix-lane steps stay, and the readings say why.** The x/net step's exit
+condition is an upstream release pinning v0.62.0 or newer. v1.21.3 pins
+v0.60.0, which carries CVE-2026-78669's fix but not CVE-2026-78661's, so the
+pin stays at v0.62.0 for the second finding and the step keeps both names. The
+go-jose step's exit condition is an upstream release pinning v4.1.6 or newer;
+v1.21.3 still pins v4.1.4, so that step stays too. Each definition's comment
+now records the 2026-11-10 reading beside the older ones.
+
+**What the refresh got wrong, and what was restored.** The postUpgradeTask
+rewrites the version string wherever it appears, including inside sentences
+that are history. In all three definitions "from 2026-09-02 until v1.21.2
+carried both fixes" became "until v1.21.3", and "v1.21.2's go.mod pins
+golang.org/x/net v0.58.0" became "v1.21.3's". Both are false: v1.21.2 is the
+release that carried the crypto and grpc fixes, and v1.21.3 pins x/net
+v0.60.0, not v0.58.0. The controller's go-jose paragraph was rewritten the same
+way, where the replacement happened to be true of v1.21.3. Every one of them is
+restored to what was measured when it was written, with today's reading added
+rather than substituted. Whether the refresh should leave comment lines alone is
+a todo item; it is a tool that edits prose it cannot evaluate.
+
+**The three statements carried.** A product identifier pins the published tag
+(Req 6.20), so a release bump moves every statement that names the old one, the
+way the 1.21.1 to 1.21.2 carry did on #208. CVE-2026-56854 (x/crypto, document
+version 3), CVE-2026-84304 (grpc, document version 3) and CVE-2026-78669
+(x/net, document version 2) now scope to 1.21.3-alpine3.23. None was carried
+blind: each claim was re-checked against v1.21.3's own go.mod, and each
+statement's notes say what was read and when. The crypto and grpc claims hold
+because upstream's pins are at or above the fixed versions; the x/net claim
+holds twice now, once through upstream's own v0.60.0 and once through the
+catalogue's v0.62.0 floor.
+
+**One stale claim corrected while the file was open.** CVE-2026-78669's impact
+statement still said the definitions bump the module to v0.60.0. The pin moved
+to v0.62.0 on 2026-11-09 and the text had not followed. It names v0.62.0 and
+the finding that moved it.
+
+**What the gate is expected to say.** Three builds, amd64 only on a pull
+request, each scanned with its statements compiled against the pushed digest of
+the throwaway registry: nothing uncovered within the aperture. The release-time
+scan after the merge covers both platforms of all three images, and the
+`chart/cert-manager/config/values-hardened.yaml` tags follow publication in
+Renovate's own pull request, as they did for 1.21.2. The upstream chart pin to
+v1.21.3 is #328 and stays separate.
