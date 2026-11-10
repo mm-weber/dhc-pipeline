@@ -1007,6 +1007,81 @@ graph TB
       pull request; H because Decision 6 measured the frontend as non-reproducible; I because
       the chart pin would still need a declared first-release state before the first install.
 
+15. **SLSA Build L2: provenance generated from the platform's signed claims, verifiable by consumers, demanded from the successor's epoch (Req 2.9, 2.10, 2.23, 2.25, 2.27 to 2.29, 7.7, 9.19; SLSA v1.2; decided 2026-10-28)**
+    - **Context**: the catalogue aims at SLSA Build L2. Measured against SLSA v1.2 (released
+      2025-11-24; the spec read from the `releases/v1.2` branch of slsa-framework/slsa, commit
+      ae7fc76, `spec/build-track-basics.md` and `spec/build-requirements.md`): L1 asks that
+      provenance exists, identifies the output by digest and is distributed (met: BuildKit
+      `provenance: mode=max` on every release, one attestation manifest per platform manifest
+      inside the index); L2 adds a hosted build platform (met: GitHub-hosted runners, and the
+      verification policy admits only the build workflow's identity on main, so nothing
+      built elsewhere is admitted) and provenance that is authentic: consumers MUST be able
+      to validate its signature and the build platform behind it, and its data MUST come from
+      the build platform's control plane, not from a tenant, with "some security control" and
+      no minimum strength (`provenance-authentic`; the threat "forge values of the provenance",
+      Build L2). Neither half holds. The BuildKit attestation manifests carry no envelope
+      signature of their own; the cosign signature over the index digest covers them only
+      transitively, which no verifier (cosign `verify-attestation`, Kyverno, slsa-verifier)
+      reads, and the policy never asks (Req 2.25 says so). And BuildKit writes them inside the
+      job, from values the job's own steps set (builder id, invocation), which is the tenant
+      side of v1.2's accuracy clause. The consumer half, step 1 and step 2 of
+      `spec/verifying-artifacts.md` (signature, subject, predicate type, then expectations on
+      builder identity, source repository, build type and external parameters), has no
+      instruction and no policy rule.
+    - **History**: no decision was ever taken against verified provenance. The cluster A
+      review of 2026-08-21 found Req 2.10 and 2.23 silent on provenance and offered two
+      fixes, require it in both or state in 2.25 that it is attached and not verified; the
+      2026-08-22 revision (ledger row 1.14, #97) took the second for 2.25 and added
+      provenance to 2.10's definition of published, but not to 2.23, so "published" names a
+      leg nothing asserts; no reason is recorded. The review of 2026-09-09 found exactly that
+      (finding 2.4: the provenance leg never asserted, Req 2.10 PARTIAL, the smoke test's
+      provenance step passing on a null result), and its eight proposed dispositions (D1 to
+      D8) carry no row for it, so it fell through. The only SLSA scope ever written down is
+      a non-goal, "full SLSA L3 hermeticity" (Overview); `docs/concepts.md` calls the
+      catalogue "L2-ish", a claim the verification policy does not back. The substrate's own
+      catalogue images carry SLSA Build L3 provenance (`data/docker_internal_build.md`); this
+      catalogue's rebuilds of them publish L1.
+    - **Options**: (A) sign the BuildKit provenance: extract it per platform manifest and
+      `cosign attest --type slsaprovenance1` under the releaser identity; it keeps the
+      resolved materials (frontend and builder digests) and fits the role model, but its
+      data is still written by the job, so v1.2's accuracy clause is met only arguably;
+      (B) GitHub's provenance service, `actions/attest-build-provenance`, per index and per
+      platform manifest, stored in the registry beside the digest: the predicate is built
+      from the signed OIDC token's claims (repository, workflow path, ref, commit, runner
+      environment), the signature is Sigstore keyless under the calling workflow's identity
+      (the releaser's), and GitHub documents it as Build L2 (L3 from a reusable workflow);
+      (C) declare the index signature an "alternate means" of authenticity (v1.2 allows
+      one, footnote to Build L2) and document it, with no new artifact, but no consumer tool
+      verifies it and the accuracy half stays open; (D) slsa-github-generator's container
+      workflow, Build L3, an isolated reusable workflow; (E) do nothing and correct the
+      claim to L1.
+    - **Decision**: **B**, the owner's call of 2026-10-28, with BuildKit's provenance left
+      attached as supplementary detail: v1.2 lets resolved dependencies be tenant-generated
+      at L2, and its materials stay the richest record of what the frontend resolved, but
+      no policy reads it and no claim rests on it. Provenance joins the release-time set
+      (2.9) before the tags, generated from the token's claims only (2.27); the policy file's
+      verification section declares the expectations (builder identity, build type, source
+      repository, workflow path, ref; 7.7) and whether provenance is required; the rendered
+      policy demands it where required (2.23, 2.28), the consumer instructions gain one step
+      (2.25), and the security policy states the level, the version and the covered digests
+      and never claims above what the policy demands (9.19). **Binding from the successor's
+      epoch**, the owner's second call: publish-on-change never re-releases an unchanged
+      digest, superseded tags stay verified daily, and provenance cannot be minted after the
+      fact (the rescan's identity must never produce it, or it would be forged by
+      construction), so a requirement switched on here would reject published digests that
+      cannot be repaired. This repository builds and attests it from task 18.3 on and reports
+      coverage daily without failing (2.29); the successor names it required from its first
+      release (task 12.1), where every digest is new.
+    - **Consequences**: the release job gains `attestations: write`; each release adds Rekor
+      entries per digest (the transparency disclosure, Req 9.1, already covers keyless
+      signing). The service writes a Sigstore bundle, not cosign v2's `.att` tag layout: what
+      verifies it (the pinned Kyverno for 2.28, a consumer command for 2.25, the smoke test
+      for 9.13) is measured first (task 18.2, ADR 0005); if only cosign v3 reads it, ADR
+      0003's major gate is the owner's call, not this decision's. The GitHub coupling deepens
+      by one service; the trust-boundary table names it, with D as the L3 path and A as the
+      seam a fork on another forge would take. The comparator, the VEX planes and the
+      re-attester are untouched: none reads provenance. Build L3 stays out of scope.
+
 ## System Flows
 
 ### Release flow (Req 2.7 to 2.17, 2.26; as specified 2026-08-22, implementation task 9)
