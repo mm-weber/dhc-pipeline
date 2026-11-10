@@ -98,7 +98,7 @@ contents:
           with:
             deps:
               # renovate: datasource=go depName=github.com/go-jose/go-jose/v4
-              - github.com/go-jose/go-jose/v4@v4.1.6
+              - github.com/go-jose/go-jose/v4@v4.1.9
             download: true
             tidy: true
         # No test step: cmd/* submodules share the monorepo's suite, which
