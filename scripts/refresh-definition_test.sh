@@ -40,6 +40,7 @@ contents:
             # authenticity: signed-tag
             checksum: $OLD_SHA
       pipeline:
+        # the fix lane ran from 2026-09-02 until v$1 carried both fixes
         - name: build
           uses: go/build@v1
           with:
@@ -168,6 +169,12 @@ assert_line "cert minor: display name"        "$F" "name: cert-manager controlle
 refute "cert minor: no stale 1.20.x name"     "$F" "1.20.x"
 refute "cert minor: no stale 1.20.3"          "$F" "1.20.3"
 refute "cert minor: no stale old sha"         "$F" "$OLD_SHA"
+
+# 1b: a comment that records history is not a version field: the refresh must
+# leave its version alone. On 2026-11-10 it rewrote "until v1.21.2 carried both
+# fixes" to v1.21.3 in three cert-manager definitions, a false statement.
+newtag="v1.21.0"; run_bump cert_def 1.20.3 "$newtag"
+assert_line "cert minor: a comment recording history keeps its version" "$F" "        # the fix lane ran from 2026-09-02 until v1.20.3 carried both fixes"
 
 # 2: cert-manager patch bump 1.20.3 -> 1.20.4 (major.minor unchanged)
 newtag="v1.20.4"; run_bump cert_def 1.20.3 "$newtag"
