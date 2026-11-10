@@ -32,7 +32,7 @@ Dependency: phase 1 merged. The rebuild runs at 04:47 UTC on the active set; by 
 ### Tasks
 
 - [ ] **2.1 The rebuild read**: the build run for grafana, whether the package set differed, the digest it published, the three tags moved, the release-time scan's uncovered count and what the status issue carries for the three findings afterwards
-- [ ] **2.2 The end-to-end suite read**: the grafana component back in the matrix and the `http-health` probe's result on the installed chart
+- [ ] **2.2 The end-to-end suite read**: the grafana component in the matrix of the bump's pull request, since a pull request selects components by changed chart or definition, and the `http-health` probe's result on the installed chart
 - [ ] **2.3 The bot's bump**: Renovate's pull request for the current 13.1.x release, its postUpgradeTask rewriting the URL and both checksums, and the finding set its gate reports; the numbers go to the owner, the decisions are their call and their own pull requests
 - [ ] **2.4 The evidence pull request**: the addendum to the LOG entry, this plan and the registry closed
 
