@@ -4346,7 +4346,7 @@ decided separately. The stdlib finding of #300 was not named by the gate on
 these builds, so a fresh build no longer reports it; what the published
 digests carry is read from the next release's reports.
 
-## 2026-11-10: grafana returns to the active set, the fix rung reopened
+## 2026-11-10: grafana returns to the active set, the fix rung reopened (#388)
 
 *Image: grafana, the frozen 13.1.7 digest sha256:89c5680a868b, inactive since
 2026-10-19. The owner's call of 2026-11-10, conductor track
