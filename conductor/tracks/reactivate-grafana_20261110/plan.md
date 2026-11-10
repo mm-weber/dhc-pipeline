@@ -3,7 +3,7 @@
 **Track ID:** reactivate-grafana_20261110
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-11-10
-**Status:** [~] in progress (phase 1 opened 2026-11-10)
+**Status:** [~] in progress (phase 1 in #388, opened 2026-11-10: RED 0137687, GREEN 667bd97, the record 7782bc6)
 
 ## Overview
 
@@ -15,15 +15,15 @@ Worktree `reactivate-grafana` from main.
 
 ### Tasks
 
-- [ ] **1.1 RED 1: the live-state case asserts seven by four** (FR-2): `scripts/lint-probes_test.sh` case 13 expects `7 active definition(s)`, `7 covered by 4 probe registration(s)` and `0 declared none`, and fails on the repository as it stands, which reports six by three; committed red
-- [ ] **1.2 GREEN 1: the line back** (FR-1): `grafana` returns to `active_set` between `cert-manager-cainjector` and `valkey`, the deactivation comment is amended, `scripts/render-tracking.sh` re-renders the tracking block with no grafana glob, and `test/renovate/managers.test.mjs`'s tracking-scope expectations move with the behaviour; nothing under `image/grafana/` or `chart/grafana/` changes; case 13 green, the whole validate suite green locally
-- [ ] **1.3 The record** (FR-3, FR-4, FR-5): the README's `image/` row and the manual's definitions row name the return and its date; the LOG entry is added; ledger rows 1.15 and 1.16 gain the dated sentence; the exception file is untouched
-- [ ] **1.4 The pull request**: title `chore: grafana returns to the active set, the fix rung reopened (Req 1.13, 1.14, 3.2, 5.8, 7.11)`, a TL;DR; the owner merges (checkpoint)
+- [x] **1.1 RED 1: the live-state case asserts seven by four** (FR-2): `scripts/lint-probes_test.sh` case 13 expects `7 active definition(s)`, `7 covered by 4 probe registration(s)` and `0 declared none`, and fails on the repository as it stands, which reports six by three; committed red
+- [x] **1.2 GREEN 1: the line back** (FR-1): `grafana` returns to `active_set` between `cert-manager-cainjector` and `valkey`, the deactivation comment is amended, `scripts/render-tracking.sh` re-renders the tracking block with no grafana glob, and `test/renovate/managers.test.mjs`'s tracking-scope expectations move with the behaviour; nothing under `image/grafana/` or `chart/grafana/` changes; case 13 green, the whole validate suite green locally
+- [x] **1.3 The record** (FR-3, FR-4, FR-5): the README's `image/` row and the manual's definitions row name the return and its date; the LOG entry is added; ledger rows 1.15 and 1.16 gain the dated sentence; the exception file is untouched
+- [ ] **1.4 The pull request**: #388, title `chore: grafana returns to the active set, the fix rung reopened (Req 1.13, 1.14, 3.2, 5.8, 7.11)`, a TL;DR; the owner merges (checkpoint)
 
 ### Verification (orchestrator)
 
-- [ ] `scripts/lint-active-set.sh .`, `scripts/lint-probes.sh .`, `scripts/lint-probes_test.sh`, `scripts/render-tracking.sh --check .`, `node test/renovate/managers.test.mjs`, `scripts/lint-live-evidence.sh .`, `scripts/lint-log-anchors.sh all .` all green
-- [ ] No em-dashes in the added lines; no closing keyword before an issue reference; the diff touches no definition or chart file
+- [x] `scripts/lint-active-set.sh .`, `scripts/lint-probes.sh .`, `scripts/lint-probes_test.sh`, `scripts/render-tracking.sh --check .`, `node test/renovate/managers.test.mjs`, `scripts/lint-live-evidence.sh .`, `scripts/lint-log-anchors.sh all .` all green
+- [x] No em-dashes in the added lines; no closing keyword before an issue reference; the diff touches no definition or chart file
 
 ## Phase 2: the first active day (one pull request)
 
