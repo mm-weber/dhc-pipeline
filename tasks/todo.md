@@ -429,15 +429,17 @@ left of the program is the follow-up list below, one decision each.
       of them supported grades absent by name, an issue naming no image keeps
       the old reading. The ledger row stays `defect` until a live closure shows
       the grade read on the issue's own images; that run flips it.
-- [ ] The refresh rewrites prose it cannot evaluate (found 2026-11-10 on
-      Renovate's #327): `scripts/refresh-definition.sh`, the postUpgradeTask,
-      replaces the old version string wherever it occurs in a definition,
-      including inside comment sentences that record history. The cert-manager
-      1.21.3 bump had three definitions' fix-lane paragraphs rewritten into two
-      false claims, restored by hand in the bump's own pull request. Options:
-      confine the rewrite to the value lines it owns, or leave comments alone
-      and let the bump's author update them. Its own pull request, test-first;
-      `scripts/refresh-definition_test.sh` is the suite.
+- [x] The refresh rewrites prose it cannot evaluate: FIXED 2026-11-10.
+      `scripts/refresh-definition.sh`'s step 1 replaced the old version and sha
+      everywhere in the file, comments included, which turned two historical
+      sentences into false claims in each of the three cert-manager definitions
+      on the 1.21.3 bump. Both expressions now skip a line whose first
+      non-whitespace character is a hash, reaching every derived field exactly
+      as before; the authenticity comment still moves, through step 3. One
+      refutation in the suite moved with the behaviour, reading the fields
+      rather than the whole file. Test-first; on a scratch copy of the real
+      controller definition the old and new scripts differ in two comment lines
+      and no field.
 - [ ] The status keeps a retired definition's rows (found by 16.16,
       2026-11-08): drill-app's three finding rows and the HIGH's clock
       (21 / 90) stay in the status issue and the page, carried from the
