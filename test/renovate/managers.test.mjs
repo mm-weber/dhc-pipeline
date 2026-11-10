@@ -696,19 +696,60 @@ check(
     has(deps, { depName: "google.golang.org/grpc", datasource: "go" }),
     JSON.stringify(deps),
   );
+  // A fix-lane floor is the lowest version a go/bump pin allows under minimal
+  // version selection: the one that fixes the finding (M10, docs/CONVENTIONS.md).
+  // Renovate keeps raising it, so the comparison is asserted, not an equality.
+  const atLeast = (got, floor) => {
+    // "v4.1.6" -> [4, 1, 6]; anything else is not a version we can compare.
+    const parts = (v) => {
+      const s = String(v ?? "");
+      return /^v?\d+(\.\d+)*$/.test(s) ? s.replace(/^v/, "").split(".").map(Number) : null;
+    };
+    const [g, f] = [parts(got), parts(floor)];
+    if (!g || !f) return false;
+    for (let i = 0; i < Math.max(g.length, f.length); i++) {
+      const d = (g[i] ?? 0) - (f[i] ?? 0);
+      if (d !== 0) return d > 0;
+    }
+    return true;
+  };
+  check(
+    "go-bump pins: a floor holds at or above its fixing version and refuses anything below it",
+    atLeast("v4.1.9", "v4.1.6") &&
+      atLeast("v4.1.6", "v4.1.6") &&
+      !atLeast("v4.1.5", "v4.1.6") &&
+      !atLeast("v4.0.9", "v4.1.6") &&
+      atLeast("v0.62.0", "v0.60.0") &&
+      !atLeast("v0.58.0", "v0.60.0") &&
+      !atLeast(undefined, "v4.1.6"),
+    JSON.stringify(["v4.1.9", "v4.1.6", "v4.1.5", "v4.0.9"].map((v) => atLeast(v, "v4.1.6"))),
+  );
   for (const role of ["controller", "webhook", "cainjector"]) {
     const live = extract(goBumpMgr, read(`image/cert-manager-${role}/image.yaml`));
     check(
-      `go-bump pins: cert-manager-${role} carries the x/net pin of 2026-10-12 (CVE-2026-78669), tracked via the go datasource at v0.60.0`,
+      `go-bump pins: cert-manager-${role} carries the x/net pin of 2026-10-12 (CVE-2026-78669, CVE-2026-78661) at or above its floor of v0.62.0, the version fixing CVE-2026-78661, tracked via the go datasource`,
       has(live, { depName: "golang.org/x/net", datasource: "go" }) &&
-        dep(live, { depName: "golang.org/x/net" })?.currentValue === "v0.60.0",
+        atLeast(dep(live, { depName: "golang.org/x/net" })?.currentValue, "v0.62.0"),
       JSON.stringify(live),
     );
-    check(
-      `go-bump pins: cert-manager-${role} carries that one pin and no other (x/crypto and grpc went with 1.21.2, LOG 2026-09-18)`,
-      live.length === 1,
-      JSON.stringify(live),
-    );
+    // The controller gained a second pin on 2026-11-09, go-jose v4.1.6 for
+    // CVE-2026-116587 (LOG 2026-11-09); the other two roles carry the x/net
+    // pin alone, x/crypto and grpc having gone with 1.21.2 (LOG 2026-09-18).
+    if (role === "controller") {
+      check(
+        `go-bump pins: cert-manager-${role} carries the go-jose pin of 2026-11-09 (CVE-2026-116587) at or above its floor of v4.1.6, the version fixing that finding, and those two pins only`,
+        live.length === 2 &&
+          atLeast(dep(live, { depName: "github.com/go-jose/go-jose/v4" })?.currentValue, "v4.1.6") &&
+          dep(live, { depName: "github.com/go-jose/go-jose/v4" })?.datasource === "go",
+        JSON.stringify(live),
+      );
+    } else {
+      check(
+        `go-bump pins: cert-manager-${role} carries that one pin and no other (x/crypto and grpc went with 1.21.2, LOG 2026-09-18)`,
+        live.length === 1,
+        JSON.stringify(live),
+      );
+    }
   }
   check(
     "go-bump pins: manager reads definition files",
@@ -735,8 +776,8 @@ check(
   check("tracking scope: the committed block is an ignorePaths array", Array.isArray(config.ignorePaths), JSON.stringify(config.ignorePaths));
   const chk = spawnSync(join(root, "scripts/render-tracking.sh"), ["--check", root], { encoding: "utf8" });
   check("tracking scope: the committed block matches the active set (render-tracking --check)", chk.status === 0, `${chk.stdout}${chk.stderr}`);
-  // The reference instance activates everything but grafana, deactivated on 2026-10-19 (design Decision 11; triage/LOG.md 2026-10-19), so it ignores exactly grafana's directory and the chart deploying only it.
-  check("tracking scope: the reference instance ignores grafana's directory and chart, nothing else", JSON.stringify(config.ignorePaths ?? []) === JSON.stringify(["image/grafana/**", "chart/grafana/**"]), JSON.stringify(config.ignorePaths));
+  // The reference instance activates everything again, grafana returned to the set on 2026-11-10 (design Decision 11; triage/LOG.md 2026-10-19, 2026-11-10), so it ignores no path at all.
+  check("tracking scope: the reference instance ignores no path", JSON.stringify(config.ignorePaths ?? []) === JSON.stringify([]), JSON.stringify(config.ignorePaths));
 
   const sb = mkdtempSync(join(tmpdir(), "dhc-tracking-"));
   for (const d of ["image", "chart"]) cpSync(join(root, d), join(sb, d), { recursive: true });
@@ -753,18 +794,18 @@ check(
   } catch (e) {
     check("tracking scope: the rendered block is JSON5 the config loader reads", false, e.message);
   }
-  const want = ["image/grafana/**", "image/hardened-app/**", "chart/grafana/**", "chart/hardened-app/**"];
+  const want = ["image/hardened-app/**", "chart/hardened-app/**"];
   check(
-    "tracking scope: the inactive definitions' directories and the charts deploying only them are ignored (grafana since 2026-10-19, hardened-app in the fixture)",
+    "tracking scope: the inactive definition's directory and the chart deploying only it are ignored (hardened-app in the fixture)",
     !!rendered && JSON.stringify(rendered.ignorePaths) === JSON.stringify(want),
     JSON.stringify(rendered?.ignorePaths),
   );
   try {
     const fm = require("renovate/dist/workers/repository/extract/file-match.js");
     const files = [
-      "image/grafana/image.yaml",
-      "chart/grafana/chart.yaml",
-      "chart/grafana/config/values-hardened.yaml",
+      "image/hardened-app/image.yaml",
+      "chart/hardened-app/chart.yaml",
+      "chart/hardened-app/values.yaml",
       "image/valkey/image.yaml",
       "chart/valkey/config/values-hardened.yaml",
       "scripts/install-tool.sh",
@@ -866,6 +907,40 @@ check(
     }
   }
   check(`markers: every # renovate: marker resolves to a manager dep (${markers} markers)`, markers > 0 && unresolved.length === 0, unresolved.join("; "));
+}
+
+// --- a dismissed alert opens no fix PR (Req 3.15; ledger row 3.15) ----------
+// The refusal itself is upstream's: Renovate decides what to open, this
+// repository only supplies the input. So what is pinned here is that input:
+// alerts are enabled at all, and the pinned Renovate's GitHub platform reads
+// them from the open-alert endpoint alone, so an alert a maintainer dismissed
+// (state `dismissed`) is never in the input a fix PR could come from.
+{
+  check(
+    "dismissed alerts: the config enables vulnerability alerts, so alerts are an input",
+    config.vulnerabilityAlerts?.enabled === true,
+    `vulnerabilityAlerts=${JSON.stringify(config.vulnerabilityAlerts)}`,
+  );
+
+  const pinnedRenovate = /RENOVATE_VERSION:\s*(\S+)/.exec(read(".github/workflows/validate.yml"))?.[1];
+  try {
+    const { getVulnerabilityAlerts } = require("renovate/dist/modules/platform/github/index.js");
+    const src = String(getVulnerabilityAlerts);
+    check(
+      `dismissed alerts: the github platform reads alerts from the open-alert endpoint alone (pinned renovate ${pinnedRenovate})`,
+      src.includes("dependabot/alerts?state=open") && (src.match(/dependabot\/alerts/g) ?? []).length === 1,
+      JSON.stringify(src.match(/dependabot\/alerts[^\s"']*/g)),
+    );
+  } catch (e) {
+    check("dismissed alerts: renovate github platform module loadable", false, `${e.message}: path moved on a renovate major?`);
+  }
+
+  const otherAlertKeys = Object.keys(config).filter((k) => /vulnerabilityalert/i.test(k) && k !== "vulnerabilityAlerts");
+  check(
+    "dismissed alerts: the config declares no second alert source that would bypass it",
+    config.osvVulnerabilityAlerts === undefined && otherAlertKeys.length === 0,
+    `osvVulnerabilityAlerts=${config.osvVulnerabilityAlerts}, other keys=${JSON.stringify(otherAlertKeys)}`,
+  );
 }
 
 if (failures > 0) {

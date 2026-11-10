@@ -146,6 +146,15 @@ for key in $(printf '%s\n' "${!tags_of[@]}" | sort); do
     if ! trivy convert --format cosign-vuln --output "$work/vuln-${m#sha256:}.json" "$f"; then
       echo "::error::reattest: trivy convert failed for ${f}"; ok=false; break
     fi
+    # Req 6.55: the conversion leaves scanner.db empty, so the database this
+    # report matched against is written in beside the scanner, exactly as the
+    # release path does between its convert and its attest. Guarded like the
+    # conversion above because this script runs without -e: a predicate whose
+    # database could not be named is never attested, and the digest is counted
+    # as failed rather than silently attested with an unnamed database.
+    if ! "$HERE/fill-scanner-db.sh" "$work/vuln-${m#sha256:}.json"; then
+      echo "::error::reattest: fill-scanner-db failed for $work/vuln-${m#sha256:}.json"; ok=false; break
+    fi
     if attest vuln "${repo}@${m}" --yes --type vuln --replace --predicate "$work/vuln-${m#sha256:}.json" "${repo}@${m}"; then
       reports_attested=$((reports_attested + 1))
     else
