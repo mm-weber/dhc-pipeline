@@ -486,22 +486,48 @@ left of the program is the follow-up list below, one decision each.
       `resolved:not_affected`). The image's last open finding is CVE-2026-111943
       (#300, Go's standard library, shared with five active images; next
       item).
-- [ ] CVE-2026-111943 (#300, HIGH, Go `crypto/x509`, fixed in Go 1.26.10 and
-      1.27.3): filed by the rescan of 2026-10-21 on twelve digests across the
-      three cert-manager images, drill-app, hardened-app and grafana. The five
-      built repositories were fixed on 2026-10-24 by the builder pin at Go
-      1.27.3, three days after first sight; the finding rests on grafana's
-      frozen digest alone. Measured 2026-11-10 on that digest: the server
-      binary at go1.26.6 and both bundled plugins at go1.26.7, all three below
-      the fixed toolchain; none of the eight distrusted intermediate keys is a
-      trust anchor in the image's 121-root bundle, four sibling eMudhra roots
-      are, and five of the eight intermediates' issuers cannot be established
-      from this environment, so no not-affected claim is available. Not a code
-      defect: Go hardcodes a denylist the verify call applies to every chain.
-      The acceptance proposal of 2026-11-10 was withdrawn when the owner chose
-      reactivation (track `reactivate-grafana_20261110`), which reopens the fix
-      rung: the released 13.1.9 carries Go 1.26.10. It waits on the finding set
-      the first bump's gate reports, then one decision, its own pull request.
+- [x] CVE-2026-111943 (#300), CVE-2026-116587 (#338) and CVE-2026-78661 (#375)
+      DECIDED 2026-11-10 in one bounded round, seven entries in
+      `triage/accepted-risk/grafana.yaml`, one per binary per finding, all
+      expiring 2026-12-12 beside the nine of 2026-10-13 (LOG 2026-11-10). The
+      gate had refused the build-layer round on grafana naming all seven, which
+      is the first time it ran on this definition since the reactivation.
+      Measured per binary on the published digest sha256:a9540c499384: the
+      server at go1.26.6, x/net v0.58.0, go-jose v4.1.4; both bundled plugins at
+      go1.26.7 and x/net v0.58.0, built 2026-09-10 and 2026-09-16 by their own
+      repositories. The server's toolchain finding is an acceptance that the
+      queued 13.1.9 bump retires; the plugin halves transfer to the tickets the
+      October round opened; go-jose is an acceptance because its fix reaches
+      grafana only in 13.3.0, which this lane does not follow by the owner's
+      decision that a new minor is a different image; x/net transfers to
+      grafana/grafana#136276, on main since 2026-10-28 and in no release.
+- [ ] The 13.1.9 repackage bump (2026-11-10): unlimited on the dependency
+      dashboard, so Renovate creates it on its next run. It fixes the server's
+      toolchain finding and retires the first entry of the 2026-11-10 round.
+      Renovate must supply the per-build tarball URL and both per-arch
+      checksums, which this environment cannot fetch.
+- [ ] Grafana's 2026-12-12 sitting (set 2026-11-10): sixteen entries come due
+      at once, the nine of 2026-10-13 and the seven of 2026-11-10. With one
+      finding fixable only outside the lane and two resting on prebuilt plugin
+      binaries nobody here can rebuild, the question is whether this image keeps
+      its tags or takes a step down the retirement table. The owner's call.
+- [ ] Transient external failures need a human to re-run (three on 2026-11-10):
+      a GitHub release-asset 504, a buildx cache 503 on the valkey build of
+      #349, and a CISA KEV feed outage on the grafana build of #394 each failed
+      a run that nothing in the change had caused. The rerun-failed-jobs
+      endpoint answers 403 to this repository's token, so each one needs the
+      owner, and an empty commit does not re-trigger a pull request's checks:
+      GitHub registered no synchronize for one on 2026-11-10. Read what the KEV
+      fetch's retry actually does before adding another (Req 6.59, 6.60), and
+      decide whether a documented re-run path or a narrower retry is the answer.
+      Its own pull request.
+- [ ] The tool-pin lane stalls silently (found 2026-11-10): a pinned-executable
+      bump needs a hand-added checksum commit, which Renovate reads as an edit
+      and stops rebasing, so the pull request sits behind main until someone
+      ticks its rebase box. Four had sat since 2026-10-31 and nothing surfaced
+      it. Options: have the refresh tooling record the checksum so the branch
+      stays Renovate's, or report stalled bumps in the daily run. Its own pull
+      request.
 - [ ] Grafana reactivated, the follow-ups (track
       `reactivate-grafana_20261110`, 2026-11-10): the first active day read
       (the rebuild's package-set comparison, the digest and tags it publishes,
