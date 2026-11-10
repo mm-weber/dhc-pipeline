@@ -479,9 +479,32 @@ left of the program is the follow-up list below, one decision each.
       item).
 - [ ] CVE-2026-111943 (#300, HIGH, Go `crypto/x509`, fixed in Go 1.26.10 and
       1.27.3): filed by the rescan of 2026-10-21 on twelve digests across the
-      three cert-manager images, drill-app, hardened-app and grafana. The
-      remedy is a build on the fixed toolchain wherever each binary is built;
-      not yet looked at, its own track when the owner opens it.
+      three cert-manager images, drill-app, hardened-app and grafana. The five
+      built repositories were fixed on 2026-10-24 by the builder pin at Go
+      1.27.3, three days after first sight; the finding rests on grafana's
+      frozen digest alone. Measured 2026-11-10 on that digest: the server
+      binary at go1.26.6 and both bundled plugins at go1.26.7, all three below
+      the fixed toolchain; none of the eight distrusted intermediate keys is a
+      trust anchor in the image's 121-root bundle, four sibling eMudhra roots
+      are, and five of the eight intermediates' issuers cannot be established
+      from this environment, so no not-affected claim is available. Not a code
+      defect: Go hardcodes a denylist the verify call applies to every chain.
+      The acceptance proposal of 2026-11-10 was withdrawn when the owner chose
+      reactivation (track `reactivate-grafana_20261110`), which reopens the fix
+      rung: the released 13.1.9 carries Go 1.26.10. It waits on the finding set
+      the first bump's gate reports, then one decision, its own pull request.
+- [ ] Grafana reactivated, the follow-ups (track
+      `reactivate-grafana_20261110`, 2026-11-10): the first active day read
+      (the rebuild's package-set comparison, the digest and tags it publishes,
+      the release-time scan's uncovered count, the end-to-end suite's grafana
+      component and its `http-health` probe); the bot's bump to the current
+      13.1.x and the finding set its gate reports, which is the evidence the
+      three undecided findings wait on (#300, #338 go-jose 4.1.6, #375 x/net
+      0.62.0); the nine transfers of 2026-10-13 re-decided on 2026-12-12 with
+      their exit restored, the stdlib halves fixed by a 13.1.9 build and the
+      plugin halves whatever that tarball bundles. What a 13.1.9 tarball
+      carries in its two prebuilt plugin binaries is unmeasured here: the
+      download host is outside the allowlist, the gate is the measurement.
 - [ ] Dashboard usability amendment (owner liked the direction, parked on
       2026-10-08): a legend for the four statuses; on fixed rows, the version
       and component change that fixed them; a release line per definition;
