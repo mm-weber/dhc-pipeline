@@ -29,7 +29,7 @@ THE Repository SHALL set `release.fail_closed` to `true` in `catalogue-policy.ya
 
 **Acceptance criteria:**
 
-- [ ] The pull request's number and squash; `scripts/release-policy.sh . fail-closed` printing `true` on that commit; validate green
+- [x] #334, squash 8ea59f4 (merged 2026-10-28 12:47:50Z); the reader printed `true` on 10b79de; validate green
 
 ### FR-2: The release refused (Req 2.8, 2.13)
 
@@ -39,7 +39,7 @@ Notes: the drill definition builds for the declared platforms (two platform mani
 
 **Acceptance criteria:**
 
-- [ ] The run's id, the pushed digest, the per-manifest `uncovered` lines of the scan step, the gate step's error line and the skipped steps after it; the build gate red
+- [x] Run 40691384018; `sha256:925dd22c2ead334b193b82447e994142be241714883d0c99e832700869ba1736`; the scan step's lines are in the log (the gate's error line carries the count, two, one per platform manifest); the error line quoted in row 2.13; the four steps after it skipped; the build gate red at 13:00:54Z
 
 ### FR-3: Frozen (Req 2.11)
 
@@ -49,7 +49,7 @@ Notes: the registry reads are a manifest fetch by digest, `cosign download signa
 
 **Acceptance criteria:**
 
-- [ ] The manifest fetched by digest; no signature, no attestation; the tag list unchanged (the tags still referencing `sha256:0c61394798b5...`); the scheduled run of 2026-10-28 enumerating drill-app's tagged digest only, the status data listing no second digest for it
+- [x] The manifest fetched by digest (HTTP 200, an OCI index); no signature (`no signatures associated`), no attestation; the tag list unchanged, the three tags on `sha256:bfe9a515ce9a...` (not `0c61394798b5`: the first dispatch had moved them that morning); the scheduled run 40693681245 of 2026-10-28 listing drill-app's tagged digest only
 
 ### FR-4: The switch off (Req 2.13)
 
@@ -59,7 +59,7 @@ Notes: kept on, the switch refuses every scheduled rebuild that publishes on cha
 
 **Acceptance criteria:**
 
-- [ ] The pull request's number and squash, or the owner's word that the switch stays on, recorded
+- [x] #335, squash 46353ef (merged 13:52Z): the switch off the same day
 
 ### FR-5: The evidence (Req 7.11)
 
@@ -67,7 +67,7 @@ THE Repository SHALL flip ledger rows 2.11 and 2.13 to `exercised` with the run 
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` green with 141 exercised; `scripts/lint-log-anchors.sh all .` green; the tick `[done <date>, #nnn; conductor track fail-closed-release_20261027]`; `conductor/tracks.md` lists the track under Completed
+- [x] `scripts/lint-live-evidence.sh .` green with 141 exercised; `scripts/lint-log-anchors.sh all .` green; the tick `[done 2026-10-28, #336; conductor track fail-closed-release_20261027]`; `conductor/tracks.md` lists the track under Completed
 
 ## Scope
 
@@ -102,8 +102,8 @@ THE Repository SHALL flip ledger rows 2.11 and 2.13 to `exercised` with the run 
 
 ## Open questions (the owner's calls)
 
-- [ ] The switch off the same day, or kept on through 16.6 (drafted: off the same day; kept on it must go off before 16.7)
-- [ ] The evidence pull request as a draft today, ready after the scheduled run of 2026-10-28 (drafted: yes, the rule for evidence still arriving)
+- [x] Off the same day (#335)
+- [x] A draft until the scheduled run of 2026-10-28 was read, then ready
 
 ## References
 

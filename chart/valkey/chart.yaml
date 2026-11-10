@@ -3,7 +3,7 @@
 upstream:
   name: valkey
   repository: https://valkey-io.github.io/valkey-helm
-  version: 0.12.0
+  version: 0.12.1
 # The next release (0.13.x, carrying their Sentinel change) must include the
 # fix for valkey-io/valkey-helm#264 before its bump merges: on their main the
 # standalone Deployment's init container cannot start, and the e2e installs

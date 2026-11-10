@@ -41,7 +41,7 @@ the clocks beneath, the status data itself beside it.
 
 | Path | What |
 |---|---|
-| `image/` | Definitions: hardened-app, cert-manager ×3, valkey (+`valkey-compat` variant), drill-app (the live-drill fixture, never installed by design; task 16.2); grafana inactive since 2026-10-19, last published 13.1.7 (the directory and the chart stay; its published tags keep their daily planes) |
+| `image/` | Definitions: hardened-app, cert-manager ×3, valkey (+`valkey-compat` variant); drill-app, the live-drill fixture of task group 16, retired 2026-11-07 (its published tags stay, nothing scans them; LOG 2026-11-07); grafana, inactive from 2026-10-19 and active again since 2026-11-10 (the owner's call, LOG 2026-11-10), frozen at 13.1.7 until a bump lands |
 | `chart/` | Upstream charts pinned + hardened via overrides only; one owned chart |
 | `test/` | Ginkgo/kind e2e: readiness, live securityContext, functional probes, upgrades |
 | `triage/` | OpenVEX source, accepted-risk exceptions, decision log, upstream investigations |
@@ -51,6 +51,19 @@ the clocks beneath, the status data itself beside it.
 | `docs/` | [User manual](docs/user-manual.md), conventions, ADRs, operating-loop evidence |
 
 ## Verify an image
+
+> [!IMPORTANT]
+> **What a signature means here.** A signed, admitted digest is one this
+> repository built, scanned and attested, with every known HIGH or CRITICAL
+> carrying a published status; it is not a digest free of known findings.
+> The pull request gate blocks an uncovered finding before the merge. The
+> release on `main` does not, by its declared default
+> (`release.fail_closed: false`, Req 2.12): an advisory landing between a
+> pull request's scan and its release ships as `under_investigation` in the
+> attested OpenVEX, with an issue and a clock behind it. The admission policy
+> checks that the signature and the attestations exist and come from the
+> pinned identities, not what the OpenVEX says. Read it before trusting a
+> tag; the recipe below prints it.
 
 Every digest a catalogue tag references carries a cosign keyless signature
 (GitHub OIDC), an SPDX SBOM and an OpenVEX document, and the daily admission
@@ -86,7 +99,8 @@ docker buildx imagetools inspect "$REF" --format '{{ json .Provenance }}'
 
 The PR scan gate (Trivy, the authoritative VEX consumer; Grype as a declared
 second consumer, its results in the VEX portability block) fails on any
-HIGH/CRITICAL not covered by a VEX statement (`not_affected`/`fixed`, with
+HIGH/CRITICAL not covered by a VEX statement (the release on `main` does not
+block; see "What a signature means here" above) (`not_affected`/`fixed`, with
 `govulncheck` reachability evidence) or a time-boxed accepted-risk exception
 that decays back to un-triaged on expiry. Every decision is a commit:
 [`triage/README.md`](triage/README.md) has the model,

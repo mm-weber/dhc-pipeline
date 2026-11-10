@@ -204,3 +204,141 @@ vulnerabilities:
     statement: "transfer: waiting on a grafana release bundling an elasticsearch build on Go 1.26.9+ and x/net v0.60.0 (grafana/grafana-elasticsearch-datasource#450)"
     decided_at: 2026-10-13
     expired_at: 2026-12-12
+  # ---------------------------------------------------------------------------
+  # 2026-11-10: the first round since grafana returned to the active set
+  # (#388). The gate now builds this definition, so its uncovered findings stop
+  # a pull request rather than publishing as under investigation; the seven
+  # instances the gate names on the republished digest sha256:a9540c499384 are
+  # the seven entries below, one per binary per finding (Req 6.23). Measured on
+  # that digest: bin/grafana at go1.26.6 with x/net v0.58.0 and go-jose v4.1.4,
+  # both bundled plugins at go1.26.7 with x/net v0.58.0, built 2026-09-10 and
+  # 2026-09-16 by their own repositories. Releases read the same day: 13.1.9 and
+  # 13.2.5 carry Go 1.26.10 and x/net v0.60.0, 13.3.0 Go 1.27.3, x/net v0.61.0
+  # and go-jose v4.1.6, upstream main x/net v0.62.0 and go-jose v4.1.8. The
+  # owner's decision of 2026-11-10: a new grafana minor is a different image, so
+  # this lane never moves to 13.3.x, and a fix counts only when it reaches a
+  # 13.1.x release. One re-decision date for the round, 2026-12-12, the date the
+  # nine of 2026-10-13 already carry (triage/LOG.md 2026-11-10).
+  - id: CVE-2026-111943
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/bin/grafana"]
+    treatment: accept
+    owner: mm-weber
+    ref: "LOG.md#2026-11-10-grafanas-three-findings-one-bounded-round"
+    blocked: "avoidance would remove Grafana from the Grafana image.
+              Remediation is available in this lane and is the plan, not an
+              exception: 13.1.9 (2026-10-27) carries Go 1.26.10 and the
+              repackage bump is queued, so this entry covers only the interval
+              until that bump lands and is retired by it. not_affected is
+              refused: Certificate.Verify is reachable in every outbound TLS
+              call this binary makes, the image's 121-root bundle trusts four
+              sibling eMudhra roots, and the issuers of five of the eight
+              distrusted intermediates could not be established"
+    statement: "accept: Go 1.26.10 is released in this lane as 13.1.9 and the repackage bump is queued; this covers the interval until it lands"
+    decided_at: 2026-11-10
+    expired_at: 2026-12-12
+  - id: CVE-2026-111943
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#2026-11-10-grafanas-three-findings-one-bounded-round"
+    blocked: "avoidance declined on 2026-09-03: a drop-in Grafana keeps its
+              datasources. Remediation is closed to us twice over: the
+              definition repackages a release tarball and compiles nothing, and
+              this binary is a prebuilt artifact of another repository, built
+              2026-09-10 on go1.26.7, so no grafana release fixes it without
+              rebundling a newer plugin build. The open ticket asks for exactly
+              that rebuild; its Go floor now reads 1.26.10. not_affected
+              refused as for the server: a statement scopes by package and
+              bin/grafana carries the same stdlib with the code present
+              (Req 6.19)"
+    statement: "transfer: waiting on a grafana release bundling a zipkin build on Go 1.26.10+ (grafana/grafana-zipkin-datasource#94)"
+    decided_at: 2026-11-10
+    expired_at: 2026-12-12
+  - id: CVE-2026-111943
+    purls: ["pkg:golang/stdlib"]
+    paths: ["usr/share/grafana/data/plugins-bundled/elasticsearch/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-elasticsearch-datasource/issues/450"
+    ref: "LOG.md#2026-11-10-grafanas-three-findings-one-bounded-round"
+    blocked: "as the zipkin entry for this CVE: a prebuilt artifact of another
+              repository, built 2026-09-16 on go1.26.7, reachable by no bump of
+              ours and by no grafana release that does not rebundle it. The open
+              ticket asks for that rebuild; its Go floor now reads 1.26.10"
+    statement: "transfer: waiting on a grafana release bundling an elasticsearch build on Go 1.26.10+ (grafana/grafana-elasticsearch-datasource#450)"
+    decided_at: 2026-11-10
+    expired_at: 2026-12-12
+  - id: CVE-2026-116587
+    purls: ["pkg:golang/github.com/go-jose/go-jose/v4"]
+    paths: ["usr/share/grafana/bin/grafana"]
+    treatment: accept
+    owner: mm-weber
+    ref: "LOG.md#2026-11-10-grafanas-three-findings-one-bounded-round"
+    blocked: "avoidance would remove Grafana from the Grafana image.
+              Remediation exists only outside this lane: go-jose v4.1.6 reaches
+              grafana in 13.3.0, and the owner's decision of 2026-11-10 is that
+              a new minor is a different image, so this lane never moves to it.
+              No 13.1.x release carries the fix, the module arrived in 13.3.0
+              transitively rather than through a security bump, and no upstream
+              ticket asks for a backport, so there is no external owner to
+              transfer to. not_affected would have to prove the JWK parsing
+              path unreachable in a server that serves JWT and OAuth logins;
+              that is unmeasured"
+    statement: "accept: the fix reaches grafana only in 13.3.0, which this lane does not follow, and no 13.1.x release carries it"
+    decided_at: 2026-11-10
+    expired_at: 2026-12-12
+  - id: CVE-2026-78661
+    purls: ["pkg:golang/golang.org/x/net"]
+    paths: ["usr/share/grafana/bin/grafana"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana/pull/136276"
+    ref: "LOG.md#2026-11-10-grafanas-three-findings-one-bounded-round"
+    blocked: "avoidance would remove Grafana from the Grafana image.
+              Remediation is closed to us: the definition repackages the
+              official release tarball, so no fetch-phase bump reaches
+              bin/grafana. Upstream merged x/net v0.62.0 to main on 2026-10-28
+              (#136276) and no release carries it yet: 13.1.9 pins v0.60.0 and
+              13.3.0 v0.61.0. A backport into the 13.1.x line is the exit, and
+              grafana has backported this module before, v0.60.0 reaching
+              13.1.9. not_affected refused: a statement scopes by package and
+              this binary links x/net with the code present (Req 6.19)"
+    statement: "transfer: waiting on a 13.1.x release carrying golang.org/x/net v0.62.0 (grafana/grafana#136276, on main since 2026-10-28)"
+    decided_at: 2026-11-10
+    expired_at: 2026-12-12
+  - id: CVE-2026-78661
+    purls: ["pkg:golang/golang.org/x/net"]
+    paths: ["usr/share/grafana/data/plugins-bundled/zipkin/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-zipkin-datasource/issues/94"
+    ref: "LOG.md#2026-11-10-grafanas-three-findings-one-bounded-round"
+    blocked: "as the zipkin stdlib entry: a prebuilt artifact of another
+              repository carrying its own x/net v0.58.0, which no bump of ours
+              and no grafana release reaches without a rebundle. The open ticket
+              asks for the rebuild; its x/net floor now reads v0.62.0.
+              not_affected is not written even though this binary links
+              x/net/http2 only for Framer and hpack, with none of the server,
+              client or flow-control receivers present: a statement scopes by
+              package and bin/grafana carries the same package with the code
+              present (Req 6.19)"
+    statement: "transfer: waiting on a grafana release bundling a zipkin build on x/net v0.62.0+ (grafana/grafana-zipkin-datasource#94)"
+    decided_at: 2026-11-10
+    expired_at: 2026-12-12
+  - id: CVE-2026-78661
+    purls: ["pkg:golang/golang.org/x/net"]
+    paths: ["usr/share/grafana/data/plugins-bundled/elasticsearch/*"]
+    treatment: transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/grafana-elasticsearch-datasource/issues/450"
+    ref: "LOG.md#2026-11-10-grafanas-three-findings-one-bounded-round"
+    blocked: "as the elasticsearch stdlib entry and the zipkin entry for this
+              CVE: a prebuilt artifact with its own x/net v0.58.0, no route to
+              it from here, the open ticket carrying the ask and its x/net floor
+              now reading v0.62.0"
+    statement: "transfer: waiting on a grafana release bundling an elasticsearch build on x/net v0.62.0+ (grafana/grafana-elasticsearch-datasource#450)"
+    decided_at: 2026-11-10
+    expired_at: 2026-12-12

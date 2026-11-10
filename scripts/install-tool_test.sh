@@ -26,35 +26,35 @@ FAILURES=0
 # The pins the script must ship with, verified against the digests upstream
 # publishes beside each release (kind-linux-amd64.sha256sum, checksums.txt).
 KIND_VER=0.33.0
-KYVERNO_VER=1.19.1
+KYVERNO_VER=1.19.2
 KIND_ASSET="kind-linux-amd64"
 KYVERNO_ASSET="kyverno-cli_v${KYVERNO_VER}_linux_x86_64.tar.gz"
 KIND_URLDIR="kubernetes-sigs/kind/releases/download/v${KIND_VER}"
 KYVERNO_URLDIR="kyverno/kyverno/releases/download/v${KYVERNO_VER}"
 KIND_PIN=aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d
-KYVERNO_PIN=b38228f367fc0fdc2b08f4c83ea50ac5f16c60ff8d62d76a66157c33c47b70ae
+KYVERNO_PIN=357eaf1df8bc24ddd5a73979fadeaae6a032e8710f11af264229756e4956bf4a
 KIND_DEP=kubernetes-sigs/kind
 KYVERNO_DEP=kyverno/kyverno
 
 # helm's binaries live on get.helm.sh (the GitHub release carries source
 # only), so its fixture sits at the served root; ct is a github tarball whose
 # archive also ships the lint configs ct needs at runtime.
-HELM_VER=4.3.0
+HELM_VER=4.3.1
 CT_VER=3.15.0
 HELM_ASSET="helm-v${HELM_VER}-linux-amd64.tar.gz"
 CT_ASSET="chart-testing_${CT_VER}_linux_amd64.tar.gz"
 CT_URLDIR="helm/chart-testing/releases/download/v${CT_VER}"
-HELM_PIN=86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb
+HELM_PIN=0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b
 CT_PIN=467561730f25fe09d5e6cd09a3e1f6aa759871c657a57602947c716d9be2c583
 HELM_DEP=helm/helm
 CT_DEP=helm/chart-testing
 
 # syft generates the SBOMs the release arm attests per platform manifest
 # (Req 2.9); its archive is a github tarball with the binary at the root.
-SYFT_VER=1.54.1
+SYFT_VER=1.55.0
 SYFT_ASSET="syft_${SYFT_VER}_linux_amd64.tar.gz"
 SYFT_URLDIR="anchore/syft/releases/download/v${SYFT_VER}"
-SYFT_PIN=c069905b391cc4c20a5ba65ad5c10be2a7ba074f8ea6ad203e24d14e303dad47
+SYFT_PIN=bb65249542db5fedeeb4d3f9b018b75e7264dbfbbb10486f044581a92f90490d
 SYFT_DEP=anchore/syft
 
 # crane lists registry tags for the rescan enumeration (Req 2.22, task 9.3);

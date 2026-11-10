@@ -2191,6 +2191,8 @@ opened the fourteen-day expiry warnings for the grafana exceptions of
 nothing to do with the drill. Task 16.2 ends here; 16.4 is the first drill
 that moves these two entries.
 
+**What the drill found.** The gate refuses what the fixture carries: the first scanned run named both seeded findings with their fixed versions and the four ways out (Req 6.1), and govulncheck's binary mode placed each at symbol level, which forbids a `not_affected` statement (Req 6.14) and leaves accept within the ceilings (30 days for the CRITICAL, 90 for the HIGH, CISA listing neither). The release compiled the two entries as `affected` statements and signed them, the package came out public on its first publish with nothing for the owner to flip, and Renovate listed the definition by the next morning (Req 1.14). The first rescan filed no issue, both findings having arrived decided, so Req 6.3's mechanism is exercised by nature, not by this drill. One deviation: build-stage steps have no egress, so the archetype's `go test` step was dropped, the cert-manager precedent.
+
 ## 2026-10-19: grafana deactivated, the switch exercised live; twelve moot exceptions retired
 
 *Image: grafana. The owner's call of 2026-10-19, pull request #290, conductor
@@ -3137,6 +3139,8 @@ the task text and the track's risk table say. Task 16.8 is done on these
 runs; 16.3, the KEV-listed finding under an exception, is next, and its
 drill reads the `kev-synthetic` value this track shipped.
 
+**What the drill found.** Both arms fail closed by name on an unreachable feed: the gate's tier step stopped in one second and every release step behind it was skipped (Req 6.59); the rescan's invariants step failed the run, the enrich and status steps refused, each naming the step that reports why (Req 6.60), and the status issue and the page kept their 13:33Z data until the next scheduled run. An outage is a non-evaluation, never an evaluation against an empty KEV set, which would hand every exploited finding the widest tier. The dispatch attested the day's reports and applied the lifecycle before the fetch. An address under `.invalid` makes the outage certain and harmless. Ledger rows 6.59 and 6.60 are exercised; the job summary is not readable through the API from the devcontainer, the warning annotation carrying the same input and address.
+
 ## 2026-10-25: the drill's HIGH listed as exploited by the synthetic feed, the standing exception refused in both arms, re-decided to one day (task 16.3)
 
 *Image: drill-app. Task 16.3, conductor track `kev-ceiling_20261024` (#318,
@@ -3242,6 +3246,8 @@ these runs: both arms refused the standing exception by name on the feed
 that listed the finding, and passed the re-decided one. Drill 16.4 follows
 from midnight UTC.
 
+**What the drill found.** The tier check holds on both arms: under a feed that lists the finding, the rescan refused the standing 90-day exception by name, 76 days over the 14-day KEV tier (Req 6.51), and the gate refused the same entry (Req 6.50); the re-decided one-day entry passed the rescan's step against the synthetic feed. With the KEV set on disk, the steps behind the failed step ran, and the status and the page read KEV yes for the first time (Req 6.46) until the scheduled run read CISA's feed again. One day, not zero, follows from the two clocks: Trivy drops an entry from midnight UTC of its expiry day, the lint and the compiler keep it live through that day. Unplanned: a changed exception file puts its image in the build matrix, so the gate re-ran against the entry.
+
 ## 2026-10-26: deliberate violations, every lint refuses by name (task 16.15)
 
 *Task 16.15, conductor track `deliberate-violations_20261025` (#322, squash
@@ -3312,6 +3318,8 @@ Rows 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10, 6.11, 6.12, 6.19, 6.25, 6.39,
 7.10, 9.6 and 9.18 are `exercised` on these runs; 4.2, 4.3, 4.6 and 7.9
 carry the re-observation. The pull request is closed with a comment once
 this evidence merges. Task 16.15 is done.
+
+**What the drill found.** The fifteen conventions held: twenty-one violations were each refused by the lint or gate that holds them, so rows 1.6, 1.11, 1.12, 1.18, 4.8, 5.8, 5.10, 6.11, 6.12, 6.19, 6.25, 6.39, 7.10, 9.6 and 9.18 are exercised and 4.2, 4.3, 4.6 and 7.9 re-observed. The validate job stops at its first failing step, and the drill's own method met that: a reset script that never removed a file the base lacked let a stray `.trivyignore.yaml` ride on eleven commits, so nine were pushed again, thirty in all. Two refusals, the revocation record's schema check and the chart gate, name their cause in the job's log only, with no annotation, a follow-up noted in `tasks/todo.md`. The pin lint does not read a chart's split pin values; the Renovate fixture step does, and refused the two malformed chart pins beside the gate.
 
 ## 2026-10-26: the drill's exception expires, the lapse on every plane (task 16.4)
 
@@ -3477,3 +3485,1113 @@ gate and the scan read Trivy's clock, the stricter. A follow-up item in
 `tasks/todo.md` leaves the owner the call between aligning the three
 scripts to Trivy's reading and documenting the expiry day as the first day
 without coverage.
+
+**What the drill found.** Three refusals live for the first time: the gate refused the expired entry as uncovered (Req 6.9), the lint refused a past expiry on a pull request (Req 6.11) and the compiler's note named the lapse (Req 6.41), re-attested on that change of note alone (Req 6.43). The two clocks showed: on the expiry day the gate, the scan, the statement, the status and the issue step treated the finding as uncovered while the lint, the page and the note kept the entry live; the day after, every plane agreed. The day costs mismatched notes, not coverage, so it is the documented difference, not a defect row, a `tasks/todo.md` item leaving the owner the call. Unforeseen: an undecided HIGH refuses every pull request that builds the definition, the evidence one included, merged by the ruleset's admin bypass, the first such merge of this program.
+
+## 2026-10-27: the drill's finding over its ceiling, the alarm raised by a one-day KEV ceiling and cleared (task 16.5)
+
+*Image: drill-app. Task 16.5, conductor track `over-ceiling_20261027`
+(#330, squash 0d3eae5). The drill definition's HIGH, CVE-2025-30204, has
+been undecided since task 16.4 removed its lapsed exception (#329): the
+status counts its age from 2026-10-18 against the HIGH ceiling of 90 days.
+No published status had ever flagged a finding over its ceiling (`over
+ceiling: 0` on every run since the clocks were first published on
+2026-09-06), and the page had never marked a row. The task text lowered the
+HIGH ceiling to one day; that value cannot move far, because
+`triage.ceilings` is read three times: as the clock undecided findings are
+measured against (Req 6.47), as the tier every unexpired exception's span
+must fit (`check-exceptions.sh`, Req 6.50, 6.51) and as the lint's outer
+bound (`lint-accepted-risk.sh`, Req 6.11). Grafana's nine standing
+transfers run 60 days each, so a HIGH ceiling under 60 days fails the daily
+rescan on all nine by name and, under 30, validation on every pull request;
+a ceiling of 60 puts nothing over, the finding being nine days old. The one
+value this drill changed is the policy's second ceiling, `triage.kev_ceiling`
+(Req 6.49), which the status applies in place of the severity's to an
+undecided finding the day's KEV set lists (`status.go`, `ceilingFor`): CISA
+does not list the finding, the `kev-synthetic` drill input of task 16.8
+does. Nothing in the code changed; no decision was written.*
+
+**The one-day ceiling (2026-10-27, 20:27Z).** Pull request #331 (squash
+16727ab) set `kev_ceiling: 1d`, one line with a comment naming the drill
+and the revert; validation green, the reader printing `1`, nothing built.
+No exception covers a finding either feed lists, so no tier moved.
+
+**The breach (2026-10-27, 20:28 to 20:45Z).** The owner dispatched
+`rescan.yml` on main at 16727ab with `drill: kev-synthetic` (run
+40578319282, job 122450634752) at 20:28:12Z, after the day's scheduled run
+(40503212074, 12:22Z). As on every dispatch, the run attested the day's
+reports and re-attested the documents that changed (register row M17):
+drill-app's among them, its statement for the finding recompiled with the
+generic uncovered note in place of the lapse note, the lapsed entry having
+left the exception file with #329 at 13:01Z; the statement's `timestamp`
+and `last_updated` unchanged (2026-10-23T14:12:33Z and
+2026-10-27T12:23:46Z: `last_updated` records a change of status, action
+statement, package or issue link, not of a note's wording, `compile-vex.sh`
+`carry_forward`), read back from the registry at 20:50Z. The invariants
+step fetched the synthetic feed in place of CISA's, the warning annotation
+naming the substitution, evaluated every unexpired exception against it and
+passed at 20:40:09Z: none covers the one finding that feed lists. The
+status, published to #151 at 20:44:30Z, read the finding as listed and
+measured it against the KEV ceiling: `drill-app | CVE-2025-30204 | HIGH |
+yes | undecided | 2026-10-18 | n/a | **9 / 1** | undecided, awaiting a
+triage decision (dhc-pipeline#325)`, the first row of the table, the
+aggregates `findings: 42; undecided: 2 (over ceiling: 1, oldest: 9 days);
+decided: 11; fixed: 29`, the JSON block carrying `kev_ceiling_days: 1`
+and, on the finding, `age_days: 9`, `ceiling_days: 1`, `over_ceiling:
+true`. The page (job 122459124884, 20:44:57Z) read `Decision aperture
+CRITICAL, HIGH; exception ceilings CRITICAL 30 days, HIGH 90 days, KEV 1
+days` in its lead, `Findings 42, undecided 2 (over ceiling 1, oldest 9
+days)`, drill-app's card `undecided 1, over ceiling 1` in red, and the
+finding's row marked (`class="over"`, `9 / 1`), read on the published page
+at 20:50Z. Req 6.47's over-ceiling flag, first time live; the alarm is the
+published number and the marked row, nothing fails on it. The status and
+the page read KEV yes on the drill definition until the next scheduled run
+reads CISA's feed again (M26).
+
+**The revert (2026-10-27, 20:52Z).** Pull request #332 (squash
+ebd0f65) restored `kev_ceiling: 14d` the same day, the comment
+recording the run; no scheduled run read the one-day value.
+
+**The clear (2026-10-28, 13:08 to 13:35Z).** The scheduled run
+40693681245 (main at 8ea59f4, job 122834693772) read CISA's feed, which does not
+list the finding, and measured it against the HIGH ceiling again: the
+status published to #151 at 13:35:20Z read `drill-app | CVE-2025-30204
+| HIGH | no | undecided | 2026-10-18 | n/a | 10 / 90 | undecided,
+awaiting a triage decision (dhc-pipeline#325)`, the aggregates `undecided:
+2 (over ceiling: 0, oldest: 10 days)`, the policy block
+`kev_ceiling_days: 14`; the page (13:35:50Z) read `KEV 14 days` in its
+lead, `over ceiling 0` on the card, the row unmarked. The alarm was the
+value's and left with it. The window in which the one-day value stood,
+20:27:46Z to 20:52:45Z on 2026-10-27, held the dispatch and no scheduled
+run.
+
+**What the drill found.** One policy value, `triage.ceilings`, is read
+three ways, and the drill could not use it: a HIGH ceiling that puts a
+ten-day-old finding over it re-tiers every standing exception and refuses
+the lint's bound. The follow-up item in `tasks/todo.md` leaves the owner the
+call on separating the decision clock from the exception tier. Read on the
+same evening: the re-attestation of 2026-10-27 12:34Z recorded in the entry
+above differed from the attested document by the lapse note and the
+appended issue link together, and `last_updated` moved for the link, which
+the compiler counts as decision-bearing content, not for the note.
+
+## 2026-10-27: the fail-closed release gate refuses the drill's release, the digest frozen (task 16.9)
+
+*Image: drill-app. Task 16.9, conductor track `fail-closed-release_20261027`
+(#333, squash 06c9b6e). The release path pushes an image by digest, scans
+every platform manifest of the pushed digest with the compiled VEX
+documents and the unexpired exceptions (Req 2.8) and only then signs,
+attests and tags (Req 2.9). With `release.fail_closed` off, an uncovered
+finding releases as an `under_investigation` statement (Req 2.12); with it
+on, the gate step names the finding per platform manifest and exits, so
+nothing is signed, attested or tagged and the digest, referenced by no tag,
+is frozen (Req 2.11, 2.13). The switch had been off since the criteria
+landed and the gate step skipped in every build job. The drill definition
+supplied the uncovered finding: CVE-2025-30204 on drill-app, without an
+exception since task 16.4 removed the lapsed entry (#329) and without a
+decision. Nothing in the code changed; no decision was written; the way
+out the gate offers is drill 16.6's fix.*
+
+**The switch on (2026-10-28, 12:47Z).** Pull request #334 (squash 8ea59f4)
+set `fail_closed: true`, one line with a comment naming the drill and the
+revert; validation green (`release-policy.sh . check` accepts the text),
+nothing built.
+
+**A release before the switch (2026-10-28, 11:35 to 11:45Z).** The owner's
+first dispatch of `build.yml` for drill-app (run 40681096763, main at
+06c9b6e, the track's squash) started before the switch existed on main,
+on a step list of mine that had put two of the owner's actions under one
+number. The pull request gate runs on pull requests only, so the run took
+the switch-off path as the policy prescribes: the image pushed by digest,
+the release-time scan reporting the finding on both platform manifests,
+the gate step skipped, the reports attested (11:43:38Z), the document
+compiled with CVE-2025-30204 `under_investigation` and the release-time
+note (Req 2.12), signed (11:45:15Z) and the three tags moved to the new
+digest `sha256:bfe9a515ce9a...` at 11:45:21Z. Two things that release
+showed, read back from the registry: the compiled document's timestamps
+for both findings are the release scan's, 2026-10-28T11:43:23Z, since the
+release-time compile reads no previous document and a rebuilt digest's
+statements start their clock at its release, while the status carries the
+finding's first-seen date, 2026-10-18, from its own data across the
+definition's digests; and the digest the tags left, `sha256:0c61394798b5...`,
+is now referenced by no catalogue tag and so frozen by nature (Req 2.11),
+the first digest of this catalogue to be. Both are recorded, neither was
+the drill.
+
+**The refusal (2026-10-28, 12:52 to 13:01Z).** The owner's second dispatch
+of `build.yml` for drill-app (run 40691384018, main at 8ea59f4, job
+122826840522) met the switch. The image was pushed by digest at 13:00:17Z,
+`sha256:925dd22c2ead334b193b82447e994142be241714883d0c99e832700869ba1736`,
+an index of two platform manifests (amd64 `sha256:b6abf5bfb3db...`, arm64
+`sha256:77f25853638b...`); the release-time scan (13:00:34Z) reported the
+finding on each; the gate step failed at 13:00:34Z with `drill-app: 2
+uncovered finding(s) in the release-time scan of sha256:925dd22c2ead...:
+CVE-2025-30204 (HIGH github.com/golang-jwt/jwt/v5@v5.2.1, fixed: 5.2.2).
+The declared fail-closed setting is enabled, so this digest is signed by
+nothing, attested by nothing and carries no tag (Req 2.13). It stays
+frozen and pullable by digest; the ways out are the same four the gate
+offers.`, the count being one per platform manifest and the summary
+carrying the table; the steps that attest the reports, compile the
+document, sign and tag did not run, and the build gate was red at
+13:00:54Z. Req 2.13, first time live. The registry, read at 13:01Z: the
+manifest is served by its digest (an OCI index, HTTP 200), `cosign
+download signature` answers `no signatures associated`, `cosign download
+attestation` returns nothing, and of the repository's 51 tags none
+references the digest, the three catalogue tags still on
+`sha256:bfe9a515ce9a...`: frozen as Req 2.11 defines it, by the gate's
+hand this time.
+
+**The switch off (2026-10-28, 13:52Z).** Pull request #335
+(46353ef) restored `fail_closed: false` the same day, the comment
+recording the run. No scheduled rebuild ran while the switch was on: the
+day's had published at 10:50Z, before #334.
+
+**The frozen half (2026-10-28, 13:08 to 13:35Z).** The scheduled rescan
+40693681245 (main at 8ea59f4) enumerated drill-app's catalogue tags and
+the one digest they reference, `sha256:bfe9a515ce9a...` (released that
+morning), scanned and attested that one and listed it alone in the status
+data; the frozen digest `sha256:925dd22c2ead...` appeared nowhere, neither
+scanned nor re-attested (Req 2.11), nor did `sha256:0c61394798b5...`, the
+digest the tags had left. The way out the gate named is drill 16.6's fix;
+until then every release of the definition under the switch would be
+refused the same way, and with the switch off, published as
+`under_investigation` as the first dispatch was.
+
+**What the drill found.** The release gate under the switch does what Req 2.13 says, first time live: the release-time scan named the finding per platform manifest, the gate exited before the attest, compile, sign and tag steps, and the digest stayed pullable with no signature, no attestation and no tag, frozen by the gate's hand (Req 2.11); the scheduled rescan listed it nowhere. With the switch off, the same finding released as an `under_investigation` statement (Req 2.12). Two readings came from that release: a rebuilt digest's statements start their clock at its release, while the status carries the first-seen date from its own data; and the digest the tags left is frozen by nature, the first of this catalogue. One deviation: the first dispatch started before the switch existed on main, two of the owner's actions having been put under one step number.
+
+## 2026-10-28: the drill's findings fixed, the issue closed on the attested SBOMs, the fix clock (task 16.6)
+
+*Image: drill-app. Task 16.6, conductor track `drill-fix_20261028` (#341,
+squash a403884). The drill definition carried two findings on purpose
+(entry of 2026-10-18): CVE-2017-20146, CRITICAL, `github.com/gorilla/handlers`
+v1.2.1, accepted under an exception until 2026-11-17, and CVE-2025-30204,
+HIGH, `github.com/golang-jwt/jwt/v5` v5.2.1, undecided since its lapsed
+exception left the file (task 16.4), its issue #325 open since 2026-10-26,
+named by the fail-closed gate on 2026-10-28 as a finding with four ways
+out (task 16.9). This entry takes the fix, the catalogue's lane between
+upstream releases (register row M10, the cert-manager entries of 2026-09-02
+and 2026-10-12): the modules bumped in the definition's fetch phase, the
+drill's source keeping its go.mod on purpose. Nothing in the code changed;
+no VEX statement was written; the drop of the bump step is drill 16.7's.*
+
+**The bump (2026-10-28, 20:51 to 21:07Z).** Pull request #342 (commit
+987fa12, squash 57ebed4) added one `go/bump@v2` step before the build step
+in `image/drill-app/image.yaml`, in the drill's work directory, bumping
+`github.com/gorilla/handlers` to v1.3.0 and `github.com/golang-jwt/jwt/v5`
+to v5.2.2, each with its Renovate marker. The pull request's build of
+drill-app (run 40766991968, job 123093855402) was green by the fix: the
+Trivy scan at 20:55:24Z with nothing uncovered, govulncheck at 20:57:08Z
+reaching no vulnerable symbol, the Grype second opinion skipped for want
+of a CRITICAL, the tier step and the scan gate green at 20:57:09Z with no
+annotation at all, the first green gate on this definition since it joined
+the catalogue. Validation green. The owner merged at 21:07:13Z.
+
+**The release (2026-10-28, 21:07 to 21:18Z).** Main's push build (run
+40769247657, job 123101712904) pushed the image by digest at 21:16:03Z,
+scanned both platform manifests at 21:16:10Z with nothing within the
+aperture (the fail-closed gate step skipped, nothing to refuse), attested
+the reports (21:16:31Z), compiled the digest's OpenVEX document, signed
+(21:18:26Z) and moved the three catalogue tags at 21:18:31Z to
+`sha256:5cacd03bc770fd5374674ce3c8b0e7fd4d4342a66438668f78d1cbe7dcb00d77`.
+Read back from the registry at 21:22Z: the OpenVEX attestation carries no
+statement at all, the CRITICAL's unexpired exception publishing nothing
+because the report lists nothing to suppress (Req 6.38), and the two SPDX
+SBOMs attested to the index list `github.com/golang-jwt/jwt/v5 v5.2.2` and
+`github.com/gorilla/handlers v1.3.0`, the evidence the lifecycle grades a
+closure on (Req 6.56). The digest the tags left, `sha256:bfe9a515ce9a...`
+of that morning, is referenced by no tag any more and frozen (Req 2.11),
+the third of the drill's digests to be.
+
+**The closure and the clock (2026-10-28 23:33Z to 2026-10-29 00:03Z).** The
+owner dispatched `rescan.yml` on main at 57ebed4 (run 40788144199, job
+123166403693) rather than wait for the next scheduled run, a release of
+attestations as every dispatch is (register row M17), with nothing else on
+main to attest. The scan step read the new supported digest; the lifecycle
+step found CVE-2025-30204 in no supported digest's attested report and
+closed the issue, #325, at 23:49:53Z with the comment naming every
+supported digest examined, seven repositories with their platform
+manifests, and the reports' scanner and database versions, trivy 0.75.0
+and the database of 2026-10-28T19:18Z (Req 6.52), the label
+`resolved:fixed` (Req 6.56): the attested SPDX SBOMs of the supported digest list `github.com/golang-jwt/jwt/v5 v5.2.2`, the fixed version. The status, published to #151 at
+00:02:32Z and dated 2026-10-28, the run's day, listed both findings as
+fixed on 2026-10-28, 10 days
+after their first-seen date of 2026-10-18 (Req 6.46), the aggregates
+`findings: 45; undecided: 4 (over ceiling: 0, oldest: 7 days); decided: 10; fixed: 31`, the median days to fix unchanged at 4 (two tens among thirty-one fixed findings); the page (00:03:09Z) showed
+drill-app's card with `CRITICAL 0 · HIGH 0; undecided 0, over ceiling 0; fixed 3`, the three fixed findings listed beneath (the drill's two and CVE-2026-111943, fixed by the rebuild of 2026-10-24). One reading to know: the status keeps the CRITICAL's decision text, `accept, accepted risk until 2026-11-17`, on the fixed row until the entry leaves the file, which this entry's pull request does.
+
+**The exception retired (2026-10-28).** The evidence pull request (#344)
+removes CVE-2017-20146's entry from `triage/accepted-risk/drill-app.yaml`
+as moot, the file kept with an empty list for drill 16.7's re-decision;
+the lint accepts the empty lane (nine refs resolve where ten did). The
+fix clock on this definition is the program's: two findings first seen on
+2026-10-18, decided the same day, one lapsed on 2026-10-26, both fixed on
+2026-10-28 by the lane the catalogue uses for its real images. Drill 16.7
+drops the bump step and brings them back.
+
+**What the drill found.** The fix lane between upstream releases (register row M10) clears the drill's findings as it does the real images': one `go/bump@v2` step in the fetch phase, and the gate on this definition was green for the first time since it joined the catalogue, with no annotation at all. The closure runs on evidence: the lifecycle found CVE-2025-30204 in no supported digest's attested report, and the issue, #325, closed as `resolved:fixed` with every digest examined and the scanner and database versions in the comment (Req 6.52, 6.56), the attested SBOMs listing the fixed versions. An unexpired exception publishes nothing when the report lists nothing to suppress (Req 6.38), and the status keeps the CRITICAL's decision text on the fixed row until the entry leaves the file. The fix clock is the program's: first seen 2026-10-18, both fixed 2026-10-28, ten days (Req 6.46).
+
+## 2026-10-29: the drill's HIGH brought back for a day, the issue reopened on the lapse (task 16.7)
+
+*Image: drill-app. Task 16.7, conductor track `drill-regression_20261029`.
+Task 16.6 fixed the drill definition's two findings in its fetch phase and
+the rescan closed CVE-2025-30204's issue #325 as `resolved:fixed` on the
+attested SBOMs (entry of 2026-10-28). No fixed finding has ever returned to
+this catalogue, so the lifecycle's reopen (Req 6.57) has never run. This
+entry brings the HIGH back, one module, the CRITICAL staying fixed, and
+records what the rescan does with a finding it had seen leave.*
+
+**The way back.** A regression is a pull request that builds the definition
+with the vulnerable module again, and the pull request gate refuses an
+uncovered finding by name (Req 6.1), as it should; merging over it would
+be a bypass of the gate, which no maintainer does to a catalogue. The
+maintainer's move when a vulnerable module must ship for a while is a
+bounded acceptance (Req 6.7), and that is the path this drill takes: the
+pull request removes `github.com/golang-jwt/jwt/v5` from the bump step and
+accepts the finding for one day, the entry below. From midnight UTC on the
+expiry day Trivy no longer honours the entry (task 16.4's first clock), the
+daily report lists the finding as reported, and the lifecycle reopens the
+issue; the entry leaves the file that day, before the lint's second clock.
+
+### ACCEPT: the drill's HIGH brought back for one day, the regression drill
+
+The finding, the module and the reachability are those of 2026-10-18
+(govulncheck reaches `ParseUnverified` in the binary), and the fix is
+known and was in place from 2026-10-28; it is removed on purpose, for one
+day, so that the finding returns to the supported digest's report and its
+closed issue reopens, the observation task 16.7 exists for. The other
+treatments do not fit: `not_affected` is forbidden by the reach, a fix
+would end the drill before it starts, and transfer has no owner but the
+owner.
+
+**Decision: accept** (owner's call, 2026-10-29, confirmed by merging the
+pull request that carries this entry; `decided_at` 2026-10-29, `expired_at`
+2026-10-30: one day, the shortest span that keeps the release's own gate
+green, the shape of the re-decision of 2026-10-25). The entry is written in
+`triage/accepted-risk/drill-app.yaml` with its reasoning here.
+
+**Exit condition:** the lapse is intended. On 2026-10-30 the scheduled
+rescan reads the finding as reported again, reopens #325 and publishes it
+undecided with first seen 2026-10-18 carried; the evidence pull request of
+that day removes the lapsed entry and records the run. The finding then
+stays undecided, with no second fix and no second exception, until the
+definition retires with task 16.16.
+
+**The regression released (2026-10-29, 23:39 to 23:55Z).** The track
+merged at 23:39Z (#347, squash c0c8850) and the regression pull request
+#348 (commit db12bd7, squash ec90a95) at 23:47Z: the HIGH's bump removed
+from the step, the CRITICAL's kept, the entry above in the exception file.
+The pull request's build of drill-app (run 40974710663) was green at the
+gate by the exception, the tier step within the 90-day ceiling, govulncheck
+naming `ParseUnverified` again. Main's push build (run 40975473407, job
+123802336198) pushed the image by digest at 23:53:31Z and scanned it at
+23:53:38Z, before midnight, so the exception was honoured: the compiled
+document carries one statement, CVE-2025-30204 `affected` with the action
+statement timestamp of 2026-10-29, signed at 23:55:01Z, the three tags
+moved to `sha256:d5d9bb51146f8dc60bc0c5fc44166a2b266484c75c2b3363dfc44e7dad771fa4`
+at 23:55:04Z; the SBOMs list `github.com/golang-jwt/jwt/v5 v5.2.1` and
+`github.com/gorilla/handlers v1.3.0` (read back from the registry at
+00:05Z). The fixed digest of 2026-10-28, `sha256:5cacd03bc770...`, is
+referenced by no tag any more and frozen (Req 2.11).
+
+**The reopen (2026-10-30, 13:06 to 13:27Z).** The scheduled run
+41060449312 (main at ec90a95, job 124078557157) scanned the supported digest with
+the exception file as Trivy's ignorefile; the entry's `expired_at`,
+2026-10-30, read as midnight UTC, was before now, so Trivy dropped it and
+the report listed CVE-2025-30204 as reported. The lifecycle found the
+finding named by a closed cve issue reported again on a supported digest
+and reopened #325 at 13:19:27Z with the comment `Reopened by the rescan (Req 6.57): CVE-2025-30204 is reported again on a supported digest.` naming `ghcr.io/mm-weber/dhc/drill-app@sha256:d5d9bb51146f...` with its three tags and both platform manifests (`sha256:b0baea633a16...`, `sha256:d1ae8a0ae416...`), each HIGH, and `scanner trivy 0.75.0, vulnerability database updated 2026-10-30T07:16:25Z`, removing
+`resolved:fixed` (Req 6.57, first time live). The status, published to
+#151 at 13:26:29Z, listed the finding undecided again with first seen
+2026-10-18 carried, `drill-app | CVE-2025-30204 | HIGH | no | undecided | 2026-10-18 | n/a | 12 / 90 | undecided, awaiting a triage decision`, its age 12 days, the fixed date gone
+from the row; the aggregates `findings: 45; undecided: 4 (over ceiling: 0, oldest: 12 days); decided: 10; fixed: 31`; the page (13:26:50Z) showed
+drill-app's card with `CRITICAL 0 · HIGH 1; undecided 1, over ceiling 0; fixed 2`. The expiries step warned `expires in 0 days (2026-10-30)` and the page listed the entry as lapsing, the day between the two clocks as on task 16.4's first day.
+
+**The entry leaves (2026-10-30).** The evidence pull request (#351)
+removes the lapsed entry from `triage/accepted-risk/drill-app.yaml` the same
+day, before the lint's second clock turns validation red; the lane stays,
+empty, for task 16.16. A changed exception file puts its image in the
+build matrix (Req 6.9), so this pull request built drill-app and its scan
+gate refused the finding by name (run 41063600623, 13:33:42Z), nothing
+covering it now; validation green. As with task 16.4's evidence (#329), the
+only green way out would decide or fix the finding, which the program
+keeps undecided for its retirement, so the owner merges over the red gate
+by the ruleset's admin bypass, the second such merge, recorded here; the
+track's plan had not named it in advance, the deviations log does. No second fix and no second exception: the finding
+stays undecided, its issue open, until the definition retires. The program
+has now seen the drill's HIGH decided, re-decided against the KEV ceiling,
+lapsed, over its ceiling, refused at the release gate, fixed with its clock
+published, and brought back with its issue reopened, each on the catalogue's
+real machinery.
+
+**What the drill found.** The lifecycle reopens what it closed: the rescan found a finding named by a closed cve issue reported again on a supported digest and reopened the issue, #325, naming the digest and the scanner and database versions, the `resolved:fixed` label removed (Req 6.57, first time live); the status carried the first-seen date of 2026-10-18 through the fix and the return. A regression enters by a bounded acceptance (Req 6.7), since the gate refuses an uncovered finding by name (Req 6.1); the one-day entry kept the release green, and the day between the two clocks showed as on task 16.4's first day. The evidence pull request, building drill-app on its changed exception file (Req 6.9), was refused at the scan gate and merged by the ruleset's admin bypass, the second such merge, recorded in the deviations log. The finding stays undecided until the definition retires.
+
+## 2026-10-30: the drill definition's directory removed, its active-set entry refused by name (task 16.11)
+
+*Image: drill-app. Task 16.11, conductor track `active-set-entry_20261030`
+(#353, squash af626ea). The task's deactivation half ran for real on
+2026-10-19, when grafana left the active set by the documented switch
+(#290): the matrices and the tracking scope excluded it, no digest or tag
+followed, and the replayed bump was refused by name (entry of 2026-10-19).
+One refusal of the task had never run: an active-set entry naming a
+definition with no directory under `image/` (Req 1.19). This entry records
+it on a drill branch, never merged, in two commits, because the tree's
+guards meet a removed directory in an order worth reading.*
+
+**Commit 1, the directory alone (2026-10-30, 22:00Z).** Pull request
+#354, a draft, removed `image/drill-app/` and nothing else, the active set
+and the exception lane's filename still naming drill-app. Validation
+(run 41135094891) failed at step 9, the accepted-risk lint (22:00:25Z) with `risk treatment (Req 6.11): no image definition 'image/drill-app/image.yaml'`:
+the lane file names a definition that does not exist, the filename being what ties its exceptions to an image, so the lane's own guard spoke before the active set was read. The build (run 41135094902): its affected-definitions job failed at its first step, reading the active set through the same reader, with `active_definitions: active_set entry 'drill-app' has no definition: image/drill-app/image.yaml does not exist (Req 1.19) (Req 1.13)`, the build gate red at 22:00:30Z; the e2e workflow's affected-components job (run 41135094774) failed on the same line, the e2e gate red at 22:00:27Z. The Req 1.19 line therefore appeared on the first commit already, in the two matrix jobs, while validation had stopped one step short of its own.
+
+**Commit 2, the lane removed as well (2026-10-30, 22:02Z).** The
+second commit removed `triage/accepted-risk/drill-app.yaml` too, empty since
+task 16.7. Validation (run 41135329824) passed the accepted-risk lint and
+failed at the active-set step (22:02:18Z) with `active_definitions: active_set entry 'drill-app' has no definition: image/drill-app/image.yaml does not exist (Req 1.19) (Req 1.13)`, the
+reader's refusal surfaced by `lint-active-set: the active set is malformed
+(Req 1.19); nothing else checked`: Req 1.19, first time live. The build
+(run 41135329854): the affected-definitions job red on the same line again, the build gate red at 22:02:21Z, the e2e gate (run 41135329816) likewise at 22:02:22Z. The proofs entry for drill-app
+(`catalogue-policy.yaml`, kind none) stayed; the probe lint runs after the
+active-set step and was not reached.
+
+**What the drill found.** The guards stand in an order: a lane file for a
+definition that does not exist is refused before the active set is read,
+so a pull request that forgets the policy entry hears first about the
+exception file it also forgot, and about the entry only once that is
+gone; both name the definition, and neither lets the tree pass. The
+retirement (task 16.16) removes the directory, the entry, the lane and the
+proofs entry together, through the switch, and this entry is the record
+of what refuses a retirement done by halves. The drill pull request is
+closed unmerged with a comment after the evidence merges.
+
+## 2026-11-01: the switches, one run each: every rebuild published, the page off, the deployment refused (task 16.13)
+
+*Images: the seven active definitions. Task 16.13, conductor track
+`switches_20261030` (#356, squash c0177f6). Two declared switches flipped
+for one day through #357 (merged 2026-10-31, 14:28Z, squash 438d456) and
+back through #359 (merged 2026-11-01, 21:25Z, squash 2338535):
+`release.publish_policy` always, so the scheduled rebuild publishes every
+active definition whatever the comparator says (Req 2.17), and
+`release.page` false, so the scheduled rescan skips the page and the served
+page keeps the previous day's data (Req 6.61's disabled branch). The track's
+heading named 2026-10-31; the flip merged after that day's scheduled runs,
+so the runs fell on 2026-11-01, the policy being read at run time, and this
+entry carries that date. The heading's third clause, the deployment refused
+(Req 6.62), is the owner's Pages action, taken on 2026-11-03 and 2026-11-04
+and recorded at the end.*
+
+**The rebuild (2026-11-01, 11:31Z to 12:49Z).** Run 41302227631, the
+scheduled build. Seven build jobs green, every one of them through the
+release path with its tags step run: drill-app (11:46Z), valkey (11:54Z),
+hardened-app (11:54Z), valkey-compat (12:08Z), cert-manager-webhook
+(12:10Z), cert-manager-cainjector (12:22Z), cert-manager-controller
+(12:49Z); the gate green at 12:49:56Z. The registry read after the run:
+every full-release tag on a new digest, the previous one frozen and
+pullable by digest. hardened-app 0.1.1 from sha256:1e0a053f0692 to
+sha256:a3b9fe126a6b (0.1.0 stays on sha256:c559928e156c, a frozen
+release); cert-manager-controller 1.21.2 from sha256:cad69ac59c4c to
+sha256:063e4628ce11, cert-manager-webhook from sha256:ad4f03f116fd to
+sha256:14a467e50b51, cert-manager-cainjector from sha256:14bdbed1a189 to
+sha256:b9db8a1d2edb; valkey 9.1.2 to sha256:430ad9dcbb67 and its compat
+variant from sha256:50d00b8eafab to sha256:d41927dda080; drill-app 0.1.0
+from sha256:d5d9bb51146f to sha256:cf147012fad2. Grafana, inactive,
+untouched on sha256:89c5680a868b. The new drill digest's attested OpenVEX
+document (compiled 2026-11-01, 11:43:53Z) carries CVE-2025-30204
+`under_investigation`, the undecided HIGH of #325 republished as the costs
+named before the merge said it would be; its statement clock restarted with
+the digest, the follow-up item seen by 16.9. The jobs' summaries, where the
+comparator's verdict and the policy are printed side by side, were not read
+from here: the logs and summaries sit behind a host this environment cannot
+reach, and the tags step's run in all seven jobs is the policy's effect
+that the API shows.
+
+**The rescan (2026-11-01, 13:34Z to 13:58Z).** Run 41311884446, the
+scheduled rescan, green. Step 29, "upload the catalogue page (Req 6.61)",
+skipped; the job "publish the catalogue page" skipped with it, the
+read-back step (Req 6.62) never reached. The served page, read on
+2026-11-01 after the run: "generated 2026-10-31", the previous day's run,
+with that day's numbers. The status issue and the attestations of the day
+unaffected: the page is the one artifact the switch withholds, and the page
+says its own date, which is how a withheld page is told from a current one.
+
+**The revert and the days after.** #359 set both switches back with their
+lines' comments naming the two runs. The scheduled rebuild of 2026-11-02
+(run 41448321935, 12:53Z) built all seven locally and published none, the
+comparator's verdict kept under on-change: Req 2.15 re-observed the day
+after its counterpart. The scheduled rescan of 2026-11-02 (run 41478864444,
+16:10Z) uploaded and deployed the page and its read-back passed, the page
+generated 2026-11-02 (Req 6.61 again, 6.62's passing branch).
+
+**The chart digests (Req 3.12).** Renovate's runs of 2026-11-01 opened #360
+(cert-manager's three pins, 14:52Z), #361 (hardened-app's pin, 14:52Z) and
+#362 (valkey's compat pin, 20:22Z), every digest in them the one the
+rebuild had published. Their automerge waited on the e2e gate, which had
+been red on every chart-deploying job since 2026-10-28 (last pass run
+40579021551 of 2026-10-27, first failure run 40635146998) for a cause
+outside the repository: GitHub's `ubuntu-latest` moving to Ubuntu 26.04,
+whose Docker 29 saves images from the containerd image store in a shape
+kind 0.33.0's loader cannot import (kind issue 3795). Nothing had merged
+through that lane in the six days, so the gate's state went unread until
+these pull requests arrived. #363 (merged 2026-11-02, squash d9ad1f2)
+pinned the suite's job to `ubuntu-24.04`; #364 (merged 2026-11-03, squash
+d38c61f) names the runner image in every run and fails by name on that
+store. With the gate green again, #360 merged 2026-11-03 at 12:02:47Z
+(squash a612686) and #361 at 14:19:23Z (squash e1643ae), each inside a
+Renovate pass the owner dispatched (runs 41632269872 and 41652365223), one
+merge per pass: the ruleset's up-to-date rule puts the remaining branches
+behind main after every merge, and Renovate rebases them on its next pass.
+GitHub's scheduler had dropped Renovate's passes of 22:00Z on 2026-11-02
+and 06:00Z and 10:00Z on 2026-11-03 (the one of 11:44Z rebased, run
+41629967221). #362 merged at 19:19:31Z (squash 741bebe) inside the scheduled pass
+41701850184, the first scheduled pass GitHub ran after the two dispatches,
+three digest pull requests in three passes.
+
+**What the drill found.** The policy is read at run time, so a day's
+switch runs from the flip's merge to the revert's merge, and a flip merged
+after the day's scheduled runs reaches the next day's: the entry's date
+follows the runs, not the plan. The always policy costs seven digests and
+freezes seven; Renovate's digest pull requests follow within hours and
+merge behind every required check, so a red gate anywhere in the chart
+lane holds Req 3.12 without a word, and here the digest pull requests were
+what made a six-day failure of the e2e gate visible (#363, #364). The page
+switch withholds the page alone and the served page carries its own date,
+the one signal a reader has. Several green Renovate pull requests under the
+up-to-date rule land one per pass; a merge queue would land them in
+sequence without the passes, a candidate for the register.
+
+**The deployment refused (Req 6.62), 2026-11-03 to 2026-11-04.** The
+owner's action, in two steps. An unpublish of the site in the Pages settings
+at 21:22Z on 2026-11-03 would not have done: GitHub keeps the site's
+configuration and the next successful workflow run creates a new deployment
+(its documentation says so), so the owner deleted the site at 21:30Z by
+setting the source to "Deploy from a branch" and the branch to "None", the
+Pages API answering 404 from then on and the page URL with it. The owner's
+rule, stated that evening and recorded: a drill dispatches its runs, the
+scheduler being exercised daily for months, so both runs below are
+dispatched where the track's text said scheduled. The dispatched rescan
+41748083578 (2026-11-04, 00:36:23Z) ran its rescan job green through the
+page artifact's upload (00:55:22Z) and failed in the page job at "deploy
+the catalogue page (Req 6.61)" at 00:55:33Z with `Error: Failed to create
+deployment (status: 404) with build version
+21a5240c9982f9435ec9bb237e902add4a44235d. Ensure GitHub Pages has been
+enabled`, the read-back step skipped behind it, the run a failure, the site
+404: the disabled site and the failed deployment of the row's wording, by
+name, for the first time. The owner set the source back to GitHub Actions
+(the API showed the site again at 01:24:01Z, no deployment yet) and
+dispatched the rescan 41753888464 (01:24:54Z): the page job deployed at
+01:45:21Z, the read-back passed (step 3, Req 6.62), the page served with
+"generated 2026-11-04" naming that run. Two dispatched rescans on
+2026-11-04 before 02:00Z, two attestation releases (register row M17), the
+cost of the branch.
+
+## 2026-11-05: the drill definition's tag moved by its maintainer, the first true mismatch, decided and restored (task 16.10)
+
+*Image: drill-app. Task 16.10, conductor track `auth-mismatch_20261105`
+(#367, squash ec04bfd). Every active definition's authenticity signal is
+re-verified once a day inside the rescan (Req 3.10, task 11.3): drill-app
+declares `signed-commit`, its pinned tag `v0.1.0` at commit b7868d7a whose
+signature GitHub reports as valid. The check had run daily since
+2026-09-07 and fired only on unreadable reads (2026-09-16, six issues from a
+rate-limited API, the incident Req 3.13 corrects); no signal had ever moved.
+This entry records the first true mismatch, induced by the definition's own
+maintainer, and what the catalogue did with it. By the owner's rule of
+2026-11-03 the runs are dispatched; each is a release of attestations
+(register row M17).*
+
+**The tag moved (2026-11-05, 10:29Z).** In `mm-weber/drill-app`, from a
+detached checkout of the pinned commit, the owner created an unsigned empty
+commit d273710 (10:29:00Z) and moved `v0.1.0` onto it as an annotated,
+unsigned tag (object 726afc2, tagger 10:29:12Z), pushed with force; the
+branch `main` untouched, the repository's three rulesets being branch rules
+with no word on tags. One push, both of the check's conditions: the tag no
+longer at the pinned commit, and no valid signature on what it points at.
+The owner's action preceded the track's pull request by the hour; the plan
+logs it.
+
+**The mismatch reported (10:31Z to 10:46Z).** The dispatched rescan
+42011386908 (10:31:18Z) failed at step 15, "authenticity signals (Req 3.10,
+3.13, 4.9)", with `check-authenticity: drill-app (signed-commit, v0.1.0):
+tag v0.1.0 now points at d27371001ef9, the definition pins b7868d7a6f41: the
+tag moved (Req 3.10)`; the rescan job ended red at 10:45:59Z, and every step
+after the check still ran, the status compiled and published to the status
+issue, the page uploaded, deployed at 10:46:19Z with its read-back green:
+review disposition D1, a supply-chain signal suspends nothing else. The step
+filed #368 at 10:39:51Z, "Supply-chain signal: drill-app (signed-commit,
+v0.1.0) failed re-verification", label `supply-chain`, its body naming the
+definition, the class, the ref and the finding, and saying what the design
+says: evidence, not a decision; the pinned content unchanged; every
+published image still verifying against its own signature; the rescan
+failing daily and the issue open until someone decides. No build of
+drill-app fell inside the window (the scheduled rebuild of the day had not
+run), so the build's own refusal of a moved tag, the fetch's checksum being
+the pinned commit, stayed unexercised today.
+
+**The decision and the restore (10:54Z).** The owner's decision, register
+row M18: a drill, the tag moved by its own maintainer, no key rotated, no
+upstream publishing changed, nothing compromised. The original tag object
+ca6144e6 (signed, valid, at b7868d7a) was pushed back at 10:54Z with force
+(`+ 726afc2...ca6144e v0.1.0`), the API reading the tag at that object and
+the object at the pinned commit, verified. The dispatched rescan 42014582733
+(10:54:35Z) passed the authenticity step, filed nothing, and ended green at 11:14:56Z, the status and the page published as on any day. #368 was closed by the owner at 11:55:39Z with the decision as
+its reason.
+
+**What the drill found.** The signal measures exactly what it says, a tag
+and a signature, and reports the two shas side by side; the issue it files
+reads as a question to a human, and nothing closes that question but a
+human, which is the register's row M18 working as written. A moved tag is
+also refused by the build's fetch on the pinned commit, so the catalogue
+holds a moved upstream twice: in the daily report and at the next build.
+The window ran 25 minutes; the restore is one push of a known object, which
+is why this entry names it.
+
+## 2026-11-05: a report through the private channel, handled and closed as a drill (task 16.14)
+
+*Image: drill-app, the report's subject. Task 16.14, conductor track
+`private-report_20261031` (#358, squash dcda06f). SECURITY.md names one
+channel for vulnerability reports, GitHub private vulnerability reporting on
+this repository, and the rescan asserts daily that the channel is enabled
+(Req 9.3, exercised 2026-09-08). No report had ever arrived, so the
+receiving half (Req 9.2) and the handling the policy implies had never run.
+The track's heading named 2026-10-31, the day it was opened; the report was
+filed on 2026-11-05, and this entry carries that date.*
+
+**The channel cannot be self-tested (2026-11-02).** The owner's first
+attempt, from the repository's own account: the Security tab offered the
+admin's "Open a draft security advisory" form, not the report form, and the
+REST report endpoint answered 403, "You are not authorized to report
+advisories in this repository via private vulnerability reporting"
+(21:20:31Z). GitHub's documentation confirms it: anyone may report, and an
+admin is directed to a draft advisory instead, which starts in state draft,
+with no reporter and no triage step. A report in state triage, the shape the
+policy promises to handle, needs an account that is not a collaborator. The
+owner found one.
+
+**The report (2026-11-05, 13:29Z).** Filed from that account through the
+Security tab: GHSA-6xgw-5wvx-p8xx, "Drill 16.14: drill-app ships
+golang-jwt/jwt v5.2.1 (CVE-2025-30204) on every current tag, undecided for
+18 days", severity high, package ghcr.io/mm-weber/dhc/drill-app at digest
+sha256:cf147012fad2, all three current tags. Its subject is real and of the
+shape SECURITY.md names as reportable, a published status the reporter
+believes wrong: the finding undecided at 18 of 90 days under a signed,
+attested digest re-released on 2026-11-01; three questions, whether the
+digest is safe behind an ingress that accepts tokens, why it was
+re-released with the finding open, and what the 90 commits the catalogue
+to; the last paragraph naming the drill. The pipeline's token cannot read a
+report in triage (the single read 403, the triage listing empty), so the
+thread's times are the owner's, posted as the maintainer and reported here.
+
+**The handling (13:55Z to 13:59Z).** Acknowledged in the thread at 13:55Z,
+26 minutes after filing. Examined against the records: the finding tracked
+as #325, first seen 2026-10-18, undecided, 18 of 90 days; the digest's
+attested OpenVEX document saying `under_investigation`, the statement
+behind the page's word; the admission clause of 2026-10-28 (README "What a
+signature means here", SECURITY.md "What a signature does not say"),
+saying that a signature means the pipeline built the digest and attested
+what it found, releases publishing under the fail-open default with an
+undecided finding inside its ceiling attested as such; govulncheck's
+symbol-level verdict of 2026-10-18 that `ParseUnverified` is reachable in
+the binary, so a deployment parsing untrusted tokens would be exposed, the
+image being a fixture never installed by design, its fix applied on
+2026-10-28 and reverted on 2026-10-29 to exercise the reopen; the
+re-release of 2026-11-01 by the switches drill; the ceiling's end,
+2027-01-16, and what follows it. Answered at 13:59Z with that examination,
+30 minutes after filing, and closed as a drill at 13:59Z with the closing
+note: nothing published, the finding keeping its tracked status. The owner
+asked whether to publish the advisory instead; no: SECURITY.md reserves a
+published advisory for a revoked digest, a wrong published status or a
+compromised input, none of which the examination found, and the first
+published advisory is task 16.12's, for a revoked digest through the
+runbook. Confidential comments were not used: the answer is for the
+reporter.
+
+**What the drill found.** The policy's channel accepts a report from anyone
+but its own maintainer, so it cannot be exercised from inside; its daily
+evidence is the enabled flag (Req 9.3), and a report from outside is the
+only way to see the receiving half, which is why this entry records one.
+The pipeline's token sees nothing of a report in triage, so the handling's
+record rests on the maintainer's word and the thread, as the track's risk
+table said it might. The examination took thirty minutes because every
+fact it needed was already written down: the issue, the attested document,
+the log entries of 16.2, 16.6, 16.7 and 16.13, and the admission clause. No
+response window is promised; the numbers are recorded as numbers.
+
+## 2026-11-05: the drill digest withdrawn, the posture step red by name, the runbook executed as written (task 16.12)
+
+*Image: drill-app. Task 16.12, conductor track `revocation_20261105`
+(#371, squash 62918cf). A revocation is the decision that a published
+digest must not be pulled any more (register row M14); the record,
+`triage/revocations.yaml`, drives the mechanics (Req 9.5 to 9.7), and the
+advisory is a repository security advisory (Req 9.4). The record was empty
+and no advisory had been published. This entry records the first entry,
+the first refusal of the posture step, the first withdrawal and the first
+advisory, all on the drill definition's current digest,
+sha256:cf147012fad2, the one the switches drill published on 2026-11-01
+and the private report of 16.14 named. By the owner's rule of 2026-11-03
+the runs are dispatched, each a release of attestations (register row
+M17); one scheduled run fell inside the window as well.*
+
+**What the schema decided.** The record admits two shapes, `replaced`,
+which needs the replacement digest, and `withdrawn`, and no shape for an
+entry whose move has not happened. The runbook's Move A publishes the
+replacement through the release path, and the release that produces it
+moves the definition's three tags in the same run, so a `replaced` entry
+can only ever name a digest no tag references: Move A cannot show Req 9.7.
+Move B2, a tombstone, is not built. The one entry that can be recorded
+while the tags still reference the digest is a withdrawal, Move B1, which
+the task text names as well; the drill took it, with the advisory drafted
+first because the entry's `advisory` field requires its URL.
+
+**The advisory and the entry (2026-11-05).** The owner drafted the
+advisory GHSA-mxcv-w9jx-vj6j on this repository: the affected package
+`ghcr.io/mm-weber/dhc/drill-app`, the affected version the digest, the
+patched version "withdrawn", the description the reason, a draft. #374
+(merged 23:32:28Z, squash 77c435e) added the entry: image, digest, reason
+`drill: task 16.12 executes the revocation runbook on the drill fixture;
+nothing was compromised`, `replacement: none`, `withdrawal:
+delete-version`, the advisory's URL, the date; validate's schema check
+(Req 9.6) green; rehearsed before the merge against an enumeration
+carrying the three tags, the posture script refused each by name and
+exited 1. Merged while the tags 0.1.0-alpine3.23, 0.1-alpine3.23 and
+0-alpine3.23 still referenced the digest, on purpose.
+
+**The tag reported (2026-11-05, 23:32Z to 23:53Z; 2026-11-06, 14:23Z to
+14:41Z).** The dispatched rescan 42130207670 (23:32:58Z) failed at step
+30, "posture invariants (Req 9.3, 9.7, 9.9)", with one line per tag:
+`ghcr.io/mm-weber/dhc/drill-app:0.1.0-alpine3.23 references revoked digest
+sha256:cf147012fad2c088997e4142b5c21abc386a716501f6440efb05efb0d0a8792f as
+its index (revoked 2026-11-05,
+https://github.com/mm-weber/dhc-pipeline/security/advisories/GHSA-mxcv-w9jx-vj6j);
+the tag must move or the version go (Req 9.7)`, and the same for
+0.1-alpine3.23 and 0-alpine3.23; the rescan job ended red at 23:52:52Z and
+every step after the scan had run, the status issue published with
+`revocations: 1 (Req 9.5), listed below` and the entry's row, the page
+deployed with its read-back green (D1). Each line appears twice in the
+check's annotations: the run reads the record twice, once for the status
+data and once in the posture step. The scheduled rescan of 2026-11-06
+(42233459314, 14:23:17Z) failed the same way with the same three lines:
+the design's "fails daily while any catalogue tag still references a
+recorded digest", seen on the scheduler's own run. Req 9.7, first time
+live, twice.
+
+**The withdrawal (2026-11-07, 10:07Z).** The owner deleted the package
+version carrying the digest in the package's web page, the version whose
+tags were the three above, the catalogue's one deliberate exception to "nothing
+is deleted" (runbook, Move B1). Read after it: no catalogue tag on
+drill-app, the digest answering 404 by digest, and 72 manifests left under
+cosign's `sha256-<digest>.sig` and `.att` tags, the signatures and
+attestations of the digests and platform manifests the definition ever
+published, this one's among them: the runbook names only the version, and the signature and
+attestation manifests of a deleted digest outlive it. The dispatched
+rescan 42362729195 (10:09:16Z) passed the posture step, `1 recorded, 0
+referenced by a catalogue tag`, the run green, the status issue listing
+the entry under `revocations: 1`, the page saying of drill-app `declared,
+no digest today: 0-alpine3.23, 0.1-alpine3.23, 0.1.0-alpine3.23`, and the
+finding CVE-2025-30204 still listed undecided at 20 of 90 days, carried
+from the previous data (Req 6.46) against a digest nobody can pull any
+more; the issue itself, #325, that run had closed at 10:21:26Z, graded
+`resolved:fixed` on other images' SBOMs (the grade's defect, read on
+2026-11-08 and recorded in the retirement entry), and the scheduled rescan
+of 13:29Z reopened it on the republished digest. Today's scheduled rebuild had not run; under on-change it
+republishes the definition on a new digest with its tags the day it does,
+which is why the retirement (task 16.16) follows at once. The scheduled
+build of 2026-11-06 (42218250310) failed in cert-manager-webhook's local
+rebuild on a buildx layer write, unrelated to the drill and read on its
+own.
+
+**The advisory's state.** Published by the owner on 2026-11-07 at 11:59:02Z, once the entry had merged, as the runbook says. It went public with the wrong text: the draft had been saved with the 16.14 report's title, severity and description, and was published so; corrected in place at 13:37:38Z, the id unchanged, to the withdrawal's title (Drill 16.12: ghcr.io/mm-weber/dhc/drill-app at sha256:cf147012fad2 withdrawn, the revocation runbook, Move B1), severity low, the affected version naming the digest and its three tags, and a description saying what was withdrawn and why; the patched-versions field left empty. Ninety-eight minutes in which the repository's one published advisory said the wrong thing, on a drill, which is what a drill is for: the runbook's next edit has the advisory's text read back before it is published.
+
+**What the drill found.** The record has no shape for "revoked, the move
+pending", so a replacement release can never be recorded before it moves
+the tags, and the posture step's refusal belongs to the half-executed
+withdrawal alone; a third shape is a follow-up candidate, not a change
+made here. A deleted version leaves its cosign signature and attestation
+manifests behind, 72 of them on this definition; the runbook's next edit
+names them. An active definition with nothing published is a state the
+page has words for, "declared, no digest today", while the status keeps
+the withdrawn digest's finding and its clock, which only a decision or
+the retirement ends. And a withdrawn definition comes back at the next
+scheduled rebuild unless it is retired or deactivated: a withdrawal is two
+moves, the version's and the definition's, and the runbook says only the
+first.
+
+## 2026-11-07: the drill definition retired, the drill program closed (task 16.16)
+
+*Image: drill-app. Task 16.16, conductor track `retirement_20261107`
+(#377, squash ea59ee1). The drill definition joined the catalogue on
+2026-10-18 to carry two findings on purpose (task 16.2) and was the
+fixture of every live drill since: the KEV tier (16.3), the lapse (16.4),
+the ceiling (16.5), the fix (16.6), the regression (16.7), the fail-closed
+gate (16.9), the active-set entry (16.11), the switches (16.13), the
+private report (16.14), the authenticity mismatch (16.10) and the
+withdrawal (16.12), with the KEV outage (16.8) and the deliberate
+violations (16.15) around it. Fourteen drills done, every ledger row that
+waited for one exercised, this entry retires the fixture at level 2 of the
+retirement table (track `retire-grafana_20261019`): the definition leaves
+the catalogue, not only the active set.*
+
+**What leaves (#378).** The active-set line and the proofs entry in
+`catalogue-policy.yaml`, the directory `image/drill-app/`, and the lane
+`triage/accepted-risk/drill-app.yaml`, empty since task 16.7 and kept for
+this day, in one pull request; Req 1.19 is satisfied by the line and the
+directory leaving together, the shape the 2026-10-30 drill showed is the
+only one validation admits. The probe lint's live-state case moved first:
+six active definitions, six chart-proved, none declared, red on the
+repository as it stood and green on the removal. The tracking block did
+not change, a removed directory needing no ignore glob. Renovate's #346,
+the fixture's gorilla/handlers bump, lost its file. The README's and the
+manual's definition rows name the fixture retired.
+
+**What stays and what stops.** Nothing published is deleted: every digest
+the fixture published stays pullable by digest, its tags where they were
+left, its last attestations in place, cosign's signature and attestation
+manifests under the package, and the withdrawn digest's entry in
+`triage/revocations.yaml`, which nothing is ever removed from. What stops
+is the catalogue's daily attention: the enumeration reads repositories
+from the definitions, so the fixture's tags are not enumerated, scanned or
+re-attested from the first rescan after the merge, a correction of the
+task's wording that assumed the scans would continue, which the retirement
+table of 2026-10-19 had already noted. The scheduled rebuild of 2026-11-07
+(run 42367838163, 11:37Z) had republished the withdrawn definition on
+sha256:daeef9400b83 that morning, as the 16.12 entry said it would; it is
+the last digest the fixture will publish, and its tags stay on it. The
+upstream repository, `mm-weber/drill-app`, was archived by the owner at
+08:07:14Z on 2026-11-08, ten minutes after the merge; its tags and commits,
+cited by this log, stay readable.
+
+**The first rescan after (2026-11-08).** The dispatched rescan 42461602452 (08:07:54Z to 08:24:04Z) read the registry without the definition: six definitions and grafana's frozen digest examined, no drill-app tag enumerated. The fixture's issue, #325, closed at 08:16:24Z by name, "CVE-2025-30204 appears, reported or suppressed, in no supported digest's attested scan report today", the rule of Req 6.52 doing what the retirement expected; but it closed graded `resolved:fixed`, the SBOM grade having found golang-jwt/jwt/v5 at v5.3.1 in cert-manager-controller's and grafana's platform manifests, images the issue never named, and called that "every occurrence bumped". The grade reads every supported manifest's SBOM, not the issue's own images, and had done the same at 10:21:26Z on 2026-11-07 after the withdrawal, before the scheduled rescan of 13:29Z reopened the issue on the republished digest, an omission of the 16.12 entry corrected there today. Ledger row 6.56 turns to `defect` on that evidence; its fix is a todo item. The posture step printed `revocations: 1 recorded, 0 referenced by a catalogue tag`, the withdrawn digest's entry listed with nothing referencing it, and in the same step `rulesets: unreadable (HTTP Error 403: rate limit exceeded)` and `private vulnerability reporting: unreadable (HTTP Error 403: rate limit exceeded)`: the governance half's two reads refused by GitHub's primary rate limit, which the reader does not wait out by design, the step red by name and no issue filed, the first unreadable governance read, the owner's token reading the flag enabled minutes later; the run was red for that alone. The status issue and the page published without the definition among the catalogue's images and with its three finding rows still carried from the previous data, the HIGH's clock at 21 of 90 days on a digest the catalogue no longer stands behind: the status keeps a retired definition's rows until something drops them, a todo item. The page deployed, its read-back green.
+
+**The record complete.** The ledger reads 149 criteria exercised, two
+defects (6.55, the attested reports' empty database fields; 6.56, the
+closure grade read on this day's run, below), each with its fix a todo
+item, and four unexercised with their reasons (2.26, 3.13, 3.15, 4.9), no
+row waiting for a drill. Eight of the fourteen drill entries closed
+without a "What the drill found" paragraph; each has one as of this pull
+request, written from its own text, so that every drill names what it
+found. The authenticity table of SECURITY.md never listed the fixture's
+class; it listed the catalogue's images, and the fixture was never one, a
+reading recorded here rather than corrected. The drill program's
+follow-ups stand in `tasks/todo.md`: the two expiry clocks, the one
+ceiling read three ways, a rebuilt digest's restarted statement clock, the
+log-only refusals of Req 7.4, the record's missing shape for a revocation
+whose move is pending, cosign's manifests outliving a deleted version, and
+the runbook's text read back before an advisory is published.
+
+**What the drill found.** A definition that carries findings on purpose
+costs what any definition costs, a daily scan, an issue per finding, a
+clock, and buys every mechanism's first live run at a known address; the
+catalogue treated it as it treats the rest, which is the point. Retiring
+it is two moves, the version's and the definition's, and only the second
+ends the catalogue's attention; the first, taken alone on 2026-11-07,
+lasted until the next rebuild. What the fixture leaves behind is the
+record: fourteen entries, each naming what its drill found, and a ledger
+with no row that waits. Its last run found two more things: the closure
+grade reads SBOMs the issue never named, a defect now on the ledger's row
+6.56, and the status carries a retired definition's rows with their clocks
+until something drops them.
+
+## 2026-11-09: fix by fetch-phase module bumps, CVE-2026-116587 and CVE-2026-78661, go-jose and x/net in the three cert-manager images (#385)
+
+*Images: cert-manager-controller for go-jose, all three cert-manager images
+for x/net. grafana's half of both findings is a repackaged upstream binary
+and is decided separately; each issue stays open until every repository on it
+is fixed or covered.*
+
+Go JOSE spends unbounded work parsing a JWK that carries an RSA key: HIGH,
+EPSS 0.0037 (30th percentile), not in CISA KEV, filed by the rescan on
+2026-10-28 as #338 against cert-manager-controller and grafana. The
+controller carries the vulnerable code through its own module: v1.21.2's
+`cmd/controller/go.mod` pins `github.com/go-jose/go-jose/v4` v4.1.4,
+indirect, fixed in v4.1.6 of 2026-10-14, so only a pin move retires it.
+Upstream has made that move, master and release-1.21 both pinning v4.1.6
+(read 2026-11-09), and no release carries it: v1.21.3's go.mod still pins
+v4.1.4, which is why the 1.21.3 bump is no fix lane here.
+
+**Why no bump was ever offered.** Nothing in this repository named go-jose.
+The fetch phase's bump steps list the modules a finding made us pin, each
+with its `# renovate:` marker (Req 7.6), and the gomod manager sees this
+repository's own two modules alone, `test/` and `triage/rescan/`. Renovate
+bumps what the repository names, so a transitive module of an upstream built
+from source is invisible to it until a step names it, and the vulnerability
+alerts it does read are Dependabot's on those two modules, not the scanners'
+findings on the images. The marker added with the step makes it tracked from
+here on, the way x/net has been since 2026-10-12.
+
+**Decision: fix** (the owner's call, 2026-11-09). The reach order's first
+rung, through the lane the 2026-10-12 entry re-established: a `go/bump@v2`
+step in the definition's fetch phase, work-dir the cmd submodule the binary
+resolves through, `github.com/go-jose/go-jose/v4@v4.1.6` with its marker,
+`download: true`, `tidy: true`. Minimal version selection makes the pin a
+floor that a later upstream requirement wins over. Exit condition: drop the
+step when an upstream release pins v4.1.6 or newer.
+
+**And x/net with it, CVE-2026-78661 (#375).** The two findings blocked each
+other. The gate on this pull request's first build, run 42613568925, answered
+the go-jose fix with the next uncovered finding, `golang.org/x/net@v0.60.0,
+fixed: 0.62.0`: the pin the 2026-10-12 entry set is a floor, and a second
+HTTP/2 finding in the same package has moved the fixed version past it.
+Renovate had read that and offered v0.62.0 in #270, which was red at the gate
+for the opposite reason, nothing covering go-jose. So the x/net pin moves to
+v0.62.0 in all three definitions here, the same change #270 proposes, and
+#270 is subsumed: Renovate closes it once the marker reads v0.62.0 on main.
+The step's name and exit condition name both findings now.
+
+**What it unblocks.** The scan gate on every pull request that builds a
+cert-manager image named these findings as the uncovered things in its
+aperture (Req 6.1), so Renovate's x/net bump (#270), the build-layer digest
+(#349) and the cert-manager 1.21.3 pair (#327, #328) were all red at it. With
+both pins moved the gate has nothing left to name on those builds, the
+release republishes the three images, and the remaining bumps stand on their
+own merits. Neither issue closes yet: grafana carries both findings in a
+repackaged upstream binary, which no pin of ours can move, and its half is
+decided separately. The stdlib finding of #300 was not named by the gate on
+these builds, so a fresh build no longer reports it; what the published
+digests carry is read from the next release's reports.
+
+## 2026-11-10: grafana returns to the active set, the fix rung reopened (#388)
+
+*Image: grafana, the frozen 13.1.7 digest sha256:89c5680a868b, inactive since
+2026-10-19. The owner's call of 2026-11-10, conductor track
+`reactivate-grafana_20261110`: the line goes back into `active_set` by the same
+switch that removed it, and nothing more.*
+
+**Why the call changed.** The deactivation did what it was opened to do, which
+was to exercise the documented switch live on a real definition, and the
+ledger holds that evidence on rows 1.15 and 1.16. What it also did was close
+the fix rung on a digest the catalogue keeps enumerating, scanning, clocking
+and re-attesting every day. Three undecided HIGH findings accumulated on it
+with no treatment left but a bounded acceptance and no exit but a second one,
+and the nine transfers of 2026-10-13 lost the build that was to end them. The
+evidence for the oldest of the three was prepared for a decision on 2026-11-10
+and the measurement moved the question rather than answering it: a released
+13.1.x now carries the toolchain that finding needs, so the honest first rung
+was no longer closed.
+
+**What was measured.** On the frozen digest, pulled and extracted, and against
+upstream's dependency manifests at the relevant tags. The server binary's own
+build information reads go1.26.6, `golang.org/x/net` v0.58.0 and
+`github.com/go-jose/go-jose/v4` v4.1.4.
+
+| Finding | Needs | Frozen 13.1.7 | Released 13.1.9 |
+|---|---|---|---|
+| CVE-2026-111943 (#300) | Go 1.26.10 | go1.26.6 | go 1.26.10 |
+| the nine transfers of 2026-10-13 | Go 1.26.9, x/net 0.60.0 | go1.26.6, v0.58.0 | go 1.26.10, v0.60.0 |
+| the five kin-openapi statements | 0.146.0 | v0.144.0 | v0.151.0 |
+| CVE-2026-116587 (#338) | go-jose 4.1.6 | v4.1.4 | v4.1.4 |
+| CVE-2026-78661 (#375) | x/net 0.62.0 | v0.58.0 | v0.60.0 |
+
+Upstream's main branch carries Go 1.27.3, x/net v0.62.0 and go-jose v4.1.8, so
+the two newest findings have a real exit in a release grafana has not cut yet.
+The two bundled plugin binaries, measured at go1.26.7 in the round of
+2026-10-13 and built on 2026-09-10 and 2026-09-16, are prebuilt artifacts of
+their own repositories: what a 13.1.9 tarball bundles is not measurable from
+this environment, whose allowlist does not reach the download host. The gate of
+the first bump is that measurement, which is an argument for proposing one.
+
+**What the three findings now wait on.** Nothing is decided here and the
+exception file is untouched. CVE-2026-111943 waits on the finding set the first
+bump's gate reports, with the fix rung as its first option; its acceptance
+proposal of this morning is withdrawn. CVE-2026-116587 and CVE-2026-78661 wait
+on a grafana release carrying what upstream's main already has, which makes a
+transfer with a dated exit the honest treatment rather than an acceptance. All
+three sit inside their ninety-day ceilings, which fall on 2027-01-19,
+2027-01-26 and 2027-02-05.
+
+**The nine transfers.** Their planned exit is restored. A 13.1.9 build clears
+the stdlib half of all three findings, Go 1.26.10 being past the 1.26.9 wave,
+and moves x/net to v0.60.0, the version CVE-2026-78669 names as fixed. What the
+two plugin halves carry depends on what that tarball bundles. The re-decision
+date stays 2026-12-12, and the 2026-10-19 entry's reading of it, accept because
+no build will fix this image, is no longer the only reading available.
+
+**The five not-affected statements.** Each is scoped to 13.1.7-alpine3.23, so a
+rebuild at the same version stays inside their scope and the claims keep
+matching. A 13.1.9 build makes them moot instead: the module they excuse moves
+to v0.151.0, past the 0.146.0 to 0.149.0 the five advisories name as fixed.
+
+**What changes on the merge.** `grafana` returns to `active_set` between
+`cert-manager-cainjector` and `valkey` and the comment recording the
+deactivation is amended; nothing under `image/grafana/` or `chart/grafana/`
+moves. `renovate.json5`'s tracking block is re-rendered with no grafana glob,
+so the bot extracts the definition again and `scripts/refresh-grafana.sh`, the
+postUpgradeTask of ADR 0002, is what will rewrite the per-build tarball URL and
+both per-arch checksums on a bump. The live-state case of
+`scripts/lint-probes_test.sh` moves to seven active definitions, seven covered
+by four probe registrations and none declared, test-first. The end-to-end
+suite's affected-components job reads the active set to know which charts may
+run at all, and then selects on a pull request the components whose chart or
+whose active definition changed. This change touches neither, so no grafana
+suite runs here; the chart is installed again on the first pull request that
+moves the definition, which is the bot's bump, and on a dispatch of every
+component. `test/e2e/probes_test.go` has kept its `http-health` registration,
+an in-cluster request for `/api/health`, throughout.
+
+**What this pull request does not do.** It builds nothing: a pull request's
+matrix is derived from changed `image/<name>/image.yaml` paths and from the
+images a changed statement names, and this change touches neither, so the scan
+gate scans nothing here. It moves no tag and it decides no finding.
+`release.fail_closed` is false, so an uncovered finding in a release-time scan
+is published as under investigation rather than stalling the release, which is
+why the three open findings do not block the return;
+`release.publish_policy` is on-change, so the first scheduled rebuild publishes
+only if its package set differs from the published digest's.
+
+**What the first active day is expected to show**, named here so it can be
+checked rather than assumed: a build run with grafana in its matrix, a package
+set three weeks newer than the published digest's, a new digest under
+`13-alpine3.23`, `13.1-alpine3.23` and `13.1.7-alpine3.23`, a release-time scan
+naming three uncovered findings, a status issue that carries them with their
+first-seen dates unchanged, and a daily authenticity re-check that covers the
+definition's two tarball origins again, its class being cross-origin-checksum,
+dormant since 2026-10-19. The build also runs `scripts/verify-arch-pins.sh`
+over the definition again, which fetches both per-arch tarballs and checks the
+pinned checksums against the bytes upstream serves. The end-to-end component and the gate's full
+finding set arrive with the bump instead, which is the next pull request and
+not this one. The track's second pull request reads both and adds the
+addendum.
+
+## 2026-11-10: cert-manager 1.21.3, the three statements carried, both fix-lane pins re-checked
+
+*Images: cert-manager-controller, cert-manager-webhook, cert-manager-cainjector.
+Renovate proposed the release in #327, which is red at the statement lint
+because a statement may only pin a tag its definition publishes. This pull
+request carries what a release bump has to carry with it, so #327 is subsumed.*
+
+**What the release brings.** v1.21.3's go.mod, read on 2026-11-10 at the root
+and in each of the three cmd submodules: `golang.org/x/crypto` v0.57.0, up from
+v0.56.0; `golang.org/x/net` v0.60.0, up from v0.58.0;
+`google.golang.org/grpc` v1.83.2, unchanged; `github.com/go-jose/go-jose/v4`
+v4.1.4, unchanged. The upstream tag is signed and its commit is
+925c22283de556172d48d96a165dc2fa27f7a6ff.
+
+**Both fix-lane steps stay, and the readings say why.** The x/net step's exit
+condition is an upstream release pinning v0.62.0 or newer. v1.21.3 pins
+v0.60.0, which carries CVE-2026-78669's fix but not CVE-2026-78661's, so the
+pin stays at v0.62.0 for the second finding and the step keeps both names. The
+go-jose step's exit condition is an upstream release pinning v4.1.6 or newer;
+v1.21.3 still pins v4.1.4, so that step stays too. Each definition's comment
+now records the 2026-11-10 reading beside the older ones.
+
+**What the refresh got wrong, and what was restored.** The postUpgradeTask
+rewrites the version string wherever it appears, including inside sentences
+that are history. In all three definitions "from 2026-09-02 until v1.21.2
+carried both fixes" became "until v1.21.3", and "v1.21.2's go.mod pins
+golang.org/x/net v0.58.0" became "v1.21.3's". Both are false: v1.21.2 is the
+release that carried the crypto and grpc fixes, and v1.21.3 pins x/net
+v0.60.0, not v0.58.0. The controller's go-jose paragraph was rewritten the same
+way, where the replacement happened to be true of v1.21.3. Every one of them is
+restored to what was measured when it was written, with today's reading added
+rather than substituted. Whether the refresh should leave comment lines alone is
+a todo item; it is a tool that edits prose it cannot evaluate.
+
+**The three statements carried.** A product identifier pins the published tag
+(Req 6.20), so a release bump moves every statement that names the old one, the
+way the 1.21.1 to 1.21.2 carry did on #208. CVE-2026-56854 (x/crypto, document
+version 3), CVE-2026-84304 (grpc, document version 3) and CVE-2026-78669
+(x/net, document version 2) now scope to 1.21.3-alpine3.23. None was carried
+blind: each claim was re-checked against v1.21.3's own go.mod, and each
+statement's notes say what was read and when. The crypto and grpc claims hold
+because upstream's pins are at or above the fixed versions; the x/net claim
+holds twice now, once through upstream's own v0.60.0 and once through the
+catalogue's v0.62.0 floor.
+
+**One stale claim corrected while the file was open.** CVE-2026-78669's impact
+statement still said the definitions bump the module to v0.60.0. The pin moved
+to v0.62.0 on 2026-11-09 and the text had not followed. It names v0.62.0 and
+the finding that moved it.
+
+**What the gate is expected to say.** Three builds, amd64 only on a pull
+request, each scanned with its statements compiled against the pushed digest of
+the throwaway registry: nothing uncovered within the aperture. The release-time
+scan after the merge covers both platforms of all three images, and the
+`chart/cert-manager/config/values-hardened.yaml` tags follow publication in
+Renovate's own pull request, as they did for 1.21.2. The upstream chart pin to
+v1.21.3 is #328 and stays separate.
+
+## 2026-11-10: grafana's three findings, one bounded round
+
+*Image: grafana, the digest sha256:a9540c499384 published by the dispatched
+build of 2026-11-10 under all three tags. The owner's calls of 2026-11-10,
+taken together because the gate names all seven instances at once and because
+one re-decision date serves them better than three.*
+
+**Why now, and why this is new.** Deactivation had kept the pull request gate
+off this definition: an inactive definition is never built, so its undecided
+findings published as under investigation and stopped nothing. Reactivation
+(#388) turned the gate back on, and the first change to touch every definition,
+the build-layer round, went red on grafana naming seven uncovered findings
+within the aperture. From here every pull request that builds this image waits
+on these decisions, which is the reactivation's first real cost and the reason
+the fix rung was worth reopening.
+
+**What was measured, per binary, on the published digest.** Read from the
+attested cosign-vuln predicate of its amd64 manifest sha256:6d5db40a9ddc, and
+matched against the gate's own report:
+
+| Binary | CVE-2026-111943 | CVE-2026-78661 | CVE-2026-116587 |
+|---|---|---|---|
+| `bin/grafana` | stdlib v1.26.6 | x/net v0.58.0 | go-jose v4.1.4 |
+| elasticsearch plugin, built 2026-09-16 | stdlib v1.26.7 | x/net v0.58.0 | absent |
+| zipkin plugin, built 2026-09-10 | stdlib v1.26.7 | x/net v0.58.0 | absent |
+
+Seven instances, three findings, three binaries. The five kin-openapi findings
+do not appear: their statements, scoped to `13.1.7-alpine3.23`, matched the
+republished digest and suppressed them, which is the carry-forward working
+across a rebuild.
+
+**What the releases carry.** Read the same day from each tag's own go.mod:
+13.1.9 and 13.2.5 carry Go 1.26.10 and x/net v0.60.0 with go-jose still v4.1.4;
+13.3.0 carries Go 1.27.3, x/net v0.61.0 and go-jose v4.1.6; upstream main
+carries x/net v0.62.0 and go-jose v4.1.8. So one finding has a released in-lane
+fix, one has a fix only outside the lane, and one has no release at all.
+
+**The lane, stated by the owner.** A new grafana minor is a different image.
+This definition tracks 13.1.x and never moves to 13.2.x or 13.3.x; a fix counts
+for it only when a 13.1.x release carries it. That is what makes the go-jose
+decision an acceptance rather than a deferred bump, and it is worth writing
+down because the measurement above would otherwise read as an argument for
+13.3.0.
+
+**The seven decisions.** One per binary per finding, because one entry per
+binary stops one plugin's upstream covering another's (Req 6.23).
+
+- **CVE-2026-111943, `bin/grafana`: accept**, and the shortest-lived of the
+  seven. Remediation is available in this lane: 13.1.9 carries Go 1.26.10 and
+  the repackage bump is queued, so the entry covers the interval until that
+  bump lands and is retired by it rather than re-decided.
+- **CVE-2026-111943, both plugins: transfer**, against the tickets the
+  2026-10-13 round already opened on each plugin repository. The ask is the one
+  those tickets carry, a rebuild on a fixed toolchain, with the Go floor now
+  reading 1.26.10. No grafana release reaches a prebuilt plugin binary without
+  rebundling a newer build of it.
+- **CVE-2026-116587, `bin/grafana`: accept.** The fix reaches grafana in
+  13.3.0, outside this lane by the lane's own definition. The module arrived
+  there transitively rather than through a security bump, no 13.1.x release
+  carries it, and no upstream ticket asks for a backport, so there is no
+  external owner to transfer to. An acceptance with no upstream is the honest
+  shape, and if the owner opens a backport request it becomes a transfer.
+- **CVE-2026-78661, all three binaries: transfer.** Upstream merged x/net
+  v0.62.0 to main on 2026-10-28 (grafana/grafana#136276) and no release carries
+  it; the exit is a backport into 13.1.x, which grafana has done for this module
+  before, v0.60.0 reaching 13.1.9. The plugin halves transfer to their own
+  repositories' tickets, whose x/net floor now reads v0.62.0.
+
+**Why not_affected is written for none of them.** For the toolchain finding the
+verify call is reachable in every outbound TLS call, the image's 121-root bundle
+trusts four sibling eMudhra roots, and the issuers of five of the eight
+distrusted intermediates could not be established from this environment. For
+the network finding the plugins do link x/net/http2 only for Framer and hpack,
+with none of the server, client or flow-control receivers present, which is the
+measurement the 2026-10-13 round took; but a statement scopes by package and
+`bin/grafana` carries the same package with the code present (Req 6.19), so the
+claim cannot be written for the image. For go-jose the JWK parsing path is
+unmeasured in a server that serves JWT and OAuth logins.
+
+**One date.** Every entry expires 2026-12-12, the date the nine transfers of
+2026-10-13 already carry, so grafana's whole open set comes due in one sitting.
+That sitting is where the lane's end state belongs: with one finding fixable
+only outside the lane and two resting on prebuilt binaries nobody here can
+rebuild, the question on 2026-12-12 is whether this image keeps its tags or
+takes a step down the retirement table.
+
+**What this unblocks.** The build-layer round, #393, can go green with grafana
+included once these entries are on main. The 13.1.9 bump follows and retires the
+first entry. Neither waits on the other.

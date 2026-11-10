@@ -1,4 +1,4 @@
-# syntax=dhi.io/build:2-alpine3.23@sha256:8aa6c00cdb38f5ee6ded2ce8922124624c2415d6f381377c15014c2502495bf7
+# syntax=dhi.io/build:2-alpine3.23@sha256:989216eaa8b717f23106179de52d1624552cf0e2f464f011ea690654c58bb9a6
 
 name: cert-manager controller 1.21.x
 image: ghcr.io/mm-weber/dhc/cert-manager-controller
@@ -6,19 +6,19 @@ variant: runtime
 tags:
   - 1-alpine3.23
   - 1.21-alpine3.23
-  - 1.21.2-alpine3.23
+  - 1.21.3-alpine3.23
 platforms:
   - linux/amd64
   - linux/arm64
 dates:
   release: "2026-06-25"
 vars:
-  COMMIT_SHA: 922a06aa49ee4bb802db268ef72a174af70edd32
-  GOLANG_REFERENCE: dhi.io/golang:1.27.3-alpine3.23-dev@sha256:568da883960cf1ef92931413a4b5f8c424eb05b1b41384343ec54f01f404d721
+  COMMIT_SHA: 925c22283de556172d48d96a165dc2fa27f7a6ff
+  GOLANG_REFERENCE: dhi.io/golang:1.27.3-alpine3.23-dev@sha256:2bbed7b88da3551da9fc54400e18e73778392af823370ace400587157e39e7f0
   SEMVER_MAJOR_MINOR_VERSION: "1.21"
   SEMVER_MAJOR_VERSION: "1"
-  SEMVER_VERSION: 1.21.2
-  VERSION: 1.21.2
+  SEMVER_VERSION: 1.21.3
+  VERSION: 1.21.3
 contents:
   repositories:
     - https://dhi.io/apk/alpine/v3.23/main
@@ -32,7 +32,7 @@ contents:
     - tzdata
   builds:
     - name: cert-manager-controller
-      uses: dhi.io/golang:1.27.3-alpine3.23-dev@sha256:568da883960cf1ef92931413a4b5f8c424eb05b1b41384343ec54f01f404d721
+      uses: dhi.io/golang:1.27.3-alpine3.23-dev@sha256:2bbed7b88da3551da9fc54400e18e73778392af823370ace400587157e39e7f0
       work-dir: /go/src/github.com/cert-manager/cert-manager
       caches:
         - path: /go/pkg/mod
@@ -40,16 +40,16 @@ contents:
         packages:
           - ca-certificates-bundle
         files:
-          - url: git+https://github.com/cert-manager/cert-manager.git#v1.21.2
-            # authenticity: signed-tag, verified v1.21.2 (GitHub verification: valid), 2026-09-18
-            checksum: 922a06aa49ee4bb802db268ef72a174af70edd32
+          - url: git+https://github.com/cert-manager/cert-manager.git#v1.21.3
+            # authenticity: signed-tag, verified v1.21.3 (GitHub verification: valid), 2026-11-10
+            checksum: 925c22283de556172d48d96a165dc2fa27f7a6ff
             path: /go/src/github.com/cert-manager/cert-manager
             spdx:
               name: cert-manager-controller
-              version: 1.21.2
+              version: 1.21.3
               packages:
                 - name: cert-manager-controller
-                  purl: pkg:golang/github.com/cert-manager/cert-manager@1.21.2
+                  purl: pkg:golang/github.com/cert-manager/cert-manager@1.21.3
                   license: Apache-2.0
             uid: 0
             gid: 0
@@ -59,19 +59,46 @@ contents:
         # controller and webhook, google.golang.org/grpc (CVE-2026-84304) from
         # 2026-09-02 until v1.21.2 carried both fixes (triage/LOG.md
         # 2026-09-18). Reopened 2026-10-12 for CVE-2026-78669: v1.21.2's
-        # go.mod pins golang.org/x/net v0.58.0, fixed in v0.60.0, which
+        # go.mod pinned golang.org/x/net v0.58.0, fixed in v0.60.0, which
         # upstream merged on master and release-1.21 on 2026-10-09 with no
         # release carrying it yet. Minimal version selection makes the pin a
         # floor a later upstream requirement wins over. Exit condition: drop
-        # the step when an upstream release pins x/net v0.60.0 or newer, the
+        # the step when an upstream release pins x/net v0.62.0 or newer, the
         # Renovate release PR being the reminder (triage/LOG.md 2026-10-12).
-        - name: bump x/net (CVE-2026-78669)
+        # Moved to v0.62.0 on 2026-11-09 for CVE-2026-78661, the same package
+        # again and the version Renovate offered in its own pull request; both
+        # findings leave with this one pin (triage/LOG.md 2026-11-09).
+        # v1.21.3's go.mod pins x/net v0.60.0 (read 2026-11-10), which carries
+        # CVE-2026-78669's fix but not CVE-2026-78661's, so the exit condition
+        # is still unmet and the pin stays for the second finding
+        # (triage/LOG.md 2026-11-10).
+        - name: bump x/net (CVE-2026-78669, CVE-2026-78661)
           uses: go/bump@v2
           work-dir: /go/src/github.com/cert-manager/cert-manager/cmd/controller
           with:
             deps:
               # renovate: datasource=go depName=golang.org/x/net
-              - golang.org/x/net@v0.60.0
+              - golang.org/x/net@v0.62.0
+            download: true
+            tidy: true
+        # Added 2026-11-09 for CVE-2026-116587, a denial of service in Go JOSE
+        # when parsing JWKs that carry RSA keys: v1.21.2's cmd/controller
+        # go.mod pinned github.com/go-jose/go-jose/v4 v4.1.4 (indirect), fixed
+        # in v4.1.6. Upstream pinned v4.1.6 on master and release-1.21 (read
+        # 2026-11-09) and no release carried it. v1.21.3's cmd/controller
+        # go.mod still pins v4.1.4 (read 2026-11-10), so the pin stays.
+        # Nothing in this repository named go-jose, so no
+        # Renovate bump could ever have been offered for it; the marker below
+        # makes it tracked from here on. Exit condition: drop the step when an
+        # upstream release pins v4.1.6 or newer, the Renovate release pull
+        # request being the reminder (triage/LOG.md 2026-11-09).
+        - name: bump go-jose (CVE-2026-116587)
+          uses: go/bump@v2
+          work-dir: /go/src/github.com/cert-manager/cert-manager/cmd/controller
+          with:
+            deps:
+              # renovate: datasource=go depName=github.com/go-jose/go-jose/v4
+              - github.com/go-jose/go-jose/v4@v4.1.9
             download: true
             tidy: true
         # No test step: cmd/* submodules share the monorepo's suite, which
@@ -84,8 +111,8 @@ contents:
             ldflags:
               - -w
               - -s
-              - -X github.com/cert-manager/cert-manager/pkg/util.AppVersion=v1.21.2
-              - -X github.com/cert-manager/cert-manager/pkg/util.AppGitCommit=922a06aa49ee4bb802db268ef72a174af70edd32
+              - -X github.com/cert-manager/cert-manager/pkg/util.AppVersion=v1.21.3
+              - -X github.com/cert-manager/cert-manager/pkg/util.AppGitCommit=925c22283de556172d48d96a165dc2fa27f7a6ff
             output: ${target.dir}/usr/local/bin/cert-manager-controller
             packages: .
       outputs:

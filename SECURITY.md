@@ -28,9 +28,18 @@ automation produces the status and the human supplies only decisions:
 3. **Time to decision and time to fix are measured and published** as
    numbers in the status issue, not promised as service levels.
 
-Not promised: remediation windows, an on-call duty, a second reviewer. A fork
-with staff reaches those by changing numbers and the committed ruleset, not
-the machinery.
+**What a signature does not say.** A signed, published digest can carry a
+known HIGH or CRITICAL as `under_investigation`: the pull request gate blocks
+an uncovered finding before the merge, the release on `main` publishes it
+with that status by the declared default (`release.fail_closed: false`,
+Req 2.12; the switch, Req 2.13), and the daily admission proof checks that
+the signature and the attestations exist from the pinned identities, not
+what they say (Req 2.24). Read "published" as "accounted for", not "clean";
+the attested OpenVEX is the statement to read.
+
+Not promised: remediation windows, an on-call duty, a second reviewer, a
+release blocked on an uncovered finding. A fork with staff reaches those by
+changing numbers and the committed ruleset, not the machinery.
 
 ## Decision aperture and ceilings
 

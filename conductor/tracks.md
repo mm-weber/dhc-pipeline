@@ -16,23 +16,95 @@
 
 ---
 
-### [~] fail-closed-release_20261027: The fail-closed release gate refuses a release, the digest frozen, live
+### [~] reactivate-grafana_20261110: Grafana returns to the active set, the fix rung reopened
 
-**Description:** The fail-closed release switch turned on for one dispatched build of the drill definition, whose HIGH is uncovered since task 16.4: the release-time scan names the finding per platform manifest, the gate signs, attests and tags nothing, the pushed digest stays frozen and pullable by digest, the next scheduled rescan neither enumerates nor re-attests it; the switch back off the same day unless the owner keeps it; the way out is drill 16.6's fix.
-**Priority:** high (the live program; possible today, before 16.6 fixes the finding)
-**Folder:** [./tracks/fail-closed-release_20261027/](./tracks/fail-closed-release_20261027/)
-
----
-
-### [~] over-ceiling_20261027: An undecided finding past its ceiling, the alarm raised and cleared, live
-
-**Description:** The drill definition's undecided HIGH, ten days old, put over its ceiling for one rescan: `triage.kev_ceiling` lowered to one day in one pull request, the owner's dispatch with `drill: kev-synthetic` listing the finding, the status issue and the page publishing over ceiling: 1 with the row marked (the first live over-ceiling flag), the value restored the same day, the next scheduled run clearing the alarm on the declared feed. The HIGH ceiling the task text named cannot go under 60 days: `triage.ceilings` also tiers every standing exception and bounds the lint, and grafana's nine transfers run 60 days.
-**Priority:** high (the next drill of the live program; 16.6 fixes the finding after it)
-**Folder:** [./tracks/over-ceiling_20261027/](./tracks/over-ceiling_20261027/)
+**Description:** Grafana returns to `active_set` by the same switch that removed it on 2026-10-19: the line back, the tracking block re-rendered, the live-state case moved to seven by four test-first, the README and manual rows and the LOG entry in the same pull request; the fix rung reopens for the three undecided HIGH findings on the frozen digest and for the nine transfers of 2026-10-13, whose exit the released 13.1.x line now carries; the first active day and the bot's bump read in a second pull request.
+**Priority:** high (three undecided HIGH findings on the frozen digest are waiting on this decision; the oldest has been undecided for 20 days)
+**Folder:** [./tracks/reactivate-grafana_20261110/](./tracks/reactivate-grafana_20261110/)
 
 ---
 
 ## Completed tracks
+
+### [x] retirement_20261107: The drill definition retired, the drill program closed, the ledger complete
+
+**Description:** The drill definition retired at level 2 of the retirement table: its active-set line, proofs entry, directory and empty lane removed in one pull request with the live-state case moved to six, test-first; the record completed (the LOG entry, the eight drill entries given their findings paragraph, the README and manual rows, the ledger complete); the upstream repository archived by the owner; the first dispatched rescan after read for the issues closing on evidence and the definition leaving the status; task group 16 closed.
+**Priority:** high (the live program's last task; a scheduled rebuild republishes the withdrawn definition every day until this merges)
+**Completed:** 2026-11-08 (#377 merged as ea59ee1, the track; #378 the retirement, merged as b90900f; the upstream archived 08:07Z; the dispatched rescan after read; the evidence in #379; task group 16 complete)
+**Folder:** [./tracks/retirement_20261107/](./tracks/retirement_20261107/)
+
+### [x] revocation_20261105: A revocation, its advisory and the runbook, the drill digest withdrawn, live
+
+**Description:** The drill definition's current digest recorded as revoked with reason drill while its three tags still reference it (a withdrawal, Move B1, the one entry the schema admits before the move), the advisory drafted first, the dispatched rescan red at the posture step naming the three tags, the package version deleted by the owner, the next dispatched rescan green with the entry listed, the advisory published or kept at the owner's call; ledger rows 9.4, 9.5 and 9.7 exercised.
+**Priority:** high (the live program; the last three drill rows)
+**Completed:** 2026-11-07 (#371 merged as 62918cf, the track; the advisory GHSA-mxcv-w9jx-vj6j drafted; #374 the entry, merged while the three tags still referenced the digest; the dispatched rescan 42130207670 and the scheduled rescan 42233459314 red at the posture step by name; the version deleted by the owner on 2026-11-07; the dispatched rescan 42362729195 green with the entry listed; the evidence in #376: rows 9.4, 9.5 and 9.7 exercised)
+**Folder:** [./tracks/revocation_20261105/](./tracks/revocation_20261105/)
+
+### [x] private-report_20261031: A report through the private channel, handled as the policy promises, live
+
+**Description:** One private vulnerability report filed by the owner, titled as a drill, received through the channel SECURITY.md names, acknowledged, examined against the catalogue's records, answered and closed as a drill, the elapsed times recorded against no promised window; ledger row 9.2 exercised.
+**Priority:** high (the live program; runs beside the switches drill, no scheduled run involved)
+**Completed:** 2026-11-05 (#358 merged as dcda06f, the track; the owner's own attempt refused with 403 on 2026-11-02; the report GHSA-6xgw-5wvx-p8xx filed from a non-collaborator account at 13:29Z, acknowledged 13:55Z, answered and closed as a drill 13:59Z, nothing published; the evidence in #370: row 9.2 exercised)
+**Folder:** [./tracks/private-report_20261031/](./tracks/private-report_20261031/)
+
+### [x] auth-mismatch_20261105: A true authenticity mismatch, the drill definition's tag moved by its maintainer, live
+
+**Description:** The drill definition's pinned tag moved by its maintainer to an unsigned commit, the daily re-verification reporting the first true mismatch by name and filing the supply-chain issue, the owner deciding what the signal means (M18) and restoring the original tag object, the rescan verifying again, the issue closed with the reason; ledger row 3.10 exercised, 3.13 kept with its reason.
+**Priority:** high (the live program; the one row that needs an upstream signal to move)
+**Completed:** 2026-11-05 (#367 merged as ec04bfd, the track; the owner's tag move at 10:29Z and restore at 10:54Z; the dispatched rescans 42011386908, red at the authenticity step and filing #368, and 42014582733, green; #368 closed by the owner with the decision; the evidence in #369: row 3.10 exercised, 3.13 kept)
+**Folder:** [./tracks/auth-mismatch_20261105/](./tracks/auth-mismatch_20261105/)
+
+### [x] switches_20261030: The switches, one run each: the page off, every rebuild published, live
+
+**Description:** Two declared switches flipped for one day through one pull request and flipped back through another: `release.publish_policy` always, so the scheduled rebuild publishes every active definition whatever the comparator says (seven releases, the chart digest pull request following), and `release.page` false, so the scheduled rescan skips the page and the served page keeps the previous day's data; Req 6.62's failure branch by the owner disabling Pages for one run, their call.
+**Priority:** high (the live program; two rows no other drill reaches)
+**Completed:** 2026-11-03 (#356 merged as c0177f6, the track; #357 the flip, 438d456; the scheduled rebuild 41302227631 of 2026-11-01 publishing all seven active definitions and the scheduled rescan 41311884446 skipping the page; #359 the revert, 2338535; Renovate's digest pull requests #360, #361 and #362 automerged on 2026-11-03 once the e2e gate was repaired; the evidence in #365: rows 2.17 and 6.62 exercised, the latter by the owner's Pages action around two dispatched rescans of 2026-11-04; 2.15, 3.12 and 6.61 appended)
+**Folder:** [./tracks/switches_20261030/](./tracks/switches_20261030/)
+
+### [x] active-set-entry_20261030: The drill definition's directory removed, its active-set entry refused by name, live
+
+**Description:** The drill definition's directory removed on a drill branch never merged while its active-set entry stays: validation refuses the entry by name (Req 1.19, the one refusal of task 16.11 nobody had seen live), read in two commits so that the lane's own guard and the active-set line are both recorded; ledger row 1.19 exercised.
+**Priority:** high (the live program; no clock, no switch)
+**Completed:** 2026-10-30 (#353 merged as af626ea, the track; the drill pull request #354, never merged, two commits refused by name, the first by the accepted-risk lint on the missing definition, the second at the active-set step with the Req 1.19 line; the evidence in #355: row 1.19 exercised)
+**Folder:** [./tracks/active-set-entry_20261030/](./tracks/active-set-entry_20261030/)
+
+---
+
+### [x] drill-regression_20261029: The drill's HIGH brought back, the closed issue reopened on the lapse, live
+
+**Description:** The drill definition's HIGH brought back by removing its bump, accepted for one day rather than merged over the red gate, released with an `affected` statement; from midnight UTC Trivy drops the entry, the scheduled rescan lists the finding as reported again and reopens its closed issue #325 by name, the status carrying first seen 2026-10-18; the lapsed entry removed the same day, the finding undecided until the definition retires.
+**Priority:** high (the live program; the last drill on the drill definition's findings)
+**Completed:** 2026-10-30 (#347 merged as c0c8850, the track; #348 as ec90a95, the regression under a one-day acceptance, released 2026-10-29 23:55Z with an `affected` statement; the scheduled run 41060449312 of 2026-10-30 reopening #325 by name once Trivy dropped the lapsed entry, first seen 2026-10-18 carried; the evidence in #351 with the entry removed, the finding undecided until 16.16)
+**Folder:** [./tracks/drill-regression_20261029/](./tracks/drill-regression_20261029/)
+
+---
+
+### [x] drill-fix_20261028: The drill's findings fixed, the issue closed on the attested SBOMs, the fix clock, live
+
+**Description:** The drill definition's two findings fixed by a `go/bump@v2` step in its fetch phase (the catalogue's fix lane, M10): the pull request green at the gate by the fix, the release on main, the next scheduled rescan closing issue #325 as `resolved:fixed` on the attested SBOMs and publishing both findings as fixed with their fix times, the CRITICAL's exception retired as moot. The way out the fail-closed gate named, and the fixed finding drill 16.7 brings back.
+**Priority:** high (the live program; 16.7 needs a fixed finding)
+**Completed:** 2026-10-28 (#341 merged as a403884, the track; #342 as 57ebed4, the bump, green at the gate by the fix; main's release 40769247657 to `sha256:5cacd03bc770...` with no statement and the fixed versions in the SBOMs; the owner's dispatch 40788144199 closing #325 `resolved:fixed` and publishing both findings fixed 10 days after first seen; the evidence in #344 with the CRITICAL's exception retired as moot)
+**Folder:** [./tracks/drill-fix_20261028/](./tracks/drill-fix_20261028/)
+
+---
+
+### [x] fail-closed-release_20261027: The fail-closed release gate refuses a release, the digest frozen, live
+
+**Description:** The fail-closed release switch turned on for one dispatched build of the drill definition, whose HIGH is uncovered since task 16.4: the release-time scan names the finding per platform manifest, the gate signs, attests and tags nothing, the pushed digest stays frozen and pullable by digest, the next scheduled rescan neither enumerates nor re-attests it; the switch back off the same day unless the owner keeps it; the way out is drill 16.6's fix.
+**Priority:** high (the live program; possible today, before 16.6 fixes the finding)
+**Completed:** 2026-10-28 (#333 merged as 06c9b6e, the track and the task text's amendment; #334 as 8ea59f4, the switch on; the owner's dispatch 40691384018 refused at the fail-closed release gate by name, the digest `sha256:925dd22c2ead...` frozen, pullable by digest, unsigned, unattested, untagged; #335 the switch off the same day; the evidence in #336: rows 2.11 and 2.13 exercised; a first dispatch before the switch released the definition instead, recorded)
+**Folder:** [./tracks/fail-closed-release_20261027/](./tracks/fail-closed-release_20261027/)
+
+---
+
+### [x] over-ceiling_20261027: An undecided finding past its ceiling, the alarm raised and cleared, live
+
+**Description:** The drill definition's undecided HIGH, ten days old, put over its ceiling for one rescan: `triage.kev_ceiling` lowered to one day in one pull request, the owner's dispatch with `drill: kev-synthetic` listing the finding, the status issue and the page publishing over ceiling: 1 with the row marked (the first live over-ceiling flag), the value restored the same day, the next scheduled run clearing the alarm on the declared feed. The HIGH ceiling the task text named cannot go under 60 days: `triage.ceilings` also tiers every standing exception and bounds the lint, and grafana's nine transfers run 60 days.
+**Priority:** high (the next drill of the live program; 16.6 fixes the finding after it)
+**Completed:** 2026-10-28 (#330 merged 2026-10-27 as 0d3eae5, the track and the task text's amendment; #331 as 16727ab, `kev_ceiling` to one day; the owner's dispatch 40578319282 with `drill: kev-synthetic`: the finding listed, `9 / 1`, `over ceiling: 1` on the status issue and the page, the row and the card marked, the run green; #332 as ebd0f65, the value restored the same day; the scheduled run 40693681245 of 2026-10-28 clearing it on CISA's feed; the evidence in #339: rows 6.46, 6.47 and 6.49 re-observed, the follow-up item on the three readers of `triage.ceilings`)
+**Folder:** [./tracks/over-ceiling_20261027/](./tracks/over-ceiling_20261027/)
+
+---
 
 ### [x] exception-lapse_20261025: The drill's exception expires, the lapse seen on every plane, live
 
