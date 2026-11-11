@@ -227,7 +227,9 @@ jobs:
           # takes a wildcard, and the spike had given it a wildcard. So the
           # bundle shape is read with the exact identity, with a regular
           # expression, and with an identity that did not sign, so a pass that
-          # checks nothing shows.
+          # checks nothing shows. The fifth run adds what criterion 2.28 asks
+          # beyond the signer: the five expectations as conditions on the
+          # predicate, once as emitted and once with a ref that was not built.
           signer="https://github.com/${GITHUB_WORKFLOW_REF}"
           cat > "${RUNNER_TEMP}/pod.yaml" <<EOF
           apiVersion: v1
@@ -239,7 +241,7 @@ jobs:
               - name: spike
                 image: ${SPIKE_IMAGE}@${INDEX}
           EOF
-          while IFS='|' read -r label shape field value; do
+          while IFS='|' read -r label shape field value ref; do
               cat > "${RUNNER_TEMP}/policy.yaml" <<EOF
           apiVersion: kyverno.io/v1
           kind: ClusterPolicy
@@ -266,15 +268,33 @@ jobs:
                                   issuer: ${OIDC_ISSUER}
                                   rekor:
                                     url: https://rekor.sigstore.dev
+                        conditions:
+                          - all:
+                              - key: "{{ predicate.runDetails.builder.id }}"
+                                operator: Equals
+                                value: "${signer}"
+                              - key: "{{ predicate.buildDefinition.buildType }}"
+                                operator: Equals
+                                value: "https://actions.github.io/buildtypes/workflow/v1"
+                              - key: "{{ predicate.buildDefinition.externalParameters.workflow.repository }}"
+                                operator: Equals
+                                value: "https://github.com/${GITHUB_REPOSITORY}"
+                              - key: "{{ predicate.buildDefinition.externalParameters.workflow.path }}"
+                                operator: Equals
+                                value: ".github/workflows/slsa-spike.yml"
+                              - key: "{{ predicate.buildDefinition.externalParameters.workflow.ref }}"
+                                operator: Equals
+                                value: "${ref}"
           EOF
               printf '\n%s (shape `%s`, `%s: %s`):\n' "$label" "$shape" "$field" "$value" >> "$GITHUB_STEP_SUMMARY"
               run kyverno apply "${RUNNER_TEMP}/policy.yaml" --resource "${RUNNER_TEMP}/pod.yaml" </dev/null
               note "kyverno ${label}"
           done <<EOF
-          bundle shape exact identity|SigstoreBundle|subject|${signer}
-          bundle shape regular expression|SigstoreBundle|subjectRegExp|^https://github.com/${GITHUB_REPOSITORY}/.*
-          bundle shape identity that did not sign|SigstoreBundle|subject|${signer}-not
-          cosign shape exact identity|Cosign|subject|${signer}
+          bundle shape exact identity and the five expectations|SigstoreBundle|subject|${signer}|${GITHUB_REF}
+          bundle shape a ref that was not built|SigstoreBundle|subject|${signer}|refs/heads/main
+          bundle shape regular expression|SigstoreBundle|subjectRegExp|^https://github.com/${GITHUB_REPOSITORY}/.*|${GITHUB_REF}
+          bundle shape identity that did not sign|SigstoreBundle|subject|${signer}-not|${GITHUB_REF}
+          cosign shape exact identity|Cosign|subject|${signer}|${GITHUB_REF}
           EOF
 
           say "trivy $(trivy --version 2>/dev/null | head -1)"
