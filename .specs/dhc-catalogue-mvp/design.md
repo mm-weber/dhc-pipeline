@@ -1104,8 +1104,8 @@ graph TB
       (the job's token gains `attestations: write`; `id-token: write` and `packages: write`
       are held already) and nothing paid on a public repository. Not measured: whether a
       private repository on a plan without attestations accepts the permission line.
-      BuildKit's provenance is not on this switch; whether it stays attached once the
-      platform's is live is the owner's open call of 2026-11-11.
+      BuildKit's provenance is not on this switch: it stays attached as it is, the
+      owner's call of 2026-11-11.
 
 ## System Flows
 

@@ -371,14 +371,34 @@ left of the program is the follow-up list below, one decision each.
       major gate is not triggered. Spec amended 2026-11-11 at the owner's
       call: one provenance mode (`release.provenance`: `off`, `report`,
       `required`; Req 2.30), built with 18.3; no new secret, nothing paid
-      on a public repository. Next: 18.3, provenance in the release path,
-      by TDD (ask first).
-  - [ ] The owner's open call (asked 2026-11-11): whether BuildKit's
-        unsigned provenance stays attached once the platform's is live.
-        Dropping it amends Req 2.2, 2.10, 2.25 and Decision 15;
-        `package-set-diff.sh` names its timestamps as the reason a
-        rebuild's index digest differs from the published one (not
-        measured whether dropping it makes them equal).
+      on a public repository. Amendment merged 2026-11-11 (#405, 6d9946f);
+      the owner's go for 18.3 the same day. 18.3 is ON HOLD before its
+      first slice: see the open call below.
+  - [x] BuildKit's unsigned provenance stays attached as it is (the
+        owner's call, 2026-11-11). Why it is unsigned, measured on valkey
+        `9-alpine3.23`: `cosign sign --recursive` signs the two attestation
+        manifests that hold it (each has a `.sig`), so its bytes are pinned
+        by the release signature, but the provenance itself is a bare
+        in-toto statement written by BuildKit inside the job, never
+        attested as provenance (no `.att`), so no verifier can ask for it
+        by type and signer.
+  - [ ] The owner's open call (found 2026-11-11 in the exploration for
+        18.3, `data/cosign-bundle-coexistence-2026-11-11.md`): a
+        provenance bundle beside a digest makes cosign 2.6.5 stop reading
+        that digest's `.sig` and `.att`. With 18.3 as specified the
+        comparator would republish every time, the rescan's SBOM fetch
+        would fail, the re-attestation would lose carried-forward VEX
+        silently, and the README's consumer commands would fail or verify
+        the wrong object. Paths: (1) provenance in GitHub's attestation
+        store only (`push-to-registry: false`), no registry bundle: no
+        read changes, but no Kyverno rule for `required` and 2.27's
+        "beside that digest" is amended; (2) every signature and
+        attestation moves to the bundle format first, a migration of its
+        own; (3) cosign pin to v3 (ADR 0003's major gate) with
+        `--new-bundle-format=false` in every old-layout read, consumers
+        on 2.6.x still blind; (4) defer provenance until (2). Whichever
+        is chosen, Decision 15's "untouched" sentence and ADR 0005's
+        consequences are corrected in the same pull request.
   - [ ] The owner's cleanup after ADR 0005 merges: delete the package
         `ghcr.io/mm-weber/slsa-spike` (six image tags, twelve bundle tags;
         the workspace token cannot); #401 to be shut unmerged; delete branch
