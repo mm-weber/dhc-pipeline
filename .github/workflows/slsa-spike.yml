@@ -230,6 +230,10 @@ jobs:
           # checks nothing shows. The fifth run adds what criterion 2.28 asks
           # beyond the signer: the five expectations as conditions on the
           # predicate, once as emitted and once with a ref that was not built.
+          # A condition's key is read from inside the predicate (kyverno adds
+          # the predicate, not the statement, to the context: EvaluateConditions
+          # in pkg/engine/internal/utils.go), so it names no `predicate.` prefix;
+          # the fifth run named one and every condition failed to resolve.
           signer="https://github.com/${GITHUB_WORKFLOW_REF}"
           cat > "${RUNNER_TEMP}/pod.yaml" <<EOF
           apiVersion: v1
@@ -270,19 +274,19 @@ jobs:
                                     url: https://rekor.sigstore.dev
                         conditions:
                           - all:
-                              - key: "{{ predicate.runDetails.builder.id }}"
+                              - key: "{{ runDetails.builder.id }}"
                                 operator: Equals
                                 value: "${signer}"
-                              - key: "{{ predicate.buildDefinition.buildType }}"
+                              - key: "{{ buildDefinition.buildType }}"
                                 operator: Equals
                                 value: "https://actions.github.io/buildtypes/workflow/v1"
-                              - key: "{{ predicate.buildDefinition.externalParameters.workflow.repository }}"
+                              - key: "{{ buildDefinition.externalParameters.workflow.repository }}"
                                 operator: Equals
                                 value: "https://github.com/${GITHUB_REPOSITORY}"
-                              - key: "{{ predicate.buildDefinition.externalParameters.workflow.path }}"
+                              - key: "{{ buildDefinition.externalParameters.workflow.path }}"
                                 operator: Equals
                                 value: ".github/workflows/slsa-spike.yml"
-                              - key: "{{ predicate.buildDefinition.externalParameters.workflow.ref }}"
+                              - key: "{{ buildDefinition.externalParameters.workflow.ref }}"
                                 operator: Equals
                                 value: "${ref}"
           EOF
