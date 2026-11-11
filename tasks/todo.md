@@ -363,10 +363,27 @@ left of the program is the follow-up list below, one decision each.
       attached but neither signed nor verified, and BuildKit writes it from
       the job's own values. Owner's calls of 2026-10-28: GitHub's provenance
       service (`actions/attest-build-provenance`), the requirement binding
-      from the successor's first release. Next after the spec pull request:
-      18.2, the verifier spike (one dispatch, a scratch image outside the
-      catalogue namespace), whose ADR 0005 may put ADR 0003's cosign major
-      gate before the owner.
+      from the successor's first release. 18.1 merged 2026-11-10 (#337).
+      18.2 measured 2026-11-11 (six runs on #401, the last 43033859220;
+      ADR 0005, `data/slsa-provenance-spike-2026-11-11.md`): the pinned
+      cosign 2.6.5 and Kyverno 1.19.2 both verify the bundle, Kyverno only
+      through a `SigstoreBundle` entry, so cosign stays on v2 and ADR 0003's
+      major gate is not triggered. Next: 18.3, provenance in the release
+      path, by TDD (ask first).
+  - [ ] The owner's cleanup after ADR 0005 merges: delete the package
+        `ghcr.io/mm-weber/slsa-spike` (six image tags, twelve bundle tags;
+        the workspace token cannot); #401 to be shut unmerged; delete branch
+        `slsa-spike`.
+- [ ] Kyverno's `kyverno.io/v1` ClusterPolicy is deprecated (seen by 18.2,
+      2026-11-11): Kyverno 1.19.2 prints on every `kyverno apply` that the
+      kind "will be removed in a future release" in favour of its newer
+      policy kinds (ImageValidatingPolicy for image verification). The four
+      published policies, the rendered verification policy among them, are
+      of that kind, and ADR 0005 measured the 2.28 rule in that kind only.
+      No removal version is named; the day a Kyverno bump drops it,
+      the render, the drift check and the daily must-reject proof all
+      change. One decision: when to migrate, and whether the 2.28 rule of
+      task 18.5 is written in the old kind or the new one.
 - [ ] A rebuilt digest's statements restart their clock (seen by 16.9,
       2026-10-28): the release-time compile in build.yml reads no previous
       document, so the document of a rebuilt digest carries the release

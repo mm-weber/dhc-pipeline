@@ -24,7 +24,7 @@ Navigation for the project context and the work tracks. Context first, then spec
 
 | Track | Status | Priority | Spec | Plan |
 | --- | --- | --- | --- | --- |
-| slsa-build-l2_20261028 | pending | high | [spec](./tracks/slsa-build-l2_20261028/spec.md) | [plan](./tracks/slsa-build-l2_20261028/plan.md) |
+| slsa-build-l2_20261028 | in progress | high | [spec](./tracks/slsa-build-l2_20261028/spec.md) | [plan](./tracks/slsa-build-l2_20261028/plan.md) |
 | reactivate-grafana_20261110 | in progress | high | [spec](./tracks/reactivate-grafana_20261110/spec.md) | [plan](./tracks/reactivate-grafana_20261110/plan.md) |
 | proof-kinds_20261015 | completed | high | [spec](./tracks/proof-kinds_20261015/spec.md) | [plan](./tracks/proof-kinds_20261015/plan.md) |
 | drill-definition_20261017 | completed | high | [spec](./tracks/drill-definition_20261017/spec.md) | [plan](./tracks/drill-definition_20261017/plan.md) |
