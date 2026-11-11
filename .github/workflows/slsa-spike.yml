@@ -197,8 +197,44 @@ jobs:
             --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/" \
             "${SPIKE_IMAGE}@${INDEX}"
 
+          # The log host is not reachable from where the measurement is read,
+          # and a job summary is not served by the REST API; an annotation is.
+          # So each read below that decides something is also said as a notice.
+          note() { local body; body=$(sed -n '1,30p' "${RUNNER_TEMP}/out" | cut -c1-300); body="${body//'%'/%25}"; body="${body//$'\r'/%0D}"; body="${body//$'\n'/%0A}"; echo "::notice title=$1 (exit ${rc})::${body}"; }
+
+          say "cosign, the platform manifest"
+          run cosign verify-attestation --type slsaprovenance1 \
+            --certificate-oidc-issuer "${OIDC_ISSUER}" \
+            --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/" \
+            "${SPIKE_IMAGE}@${AMD64}"
+          note "cosign, platform manifest, right identity"
+          say "cosign, the control: an identity that did not sign"
+          run cosign verify-attestation --type slsaprovenance1 \
+            --certificate-oidc-issuer "${OIDC_ISSUER}" \
+            --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}-not/" \
+            "${SPIKE_IMAGE}@${INDEX}"
+          note "cosign, index, wrong identity"
+
           say "kyverno $(kyverno version 2>/dev/null | head -1)"
-          cat > "${RUNNER_TEMP}/policy.yaml" <<EOF
+          # The second run skipped the policy before reading anything: a
+          # keyless attestor needs its transparency log named, as the rendered
+          # policy does (render-verification.sh). Two shapes are measured, the
+          # one the catalogue's policy uses today and the one kyverno documents
+          # for a sigstore bundle, each with the right identity and with one
+          # that did not sign, so a pass that checks nothing shows.
+          cat > "${RUNNER_TEMP}/pod.yaml" <<EOF
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: spike
+          spec:
+            containers:
+              - name: spike
+                image: ${SPIKE_IMAGE}@${INDEX}
+          EOF
+          for shape in Cosign SigstoreBundle; do
+            for who in "${GITHUB_REPOSITORY}" "${GITHUB_REPOSITORY}-not"; do
+              cat > "${RUNNER_TEMP}/policy.yaml" <<EOF
           apiVersion: kyverno.io/v1
           kind: ClusterPolicy
           metadata:
@@ -213,26 +249,23 @@ jobs:
                     - resources:
                         kinds: [Pod]
                 verifyImages:
-                  - imageReferences: ["${SPIKE_IMAGE}*"]
+                  - type: ${shape}
+                    imageReferences: ["${SPIKE_IMAGE}*"]
                     attestations:
                       - type: https://slsa.dev/provenance/v1
                         attestors:
                           - entries:
                               - keyless:
+                                  subject: "https://github.com/${who}/*"
                                   issuer: ${OIDC_ISSUER}
-                                  subject: "https://github.com/${GITHUB_REPOSITORY}/*"
+                                  rekor:
+                                    url: https://rekor.sigstore.dev
           EOF
-          cat > "${RUNNER_TEMP}/pod.yaml" <<EOF
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: spike
-          spec:
-            containers:
-              - name: spike
-                image: ${SPIKE_IMAGE}@${INDEX}
-          EOF
-          run kyverno apply "${RUNNER_TEMP}/policy.yaml" --resource "${RUNNER_TEMP}/pod.yaml"
+              printf '\nshape `%s`, identity `https://github.com/%s/*`:\n' "$shape" "$who" >> "$GITHUB_STEP_SUMMARY"
+              run kyverno apply "${RUNNER_TEMP}/policy.yaml" --resource "${RUNNER_TEMP}/pod.yaml"
+              note "kyverno ${shape}, identity ${who##*/}"
+            done
+          done
 
           say "trivy $(trivy --version 2>/dev/null | head -1)"
           printf 'trivy has no verb that verifies a sigstore provenance bundle; the attestation subcommands it does carry:\n```\n' >> "$GITHUB_STEP_SUMMARY"
