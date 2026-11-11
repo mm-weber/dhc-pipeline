@@ -87,6 +87,7 @@ evidence obligation, and a retired one cannot keep a row.
 | 2.27 | Each released digest carries SLSA provenance generated from the platform's signed workload claims | unexercised | | Added 2026-10-28 by task 18.1; the mechanism lands with task 18.3 and is first exercised by the next release after it merges. No drill is needed: every release exercises it. | nature |
 | 2.28 | Where declared, the verification policy demands that provenance against declared expectations | unexercised | | Added 2026-10-28 by task 18.1; rendered by task 18.5 and declared required from the successor's first release (task 12.1), the first day the daily proof applies it. | switch |
 | 2.29 | Until it is required, provenance coverage of the supported set reported daily | unexercised | | Added 2026-10-28 by task 18.1; the report lands with task 18.4 and runs on the first scheduled rescan after it merges. | nature |
+| 2.30 | With the provenance mode off, a release attests no SLSA provenance and the daily report says so | unexercised | | Added 2026-11-11 by the amendment to task 18.1 (the owner's call: one provenance mode, `off`, `report` or `required`); the mode lands with task 18.3 and is exercised by one release flipped to `off` and back in task 18.7. | switch |
 
 ## Requirement 3: Upstream Version Tracking
 

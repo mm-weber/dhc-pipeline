@@ -7,7 +7,7 @@
 **Priority:** high (a stated goal of the catalogue; task group 18 executes before the successor, task 12)
 **Created:** 2026-10-28
 **Author:** the owner, drafted by the agent
-**Spec source:** `.specs/dhc-catalogue-mvp/requirements.md` Req 2.9, 2.10, 2.23, 2.25, 7.7 (amended) and 2.27, 2.28, 2.29, 9.19 (added) by this track's pull request; design Decision 15; `tasks.md` task group 18 and task 12.1's SLSA bullet
+**Spec source:** `.specs/dhc-catalogue-mvp/requirements.md` Req 2.9, 2.10, 2.23, 2.25, 7.7 (amended) and 2.27, 2.28, 2.29, 9.19 (added) by this track's pull request; design Decision 15; `tasks.md` task group 18 and task 12.1's SLSA bullet. Amended 2026-11-11 at the owner's call: one provenance mode (`off`, `report`, `required`) in place of the trigger "required attestations name SLSA provenance", Req 2.30 added (FR-7)
 
 ### Description
 
@@ -37,7 +37,7 @@ The subject names follow design.md: the CI Pipeline (`build.yml`), the Scan Pipe
 
 ### FR-1: Provenance at release (Req 2.9, 2.27)
 
-WHEN criterion 2.9 attests a pushed digest THE CI Pipeline SHALL attest to that digest and to each platform manifest, before the tags, a SLSA provenance attestation (predicate type `https://slsa.dev/provenance/v1`) generated from the build platform's signed workload identity token, signed keyless under the build workflow's identity at refs/heads/main and stored in the declared registry namespace beside that digest; IF that attestation fails THEN THE CI Pipeline SHALL apply no tag and SHALL name the digest.
+WHEN criterion 2.9 attests a pushed digest and the policy file's provenance mode is not off THE CI Pipeline SHALL attest to that digest and to each platform manifest, before the tags, a SLSA provenance attestation (predicate type `https://slsa.dev/provenance/v1`) generated from the build platform's signed workload identity token, signed keyless under the build workflow's identity at refs/heads/main and stored in the declared registry namespace beside that digest; IF that attestation fails THEN THE CI Pipeline SHALL apply no tag and SHALL name the digest.
 
 **Acceptance criteria:**
 
@@ -47,16 +47,16 @@ WHEN criterion 2.9 attests a pushed digest THE CI Pipeline SHALL attest to that 
 
 ### FR-2: The declaration and the policy rule (Req 2.23, 2.28, 7.7)
 
-THE Repository SHALL declare the provenance expectations and the predicate type in `catalogue-policy.yaml`, and WHERE that file's required attestations name SLSA provenance THE verification policy SHALL admit an image only with that attestation from the build workflow's identity whose fields equal the expectations.
+THE Repository SHALL declare the provenance expectations and the predicate type in `catalogue-policy.yaml`, and WHERE that file's provenance mode is required THE verification policy SHALL admit an image only with that attestation from the build workflow's identity whose fields equal the expectations.
 
 **Acceptance criteria:**
 
-- [ ] `render-verification.sh --check` green in both shapes (provenance not required: no rule; required: the rule), each shape covered by a suite case
+- [ ] `render-verification.sh --check` green in every shape (mode `off` or `report`: no rule; `required`: the rule), each shape covered by a suite case
 - [ ] An offline `kyverno apply` of the required shape rejecting a pre-track supported digest by name and admitting a post-track digest
 
 ### FR-3: Coverage reported daily (Req 2.29)
 
-WHILE the policy file's required attestations do not name SLSA provenance THE Scan Pipeline SHALL report once per day, for every supported digest, whether it carries an admissible provenance attestation, and SHALL not fail the run on an absent one.
+WHILE the policy file's provenance mode is report THE Scan Pipeline SHALL report once per day, for every supported digest, whether it carries an admissible provenance attestation, and SHALL not fail the run on an absent one.
 
 **Acceptance criteria:**
 
@@ -65,7 +65,7 @@ WHILE the policy file's required attestations do not name SLSA provenance THE Sc
 
 ### FR-4: Consumer instructions and the smoke test (Req 2.25, 9.13)
 
-THE Repository SHALL give in its verification instructions one step verifying a digest's SLSA provenance against the issuer, the identity and the expectations, SHALL state which digests carry it, and SHALL describe BuildKit provenance as supplementary detail no policy verifies; the consumer smoke test SHALL run that step verbatim and SHALL fail on a null or unverified result.
+THE Repository SHALL give in its verification instructions one step verifying a digest's SLSA provenance against the issuer, the identity and the expectations, SHALL state which digests carry it, and SHALL describe BuildKit provenance as supplementary detail no policy verifies; the consumer smoke test SHALL run that step verbatim and SHALL fail on a null or unverified result. WHERE the provenance mode is off the instructions SHALL state that releases attest none and give no step, and the smoke test SHALL run none.
 
 **Acceptance criteria:**
 
@@ -74,7 +74,7 @@ THE Repository SHALL give in its verification instructions one step verifying a 
 
 ### FR-5: The claim, stated (Req 9.19)
 
-THE Repository SHALL state in `SECURITY.md` the SLSA Build level it claims, measured against SLSA v1.2, the digests the claim covers and how a consumer verifies it, and SHALL claim no level above the one its verification policy demands: Build L1 here with L2-grade provenance from the release-path merge, Build L2 from the successor's epoch.
+THE Repository SHALL state in `SECURITY.md` the SLSA Build level it claims, measured against SLSA v1.2, the digests the claim covers and how a consumer verifies it, and SHALL claim no level above the one its verification policy demands: Build L1 here with L2-grade provenance from the release-path merge, Build L2 from the successor's epoch. WHERE the provenance mode is off the statement is Build L1 with no SLSA provenance attested while it stands.
 
 **Acceptance criteria:**
 
@@ -82,11 +82,20 @@ THE Repository SHALL state in `SECURITY.md` the SLSA Build level it claims, meas
 
 ### FR-6: The evidence (Req 7.11)
 
-THE Repository SHALL flip ledger rows 2.27 and 2.29 to `exercised`, measure 9.19 present, leave 2.28 to the successor's first proof, and add the LOG entry, in an evidence pull request.
+THE Repository SHALL flip ledger rows 2.27, 2.29 and 2.30 to `exercised`, measure 9.19 present, leave 2.28 to the successor's first proof, and add the LOG entry, in an evidence pull request.
 
 **Acceptance criteria:**
 
 - [ ] `scripts/lint-live-evidence.sh .` green; `scripts/lint-log-anchors.sh all .` green; task group 18 ticked; this track listed under Completed
+
+### FR-7: The provenance mode and its off position (Req 2.30, 7.7; added 2026-11-11, the owner's call)
+
+THE Repository SHALL declare in `catalogue-policy.yaml`'s release section one provenance mode, `off`, `report` or `required`, read through `release-policy.sh`; WHERE that mode is off THE CI Pipeline SHALL attest no SLSA provenance and SHALL release otherwise unchanged, and THE Scan Pipeline SHALL state in its daily report that provenance is off and SHALL verify none.
+
+**Acceptance criteria:**
+
+- [ ] `release-policy_test.sh` holds the three accepted values and a refusal by name for a missing key and for a value outside them
+- [ ] One release with the mode `off` through a normal pull request and back: every other signature and attestation present, no provenance attestation, the rescan's line stating that provenance is off
 
 ## Scope
 
@@ -95,6 +104,7 @@ THE Repository SHALL flip ledger rows 2.27 and 2.29 to `exercised`, measure 9.19
 - The spec amendment and this track (phase 0, this pull request)
 - The verifier measurement and ADR 0005 (a scratch image outside the catalogue namespace)
 - The release step, the coverage report, the declaration and its renderings, the smoke-test assertion, the security statement, the evidence
+- The provenance mode with its `off` position (the amendment of 2026-11-11), built with the release step
 
 ### Out of scope
 
@@ -120,12 +130,14 @@ THE Repository SHALL flip ledger rows 2.27 and 2.29 to `exercised`, measure 9.19
 | The pinned cosign v2 or Kyverno 1.19.1 cannot read the service's Sigstore bundle | medium | 2.28 and the smoke test need another verifier or cosign v3 | Measured first (18.2); the cosign major is ADR 0003's gate, the owner's call |
 | The predicate's fields make poor expectations (too specific or too loose) | low | a policy that admits too much or rejects every release | 18.2 records the emitted values; 2.28 fixes the five fields v1.2's step 2 names |
 | A provenance failure blocks releases | low | a definition stays on its previous digest | The 2.26 shape: no tag, the digest named, the previous digest keeps serving |
+| The repository, or a fork of it, is private on a plan without artifact attestations | low | every release fails at the attestation step, and the consumer step as written does not apply (GitHub's own Sigstore instance keeps no transparency log) | The mode `off` (2.30); GitHub's documentation read 2026-11-11, not measured |
 | The claim drifts above the policy | low | an overclaim | 9.19 forbids it; the security statement is rendered against the policy file in 18.6 |
 
 ## Open questions (the owner's calls)
 
 - [x] The mechanism: GitHub's provenance service (decided 2026-10-28)
 - [x] When the requirement binds: the successor's epoch (decided 2026-10-28)
+- [x] One provenance mode with an `off` position, built with task 18.3 (decided 2026-11-11)
 - [ ] The spike's scratch repository name outside the catalogue namespace (drafted: `ghcr.io/mm-weber/slsa-spike`, deleted after ADR 0005)
 - [ ] If 18.2 finds only cosign v3 reads the bundle: lift ADR 0003's major gate, or verify through `gh attestation verify` in the consumer step and Kyverno in the policy
 

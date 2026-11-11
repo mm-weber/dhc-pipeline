@@ -3,7 +3,7 @@
 **Track ID:** slsa-build-l2_20261028
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-10-28
-**Status:** [~] in progress (phase 0 merged 2026-11-10 as #337, 09dcfdf; phase 1 measured 2026-11-11, runs 43025700201 to 43033859220 on #401, recorded in ADR 0005; next phase 2)
+**Status:** [~] in progress (phase 0 merged 2026-11-10 as #337, 09dcfdf; phase 1 measured 2026-11-11, runs 43025700201 to 43033859220 on #401, recorded in ADR 0005; spec amended 2026-11-11, one provenance mode, Req 2.30; next phase 2)
 
 ## Overview
 
@@ -15,6 +15,7 @@ Six phases, one pull request each, spec task group 18. Phase 0 is this pull requ
 
 - [x] **0.1 The amendment**: requirements.md 2.9, 2.10, 2.23, 2.25, 7.7 amended, 2.27 to 2.29 and 9.19 added; design.md Decision 15; tasks.md group 18, 12.1's SLSA bullet, the coverage rows; ledger rows 2.27, 2.28, 2.29, 9.19 and the notes on 2.10 and 2.25
 - [x] **0.2 The track**: this folder, `conductor/tracks.md`, `conductor/index.md`, the todo's open item
+- [x] **0.4 The amendment of 2026-11-11** (its own pull request, the owner's call of that day): one provenance mode in the policy file's release section, `off`, `report` or `required`; requirements.md 2.9, 2.10, 2.23, 2.25, 2.27 to 2.29 and 7.7 reworded, 2.30 added; Decision 15's amendment; tasks.md 18.1, 18.3 to 18.7 and 12.1's bullet; ledger row 2.30; FR-7 and phases 2 to 6 here; `scripts/lint-live-evidence.sh .` green (160 criteria)
 - [x] **0.3 The pull request**: title `spec: SLSA Build L2, provenance from the platform's signed claims, demanded from the successor's epoch (Req 2.27 to 2.29, 9.19; task 18.1)`, a TL;DR; the owner merges (checkpoint)
 
 ### Verification (orchestrator)
@@ -42,10 +43,12 @@ Dependency: phase 1 merged.
 
 ### Tasks
 
+- [ ] **2.0 The mode**: RED/GREEN in `release-policy_test.sh` for the query `provenance` (`off`, `report`, `required`; a missing key or any other value refused by name, `check` printing it), then `catalogue-policy.yaml` gains `release.provenance: report`
 - [ ] **2.1 Permissions**: RED/GREEN in `lint-workflow-policy_test.sh` for `attestations: write` declared in the policy file's workflows section and held on `build.yml`'s release job
-- [ ] **2.2 The step**: after 2.9's attestations, before the tags, one attestation per index and per platform manifest; the PR path unchanged; the rescan attests none
-- [ ] **2.3 The self-check**: the release verifies each attestation with ADR 0005's verifier before tagging; a failure applies no tag and names the digest (the 2.26 shape), with a suite case in the script that carries the check
+- [ ] **2.2 The step**: unless the mode is `off` (2.30), after 2.9's attestations, before the tags, one attestation per index and per platform manifest; the PR path unchanged; the rescan attests none
+- [ ] **2.3 The self-check**: the release verifies each attestation with ADR 0005's verifier before tagging; a failure applies no tag and names the digest (the 2.26 shape), with a suite case in the script that carries the check; with the mode `off` neither the step nor the check runs
 - [ ] **2.4 Renovate**: the action's pin tracked by the github-actions manager under the three-day age rule
+- [ ] **2.5 The listing**: `enumerate-catalogue_test.sh` gains the case of a `sha256-<hex>` tag with no suffix (the bundle's tag), dropped from the listing
 
 ### Verification
 
@@ -57,7 +60,7 @@ Dependency: phase 1 merged.
 
 - [ ] **3.1 `check-provenance.sh` report mode**: one digest verified against the declared identity and expectations, one line per supported digest, exit 0 on absent (Req 2.29); suite first, one test per slice
 - [ ] **3.2 Require mode**: absent or mismatched fails by name (for the successor); suite cases
-- [ ] **3.3 Wiring**: the rescan runs report mode over the supported set; the status data and issue gain the coverage line
+- [ ] **3.3 Wiring**: the rescan runs what the declared mode asks: with `report`, report mode over the supported set, the status data and issue gaining the coverage line; with `off`, one line stating that provenance is off, nothing verified (2.30)
 
 ### Verification
 
@@ -68,9 +71,9 @@ Dependency: phase 1 merged.
 ### Tasks
 
 - [ ] **4.1 The declaration**: `verification.provenance` (expectations, predicate type) in `catalogue-policy.yaml`, read by `render-verification.sh`; refused by name when malformed
-- [ ] **4.2 The rule**: SLSA provenance named in `required.attestations` renders the 2.28 rule; not named renders none; both shapes in the suite and in the drift check
-- [ ] **4.3 The consumer step**: the README and manual blocks gain the provenance step and the coverage sentence; BuildKit's inspect line kept, labelled supplementary
-- [ ] **4.4 The smoke test**: `consumer-smoke.sh` targets a digest carrying provenance and fails on a null or unverified result (finding 2.4)
+- [ ] **4.2 The rule**: the mode `required` renders the 2.28 rule; `report` and `off` render none; every shape in the suite and in the drift check
+- [ ] **4.3 The consumer step**: the README and manual blocks gain the provenance step and the coverage sentence; BuildKit's inspect line kept, labelled supplementary; with the mode `off`, the sentence that releases attest none and no step
+- [ ] **4.4 The smoke test**: `consumer-smoke.sh` targets a digest carrying provenance and fails on a null or unverified result (finding 2.4); with the mode `off` it runs no provenance step
 
 ### Verification
 
@@ -80,7 +83,7 @@ Dependency: phase 1 merged.
 
 ### Tasks
 
-- [ ] **5.1 `SECURITY.md`**: the SLSA section (level claimed, v1.2, covered digests, the verification step, L2 from the successor's epoch)
+- [ ] **5.1 `SECURITY.md`**: the SLSA section (level claimed, v1.2, covered digests, the verification step, L2 from the successor's epoch); the statement follows the declared mode (`off`: Build L1, no SLSA provenance attested while it stands)
 - [ ] **5.2 `docs/concepts.md`**: the "L2-ish" sentence replaced by the measured state; the trust-boundary GitHub row names the provenance service, option D as the L3 path, option A as the other-forge seam
 - [ ] **5.3 `docs/user-manual.md`** and design.md's Security Considerations
 
@@ -92,8 +95,8 @@ Dependency: phase 1 merged.
 
 ### Tasks
 
-- [ ] **6.1 The reads**: the first release after phase 2 and the first rescan after phase 3, with run ids; the offline must-reject and must-admit from phase 4
-- [ ] **6.2 The ledger and the LOG**: rows 2.27 and 2.29 exercised, 9.19 measured present, 2.28 left to 12.1; the LOG entry; group 18 ticked; this track closed
+- [ ] **6.1 The reads**: the first release after phase 2 and the first rescan after phase 3, with run ids; the offline must-reject and must-admit from phase 4; the `off` flip: one release with the mode `off` through a normal pull request and back the same day, read for every other attestation present, no provenance attestation and the rescan's line
+- [ ] **6.2 The ledger and the LOG**: rows 2.27, 2.29 and 2.30 exercised, 9.19 measured present, 2.28 left to 12.1; the LOG entry; group 18 ticked; this track closed
 
 ### Verification
 
