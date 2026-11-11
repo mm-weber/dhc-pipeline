@@ -138,6 +138,11 @@ jobs:
           AMD64: ${{ steps.subjects.outputs.amd64 }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # GitHub runs a step under `bash -e`, and a read that refuses is a
+          # result here, not a failure: the first run died because the
+          # referrers API answered "manifest unknown" and jq exited 5 on the
+          # null. Every read below is allowed to fail and say so.
+          set +e
           set -uo pipefail
           repo="${SPIKE_IMAGE#ghcr.io/}"
           say() { printf '\n## %s\n\n' "$1" | tee -a "$GITHUB_STEP_SUMMARY"; }
@@ -145,15 +150,33 @@ jobs:
           anon=$(curl -sS "https://ghcr.io/token?scope=repository:${repo}:pull&service=ghcr.io" | jq -r .token)
 
           say "where the attestation sits"
+          # Two routes, and which one answers is the finding. The OCI referrers
+          # API is the standard one; ghcr.io does not serve it, so the fallback
+          # tag `sha256-<subject digest>` that the action also pushes is what a
+          # consumer actually has to read.
           for d in "$INDEX" "$AMD64"; do
-            printf '\n`%s` referrers, read anonymously:\n```json\n' "$d" >> "$GITHUB_STEP_SUMMARY"
+            printf '\n`%s` through the referrers API:\n```json\n' "$d" >> "$GITHUB_STEP_SUMMARY"
             curl -sS -H "Authorization: Bearer ${anon}" "https://ghcr.io/v2/${repo}/referrers/${d}" \
-              | jq '{mediaType, manifests: [.manifests[] | {artifactType, digest, annotations}]}' | tee -a "$GITHUB_STEP_SUMMARY"
+              | jq '{mediaType, errors, manifests: [(.manifests // [])[] | {artifactType, digest, annotations}]}' \
+              2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+            printf '```\n\n`%s` through the fallback tag, read anonymously:\n```json\n' "$d" >> "$GITHUB_STEP_SUMMARY"
+            curl -sS -H "Authorization: Bearer ${anon}" \
+              -H 'Accept: application/vnd.oci.image.index.v1+json' \
+              "https://ghcr.io/v2/${repo}/manifests/sha256-${d#sha256:}" \
+              | jq '{mediaType, manifests: [(.manifests // [])[] | {artifactType, digest, annotations}]}' \
+              2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
             printf '```\n' >> "$GITHUB_STEP_SUMMARY"
           done
 
           say "the predicate as emitted"
-          bundle=$(curl -sS -H "Authorization: Bearer ${anon}" "https://ghcr.io/v2/${repo}/referrers/${INDEX}" | jq -r '.manifests[0].digest')
+          bundle=$(curl -sS -H "Authorization: Bearer ${anon}" \
+            -H 'Accept: application/vnd.oci.image.index.v1+json' \
+            "https://ghcr.io/v2/${repo}/manifests/sha256-${INDEX#sha256:}" \
+            | jq -r '(.manifests // [])[0].digest // empty')
+          if [ -z "$bundle" ]; then
+            printf 'no attestation referrer found for the index; the reads below cannot run\n' | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           man=$(curl -sS -H "Authorization: Bearer ${anon}" -H 'Accept: application/vnd.oci.image.manifest.v1+json' "https://ghcr.io/v2/${repo}/manifests/${bundle}")
           layer=$(printf '%s' "$man" | jq -r '.layers[0].digest')
           printf '```json\n' >> "$GITHUB_STEP_SUMMARY"
