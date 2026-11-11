@@ -207,21 +207,28 @@ jobs:
             --certificate-oidc-issuer "${OIDC_ISSUER}" \
             --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/" \
             "${SPIKE_IMAGE}@${AMD64}"
-          note "cosign, platform manifest, right identity"
+          note "cosign platform manifest signing identity"
           say "cosign, the control: an identity that did not sign"
           run cosign verify-attestation --type slsaprovenance1 \
             --certificate-oidc-issuer "${OIDC_ISSUER}" \
             --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}-not/" \
             "${SPIKE_IMAGE}@${INDEX}"
-          note "cosign, index, wrong identity"
+          note "cosign index identity that did not sign"
 
           say "kyverno $(kyverno version 2>/dev/null | head -1)"
           # The second run skipped the policy before reading anything: a
           # keyless attestor needs its transparency log named, as the rendered
           # policy does (render-verification.sh). Two shapes are measured, the
           # one the catalogue's policy uses today and the one kyverno documents
-          # for a sigstore bundle, each with the right identity and with one
-          # that did not sign, so a pass that checks nothing shows.
+          # for a sigstore bundle. The third run refused all four reads: the
+          # bundle shape matches `subject` exactly (verify.
+          # NewShortCertificateIdentity in kyverno v1.19.2's
+          # pkg/image/verifiers/cpol/cosign/sigstore.go) where the cosign shape
+          # takes a wildcard, and the spike had given it a wildcard. So the
+          # bundle shape is read with the exact identity, with a regular
+          # expression, and with an identity that did not sign, so a pass that
+          # checks nothing shows.
+          signer="https://github.com/${GITHUB_WORKFLOW_REF}"
           cat > "${RUNNER_TEMP}/pod.yaml" <<EOF
           apiVersion: v1
           kind: Pod
@@ -232,8 +239,7 @@ jobs:
               - name: spike
                 image: ${SPIKE_IMAGE}@${INDEX}
           EOF
-          for shape in Cosign SigstoreBundle; do
-            for who in "${GITHUB_REPOSITORY}" "${GITHUB_REPOSITORY}-not"; do
+          while IFS='|' read -r label shape field value; do
               cat > "${RUNNER_TEMP}/policy.yaml" <<EOF
           apiVersion: kyverno.io/v1
           kind: ClusterPolicy
@@ -256,16 +262,20 @@ jobs:
                         attestors:
                           - entries:
                               - keyless:
-                                  subject: "https://github.com/${who}/*"
+                                  ${field}: "${value}"
                                   issuer: ${OIDC_ISSUER}
                                   rekor:
                                     url: https://rekor.sigstore.dev
           EOF
-              printf '\nshape `%s`, identity `https://github.com/%s/*`:\n' "$shape" "$who" >> "$GITHUB_STEP_SUMMARY"
-              run kyverno apply "${RUNNER_TEMP}/policy.yaml" --resource "${RUNNER_TEMP}/pod.yaml"
-              note "kyverno ${shape}, identity ${who##*/}"
-            done
-          done
+              printf '\n%s (shape `%s`, `%s: %s`):\n' "$label" "$shape" "$field" "$value" >> "$GITHUB_STEP_SUMMARY"
+              run kyverno apply "${RUNNER_TEMP}/policy.yaml" --resource "${RUNNER_TEMP}/pod.yaml" </dev/null
+              note "kyverno ${label}"
+          done <<EOF
+          bundle shape exact identity|SigstoreBundle|subject|${signer}
+          bundle shape regular expression|SigstoreBundle|subjectRegExp|^https://github.com/${GITHUB_REPOSITORY}/.*
+          bundle shape identity that did not sign|SigstoreBundle|subject|${signer}-not
+          cosign shape exact identity|Cosign|subject|${signer}
+          EOF
 
           say "trivy $(trivy --version 2>/dev/null | head -1)"
           printf 'trivy has no verb that verifies a sigstore provenance bundle; the attestation subcommands it does carry:\n```\n' >> "$GITHUB_STEP_SUMMARY"
