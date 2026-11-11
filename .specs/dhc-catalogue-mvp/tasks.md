@@ -517,10 +517,10 @@
     - _Requirements: none yet; a new criterion when scheduled_
 
 - [ ] 18. SLSA Build L2: provenance generated from the platform's signed claims, attested at release, verifiable by consumers, demanded from the successor's epoch (Req 2.9, 2.10, 2.23, 2.25, 2.27 to 2.29, 7.7, 9.19; design Decision 15; SLSA v1.2, `releases/v1.2` at ae7fc76; owner's calls of 2026-10-28: GitHub's provenance service, binding from the successor's epoch). Executes before task 12; one pull request per task; conductor track slsa-build-l2_20261028
-  - [ ] 18.1 Spec amendment
+  - [x] 18.1 Spec amendment
     - requirements.md: 2.9, 2.10, 2.23, 2.25 and 7.7 amended, 2.27 to 2.29 and 9.19 added; design.md: Decision 15 (the v1.2 gap, the history, options A to E, the decision, the consequences); this group; 12.1's SLSA bullet; ledger rows 2.27, 2.28, 2.29 and 9.19 (unexercised, each with its reason) and notes on rows 2.10 and 2.25 naming the 2026-09-09 review's finding 2.4, which no disposition carried
     - _Requirements: Req 2.9, Req 2.10, Req 2.23, Req 2.25, Req 2.27, Req 2.28, Req 2.29, Req 7.7, Req 9.19_
-  - [ ] 18.2 Measure the verifier, ADR 0005 [OPERATOR: one dispatch of a spike workflow on a branch, pushing a scratch image outside the catalogue namespace]
+  - [x] 18.2 Measure the verifier, ADR 0005 [OPERATOR: one dispatch of a spike workflow on a branch, pushing a scratch image outside the catalogue namespace]
     - One scratch image pushed outside `verification.registry` (never a catalogue repository), attested by `actions/attest-build-provenance` with `push-to-registry`, pinned by commit; measured and recorded in `data/slsa-provenance-spike-<date>.md`: the predicate's builder id, build type and external parameters as emitted, where the bundle lands (OCI referrer, its artifact type), anonymous readability, and which of the pinned tools verify it with the identity and the expectations: Kyverno 1.19.1 (`kyverno apply`, the 2.28 rule), cosign 2.6.5 `verify-attestation`, `gh attestation verify --bundle-from-oci` (whether it needs a login), Trivy 0.72.0 if it reads it; one index and one platform manifest as subjects. ADR 0005 names the verifier for 2.28, the consumer command for 2.25 and the expectations' exact values; if only cosign v3 reads the bundle, ADR 0003's major gate goes to the owner and 18.4 to 18.5 wait for that call
     - _Requirements: Req 2.27, Req 2.28_
   - [ ] 18.3 Provenance in the release path

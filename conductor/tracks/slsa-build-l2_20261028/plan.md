@@ -3,7 +3,7 @@
 **Track ID:** slsa-build-l2_20261028
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-10-28
-**Status:** [ ] pending (phase 0 drafted 2026-10-28)
+**Status:** [~] in progress (phase 0 merged 2026-11-10 as #337, 09dcfdf; phase 1 measured 2026-11-11, runs 43025700201 to 43033859220 on #401, recorded in ADR 0005; next phase 2)
 
 ## Overview
 
@@ -13,13 +13,13 @@ Six phases, one pull request each, spec task group 18. Phase 0 is this pull requ
 
 ### Tasks
 
-- [ ] **0.1 The amendment**: requirements.md 2.9, 2.10, 2.23, 2.25, 7.7 amended, 2.27 to 2.29 and 9.19 added; design.md Decision 15; tasks.md group 18, 12.1's SLSA bullet, the coverage rows; ledger rows 2.27, 2.28, 2.29, 9.19 and the notes on 2.10 and 2.25
-- [ ] **0.2 The track**: this folder, `conductor/tracks.md`, `conductor/index.md`, the todo's open item
-- [ ] **0.3 The pull request**: title `spec: SLSA Build L2, provenance from the platform's signed claims, demanded from the successor's epoch (Req 2.27 to 2.29, 9.19; task 18.1)`, a TL;DR; the owner merges (checkpoint)
+- [x] **0.1 The amendment**: requirements.md 2.9, 2.10, 2.23, 2.25, 7.7 amended, 2.27 to 2.29 and 9.19 added; design.md Decision 15; tasks.md group 18, 12.1's SLSA bullet, the coverage rows; ledger rows 2.27, 2.28, 2.29, 9.19 and the notes on 2.10 and 2.25
+- [x] **0.2 The track**: this folder, `conductor/tracks.md`, `conductor/index.md`, the todo's open item
+- [x] **0.3 The pull request**: title `spec: SLSA Build L2, provenance from the platform's signed claims, demanded from the successor's epoch (Req 2.27 to 2.29, 9.19; task 18.1)`, a TL;DR; the owner merges (checkpoint)
 
 ### Verification (orchestrator)
 
-- [ ] Every added or amended criterion in EARS shape; `scripts/lint-live-evidence.sh .` green (159 criteria); no em-dashes in the added lines; no closing keyword before an issue number
+- [x] Every added or amended criterion in EARS shape; `scripts/lint-live-evidence.sh .` green (159 criteria); no em-dashes in the added lines; no closing keyword before an issue number
 
 ## Phase 1: the verifier, measured (task 18.2)
 
@@ -27,13 +27,14 @@ Dependency: phase 0 merged. Worktree `slsa-spike`. [OPERATOR: one dispatch on th
 
 ### Tasks
 
-- [ ] **1.1 The spike workflow** on a branch only, never merged: build a scratch image, push it to the scratch repository outside `verification.registry`, attest it with `actions/attest-build-provenance` pinned by commit, `push-to-registry: true`, subjects one index and one platform manifest
-- [ ] **1.2 The reads**: the predicate as emitted (builder id, build type, external parameters, resolved dependencies), the bundle's location and artifact type, an anonymous read; verification by Kyverno 1.19.1, cosign 2.6.5, `gh attestation verify --bundle-from-oci` (with and without a login), Trivy 0.72.0 if it reads it
+- [x] **1.1 The spike workflow** on a branch only, never merged: build a scratch image, push it to the scratch repository outside `verification.registry`, attest it with `actions/attest-build-provenance` pinned by commit, `push-to-registry: true`, subjects one index and one platform manifest
+- [x] **1.2 The reads**: the predicate as emitted (builder id, build type, external parameters, resolved dependencies), the bundle's location and artifact type, an anonymous read; verification by Kyverno 1.19.1, cosign 2.6.5, `gh attestation verify --bundle-from-oci` (with and without a login), Trivy 0.72.0 if it reads it (measured at the pins of the day, Kyverno 1.19.2 and Trivy 0.76.1; without a login the GitHub client refused to start inside Actions, so that half stays unmeasured)
 - [ ] **1.3 The record**: `data/slsa-provenance-spike-<date>.md` and `docs/decisions/0005-slsa-provenance-verifier.md` naming the policy verifier, the consumer command and the five expectations' exact values; the scratch package deleted; if only cosign v3 reads the bundle, the owner's call on ADR 0003 before phase 2
+  - Written 2026-11-11: `data/slsa-provenance-spike-2026-11-11.md`, ADR 0005; the pinned cosign 2.6.5 reads the bundle, so ADR 0003's gate is not triggered. Open: the scratch package `ghcr.io/mm-weber/slsa-spike` (six image tags, twelve bundle tags) is the owner's to delete, the workspace token cannot; #401 closed unmerged after this record merges
 
 ### Verification
 
-- [ ] The ADR cites the run id and the measured outputs; no catalogue repository touched (the registry listing unchanged)
+- [x] The ADR cites the run id and the measured outputs; no catalogue repository touched (every push and attestation of the six runs names `ghcr.io/mm-weber/slsa-spike`; the workflow refuses a target inside `verification.registry`)
 
 ## Phase 2: provenance in the release path (task 18.3)
 
