@@ -368,8 +368,17 @@ left of the program is the follow-up list below, one decision each.
       ADR 0005, `data/slsa-provenance-spike-2026-11-11.md`): the pinned
       cosign 2.6.5 and Kyverno 1.19.2 both verify the bundle, Kyverno only
       through a `SigstoreBundle` entry, so cosign stays on v2 and ADR 0003's
-      major gate is not triggered. Next: 18.3, provenance in the release
-      path, by TDD (ask first).
+      major gate is not triggered. Spec amended 2026-11-11 at the owner's
+      call: one provenance mode (`release.provenance`: `off`, `report`,
+      `required`; Req 2.30), built with 18.3; no new secret, nothing paid
+      on a public repository. Next: 18.3, provenance in the release path,
+      by TDD (ask first).
+  - [ ] The owner's open call (asked 2026-11-11): whether BuildKit's
+        unsigned provenance stays attached once the platform's is live.
+        Dropping it amends Req 2.2, 2.10, 2.25 and Decision 15;
+        `package-set-diff.sh` names its timestamps as the reason a
+        rebuild's index digest differs from the published one (not
+        measured whether dropping it makes them equal).
   - [ ] The owner's cleanup after ADR 0005 merges: delete the package
         `ghcr.io/mm-weber/slsa-spike` (six image tags, twelve bundle tags;
         the workspace token cannot); #401 to be shut unmerged; delete branch

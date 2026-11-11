@@ -101,9 +101,10 @@ source at v1.19.2 and is in the record; none changes the design.
 
 - **The rendering gains an entry, not a row.** `render-verification.sh`
   cannot add provenance to the existing `attestations` list; phase 4 renders
-  a second `verifyImages` entry when `required.attestations` names SLSA
-  provenance and none when it does not. The drift check and the suite hold
-  both shapes.
+  a second `verifyImages` entry when the policy file's provenance mode is
+  `required` and none otherwise (the mode of the 2026-11-11 amendment, Req
+  2.30; first drafted as `required.attestations` naming SLSA provenance).
+  The drift check and the suite hold every shape.
 - **`subject` is exact for the bundle type.** The declared `releaser`
   identity is exact already, so nothing changes for this repository. A fork
   that wants a pattern uses `subjectRegExp`; a wildcard in `subject`, which

@@ -1007,7 +1007,7 @@ graph TB
       pull request; H because Decision 6 measured the frontend as non-reproducible; I because
       the chart pin would still need a declared first-release state before the first install.
 
-15. **SLSA Build L2: provenance generated from the platform's signed claims, verifiable by consumers, demanded from the successor's epoch (Req 2.9, 2.10, 2.23, 2.25, 2.27 to 2.29, 7.7, 9.19; SLSA v1.2; decided 2026-10-28)**
+15. **SLSA Build L2: provenance generated from the platform's signed claims, verifiable by consumers, demanded from the successor's epoch (Req 2.9, 2.10, 2.23, 2.25, 2.27 to 2.30, 7.7, 9.19; SLSA v1.2; decided 2026-10-28, amended 2026-11-11)**
     - **Context**: the catalogue aims at SLSA Build L2. Measured against SLSA v1.2 (released
       2025-11-24; the spec read from the `releases/v1.2` branch of slsa-framework/slsa, commit
       ae7fc76, `spec/build-track-basics.md` and `spec/build-requirements.md`): L1 asks that
@@ -1081,6 +1081,31 @@ graph TB
       by one service; the trust-boundary table names it, with D as the L3 path and A as the
       seam a fork on another forge would take. The comparator, the VEX planes and the
       re-attester are untouched: none reads provenance. Build L3 stays out of scope.
+    - **Amendment (2026-11-11, the owner's call): one provenance mode, three positions.**
+      The policy file's release section declares `provenance`, one of `off`, `report` and
+      `required`, read by `release-policy.sh` like every release switch (a hole refuses by
+      name, never a default; 7.7). It replaces "whether provenance is required" above and
+      the trigger "required attestations name SLSA provenance" in 2.10, 2.23, 2.28 and 2.29,
+      both written before any of it was built. `off`: the release attests no SLSA provenance
+      and is otherwise unchanged, the daily report says provenance is off (2.30), the
+      instructions say releases attest none (2.25) and the security policy claims Build L1
+      (9.19). `report`, this repository's position: attested at release (2.9, 2.27),
+      coverage reported daily without failing (2.29). `required`, the successor's position
+      from its seed (task 12.1): attested, and the rendered policy demands it (2.23, 2.28).
+      One value rather than a switch for attesting beside a list for demanding, so "demanded
+      but not attested" cannot be declared and needs no guard. Why `off` exists: GitHub
+      offers artifact attestations to public repositories on every plan and to private or
+      internal ones on Enterprise Cloud only, and a private repository signs through
+      GitHub's own Sigstore instance, which keeps no transparency log (GitHub's
+      documentation, read 2026-11-11; neither measured), so a fork there, or this catalogue
+      private again (2.4), would fail every release at the attestation step and could not
+      use the consumer step as written. The `page` switch is the precedent: a fork without
+      Pages turns it off. What the track costs otherwise, asked the same day: no new secret
+      (the job's token gains `attestations: write`; `id-token: write` and `packages: write`
+      are held already) and nothing paid on a public repository. Not measured: whether a
+      private repository on a plan without attestations accepts the permission line.
+      BuildKit's provenance is not on this switch; whether it stays attached once the
+      platform's is live is the owner's open call of 2026-11-11.
 
 ## System Flows
 
