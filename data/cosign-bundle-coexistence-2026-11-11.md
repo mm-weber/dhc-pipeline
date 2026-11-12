@@ -91,6 +91,51 @@ finding.
 - Keyless signatures on ghcr.io with GitHub's real bundle (the measurement
   used a key pair and a local registry; the switch is in the reader and
   does not look at how the bundle was signed).
-- Trivy's `--vex oci` read on such a digest.
-- A bundle pushed to a sibling repository instead of beside the digest.
 - Whether cosign upstream regards the switch as a bug.
+- Whether `actions/attest-build-provenance` can push its bundle to a
+  repository that does not hold the subject manifest, and whether Kyverno's
+  `repository` field finds a bundle there (see the sibling rows below).
+
+## Follow-up measurements (2026-11-12, at the owner's request)
+
+Same local registry and key pair. Test images carry one Python package
+(PyYAML 5.3; the pinned Trivy 0.76.1, vulnerability DB of 2026-10-15,
+reports CVE-2020-14343 and CVE-2020-1747, both CRITICAL). VEX document A
+marks the first `not_affected`, document B the second, so which document a
+reader got is visible in what stays reported.
+
+### Does `cosign attest --replace` work on bundles (ADR 0004's exactly-one rule)
+
+| Case | Sequence | Result |
+|---|---|---|
+| A0, control: cosign 2.6.5, old layout | attest A, attest SBOM, attest `--replace` B | prints `Replacing attestation predicate: https://openvex.dev/ns`; `.att` holds one OpenVEX layer and the SBOM; read back: B only |
+| A1: cosign 2.6.5, `--new-bundle-format` | same | exit 0, no "Replacing" line; the bundle tag lists three bundles; read back: B **and** A |
+| A3: cosign 3.1.2, its default layout | attest A, attest `--replace` B | prints `Flag --replace has been deprecated, not needed when OCI referrers become the default behavior`; read back: B **and** A |
+| A4: cosign 3.1.2 with `--new-bundle-format=false` | attest A, attest SBOM, attest `--replace` B | prints `Flag --new-bundle-format has been deprecated, this will be the only supported format in future versions`; writes `.att`; replace works; read back: B only; Trivy suppresses per B |
+
+On bundles `--replace` is accepted and does nothing, in both versions: every
+re-attestation adds a document.
+
+### Does Trivy 0.76.1 read VEX from the registry (`--vex oci`) when it is a bundle
+
+| Case | Layout | Result |
+|---|---|---|
+| B0, control | VEX A in `.att` | `VEX attestation found`; CVE-2020-14343 suppressed, CVE-2020-1747 reported |
+| B1 | VEX A as a bundle only | `No VEX attestations found`, `VEX filtering is disabled`; both reported, exit 0 |
+| B3, the mixed case of this record | VEX A in `.att`, a provenance bundle beside it | `VEX attestation found`; suppression as in B0: Trivy is not affected by the mixed layout |
+
+ADR 0003 measured the same for Trivy 0.72.0 on 2026-08-22; four minor
+versions later nothing has changed.
+
+### A provenance bundle in a sibling repository (`COSIGN_REPOSITORY`)
+
+| Writer | Result |
+|---|---|
+| cosign 2.6.5 `attest --new-bundle-format` with `COSIGN_REPOSITORY` set | the variable is ignored: the bundle lands beside the digest (the mixed case again) |
+| cosign 3.1.2 `attest` with `COSIGN_REPOSITORY` set | the bundle lands in the sibling repository; the image's repository keeps `.sig` and `.att` only |
+
+With the bundle in the sibling repository: `cosign verify` and
+`verify-attestation --type spdxjson` on the image are unchanged in 2.6.5 and
+in 3.1.2 (exit 0, type `cosign container image signature`).
+`COSIGN_REPOSITORY=<sibling> cosign verify-attestation --type slsaprovenance1`
+exits 0 in 3.1.2 and 1 in 2.6.5 (`no matching attestations`).

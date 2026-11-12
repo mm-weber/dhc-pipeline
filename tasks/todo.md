@@ -399,6 +399,16 @@ left of the program is the follow-up list below, one decision each.
         on 2.6.x still blind; (4) defer provenance until (2). Whichever
         is chosen, Decision 15's "untouched" sentence and ADR 0005's
         consequences are corrected in the same pull request.
+        Measured 2026-11-12 (same record): on bundles `cosign attest
+        --replace` does nothing (2.6.5 and 3.1.2 both keep every
+        document), and Trivy 0.76.1 `--vex oci` finds no VEX in a bundle,
+        so path (2) is not buildable on today's pins; cosign 3.1.2 still
+        writes the old layout with a deprecated flag and replace works
+        there; Trivy is not affected by the mixed layout; a bundle in a
+        sibling repository leaves the image's reads untouched (written
+        and read with cosign 3.1.2 only). cosign 2.6 gets critical fixes
+        only, no end date published; cosign v4 is announced to remove
+        the old layout.
   - [ ] The owner's cleanup after ADR 0005 merges: delete the package
         `ghcr.io/mm-weber/slsa-spike` (six image tags, twelve bundle tags;
         the workspace token cannot); #401 to be shut unmerged; delete branch
