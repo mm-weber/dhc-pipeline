@@ -409,6 +409,20 @@ left of the program is the follow-up list below, one decision each.
         and read with cosign 3.1.2 only). cosign 2.6 gets critical fixes
         only, no end date published; cosign v4 is announced to remove
         the old layout.
+        The owner ruled out paths (3), (4) and the sibling repository on
+        2026-11-12 (non-starters); the choice is between (1) and (2).
+        Measured the same day at the owner's question (same record, the
+        unpack section): GitHub's real bundle from the attestation store
+        can be unpacked into the old `.att` layout (the envelope byte for
+        byte, certificate and log entry as cosign's annotations); cosign
+        2.6.5 verifies it keyless, every other read is unchanged,
+        `--replace` leaves it alone, Trivy is unaffected, no bundle tag
+        exists. Limits: the manifest is written by our own script; it
+        ends with Rekor v2 or cosign v4. Proposed: path (1) with the
+        unpack (the action with `push-to-registry: false`, its bundle
+        unpacked beside the digest), so Req 2.27 and 2.28 hold as
+        written. Open: one confirming run on the #401 branch (ghcr.io,
+        the subject check, Kyverno on the unpacked copy), the owner's go.
   - [ ] The owner's cleanup after ADR 0005 merges: delete the package
         `ghcr.io/mm-weber/slsa-spike` (six image tags, twelve bundle tags;
         the workspace token cannot); #401 to be shut unmerged; delete branch
