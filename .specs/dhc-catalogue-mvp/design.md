@@ -1106,6 +1106,57 @@ graph TB
       private repository on a plan without attestations accepts the permission line.
       BuildKit's provenance is not on this switch: it stays attached as it is, the
       owner's call of 2026-11-11.
+    - **Amendment (2026-11-13, the owner's call): the provenance is stored in cosign's
+      attestation layout, and no bundle sits beside the digest.** Found on 2026-11-11,
+      before 18.3's first slice (`data/cosign-bundle-coexistence-2026-11-11.md`): once a
+      Sigstore bundle sits beside a digest, cosign 2.6.5 reads bundles only and no longer
+      sees that digest's `.sig` and `.att`. With the action's `push-to-registry`, as first
+      specified, the comparator would have republished every day, the rescan's SBOM fetch
+      would have failed, the re-attestation would have dropped carried-forward VEX
+      silently and the README's commands would have failed. Two sentences of the
+      consequences above are replaced by this amendment: "the service writes a Sigstore
+      bundle ... what verifies it is measured first", and "the comparator, the VEX planes
+      and the re-attester are untouched". Ruled out by the owner on 2026-11-12: the cosign
+      major (ADR 0003's gate; consumers on 2.6 would stay blind), deferring provenance,
+      and a sibling repository for the bundle. Not buildable on today's pins: moving every
+      signature and attestation to bundles (`cosign attest --replace` does nothing on
+      bundles at 2.6.5 and 3.1.2, and Trivy 0.76.1 reads no VEX from one; measured
+      2026-11-12). **Decided:** the action runs with `push-to-registry: false`. GitHub
+      still signs the statement, logs it in Rekor and keeps the bundle in this
+      repository's attestation store, and writes nothing to the registry.
+      `scripts/unpack-provenance.sh` then stores that same attestation beside each
+      subject digest as one more layer of its `sha256-<hex>.att` manifest, where criterion
+      2.9's other attestations already live (2.27 as amended). The unpack writes five
+      parts: the bundle's signed envelope byte for byte as the layer (its hash is the one
+      the Rekor entry records), and as layer annotations the predicate type, the signing
+      certificate, the log entry with its signed entry timestamp, and the certificates
+      between the signing certificate and the root (`dev.sigstore.cosign/chain`, copied
+      from a layer cosign wrote into the same manifest and checked to have issued the
+      certificate before anything is written). Nothing the script adds is trusted by a
+      verifier: the annotations are packaging, and a wrong one only makes the layer fail.
+      Measured on ghcr.io on 2026-11-13 (runs 43402932545 and 43404580566 on #401): cosign
+      2.6.5 verifies the layer keyless with its subject check on; Kyverno 1.19.2 admits it
+      through the existing `Cosign` entry with the five expectations and refuses a wrong
+      ref and a wrong identity, and needs the chain annotation to do so; `cosign attest
+      --replace --type openvex` leaves the layer alone; a second unpack replaces it
+      rather than adding one; `gh attestation verify` passes against the store; no
+      `sha256-<hex>` bundle tag exists. What the planes share from here on: the
+      re-attester and `check-attestation-count.sh` read and write the same `.att`
+      manifest as the unpack, and both select by predicate type, so neither counts nor
+      replaces the provenance layer; the comparator and Trivy read what they read before.
+      Subjects: one statement naming the index and every platform manifest (the action's
+      `subject-checksums`), unpacked beside each. cosign's subject check passes when any
+      subject matches (read in its source); the statement with several subjects is
+      measured end to end before the release step is written (track plan 2.1), and one
+      statement per subject is the measured fallback. The release verifies every unpacked
+      layer with ADR 0005's command before the tags (2.9). **Limits, accepted:** the
+      layer is written by this repository's script, not by cosign. The route ends when
+      GitHub's service moves to a log without signed entry timestamps (Rekor v2: the
+      script refuses such a bundle by name and the release stops before the tags) or
+      when a cosign major removes the old layout (announced for v4); at either point,
+      moving every signature and attestation to bundles is the path, behind ADR 0003's
+      gate. ADR 0005 is amended the same day: no second `verifyImages` entry; the existing
+      one gains the provenance attestation where the mode is `required`.
 
 ## System Flows
 

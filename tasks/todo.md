@@ -372,8 +372,9 @@ left of the program is the follow-up list below, one decision each.
       call: one provenance mode (`release.provenance`: `off`, `report`,
       `required`; Req 2.30), built with 18.3; no new secret, nothing paid
       on a public repository. Amendment merged 2026-11-11 (#405, 6d9946f);
-      the owner's go for 18.3 the same day. 18.3 is ON HOLD before its
-      first slice: see the open call below.
+      the owner's go for 18.3 the same day. 18.3 was held before its
+      first slice on the bundle finding below; the owner decided on
+      2026-11-13: the bundle is unpacked into the attestation layout.
   - [x] BuildKit's unsigned provenance stays attached as it is (the
         owner's call, 2026-11-11). Why it is unsigned, measured on valkey
         `9-alpine3.23`: `cosign sign --recursive` signs the two attestation
@@ -382,7 +383,7 @@ left of the program is the follow-up list below, one decision each.
         in-toto statement written by BuildKit inside the job, never
         attested as provenance (no `.att`), so no verifier can ask for it
         by type and signer.
-  - [ ] The owner's open call (found 2026-11-11 in the exploration for
+  - [x] The owner's call, decided 2026-11-13 (found 2026-11-11 in the exploration for
         18.3, `data/cosign-bundle-coexistence-2026-11-11.md`): a
         provenance bundle beside a digest makes cosign 2.6.5 stop reading
         that digest's `.sig` and `.att`. With 18.3 as specified the
@@ -441,12 +442,38 @@ left of the program is the follow-up list below, one decision each.
         Still open inside 18.3: the source of the chain (the `.sig`
         layer, measured, or the public trusted root, not measured);
         admission in a cluster; a catalogue image and the rescan's
-        reattest path. Waiting: the owner's yes or no to path (1) with
-        the unpack.
-  - [ ] The owner's cleanup after ADR 0005 merges: delete the package
-        `ghcr.io/mm-weber/slsa-spike` (six image tags, twelve bundle tags;
-        the workspace token cannot); #401 to be shut unmerged; delete branch
-        `slsa-spike`.
+        reattest path.
+        Decided 2026-11-13, the owner's yes: path (1) with the unpack.
+        The source of the chain is settled the same day by measurement:
+        every layer cosign wrote into a catalogue `.att` manifest carries
+        the chain annotation (valkey `9-alpine3.23`, index and arm64), so
+        the unpack copies it from a layer of the manifest it edits and
+        checks it against the provenance certificate.
+  - [ ] The amendment of 2026-11-13 (plan task 0.5; branch
+        `provenance-release`, local, not pushed): requirements.md 2.27's
+        storage clause and the header's amendment line, Decision 15's
+        amendment, ADR 0005's amendment (no second policy entry),
+        tasks.md 18.1 and 18.3 to 18.5, the track's FR-1, risks and
+        phase 2 rewritten slice by slice. Waiting: the owner's approval
+        of the amendment and the plan; then the pull request with a
+        TL;DR, the owner merges.
+  - [ ] 18.3 by the plan's phase 2, each step after the owner's go:
+    - [ ] 2.1 one measuring run on #401: one statement naming the index
+          and a platform manifest (`subject-checksums`), unpacked beside
+          both, verified on both by cosign 2.6.5, Kyverno 1.19.2 and
+          `gh attestation verify`; its bundle becomes the suites' fixture
+    - [ ] 2.2 the mode in `release-policy.sh` (six slices, and the
+          policy file by hand)
+    - [ ] 2.3 `attestations: write`, both sides, held by the existing lint
+    - [ ] 2.4 `scripts/unpack-provenance.sh` (nineteen slices)
+    - [ ] 2.5 `scripts/check-provenance.sh verify` (ten slices)
+    - [ ] 2.6 the release steps in `build.yml`, the suites in `validate.yml`
+    - [ ] 2.7 the action's pin read by the Renovate test
+    - [ ] 2.8 the refactor commit
+    - [ ] the first release on main and the next rescan read
+  - [ ] The owner's cleanup, after plan task 2.1's run is read: delete the
+        package `ghcr.io/mm-weber/slsa-spike` (the workspace token cannot);
+        #401 to be shut unmerged; delete branch `slsa-spike`.
 - [ ] Kyverno's `kyverno.io/v1` ClusterPolicy is deprecated (seen by 18.2,
       2026-11-11): Kyverno 1.19.2 prints on every `kyverno apply` that the
       kind "will be removed in a future release" in favour of its newer

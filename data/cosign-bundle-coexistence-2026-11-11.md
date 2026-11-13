@@ -326,3 +326,56 @@ verification is untouched by the unpack, because the store keeps the bundle.
 - The owner's go named one confirming run. The second run was made on the
   same never-merging branch to measure the root cause as one variable
   rather than to state it from the sources alone.
+
+## The owner's decision and what the production unpack is built from (2026-11-13)
+
+The owner decided on 2026-11-13: path (1) with the unpack. The action runs
+with `push-to-registry: false`, its bundle is unpacked beside each subject
+digest in the old layout, chain annotation included. Three things were then
+read or measured locally for the 18.3 plan, before any code.
+
+### crane carries an edited attestation manifest byte for byte (measured)
+
+crane 0.22.1 (the repository pins crane through `scripts/install-tool.sh`),
+against the second run's index `.att` and a local `crane registry serve`:
+
+| Step | Result |
+|---|---|
+| `crane pull --format oci <ref> <dir>`, then `crane push <dir> <ref>` | the pushed manifest has the source's digest: nothing is rewritten on the way |
+| the manifest in the layout edited by hand: one more layer of media type `application/vnd.dsse.envelope.v1+json` with annotations, the layout's `index.json` pointing at the edited manifest | the pushed digest equals the sha256 of the edited manifest; the new blob is stored byte for byte; the layers already present are skipped as existing |
+
+So the production script needs no registry client of its own (the spike's
+was hand-written): jq and openssl do the transformation on an OCI layout
+directory, crane does the pull and the push.
+
+### The chain annotation is on every layer cosign wrote (measured)
+
+On a catalogue image, `ghcr.io/mm-weber/dhc/valkey:9-alpine3.23` (index
+`sha256:074cf493685f...`, its arm64 manifest `sha256:7945b6584fac...`): every
+layer of both `.att` manifests (SPDX and OpenVEX on the index; SPDX,
+CycloneDX, the scan report and OpenVEX on the platform manifest) carries
+`dev.sigstore.cosign/chain`, 1530 bytes, two certificates. The release writes
+those layers in "sign and attest" before provenance is attested, so the
+unpack can copy the chain from a layer of the manifest it is about to edit.
+It checks that this chain issued the provenance's signing certificate before
+it writes anything (`openssl verify`), and refuses by name when it did not
+or when no layer carries one. This settles the open point "source of the
+chain" above; the public trusted root as a source stays unmeasured and is
+not needed.
+
+### One statement for all subjects (read, not measured)
+
+`actions/attest` at `508db95dd578ae2727ebd6217d5ba78e4fbda05d` (v4.2.1, the
+action `attest-build-provenance` v4.2.2 wraps), `src/subject.ts` and
+`src/main.ts`: the input `subject-checksums` takes lines of
+`<hex digest> <name>` (a file or a string, up to 1024 subjects) and the
+action creates one attestation naming all of them: one statement, one
+signature, one Rekor entry, one bundle. With `push-to-registry: true` the
+action insists on exactly one subject, which is why the spike used one step
+per subject; with `false` that limit does not apply. cosign's subject check
+(`IntotoSubjectClaimVerifier`, `pkg/cosign/verifiers.go`, read at v2.6.5 and
+v3.1.2) passes when any subject of the statement carries the digest asked
+for. Not measured: cosign and Kyverno end to end on a statement with several
+subjects, and GitHub's attestation store answering for each subject digest.
+The 18.3 plan measures both on the never-merging #401 branch before the
+release step is written; one statement per subject is the measured fallback.
