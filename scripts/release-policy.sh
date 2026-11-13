@@ -86,6 +86,9 @@ def platforms():
         out.append(p)
     return out
 
+def provenance():
+    return rel["provenance"]
+
 if query == "public":
     print(boolean("public"))
 elif query == "fail-closed":
@@ -98,6 +101,8 @@ elif query == "platforms":
     print("\n".join(platforms()))
 elif query == "page":
     print(boolean("page"))
+elif query == "provenance":
+    print(provenance())
 elif query == "check":
     pub, fc, pp, sch, pl, pg = boolean("public"), boolean("fail_closed"), publish_policy(), schedule(), platforms(), boolean("page")
     print(f"release-policy: public={pub} fail_closed={fc} publish_policy={pp} page={pg} schedule=\"{sch}\" {len(pl)} platform(s): {', '.join(pl)}")
