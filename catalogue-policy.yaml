@@ -253,6 +253,20 @@ workflows:
         type: boolean
     permissions:
       contents: read
+  # Task 18.2's spike, on its branch only and never merged (track
+  # slsa-build-l2_20261028): it publishes one scratch image outside
+  # verification.registry and attests it with GitHub's provenance service so
+  # ADR 0005 can name the verifier. Declared here because Req 7.10 holds every
+  # workflow under .github/workflows/ to a declaration, this branch included.
+  # It goes when the branch does.
+  slsa-spike.yml:
+    jobs:
+      spike:
+        permissions:
+          contents: read
+          packages: write # the scratch image and its attestation referrers
+          id-token: write # the provenance service signs under the workload identity
+          attestations: write
   validate.yml:
     schedule: null
     permissions:

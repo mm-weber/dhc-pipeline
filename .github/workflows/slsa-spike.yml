@@ -1,0 +1,520 @@
+name: slsa spike
+
+# Task 18.2, phase 1 of track slsa-build-l2_20261028, the input to ADR 0005.
+#
+# This file lives on its branch and is never merged. One run builds one scratch
+# image, pushes it to a repository OUTSIDE catalogue-policy.yaml's
+# verification.registry, attests it with GitHub's provenance service, and then
+# measures which verifier can read that attestation and what the predicate
+# actually carries. Nothing it does touches a catalogue repository. The package
+# is deleted once the ADR is written (phase 1, task 1.3).
+#
+# Reused once for task 18.3 (the owner's go of 2026-11-13): the same scratch
+# image, attested with `push-to-registry: false`, and the bundle written beside
+# the digest in the layout cosign v2 reads. See the comment above the attest
+# steps. A second run of it repeats the Kyverno read with the layer's chain
+# annotation written (the first run's layer had none and Kyverno dropped it
+# unread).
+#
+# Reused a third time for plan task 2.1 of the same track (the owner's go of
+# 2026-11-13): one statement naming the index and the amd64 manifest
+# (`subject-checksums`), unpacked beside both and read by the three verifiers
+# on each; then the index alone is attested a second time, so GitHub's
+# attestation store holds two statements for it. The store's answers become
+# the fixtures of task 18.3's suites. The package is deleted after Kyverno has
+# read the first released digest (the plan's verification list).
+#
+# Two triggers, because a workflow_dispatch is only offered for a workflow that
+# exists on the default branch, and this one deliberately never lands there: the
+# dispatch is tried first, and the pull_request path is the fallback, firing once
+# when the owner opens the pull request for this branch. Either way the run is
+# started by a maintainer and happens once.
+#
+# No dispatch input: Req 7.7 declares every input a workflow accepts, and this
+# one asks for nothing.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/slsa-spike.yml
+
+permissions: {}
+
+env:
+  # Outside verification.registry (ghcr.io/mm-weber/dhc) by construction: the
+  # spec's drafted name, deleted after the ADR.
+  SPIKE_IMAGE: ghcr.io/mm-weber/slsa-spike
+  OIDC_ISSUER: https://token.actions.githubusercontent.com
+
+jobs:
+  spike:
+    name: provenance from the platform, measured
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: refuse to run against a catalogue repository
+        env:
+          REGISTRY_DECL: ghcr.io/mm-weber/dhc
+        run: |
+          set -euo pipefail
+          case "${SPIKE_IMAGE}/" in
+            "${REGISTRY_DECL}/"*)
+              echo "::error::${SPIKE_IMAGE} is inside the declared catalogue namespace ${REGISTRY_DECL}; the spike must never publish there (task 18.2)"
+              exit 1 ;;
+          esac
+          echo "spike target ${SPIKE_IMAGE} is outside ${REGISTRY_DECL}"
+
+      - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: log in to ghcr.io
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: the scratch context
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/ctx"
+          printf 'slsa provenance spike, run %s\n' "${GITHUB_RUN_ID}" > "${RUNNER_TEMP}/ctx/spike.txt"
+          # FROM scratch: no base image, so no pin and no upstream to verify.
+          # Two platforms, so the push mints an index over two manifests and the
+          # subjects below cover one of each (task 18.2).
+          cat > "${RUNNER_TEMP}/ctx/Dockerfile" <<'EOF'
+          FROM scratch
+          COPY spike.txt /spike.txt
+          EOF
+
+      - name: build and push the scratch image
+        id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: ${{ runner.temp }}/ctx
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.SPIKE_IMAGE }}:run-${{ github.run_id }}
+          # BuildKit's own provenance is what L2 found wanting; off here so the
+          # measurement reads the platform's attestation and nothing else.
+          provenance: false
+          sbom: false
+
+      - name: the two subjects
+        id: subjects
+        env:
+          REF: ${{ env.SPIKE_IMAGE }}:run-${{ github.run_id }}
+          INDEX: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          echo "index=${INDEX}" >> "$GITHUB_OUTPUT"
+          token=$(curl -sS "https://ghcr.io/token?scope=repository:${SPIKE_IMAGE#ghcr.io/}:pull&service=ghcr.io" | jq -r .token)
+          amd64=$(curl -sS -H "Authorization: Bearer ${token}" \
+            -H 'Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json' \
+            "https://ghcr.io/v2/${SPIKE_IMAGE#ghcr.io/}/manifests/${INDEX}" \
+            | jq -r '.manifests[] | select(.platform.architecture=="amd64" and .platform.os=="linux") | .digest')
+          [ -n "$amd64" ] || { echo "::error::no linux/amd64 manifest under ${INDEX}"; exit 1; }
+          echo "amd64=${amd64}" >> "$GITHUB_OUTPUT"
+          echo "index ${INDEX}, amd64 ${amd64}"
+          # The action's checksum file: one `<bare hex> <name>` line per
+          # subject, both under the repository's name (plan task 2.1).
+          printf '%s %s\n' "${INDEX#sha256:}" "${SPIKE_IMAGE}" "${amd64#sha256:}" "${SPIKE_IMAGE}" > "${RUNNER_TEMP}/subjects.txt"
+          cat "${RUNNER_TEMP}/subjects.txt"
+
+      # Plan task 2.1 (the owner's go of 2026-11-13). A `uses:` step cannot loop
+      # over a definition's platforms, so the release needs one statement that
+      # names the index and every platform manifest. The action stores it in
+      # GitHub's attestation store only, and this job writes that one signed
+      # envelope beside each of the two digests in the layout cosign v2 reads
+      # (data/cosign-bundle-coexistence-2026-11-11.md). The two confirming runs
+      # before this one attested each digest with a statement of its own.
+      - name: attest the index and the amd64 manifest in one statement
+        id: att
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: ${{ runner.temp }}/subjects.txt
+          push-to-registry: false
+
+      - name: install the verifiers at this repository's pins
+        run: |
+          set -euo pipefail
+          scripts/install-tool.sh cosign "${RUNNER_TEMP}/bin"
+          scripts/install-tool.sh kyverno "${RUNNER_TEMP}/bin"
+          scripts/install-tool.sh crane "${RUNNER_TEMP}/bin"
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+
+      - name: the reading helpers
+        run: |
+          set -euo pipefail
+          # The log host is not reachable from where the measurement is read,
+          # and a job summary is not served by the REST API; an annotation is.
+          # So every read that decides something is said as a notice, at most
+          # ten to a step (the platform keeps no more).
+          cat > "${RUNNER_TEMP}/lib.sh" <<'EOF'
+          say() { printf '\n## %s\n\n' "$1" | tee -a "$GITHUB_STEP_SUMMARY"; }
+          run() { printf '```\n$ %s\n' "$*" >> "$GITHUB_STEP_SUMMARY"; "$@" >"${RUNNER_TEMP}/out" 2>&1; rc=$?; sed -n '1,40p' "${RUNNER_TEMP}/out" | cut -c1-600 >> "$GITHUB_STEP_SUMMARY"; printf '\n(exit %s)\n```\n' "$rc" >> "$GITHUB_STEP_SUMMARY"; sed -n '1,20p' "${RUNNER_TEMP}/out" | cut -c1-600; echo "(exit $rc)"; }
+          note() { local body; body=$(sed -n '1,30p' "${RUNNER_TEMP}/out" | LC_ALL=C tr -cd '\11\12\40-\176' | cut -c1-300); body="${body//'%'/%25}"; body="${body//$'\r'/%0D}"; body="${body//$'\n'/%0A}"; echo "::notice title=${1//,/} (exit ${rc})::${body}"; }
+          # cosign prints each verified envelope as one line; what decides is
+          # what its statement says, so the line is replaced by that.
+          decoded() {
+            local f="${RUNNER_TEMP}/out" p
+            {
+              grep -v '^{' "$f"
+              grep '^{' "$f" | jq -r '.payload' | while read -r p; do
+                printf '%s' "$p" | base64 -d | jq -c '{predicateType, subject: [.subject[] | (.name // "") + "@" + ((.digest.sha256 // "")[0:12])], builder: .predicate.runDetails.builder.id, ref: .predicate.buildDefinition.externalParameters.workflow.ref, id: .predicate["@id"]} | with_entries(select(.value != null))'
+              done
+            } > "$f.decoded" 2>&1
+            mv "$f.decoded" "$f"
+          }
+          att() { echo "sha256-${1#sha256:}.att"; }
+          layers() { crane manifest "${SPIKE_IMAGE}:$(att "$1")" | jq -c '[.layers[] | {type: .annotations.predicateType, certificate: (.annotations["dev.sigstore.cosign/certificate"] != null), chain: (.annotations["dev.sigstore.cosign/chain"] != null), logEntry: (.annotations["dev.sigstore.cosign/bundle"] != null)}]'; }
+          # A bundle file of the action, one line per statement.
+          shape() { echo "lines: $(wc -l < "$1")"; jq -c '{mediaType, subjects: [.dsseEnvelope.payload | @base64d | fromjson | .subject[] | .name + "@" + .digest.sha256[0:12]], entry: .verificationMaterial.tlogEntries[0].kindVersion, signedEntryTimestamp: (.verificationMaterial.tlogEntries[0].inclusionPromise != null), inclusionProof: (.verificationMaterial.tlogEntries[0].inclusionProof != null), logIndex: .verificationMaterial.tlogEntries[0].logIndex}' "$1"; }
+          # What GitHub's attestation store holds for a digest, in the order
+          # it answers: per statement its subjects and its log entry.
+          stored() { gh api "repos/${GITHUB_REPOSITORY}/attestations/$1" | jq -c '[.attestations[] | .bundle | {subjects: (.dsseEnvelope.payload | @base64d | fromjson | .subject | length), integratedTime: .verificationMaterial.tlogEntries[0].integratedTime, logIndex: .verificationMaterial.tlogEntries[0].logIndex}]'; }
+          # gh's answer as JSON, said in one line (the first confirming run's
+          # text answers never arrived as notices).
+          verified() { local d="$1"; shift; gh attestation verify "oci://${SPIKE_IMAGE}@${d}" "$@" --format json | jq -c '[.[] | .verificationResult | {predicateType: .statement.predicateType, subjects: (.statement.subject | length), signer: .signature.certificate.subjectAlternativeName, ref: .signature.certificate.sourceRepositoryRef}]'; }
+          signer="https://github.com/${GITHUB_WORKFLOW_REF}"
+          identity=(--certificate-oidc-issuer "${OIDC_ISSUER}" --certificate-identity "${signer}")
+          EOF
+
+      - name: the catalogue's layout beside the index (signature, SBOM, VEX)
+        env:
+          INDEX: ${{ steps.subjects.outputs.index }}
+        run: |
+          set -euo pipefail
+          # What build.yml leaves beside a released digest, keyless under this
+          # workflow's identity, so the unpacked provenance is measured where
+          # it will sit: as one more layer of an attestation manifest that
+          # already holds an SBOM and exactly one OpenVEX document (ADR 0004).
+          cd "${RUNNER_TEMP}"
+          printf '%s\n' '{"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"slsa-spike","documentNamespace":"https://example.test/slsa-spike","creationInfo":{"created":"2026-11-13T00:00:00Z","creators":["Tool: slsa-spike"]},"packages":[]}' > sbom.json
+          for v in A B; do
+            printf '%s\n' "{\"@context\":\"https://openvex.dev/ns/v0.2.0\",\"@id\":\"https://example.test/slsa-spike/vex/${v}\",\"author\":\"slsa-spike\",\"timestamp\":\"2026-11-13T00:00:00Z\",\"version\":1,\"statements\":[{\"vulnerability\":{\"name\":\"CVE-2020-14343\"},\"products\":[{\"@id\":\"pkg:oci/slsa-spike\"}],\"status\":\"not_affected\",\"justification\":\"component_not_present\"}]}" > "vex${v}.json"
+          done
+          ref="${SPIKE_IMAGE}@${INDEX}"
+          cosign sign --yes "$ref"
+          cosign attest --yes --type spdxjson --predicate sbom.json "$ref"
+          cosign attest --yes --type openvex --predicate vexA.json "$ref"
+
+      - name: unpack the one statement beside each digest
+        if: always()
+        env:
+          INDEX: ${{ steps.subjects.outputs.index }}
+          AMD64: ${{ steps.subjects.outputs.amd64 }}
+          BUNDLES: ${{ steps.att.outputs.bundle-path }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # A read that refuses is a result here, not a failure (the first
+          # run's lesson); every read below is allowed to fail and say so.
+          set +e
+          set -uo pipefail
+          . "${RUNNER_TEMP}/lib.sh"
+          say "the action's bundle file, one statement for two subjects"
+          run shape "${BUNDLES}"
+          note "the action's bundle file for two subjects"
+          # GitHub's bundle carries the signing certificate alone. Kyverno
+          # 1.19.2 keeps the trust root's roots and drops its intermediates
+          # (buildCosignOptions), so the only place it finds the certificate
+          # between the two is a layer's chain annotation; the first
+          # confirming run's layer had none and was dropped unread. cosign
+          # wrote that annotation on the signature a step ago, from the same
+          # certificate authority, so it is taken from there, and the
+          # provenance certificate is checked against it before it is used.
+          say "the chain annotation of the signature layer, and the provenance certificate against it"
+          chain() {
+            local d="${RUNNER_TEMP}" n
+            crane manifest "${SPIKE_IMAGE}:sha256-${INDEX#sha256:}.sig" | jq -r '.layers[0].annotations["dev.sigstore.cosign/chain"]' > "$d/chain.pem"
+            n=$(grep -c 'BEGIN CERTIFICATE' "$d/chain.pem")
+            echo "certificates in the signature layer's chain annotation: ${n}"
+            awk -v d="$d" '/BEGIN CERTIFICATE/ {n++} {print > (d "/chain-" n ".pem")}' "$d/chain.pem"
+            for i in $(seq 1 "$n"); do openssl x509 -in "$d/chain-$i.pem" -noout -subject; done
+            head -1 "${BUNDLES}" | jq -r '.verificationMaterial.certificate.rawBytes' | base64 -d | openssl x509 -inform DER -out "$d/leaf.pem"
+            openssl x509 -in "$d/leaf.pem" -noout -issuer
+            : > "$d/between.pem"
+            for i in $(seq 1 "$((n - 1))"); do cat "$d/chain-$i.pem" >> "$d/between.pem"; done
+            openssl verify -no_check_time -CAfile "$d/chain-$n.pem" -untrusted "$d/between.pem" "$d/leaf.pem"
+          }
+          run chain
+          note "the chain annotation and the provenance certificate against it"
+          # Both digests from the one file, the way the release step will call
+          # the unpack: the same envelope becomes a layer of each digest's
+          # attestation manifest.
+          say "unpack the statement beside the index"
+          run scripts/spike-unpack-provenance.py "${BUNDLES}" "${SPIKE_IMAGE}" "${INDEX}" "${RUNNER_TEMP}/chain.pem"
+          note "unpack the two-subject statement beside the index"
+          say "unpack the same statement beside the amd64 manifest"
+          run scripts/spike-unpack-provenance.py "${BUNDLES}" "${SPIKE_IMAGE}" "${AMD64}" "${RUNNER_TEMP}/chain.pem"
+          note "unpack the two-subject statement beside the amd64 manifest"
+
+      - name: what sits beside the digests
+        if: always()
+        env:
+          INDEX: ${{ steps.subjects.outputs.index }}
+          AMD64: ${{ steps.subjects.outputs.amd64 }}
+        run: |
+          set +e
+          set -uo pipefail
+          . "${RUNNER_TEMP}/lib.sh"
+          say "this run's tags"
+          # The package still holds earlier runs' tags; only this run's count.
+          tags() { crane ls "${SPIKE_IMAGE}" | grep -e "${INDEX#sha256:}" -e "${AMD64#sha256:}" -e "run-${GITHUB_RUN_ID}"; }
+          run tags
+          note "tags of this run"
+          say "the bundle tag, which must not exist"
+          run crane manifest "${SPIKE_IMAGE}:sha256-${INDEX#sha256:}"
+          note "bundle tag of the index"
+          say "the attestation manifests"
+          both() { echo "index: $(layers "$INDEX")"; echo "amd64: $(layers "$AMD64")"; }
+          run both
+          note "layers of the two attestation manifests"
+
+      - name: cosign, the old layout with the provenance in it
+        if: always()
+        env:
+          INDEX: ${{ steps.subjects.outputs.index }}
+          AMD64: ${{ steps.subjects.outputs.amd64 }}
+        run: |
+          set +e
+          set -uo pipefail
+          . "${RUNNER_TEMP}/lib.sh"
+          say "cosign $(cosign version --json 2>/dev/null | jq -r .gitVersion 2>/dev/null)"
+          run cosign verify "${identity[@]}" "${SPIKE_IMAGE}@${INDEX}"
+          note "cosign verify the index signature"
+          run cosign verify-attestation --type spdxjson "${identity[@]}" "${SPIKE_IMAGE}@${INDEX}"
+          decoded; note "cosign SBOM of the index"
+          run cosign verify-attestation --type openvex "${identity[@]}" "${SPIKE_IMAGE}@${INDEX}"
+          decoded; note "cosign VEX of the index"
+          # The read the local measurement could not make: the subject check
+          # is on (cosign's default), so the statement must name this digest.
+          say "the provenance, subject check on"
+          run cosign verify-attestation --type slsaprovenance1 "${identity[@]}" "${SPIKE_IMAGE}@${INDEX}"
+          decoded; note "cosign provenance of the index from the two-subject statement with the subject check on"
+          run cosign verify-attestation --type slsaprovenance1 "${identity[@]}" "${SPIKE_IMAGE}@${AMD64}"
+          decoded; note "cosign provenance of the amd64 manifest from the two-subject statement with the subject check on"
+          say "the control: an identity that did not sign"
+          run cosign verify-attestation --type slsaprovenance1 \
+            --certificate-oidc-issuer "${OIDC_ISSUER}" --certificate-identity "${signer}-not" \
+            "${SPIKE_IMAGE}@${INDEX}"
+          note "cosign provenance with an identity that did not sign"
+
+      - name: kyverno, the unpacked copy
+        if: always()
+        env:
+          INDEX: ${{ steps.subjects.outputs.index }}
+          AMD64: ${{ steps.subjects.outputs.amd64 }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          set -uo pipefail
+          . "${RUNNER_TEMP}/lib.sh"
+          say "kyverno $(kyverno version 2>/dev/null | head -1)"
+          # ADR 0005 measured that the `Cosign` shape finds nothing in a
+          # bundle. Here there is no bundle: the provenance is a layer of the
+          # attestation manifest that shape reads, so it is read through the
+          # shape the catalogue's policy already uses, with the five
+          # expectations of criterion 2.28 as conditions (a key is read from
+          # inside the predicate, no `predicate.` prefix: the sixth run).
+          pod() { # <digest>
+            cat > "${RUNNER_TEMP}/pod.yaml" <<EOF
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: spike
+          spec:
+            containers:
+              - name: spike
+                image: ${SPIKE_IMAGE}@$1
+          EOF
+          }
+          keyless() { # <indent> <field> <value>
+            local pad; pad=$(printf '%*s' "$1" '')
+            printf '%s- keyless:\n%s    %s: "%s"\n%s    issuer: %s\n%s    rekor:\n%s      url: https://rekor.sigstore.dev\n' \
+              "$pad" "$pad" "$2" "$3" "$pad" "${OIDC_ISSUER}" "$pad" "$pad"
+          }
+          conditions() { # <ref>
+            cat <<EOF
+                        conditions:
+                          - all:
+                              - key: "{{ runDetails.builder.id }}"
+                                operator: Equals
+                                value: "${signer}"
+                              - key: "{{ buildDefinition.buildType }}"
+                                operator: Equals
+                                value: "https://actions.github.io/buildtypes/workflow/v1"
+                              - key: "{{ buildDefinition.externalParameters.workflow.repository }}"
+                                operator: Equals
+                                value: "https://github.com/${GITHUB_REPOSITORY}"
+                              - key: "{{ buildDefinition.externalParameters.workflow.path }}"
+                                operator: Equals
+                                value: ".github/workflows/slsa-spike.yml"
+                              - key: "{{ buildDefinition.externalParameters.workflow.ref }}"
+                                operator: Equals
+                                value: "$1"
+          EOF
+          }
+          head_() { # <policy name>
+            cat <<EOF
+          apiVersion: kyverno.io/v1
+          kind: ClusterPolicy
+          metadata:
+            name: $1
+          spec:
+            validationFailureAction: Enforce
+            background: false
+            rules:
+              - name: provenance
+                match:
+                  any:
+                    - resources:
+                        kinds: [Pod]
+                verifyImages:
+          EOF
+          }
+          apply() { kyverno apply "${RUNNER_TEMP}/policy.yaml" --resource "${RUNNER_TEMP}/pod.yaml" </dev/null; }
+
+          row() { # <label> <identity> <ref>: the provenance entry alone
+            {
+              head_ slsa-spike
+              printf '        - type: Cosign\n          imageReferences: ["%s*"]\n          attestations:\n            - type: https://slsa.dev/provenance/v1\n              attestors:\n                - entries:\n' "${SPIKE_IMAGE}"
+              keyless 20 subject "$2"
+              conditions "$3"
+            } > "${RUNNER_TEMP}/policy.yaml"
+            printf '\n%s (`subject: %s`, ref `%s`):\n' "$1" "$2" "$3" >> "$GITHUB_STEP_SUMMARY"
+            run apply
+            note "kyverno $1"
+          }
+
+          # The amd64 manifest's attestation manifest holds the provenance
+          # and nothing else; the index's holds an SBOM and a VEX document
+          # beside it. Each with the pass and one control.
+          say "the amd64 manifest, the provenance entry alone"
+          pod "${AMD64}"
+          row "amd64 exact identity and the five expectations" "${signer}" "${GITHUB_REF}"
+          row "amd64 a ref that was not built" "${signer}" refs/heads/main
+          say "the index, the provenance entry alone"
+          pod "${INDEX}"
+          row "index exact identity and the five expectations" "${signer}" "${GITHUB_REF}"
+          row "index a ref that was not built" "${signer}" refs/heads/main
+
+          # The catalogue's rendered policy as it would read in `required`
+          # mode: the signature, the SBOM, exactly one VEX, and the provenance
+          # with its expectations, all in one rule and one layout.
+          whole() { # <ref>
+            {
+              head_ slsa-spike-whole
+              printf '        - imageReferences: ["%s*"]\n          attestors:\n            - entries:\n' "${SPIKE_IMAGE}"
+              keyless 16 subject "${signer}"
+              printf '          attestations:\n            - type: https://spdx.dev/Document\n              attestors:\n                - entries:\n'
+              keyless 20 subject "${signer}"
+              printf '            - type: https://openvex.dev/ns\n              attestors:\n                - count: 1\n                  entries:\n'
+              keyless 20 subject "${signer}"
+              printf '            - type: https://slsa.dev/provenance/v1\n              attestors:\n                - entries:\n'
+              keyless 20 subject "${signer}"
+              conditions "$1"
+            } > "${RUNNER_TEMP}/policy.yaml"
+          }
+          say "the catalogue's policy shape with the provenance entry added"
+          whole "${GITHUB_REF}"
+          sed -n '1,200p' "${RUNNER_TEMP}/policy.yaml"
+          run apply
+          note "kyverno whole policy with signature SBOM VEX and provenance"
+          whole refs/heads/main
+          run apply
+          note "kyverno whole policy with a ref that was not built"
+
+      - name: gh attestation verify, from GitHub's store
+        if: always()
+        env:
+          INDEX: ${{ steps.subjects.outputs.index }}
+          AMD64: ${{ steps.subjects.outputs.amd64 }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          set -uo pipefail
+          . "${RUNNER_TEMP}/lib.sh"
+          say "gh $(gh --version | head -1)"
+          workflow=(--repo "${GITHUB_REPOSITORY}" --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/slsa-spike.yml" --predicate-type https://slsa.dev/provenance/v1)
+          run verified "${INDEX}" --owner "${GITHUB_REPOSITORY_OWNER}"
+          note "gh attestation verify the index by owner"
+          run verified "${INDEX}" "${workflow[@]}"
+          note "gh attestation verify the index by repository and signer workflow"
+          run verified "${AMD64}" --owner "${GITHUB_REPOSITORY_OWNER}"
+          note "gh attestation verify the amd64 manifest by owner"
+          run verified "${AMD64}" "${workflow[@]}"
+          note "gh attestation verify the amd64 manifest by repository and signer workflow"
+          say "what the store holds, one statement so far"
+          run stored "${INDEX}"
+          note "attestation store entries for the index after one attest"
+          run stored "${AMD64}"
+          note "attestation store entries for the amd64 manifest after one attest"
+
+      # The index alone, a second time: the store then holds two statements
+      # naming the index and one naming the amd64 manifest. That is what a
+      # release leaves when its attest step ran twice for one digest, and the
+      # store's answer for it is the fixture of the unpack's slice on several
+      # statements for one digest (plan 2.4.21).
+      - name: attest the index alone, a second time
+        id: att_again
+        if: always()
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.SPIKE_IMAGE }}
+          subject-digest: ${{ steps.subjects.outputs.index }}
+          push-to-registry: false
+
+      - name: the index with two statements in the store
+        if: always()
+        env:
+          INDEX: ${{ steps.subjects.outputs.index }}
+          AMD64: ${{ steps.subjects.outputs.amd64 }}
+          AGAIN: ${{ steps.att_again.outputs.bundle-path }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          set -uo pipefail
+          . "${RUNNER_TEMP}/lib.sh"
+          say "the second attest's bundle file"
+          run shape "${AGAIN}"
+          note "the second attest's bundle file"
+          say "what the store holds now"
+          run stored "${INDEX}"
+          note "attestation store entries for the index after the second attest"
+          run stored "${AMD64}"
+          note "attestation store entries for the amd64 manifest after the second attest"
+          say "gh attestation verify with two statements naming the index"
+          run verified "${INDEX}" --repo "${GITHUB_REPOSITORY}" --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/slsa-spike.yml" --predicate-type https://slsa.dev/provenance/v1
+          note "gh attestation verify the index with two statements in the store"
+          # The way back for a lost layer: the unpack fed with the store's
+          # answer instead of the action's file. The spike's script takes the
+          # first statement that names the digest; the log index it prints
+          # says which of the two that was.
+          say "the unpack from the store's answer"
+          gh api "repos/${GITHUB_REPOSITORY}/attestations/${INDEX}" > "${RUNNER_TEMP}/store-index.json"
+          run scripts/spike-unpack-provenance.py "${RUNNER_TEMP}/store-index.json" "${SPIKE_IMAGE}" "${INDEX}" "${RUNNER_TEMP}/chain.pem"
+          note "unpack the index from the store's answer with two statements"
+          run cosign verify-attestation --type slsaprovenance1 "${identity[@]}" "${SPIKE_IMAGE}@${INDEX}"
+          decoded; note "cosign provenance of the index after the unpack from the store"
+          gh api "repos/${GITHUB_REPOSITORY}/attestations/${AMD64}" > "${RUNNER_TEMP}/store-amd64.json"
+          run scripts/spike-unpack-provenance.py "${RUNNER_TEMP}/store-amd64.json" "${SPIKE_IMAGE}" "${AMD64}" "${RUNNER_TEMP}/chain.pem"
+          note "unpack the amd64 manifest from the store's answer"
+          run cosign verify-attestation --type slsaprovenance1 "${identity[@]}" "${SPIKE_IMAGE}@${AMD64}"
+          decoded; note "cosign provenance of the amd64 manifest after the unpack from the store"
+
+      - name: what the owner deletes afterwards
+        if: always()
+        run: |
+          printf '\n## what the owner deletes afterwards\n\npackage `slsa-spike`: versions tagged `run-%s`, the signature and the attestation manifests of this run, and the earlier runs (task 18.2, 1.3)\n' "$GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
