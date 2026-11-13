@@ -159,6 +159,7 @@ keyless, every other read is unchanged, and no bundle tag exists.
 | the statement's `predicateType` (`https://slsa.dev/provenance/v1`) | layer annotation `predicateType` |
 | `verificationMaterial.certificate.rawBytes` | layer annotation `dev.sigstore.cosign/certificate` (PEM) |
 | `verificationMaterial.tlogEntries[0]`: `canonicalizedBody`, `integratedTime`, `logIndex`, `logId.keyId` (as hex), `inclusionPromise.signedEntryTimestamp` | layer annotation `dev.sigstore.cosign/bundle` (`{"SignedEntryTimestamp":…,"Payload":{"body":…,"integratedTime":…,"logIndex":…,"logID":…}}`) |
+| not in the bundle: the certificates between the signing certificate and the root (Fulcio's intermediate, then its root) | layer annotation `dev.sigstore.cosign/chain` (PEM), added 2026-11-13: Kyverno 1.19.2 needs it, cosign 2.6.5 does not (see the confirming runs below) |
 
 The log entry is of kind `dsse` 0.0.1 in the first Rekor log
 (`rekor.sigstore.dev`) and carries an inclusion promise (the log's signed
@@ -207,9 +208,121 @@ same `.att` manifest.
   handed over as files (`SIGSTORE_ROOT_FILE`, `SIGSTORE_REKOR_PUBLIC_KEY`,
   `SIGSTORE_CT_LOG_PUBLIC_KEY_FILE`, taken from the public `trusted_root.json`).
   A runner fetches them itself.
-- Not measured: the subject check passing (the spike package is private and
-  cannot be pulled here; only the refusal of a different image is measured);
-  the unpack on ghcr.io; Kyverno 1.19.2 admitting on the unpacked copy through
-  the policy's existing `Cosign` attestation entries with the five
-  expectations; `gh attestation verify` against the store with
+- Not measured on 2026-11-12, measured on 2026-11-13 (next section): the
+  subject check passing, the unpack on ghcr.io, Kyverno 1.19.2 admitting on
+  the unpacked copy through the policy's `Cosign` attestation entries with
+  the five expectations, `gh attestation verify` against the store with
   `push-to-registry: false`.
+
+## The confirming runs on ghcr.io (measured 2026-11-13, the owner's go)
+
+Question: does the unpack hold in the real environment, that is on ghcr.io,
+with the image-match check on, and with Kyverno 1.19.2 reading the unpacked
+copy through the same kind of policy entry the catalogue publishes?
+
+Answer: yes, with one addition to the unpack. The layer must also carry the
+certificate chain annotation; without it Kyverno 1.19.2 drops the layer.
+With it, cosign 2.6.5, Kyverno 1.19.2 and `gh attestation verify` all accept
+the provenance and every control is refused.
+
+Two runs of the spike workflow on the branch of #401 (never merges), package
+`ghcr.io/mm-weber/slsa-spike`, the action
+`actions/attest-build-provenance` v4.2.2 with `push-to-registry: false`:
+
+| Run | Commit | Index digest | amd64 digest | What it changed |
+|---|---|---|---|---|
+| 43402932545 | 1914d1e | `sha256:e0656208…` | `sha256:05e38835…` | the unpack as recorded on 2026-11-12 (no chain annotation) |
+| 43404580566 | dfc2ccf | `sha256:b2f80574…` | `sha256:9a6571b2…` | the chain annotation, as the one variable |
+
+Signer of both: `https://github.com/mm-weber/dhc-pipeline/.github/workflows/slsa-spike.yml@refs/pull/401/merge`.
+
+### What both runs agree on
+
+| Read | Result |
+|---|---|
+| the action's bundle file (`bundle-path`) | one line per attest step, bundle v0.3, log entry `dsse` 0.0.1, signed entry timestamp and inclusion proof present, no RFC 3161 timestamp |
+| the unpack from the action's file (index) and from the attestation store (amd64) | both write the layer; the envelope hashes to the logged value (log index 3851334446 and 3851335188 in the second run) |
+| tags beside the digests | `.sig` and `.att` of the index, `.att` of the amd64 manifest, the run tag; no bundle tag (`MANIFEST_UNKNOWN`) |
+| cosign 2.6.5 `verify`, `verify-attestation --type spdxjson`, `--type openvex` (keyless) | exit 0, VEX A read back |
+| cosign 2.6.5 `verify-attestation --type slsaprovenance1`, keyless, the subject check on | exit 0 on the index and on the amd64 manifest; builder and ref `refs/pull/401/merge` read back |
+| control: an identity that did not sign | exit 1, `none of the expected identities matched` |
+| `gh attestation verify --bundle-from-oci` | exit 1, `no attestations found in the OCI registry` (expected: nothing is pushed as a bundle) |
+| `GET /repos/mm-weber/dhc-pipeline/attestations/<index digest>` | one entry, `https://slsa.dev/provenance/v1` |
+| `cosign attest --replace --type openvex` with VEX B beside the provenance | `Replacing attestation predicate: https://openvex.dev/ns`, `Not replacing` for SPDX and provenance; VEX B read back; the provenance still verifies |
+| a second unpack of the same digest | replaces the one provenance layer (3 layers before, 3 after); it verifies again |
+
+### Kyverno 1.19.2 and the chain annotation
+
+First run, no chain annotation: every provenance row of the `Cosign` shape
+exits 1 with `attestions not found for predicate type
+https://slsa.dev/provenance/v1`, the correct identity and the controls alike;
+the catalogue-shaped policy fails only at its provenance attestation
+(signature, SBOM and VEX pass).
+
+Root cause, read in the sources before anything was changed:
+
+- Kyverno v1.19.2 links the cosign v3.1.2 library (`go.mod`). Its verifier
+  (`pkg/image/verifiers/cpol/cosign/cosign.go`, `buildCosignOptions`) takes
+  Fulcio's roots (`sigstoretuf.FulcioRoots()`) and throws the intermediates
+  away; `IntermediateCerts` is never set.
+- cosign v3.1.2 (`pkg/cosign/verify.go`, `verifyInternal`) then takes the
+  intermediates from the layer's `dev.sigstore.cosign/chain` annotation, and
+  from nowhere else. A layer without it cannot be chained to the root.
+- `VerifyImageAttestation` drops a failing layer without a word when another
+  layer of the manifest verifies, so the provenance layer never reaches the
+  type match and Kyverno reports "not found".
+- The cosign 2.6.5 command line takes the intermediates from its own trust
+  root, which is why it never needed the annotation. The layers cosign
+  itself writes (SBOM, VEX) carry it (two certificates).
+
+Second run, the annotation as the one variable (the chain is the one of the
+`.sig` layer cosign wrote for the same digest: `CN=sigstore-intermediate`,
+then `CN=sigstore`; `openssl verify` of GitHub's provenance certificate
+against it: OK):
+
+| Kyverno row (`Cosign` shape, keyless `subject`, the five conditions) | Result |
+|---|---|
+| amd64, provenance alone, no chain annotation | exit 1, `no matching attestations: cert verification failed: x509: certificate signed by unknown authority` |
+| amd64, the same layer written again with the chain annotation | exit 0, pass |
+| index, exact identity and the five expectations | exit 0, pass |
+| index, a ref that was not built (`refs/heads/main`) | exit 1, `attestation checks failed` |
+| index, an identity that did not sign | exit 1, `subject mismatch` |
+| index, wildcard identity (`https://github.com/mm-weber/dhc-pipeline/*`) | exit 0, pass |
+| whole policy: signature, SBOM, VEX (count 1), provenance with the five expectations | exit 0, pass |
+| whole policy with a ref that was not built | exit 1, fails at the provenance attestation only |
+
+The five expectations are read from inside the predicate (ADR 0005):
+`runDetails.builder.id`, `buildDefinition.buildType`,
+`buildDefinition.externalParameters.workflow.repository`, `.path`, `.ref`.
+
+cosign 2.6.5 reads the layer with and without the annotation (index with,
+amd64 without, both exit 0).
+
+### `gh attestation verify` against the store
+
+Second run, asked as `--format json`: by owner (`--owner mm-weber`) and by
+repository and signer workflow, both exit 0; predicate type
+`https://slsa.dev/provenance/v1`, signer and ref as above. GitHub's own
+verification is untouched by the unpack, because the store keeps the bundle.
+
+### What this adds to the design and what stays open
+
+- The unpack writes five things, not four: the chain annotation is part of
+  it. The annotation is a hint for the reader, never trust: the reader's
+  roots stay its own, a wrong chain only makes the layer fail.
+- Source of the chain, to be decided in the 18.3 plan: the `.sig` layer
+  cosign wrote for the same digest (measured), or the public trusted root's
+  `certificateAuthorities[].certChain` (not measured).
+- Not measured: admission in a cluster (the rows are `kyverno apply` on the
+  runner, as in ADR 0005); Trivy on the ghcr.io copy (measured locally on
+  2026-11-12 only); a catalogue image and the rescan's reattest path.
+
+### Detours
+
+- The first run's titles with a comma were cut short (a comma ends the title
+  of a workflow notice), and its two `gh attestation verify` store notices
+  never appeared (cause not found; the second run asks for JSON and strips
+  non-ASCII, and they appear). Neither touches the design.
+- The owner's go named one confirming run. The second run was made on the
+  same never-merging branch to measure the root cause as one variable
+  rather than to state it from the sources alone.

@@ -421,8 +421,28 @@ left of the program is the follow-up list below, one decision each.
         ends with Rekor v2 or cosign v4. Proposed: path (1) with the
         unpack (the action with `push-to-registry: false`, its bundle
         unpacked beside the digest), so Req 2.27 and 2.28 hold as
-        written. Open: one confirming run on the #401 branch (ghcr.io,
-        the subject check, Kyverno on the unpacked copy), the owner's go.
+        written. The owner's go for the confirming run came on
+        2026-11-13.
+        Measured 2026-11-13 on the #401 branch (same record, the
+        confirming runs section; runs 43402932545 and 43404580566,
+        commits 1914d1e and dfc2ccf): on ghcr.io the unpack works from
+        the action's bundle file and from the attestation store; cosign
+        2.6.5 verifies the provenance with the subject check on (index
+        and amd64); `--replace` leaves it alone; `gh attestation verify`
+        against the store passes by owner and by repository and signer
+        workflow. Kyverno 1.19.2 refused the first run's layer: it takes
+        the intermediate certificate only from the layer's
+        `dev.sigstore.cosign/chain` annotation (root cause read in
+        Kyverno v1.19.2 and cosign v3.1.2 sources). With the annotation
+        written (the second run, the one variable) Kyverno admits
+        through the `Cosign` entries with the five expectations, alone
+        and in the catalogue-shaped policy, and refuses a wrong ref and
+        a wrong identity. So the unpack writes the chain annotation too.
+        Still open inside 18.3: the source of the chain (the `.sig`
+        layer, measured, or the public trusted root, not measured);
+        admission in a cluster; a catalogue image and the rescan's
+        reattest path. Waiting: the owner's yes or no to path (1) with
+        the unpack.
   - [ ] The owner's cleanup after ADR 0005 merges: delete the package
         `ghcr.io/mm-weber/slsa-spike` (six image tags, twelve bundle tags;
         the workspace token cannot); #401 to be shut unmerged; delete branch
