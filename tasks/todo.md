@@ -457,6 +457,14 @@ left of the program is the follow-up list below, one decision each.
         phase 2 rewritten slice by slice. Waiting: the owner's approval
         of the amendment and the plan; then the pull request with a
         TL;DR, the owner merges.
+  - [x] Critical review of the design before approval (2026-11-13, the
+        owner's request; one read-only reviewer): the idea held (trust,
+        the shared `.att` manifest, the envelope bytes); six gaps in how
+        it is tested and operated, taken into the plan's phase 2 the same
+        day at the owner's yes (its "Revised 2026-11-13" block). The
+        owner's call: `report` keeps withholding a release whose
+        provenance cannot be produced; both scripts get retries and
+        thorough tests.
   - [ ] 18.3 by the plan's phase 2, each step after the owner's go:
     - [ ] 2.1 one measuring run on #401: one statement naming the index
           and a platform manifest (`subject-checksums`), unpacked beside
@@ -465,13 +473,27 @@ left of the program is the follow-up list below, one decision each.
     - [ ] 2.2 the mode in `release-policy.sh` (six slices, and the
           policy file by hand)
     - [ ] 2.3 `attestations: write`, both sides, held by the existing lint
-    - [ ] 2.4 `scripts/unpack-provenance.sh` (nineteen slices)
-    - [ ] 2.5 `scripts/check-provenance.sh verify` (ten slices)
-    - [ ] 2.6 the release steps in `build.yml`, the suites in `validate.yml`
-    - [ ] 2.7 the action's pin read by the Renovate test
+    - [ ] 2.4 `scripts/unpack-provenance.sh`, modes `store` and
+          `subjects` (twenty-eight slices: retries, the attestation
+          store's answer, the last one against the real crane and cosign)
+    - [ ] 2.5 `scripts/check-provenance.sh verify` (thirteen slices:
+          retries, the last one against the real cosign)
+    - [ ] 2.6 the release steps in `build.yml`, the three suites in
+          `validate.yml`, the way out written into the manual
+    - [ ] 2.7 the action's pin read by the Renovate test; a bump merged
+          by hand and watched
     - [ ] 2.8 the refactor commit
-    - [ ] the first release on main and the next rescan read
-  - [ ] The owner's cleanup, after plan task 2.1's run is read: delete the
+    - [ ] the first pushed, the first scheduled and the first dispatched
+          release read; Kyverno on the first released digest (one run of
+          the spike workflow, the owner's go); the next rescan read
+  - [ ] Candidate, the owner's idea of 2026-11-13, not started: reshape
+        the pipeline into local composite actions where a group of steps
+        is one unit (the provenance trio a first candidate). Its own
+        track: the lints (`lint-release-steps.sh`,
+        `lint-workflow-policy.sh`) read `build.yml`'s steps and would
+        have to follow a `uses: ./...` step into the action first.
+  - [ ] The owner's cleanup, after Kyverno's read of the first released
+        digest (the spike workflow serves it once more): delete the
         package `ghcr.io/mm-weber/slsa-spike` (the workspace token cannot);
         #401 to be shut unmerged; delete branch `slsa-spike`.
 - [ ] Kyverno's `kyverno.io/v1` ClusterPolicy is deprecated (seen by 18.2,
