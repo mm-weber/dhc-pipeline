@@ -1,6 +1,6 @@
 # ADR 0005: What verifies the platform's SLSA provenance
 
-Date: 2026-11-11 · Status: **accepted** (spike measured 2026-11-11, runs 43025700201 to 43033859220) · Requirements: Req 2.25, 2.27, 2.28, 2.29, 9.13; design Decision 15; task 18.2 · Leaves ADR 0003's cosign major gate untouched
+Date: 2026-11-11 · Status: **accepted** (spike measured 2026-11-11, runs 43025700201 to 43033859220), **amended 2026-11-13** (the bundle is unpacked into cosign's attestation layout; decision 1 superseded, see the amendment below) · Requirements: Req 2.25, 2.27, 2.28, 2.29, 9.13; design Decision 15; task 18.2 · Leaves ADR 0003's cosign major gate untouched
 
 ## Context
 
@@ -132,6 +132,47 @@ source at v1.19.2 and is in the record; none changes the design.
   measured in that kind only. When to migrate is not this decision's to
   settle; it is an open item in `tasks/todo.md`.
 
+## Amendment (2026-11-13): the bundle is unpacked into cosign's attestation layout
+
+Task 18.3's exploration found on 2026-11-11 what this spike had not asked: a
+Sigstore bundle beside a digest makes cosign 2.6.5 read bundles only, so that
+digest's `.sig` and `.att` disappear for it
+([`data/cosign-bundle-coexistence-2026-11-11.md`](../../data/cosign-bundle-coexistence-2026-11-11.md)).
+The spike's scratch image carried nothing else, which is why it did not show.
+The owner decided on 2026-11-13 (design Decision 15's amendment of that day):
+the action runs with `push-to-registry: false`, and
+`scripts/unpack-provenance.sh` stores its bundle's envelope, certificate, log
+entry and certificate chain as one more layer of the digest's
+`sha256-<hex>.att` manifest. Measured on ghcr.io with the tools at this
+repository's pins, runs 43402932545 and 43404580566 on #401. What that
+changes in this record:
+
+| Above | Now |
+|---|---|
+| Decision 1: a second `verifyImages` entry of `type: SigstoreBundle` | Superseded. The existing `Cosign` entry reads the unpacked layer: where the mode is `required` it gains a third attestation, type `https://slsa.dev/provenance/v1`, with the build workflow's identity and the five expectations as conditions (the same keys). Measured: admitted alone and in the catalogue-shaped policy; a ref that was not built and an identity that did not sign are refused |
+| Decision 2: cosign 2.6.5 and one `jq -e` step | Stands, the command unchanged. cosign now reads the layer from `.att`, with its subject check on |
+| Decision 3: cosign stays on v2 | Stands |
+| Decision 4: `gh attestation verify` is not the documented step | Stands. Measured in addition: against GitHub's attestation store it passes by owner and by repository and signer workflow; `--bundle-from-oci` finds nothing, as intended |
+| Decision 6: subjects | The index and each platform manifest, as before. One statement names them all (the action's `subject-checksums`), measured end to end before the release step is written; one statement per subject is the measured fallback |
+| Consequence "the rendering gains an entry, not a row" | Reversed: a row in the existing entry's attestations, rendered when the mode is `required` |
+| Consequence "`subject` is exact for the bundle type" | Moot: the `Cosign` type is used. The declared identity stays exact |
+| Consequences "each attested digest gains one tag, `sha256-<hex>`" and "verification depends on that tag" | No such tag exists. The provenance depends on the `.att` tag the other attestations depend on |
+| Consequence "`check-attestation-count.sh` and `reattest.sh` cannot touch it" | They share the `.att` manifest with it and leave it alone: the count selects OpenVEX layers by predicate type, the re-attestation replaces by type. Measured for OpenVEX: `cosign attest --replace --type openvex` keeps the provenance layer; a second unpack replaces its own layer and adds none |
+
+One finding is new. Kyverno 1.19.2 takes the certificates between the signing
+certificate and the root only from the layer's `dev.sigstore.cosign/chain`
+annotation: it sets the roots and never the intermediates (read in its source
+and in cosign v3.1.2, which it links). Without the annotation it reports the
+attestation as not found; with it, it admits. cosign 2.6.5 on the command
+line does not need it. The unpack therefore writes it, copied from a layer
+cosign wrote into the same manifest and checked to have issued the signing
+certificate.
+
+Limits of the route, accepted with the decision: the layer is written by this
+repository's script, not by cosign; the route ends with a log that issues no
+signed entry timestamp (Rekor v2, refused by name) or with a cosign major
+that removes the old layout (announced for v4).
+
 ## Confirmed later, not by this spike
 
 - The release values in the table above are derived, not observed: the spike
@@ -149,3 +190,6 @@ bundle tags), twelve attestations for its digests in this repository's
 attestation store, pull request #401 and branch `slsa-spike`. The workspace
 token cannot delete package versions; the package is the owner's to delete
 (plan task 1.3), and #401 is closed unmerged once this record is merged.
+The two runs of 2026-11-13 added image, `.sig` and `.att` tags to the same
+package and attestations to the store; #401 stays open, never merged, until
+the measurement of plan task 2.1 is read.

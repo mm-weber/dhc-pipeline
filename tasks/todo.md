@@ -371,18 +371,131 @@ left of the program is the follow-up list below, one decision each.
       major gate is not triggered. Spec amended 2026-11-11 at the owner's
       call: one provenance mode (`release.provenance`: `off`, `report`,
       `required`; Req 2.30), built with 18.3; no new secret, nothing paid
-      on a public repository. Next: 18.3, provenance in the release path,
-      by TDD (ask first).
-  - [ ] The owner's open call (asked 2026-11-11): whether BuildKit's
-        unsigned provenance stays attached once the platform's is live.
-        Dropping it amends Req 2.2, 2.10, 2.25 and Decision 15;
-        `package-set-diff.sh` names its timestamps as the reason a
-        rebuild's index digest differs from the published one (not
-        measured whether dropping it makes them equal).
-  - [ ] The owner's cleanup after ADR 0005 merges: delete the package
-        `ghcr.io/mm-weber/slsa-spike` (six image tags, twelve bundle tags;
-        the workspace token cannot); #401 to be shut unmerged; delete branch
-        `slsa-spike`.
+      on a public repository. Amendment merged 2026-11-11 (#405, 6d9946f);
+      the owner's go for 18.3 the same day. 18.3 was held before its
+      first slice on the bundle finding below; the owner decided on
+      2026-11-13: the bundle is unpacked into the attestation layout.
+  - [x] BuildKit's unsigned provenance stays attached as it is (the
+        owner's call, 2026-11-11). Why it is unsigned, measured on valkey
+        `9-alpine3.23`: `cosign sign --recursive` signs the two attestation
+        manifests that hold it (each has a `.sig`), so its bytes are pinned
+        by the release signature, but the provenance itself is a bare
+        in-toto statement written by BuildKit inside the job, never
+        attested as provenance (no `.att`), so no verifier can ask for it
+        by type and signer.
+  - [x] The owner's call, decided 2026-11-13 (found 2026-11-11 in the exploration for
+        18.3, `data/cosign-bundle-coexistence-2026-11-11.md`): a
+        provenance bundle beside a digest makes cosign 2.6.5 stop reading
+        that digest's `.sig` and `.att`. With 18.3 as specified the
+        comparator would republish every time, the rescan's SBOM fetch
+        would fail, the re-attestation would lose carried-forward VEX
+        silently, and the README's consumer commands would fail or verify
+        the wrong object. Paths: (1) provenance in GitHub's attestation
+        store only (`push-to-registry: false`), no registry bundle: no
+        read changes, but no Kyverno rule for `required` and 2.27's
+        "beside that digest" is amended; (2) every signature and
+        attestation moves to the bundle format first, a migration of its
+        own; (3) cosign pin to v3 (ADR 0003's major gate) with
+        `--new-bundle-format=false` in every old-layout read, consumers
+        on 2.6.x still blind; (4) defer provenance until (2). Whichever
+        is chosen, Decision 15's "untouched" sentence and ADR 0005's
+        consequences are corrected in the same pull request.
+        Measured 2026-11-12 (same record): on bundles `cosign attest
+        --replace` does nothing (2.6.5 and 3.1.2 both keep every
+        document), and Trivy 0.76.1 `--vex oci` finds no VEX in a bundle,
+        so path (2) is not buildable on today's pins; cosign 3.1.2 still
+        writes the old layout with a deprecated flag and replace works
+        there; Trivy is not affected by the mixed layout; a bundle in a
+        sibling repository leaves the image's reads untouched (written
+        and read with cosign 3.1.2 only). cosign 2.6 gets critical fixes
+        only, no end date published; cosign v4 is announced to remove
+        the old layout.
+        The owner ruled out paths (3), (4) and the sibling repository on
+        2026-11-12 (non-starters); the choice is between (1) and (2).
+        Measured the same day at the owner's question (same record, the
+        unpack section): GitHub's real bundle from the attestation store
+        can be unpacked into the old `.att` layout (the envelope byte for
+        byte, certificate and log entry as cosign's annotations); cosign
+        2.6.5 verifies it keyless, every other read is unchanged,
+        `--replace` leaves it alone, Trivy is unaffected, no bundle tag
+        exists. Limits: the manifest is written by our own script; it
+        ends with Rekor v2 or cosign v4. Proposed: path (1) with the
+        unpack (the action with `push-to-registry: false`, its bundle
+        unpacked beside the digest), so Req 2.27 and 2.28 hold as
+        written. The owner's go for the confirming run came on
+        2026-11-13.
+        Measured 2026-11-13 on the #401 branch (same record, the
+        confirming runs section; runs 43402932545 and 43404580566,
+        commits 1914d1e and dfc2ccf): on ghcr.io the unpack works from
+        the action's bundle file and from the attestation store; cosign
+        2.6.5 verifies the provenance with the subject check on (index
+        and amd64); `--replace` leaves it alone; `gh attestation verify`
+        against the store passes by owner and by repository and signer
+        workflow. Kyverno 1.19.2 refused the first run's layer: it takes
+        the intermediate certificate only from the layer's
+        `dev.sigstore.cosign/chain` annotation (root cause read in
+        Kyverno v1.19.2 and cosign v3.1.2 sources). With the annotation
+        written (the second run, the one variable) Kyverno admits
+        through the `Cosign` entries with the five expectations, alone
+        and in the catalogue-shaped policy, and refuses a wrong ref and
+        a wrong identity. So the unpack writes the chain annotation too.
+        Still open inside 18.3: the source of the chain (the `.sig`
+        layer, measured, or the public trusted root, not measured);
+        admission in a cluster; a catalogue image and the rescan's
+        reattest path.
+        Decided 2026-11-13, the owner's yes: path (1) with the unpack.
+        The source of the chain is settled the same day by measurement:
+        every layer cosign wrote into a catalogue `.att` manifest carries
+        the chain annotation (valkey `9-alpine3.23`, index and arm64), so
+        the unpack copies it from a layer of the manifest it edits and
+        checks it against the provenance certificate.
+  - [ ] The amendment of 2026-11-13 (plan task 0.5; branch
+        `provenance-release`): requirements.md 2.27's
+        storage clause and the header's amendment line, Decision 15's
+        amendment, ADR 0005's amendment (no second policy entry),
+        tasks.md 18.1 and 18.3 to 18.5, the track's FR-1, risks and
+        phase 2 rewritten slice by slice. The owner approved the
+        amendment and the revised plan on 2026-11-13; opened as a pull
+        request with a TL;DR, the owner merges.
+  - [x] Critical review of the design before approval (2026-11-13, the
+        owner's request; one read-only reviewer): the idea held (trust,
+        the shared `.att` manifest, the envelope bytes); six gaps in how
+        it is tested and operated, taken into the plan's phase 2 the same
+        day at the owner's yes (its "Revised 2026-11-13" block). The
+        owner's call: `report` keeps withholding a release whose
+        provenance cannot be produced; both scripts get retries and
+        thorough tests.
+  - [ ] 18.3 by the plan's phase 2, each step after the owner's go:
+    - [ ] 2.1 one measuring run on #401: one statement naming the index
+          and a platform manifest (`subject-checksums`), unpacked beside
+          both, verified on both by cosign 2.6.5, Kyverno 1.19.2 and
+          `gh attestation verify`; its bundle becomes the suites' fixture
+    - [ ] 2.2 the mode in `release-policy.sh` (six slices, and the
+          policy file by hand)
+    - [ ] 2.3 `attestations: write`, both sides, held by the existing lint
+    - [ ] 2.4 `scripts/unpack-provenance.sh`, modes `store` and
+          `subjects` (twenty-eight slices: retries, the attestation
+          store's answer, the last one against the real crane and cosign)
+    - [ ] 2.5 `scripts/check-provenance.sh verify` (thirteen slices:
+          retries, the last one against the real cosign)
+    - [ ] 2.6 the release steps in `build.yml`, the three suites in
+          `validate.yml`, the way out written into the manual
+    - [ ] 2.7 the action's pin read by the Renovate test; a bump merged
+          by hand and watched
+    - [ ] 2.8 the refactor commit
+    - [ ] the first pushed, the first scheduled and the first dispatched
+          release read; Kyverno on the first released digest (one run of
+          the spike workflow, the owner's go); the next rescan read
+  - [ ] Candidate, the owner's idea of 2026-11-13, not started: reshape
+        the pipeline into local composite actions where a group of steps
+        is one unit (the provenance trio a first candidate). Its own
+        track: the lints (`lint-release-steps.sh`,
+        `lint-workflow-policy.sh`) read `build.yml`'s steps and would
+        have to follow a `uses: ./...` step into the action first.
+  - [ ] The owner's cleanup, after Kyverno's read of the first released
+        digest (the spike workflow serves it once more): delete the
+        package `ghcr.io/mm-weber/slsa-spike` (the workspace token cannot);
+        #401 to be shut unmerged; delete branch `slsa-spike`.
 - [ ] Kyverno's `kyverno.io/v1` ClusterPolicy is deprecated (seen by 18.2,
       2026-11-11): Kyverno 1.19.2 prints on every `kyverno apply` that the
       kind "will be removed in a future release" in favour of its newer

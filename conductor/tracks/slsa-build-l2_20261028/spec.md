@@ -7,7 +7,7 @@
 **Priority:** high (a stated goal of the catalogue; task group 18 executes before the successor, task 12)
 **Created:** 2026-10-28
 **Author:** the owner, drafted by the agent
-**Spec source:** `.specs/dhc-catalogue-mvp/requirements.md` Req 2.9, 2.10, 2.23, 2.25, 7.7 (amended) and 2.27, 2.28, 2.29, 9.19 (added) by this track's pull request; design Decision 15; `tasks.md` task group 18 and task 12.1's SLSA bullet. Amended 2026-11-11 at the owner's call: one provenance mode (`off`, `report`, `required`) in place of the trigger "required attestations name SLSA provenance", Req 2.30 added (FR-7)
+**Spec source:** `.specs/dhc-catalogue-mvp/requirements.md` Req 2.9, 2.10, 2.23, 2.25, 7.7 (amended) and 2.27, 2.28, 2.29, 9.19 (added) by this track's pull request; design Decision 15; `tasks.md` task group 18 and task 12.1's SLSA bullet. Amended 2026-11-11 at the owner's call: one provenance mode (`off`, `report`, `required`) in place of the trigger "required attestations name SLSA provenance", Req 2.30 added (FR-7). Amended 2026-11-13 at the owner's call: the provenance is stored in the attestation layout the other attestations use, no Sigstore bundle beside a digest (Req 2.27's storage clause, FR-1; ADR 0005 amended)
 
 ### Description
 
@@ -37,12 +37,14 @@ The subject names follow design.md: the CI Pipeline (`build.yml`), the Scan Pipe
 
 ### FR-1: Provenance at release (Req 2.9, 2.27)
 
-WHEN criterion 2.9 attests a pushed digest and the policy file's provenance mode is not off THE CI Pipeline SHALL attest to that digest and to each platform manifest, before the tags, a SLSA provenance attestation (predicate type `https://slsa.dev/provenance/v1`) generated from the build platform's signed workload identity token, signed keyless under the build workflow's identity at refs/heads/main and stored in the declared registry namespace beside that digest; IF that attestation fails THEN THE CI Pipeline SHALL apply no tag and SHALL name the digest.
+WHEN criterion 2.9 attests a pushed digest and the policy file's provenance mode is not off THE CI Pipeline SHALL attest to that digest and to each platform manifest, before the tags, a SLSA provenance attestation (predicate type `https://slsa.dev/provenance/v1`) generated from the build platform's signed workload identity token, signed keyless under the build workflow's identity at refs/heads/main and stored in the declared registry namespace beside that digest, in the attestation layout the other attestations use, with no Sigstore bundle beside that digest (amended 2026-11-13); IF that attestation or its storing fails THEN THE CI Pipeline SHALL apply no tag and SHALL name the digest.
 
 **Acceptance criteria:**
 
 - [ ] A release run whose digest and every platform manifest carry the attestation, verified with ADR 0005's verifier against the declared identity and expectations
 - [ ] The builder identity, build type, repository, workflow path, ref and commit in the predicate equal the token's claims (read from the run)
+- [ ] On that released digest cosign 2.6.5 still verifies the signature and every other attestation, and no `sha256-<hex>` tag without a suffix exists (added 2026-11-13)
+- [ ] `unpack-provenance_test.sh` and `check-provenance_test.sh` green: the layer's five parts, the other layers untouched, a second unpack replacing its own layer, each refusal by name with nothing written (added 2026-11-13)
 - [ ] `lint-workflow-policy.sh .` green with `attestations: write` declared; the rescan workflow attests no provenance
 
 ### FR-2: The declaration and the policy rule (Req 2.23, 2.28, 7.7)
@@ -119,7 +121,7 @@ THE Repository SHALL declare in `catalogue-policy.yaml`'s release section one pr
 | Dependency | Type | Status | Notes |
 | --- | --- | --- | --- |
 | The spec amendment | spec | in this pull request | Req 2.9, 2.10, 2.23, 2.25, 7.7 amended; 2.27 to 2.29, 9.19 added; Decision 15; group 18 |
-| The verifier (ADR 0005) | measurement | task 18.2 | Gates 18.3 to 18.5; if only cosign v3 reads the bundle, ADR 0003's major gate is the owner's call first |
+| The verifier (ADR 0005) | measurement | measured 2026-11-11, amended 2026-11-13 | Gates 18.3 to 18.5. cosign 2.6.5 and Kyverno 1.19.2 verify the provenance once it is unpacked into the `.att` layout; ADR 0003's major gate is not triggered |
 | Live drills (task group 16) | track | in progress | No ordering constraint; this track touches no drill input |
 | The successor (task 12) | task | after every implementation task | Flips the requirement on (12.1's SLSA bullet) |
 
@@ -127,9 +129,11 @@ THE Repository SHALL declare in `catalogue-policy.yaml`'s release section one pr
 
 | Risk | Likelihood | Impact | Mitigation |
 | --- | --- | --- | --- |
-| The pinned cosign v2 or Kyverno 1.19.1 cannot read the service's Sigstore bundle | medium | 2.28 and the smoke test need another verifier or cosign v3 | Measured first (18.2); the cosign major is ADR 0003's gate, the owner's call |
+| The pinned cosign v2 or Kyverno 1.19.1 cannot read the service's Sigstore bundle | happened in another shape | Both read it (18.2), but a bundle beside a digest hides that digest's signature and attestations from cosign 2.6.5 (found 2026-11-11) | Decided 2026-11-13: no bundle in the registry; the attestation is unpacked into the `.att` layout (Decision 15's amendment) |
+| The unpack's route ends: GitHub's service moves to a log without signed entry timestamps (Rekor v2), or a cosign major removes the old layout (announced for v4) | medium, no date known | Releases stop before the tags at the unpack or the self-check; nothing is published without provenance while the mode is not `off` | The script refuses such a bundle by name; then every signature and attestation moves to bundles, behind ADR 0003's gate, or the mode goes to `off` meanwhile |
+| One statement naming several subjects is not accepted by a verifier or by GitHub's store per subject | low | The release step needs one attest step per subject | Measured before the step is written (plan 2.1); one statement per subject is measured and is the fallback |
 | The predicate's fields make poor expectations (too specific or too loose) | low | a policy that admits too much or rejects every release | 18.2 records the emitted values; 2.28 fixes the five fields v1.2's step 2 names |
-| A provenance failure blocks releases | low | a definition stays on its previous digest | The 2.26 shape: no tag, the digest named, the previous digest keeps serving |
+| A provenance failure blocks releases, with the mode `report` as with `required` (Req 2.9; the owner's call of 2026-11-13 after the critical review: it stays so, a tagged digest always carries everything) | low for one release, medium on the day the action or the public Sigstore instance changes | a definition stays on its previous digest; a rebuild's fix waits | The 2.26 shape: no tag, the digest named, the previous digest keeps serving, the next scheduled rebuild tries again. Both scripts try a failed registry or verification call three times; the way out (`release.provenance: off` by pull request) is written into the manual (plan 2.6.5); a bump of the action is merged by hand and the next release read (plan 2.7.2) |
 | The repository, or a fork of it, is private on a plan without artifact attestations | low | every release fails at the attestation step, and the consumer step as written does not apply (GitHub's own Sigstore instance keeps no transparency log) | The mode `off` (2.30); GitHub's documentation read 2026-11-11, not measured |
 | The claim drifts above the policy | low | an overclaim | 9.19 forbids it; the security statement is rendered against the policy file in 18.6 |
 
@@ -139,7 +143,8 @@ THE Repository SHALL declare in `catalogue-policy.yaml`'s release section one pr
 - [x] When the requirement binds: the successor's epoch (decided 2026-10-28)
 - [x] One provenance mode with an `off` position, built with task 18.3 (decided 2026-11-11)
 - [ ] The spike's scratch repository name outside the catalogue namespace (drafted: `ghcr.io/mm-weber/slsa-spike`, deleted after ADR 0005)
-- [ ] If 18.2 finds only cosign v3 reads the bundle: lift ADR 0003's major gate, or verify through `gh attestation verify` in the consumer step and Kyverno in the policy
+- [x] If 18.2 finds only cosign v3 reads the bundle: not the case (cosign 2.6.5 reads it); ADR 0003's gate stays shut
+- [x] Where the provenance is stored: unpacked into the `.att` layout beside the digest, no bundle in the registry (decided 2026-11-13, after paths 3, 4 and the sibling repository were ruled out on 2026-11-12)
 
 ## References
 
