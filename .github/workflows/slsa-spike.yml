@@ -12,7 +12,9 @@ name: slsa spike
 # Reused once for task 18.3 (the owner's go of 2026-11-13): the same scratch
 # image, attested with `push-to-registry: false`, and the bundle written beside
 # the digest in the layout cosign v2 reads. See the comment above the attest
-# steps. The package is deleted after this run.
+# steps. A second run of it repeats the Kyverno read with the layer's chain
+# annotation written (the first run's layer had none and Kyverno dropped it
+# unread). The package is deleted after that run.
 #
 # Two triggers, because a workflow_dispatch is only offered for a workflow that
 # exists on the default branch, and this one deliberately never lands there: the
@@ -156,7 +158,7 @@ jobs:
           cat > "${RUNNER_TEMP}/lib.sh" <<'EOF'
           say() { printf '\n## %s\n\n' "$1" | tee -a "$GITHUB_STEP_SUMMARY"; }
           run() { printf '```\n$ %s\n' "$*" >> "$GITHUB_STEP_SUMMARY"; "$@" >"${RUNNER_TEMP}/out" 2>&1; rc=$?; sed -n '1,40p' "${RUNNER_TEMP}/out" | cut -c1-600 >> "$GITHUB_STEP_SUMMARY"; printf '\n(exit %s)\n```\n' "$rc" >> "$GITHUB_STEP_SUMMARY"; sed -n '1,20p' "${RUNNER_TEMP}/out" | cut -c1-600; echo "(exit $rc)"; }
-          note() { local body; body=$(sed -n '1,30p' "${RUNNER_TEMP}/out" | cut -c1-300); body="${body//'%'/%25}"; body="${body//$'\r'/%0D}"; body="${body//$'\n'/%0A}"; echo "::notice title=$1 (exit ${rc})::${body}"; }
+          note() { local body; body=$(sed -n '1,30p' "${RUNNER_TEMP}/out" | LC_ALL=C tr -cd '\11\12\40-\176' | cut -c1-300); body="${body//'%'/%25}"; body="${body//$'\r'/%0D}"; body="${body//$'\n'/%0A}"; echo "::notice title=${1//,/} (exit ${rc})::${body}"; }
           # cosign prints each verified envelope as one line; what decides is
           # what its statement says, so the line is replaced by that.
           decoded() {
@@ -170,7 +172,7 @@ jobs:
             mv "$f.decoded" "$f"
           }
           att() { echo "sha256-${1#sha256:}.att"; }
-          layers() { crane manifest "${SPIKE_IMAGE}:$(att "$1")" | jq -c '[.layers[] | {type: .annotations.predicateType, certificate: (.annotations["dev.sigstore.cosign/certificate"] != null), logEntry: (.annotations["dev.sigstore.cosign/bundle"] != null)}]'; }
+          layers() { crane manifest "${SPIKE_IMAGE}:$(att "$1")" | jq -c '[.layers[] | {type: .annotations.predicateType, certificate: (.annotations["dev.sigstore.cosign/certificate"] != null), chain: (.annotations["dev.sigstore.cosign/chain"] != null), logEntry: (.annotations["dev.sigstore.cosign/bundle"] != null)}]'; }
           signer="https://github.com/${GITHUB_WORKFLOW_REF}"
           identity=(--certificate-oidc-issuer "${OIDC_ISSUER}" --certificate-identity "${signer}")
           EOF
@@ -216,18 +218,45 @@ jobs:
           shape() { echo "path: ${BUNDLES}"; echo "lines: $(wc -l < "${BUNDLES}")"; jq -c '{mediaType, entry: .verificationMaterial.tlogEntries[0].kindVersion, signedEntryTimestamp: (.verificationMaterial.tlogEntries[0].inclusionPromise != null), inclusionProof: (.verificationMaterial.tlogEntries[0].inclusionProof != null), timestamps: ((.verificationMaterial.timestampVerificationData.rfc3161Timestamps // []) | length)}' "${BUNDLES}"; }
           run shape
           note "the action's bundle file"
-          say "unpack the index's provenance from the action's bundle file"
-          run scripts/spike-unpack-provenance.py "${BUNDLES}" "${SPIKE_IMAGE}" "${INDEX}"
-          note "unpack index from the action's file"
+          # GitHub's bundle carries the signing certificate alone. Kyverno
+          # 1.19.2 keeps the trust root's roots and drops its intermediates
+          # (buildCosignOptions), so the only place it finds the certificate
+          # between the two is a layer's chain annotation; the first
+          # confirming run's layer had none and was dropped unread. cosign
+          # wrote that annotation on the signature a step ago, from the same
+          # certificate authority, so it is taken from there, and the
+          # provenance certificate is checked against it before it is used.
+          say "the chain annotation of the signature layer, and the provenance certificate against it"
+          chain() {
+            local d="${RUNNER_TEMP}" n
+            crane manifest "${SPIKE_IMAGE}:sha256-${INDEX#sha256:}.sig" | jq -r '.layers[0].annotations["dev.sigstore.cosign/chain"]' > "$d/chain.pem"
+            n=$(grep -c 'BEGIN CERTIFICATE' "$d/chain.pem")
+            echo "certificates in the signature layer's chain annotation: ${n}"
+            awk -v d="$d" '/BEGIN CERTIFICATE/ {n++} {print > (d "/chain-" n ".pem")}' "$d/chain.pem"
+            for i in $(seq 1 "$n"); do openssl x509 -in "$d/chain-$i.pem" -noout -subject; done
+            head -1 "${BUNDLES}" | jq -r '.verificationMaterial.certificate.rawBytes' | base64 -d | openssl x509 -inform DER -out "$d/leaf.pem"
+            openssl x509 -in "$d/leaf.pem" -noout -issuer
+            : > "$d/between.pem"
+            for i in $(seq 1 "$((n - 1))"); do cat "$d/chain-$i.pem" >> "$d/between.pem"; done
+            openssl verify -no_check_time -CAfile "$d/chain-$n.pem" -untrusted "$d/between.pem" "$d/leaf.pem"
+          }
+          run chain
+          note "the chain annotation and the provenance certificate against it"
+          say "unpack the index's provenance from the action's bundle file, with the chain annotation"
+          run scripts/spike-unpack-provenance.py "${BUNDLES}" "${SPIKE_IMAGE}" "${INDEX}" "${RUNNER_TEMP}/chain.pem"
+          note "unpack index from the action's file with the chain annotation"
           if [ "$rc" -ne 0 ]; then
             gh api "repos/${GITHUB_REPOSITORY}/attestations/${INDEX}" > "${RUNNER_TEMP}/store-index.json"
-            run scripts/spike-unpack-provenance.py "${RUNNER_TEMP}/store-index.json" "${SPIKE_IMAGE}" "${INDEX}"
-            note "unpack index from the attestation store, the file having failed"
+            run scripts/spike-unpack-provenance.py "${RUNNER_TEMP}/store-index.json" "${SPIKE_IMAGE}" "${INDEX}" "${RUNNER_TEMP}/chain.pem"
+            note "unpack index from the attestation store after the file failed"
           fi
-          say "unpack the amd64 manifest's provenance from the attestation store"
+          # The amd64 manifest's layer is first written the way the first
+          # confirming run wrote it, without the annotation: its attestation
+          # manifest holds nothing else, so Kyverno has to say why it refuses.
+          say "unpack the amd64 manifest's provenance from the attestation store, without the chain annotation"
           gh api "repos/${GITHUB_REPOSITORY}/attestations/${AMD64}" > "${RUNNER_TEMP}/store-amd64.json"
           run scripts/spike-unpack-provenance.py "${RUNNER_TEMP}/store-amd64.json" "${SPIKE_IMAGE}" "${AMD64}"
-          note "unpack amd64 from the attestation store"
+          note "unpack amd64 from the attestation store without the chain annotation"
 
       - name: what sits beside the digests
         if: always()
@@ -271,19 +300,22 @@ jobs:
           # is on (cosign's default), so the statement must name this digest.
           say "the provenance, subject check on"
           run cosign verify-attestation --type slsaprovenance1 "${identity[@]}" "${SPIKE_IMAGE}@${INDEX}"
-          decoded; note "cosign provenance of the index, subject check on"
+          decoded; note "cosign provenance of the index with its chain annotation and the subject check on"
           run cosign verify-attestation --type slsaprovenance1 "${identity[@]}" "${SPIKE_IMAGE}@${AMD64}"
-          decoded; note "cosign provenance of the amd64 manifest, subject check on"
+          decoded; note "cosign provenance of the amd64 manifest without a chain annotation and the subject check on"
           say "the control: an identity that did not sign"
           run cosign verify-attestation --type slsaprovenance1 \
             --certificate-oidc-issuer "${OIDC_ISSUER}" --certificate-identity "${signer}-not" \
             "${SPIKE_IMAGE}@${INDEX}"
-          note "cosign provenance, identity that did not sign"
+          note "cosign provenance with an identity that did not sign"
 
       - name: kyverno, the unpacked copy
         if: always()
         env:
           INDEX: ${{ steps.subjects.outputs.index }}
+          AMD64: ${{ steps.subjects.outputs.amd64 }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
           set -uo pipefail
@@ -295,7 +327,8 @@ jobs:
           # shape the catalogue's policy already uses, with the five
           # expectations of criterion 2.28 as conditions (a key is read from
           # inside the predicate, no `predicate.` prefix: the sixth run).
-          cat > "${RUNNER_TEMP}/pod.yaml" <<EOF
+          pod() { # <digest>
+            cat > "${RUNNER_TEMP}/pod.yaml" <<EOF
           apiVersion: v1
           kind: Pod
           metadata:
@@ -303,8 +336,9 @@ jobs:
           spec:
             containers:
               - name: spike
-                image: ${SPIKE_IMAGE}@${INDEX}
+                image: ${SPIKE_IMAGE}@$1
           EOF
+          }
           keyless() { # <indent> <field> <value>
             local pad; pad=$(printf '%*s' "$1" '')
             printf '%s- keyless:\n%s    %s: "%s"\n%s    issuer: %s\n%s    rekor:\n%s      url: https://rekor.sigstore.dev\n' \
@@ -351,24 +385,40 @@ jobs:
           }
           apply() { kyverno apply "${RUNNER_TEMP}/policy.yaml" --resource "${RUNNER_TEMP}/pod.yaml" </dev/null; }
 
-          # The provenance entry alone, one variable at a time.
-          while IFS='|' read -r label shape field value ref; do
+          row() { # <label> <identity> <ref>: the provenance entry alone
             {
               head_ slsa-spike
-              printf '        - type: %s\n          imageReferences: ["%s*"]\n          attestations:\n            - type: https://slsa.dev/provenance/v1\n              attestors:\n                - entries:\n' "$shape" "${SPIKE_IMAGE}"
-              keyless 20 "$field" "$value"
-              conditions "$ref"
+              printf '        - type: Cosign\n          imageReferences: ["%s*"]\n          attestations:\n            - type: https://slsa.dev/provenance/v1\n              attestors:\n                - entries:\n' "${SPIKE_IMAGE}"
+              keyless 20 subject "$2"
+              conditions "$3"
             } > "${RUNNER_TEMP}/policy.yaml"
-            printf '\n%s (shape `%s`, `%s: %s`, ref `%s`):\n' "$label" "$shape" "$field" "$value" "$ref" >> "$GITHUB_STEP_SUMMARY"
+            printf '\n%s (`subject: %s`, ref `%s`):\n' "$1" "$2" "$3" >> "$GITHUB_STEP_SUMMARY"
             run apply
-            note "kyverno ${label}"
-          done <<EOF
-          cosign shape exact identity and the five expectations|Cosign|subject|${signer}|${GITHUB_REF}
-          cosign shape a ref that was not built|Cosign|subject|${signer}|refs/heads/main
-          cosign shape identity that did not sign|Cosign|subject|${signer}-not|${GITHUB_REF}
-          cosign shape wildcard identity|Cosign|subject|https://github.com/${GITHUB_REPOSITORY}/*|${GITHUB_REF}
-          bundle shape with no bundle in the registry|SigstoreBundle|subject|${signer}|${GITHUB_REF}
-          EOF
+            note "kyverno $1"
+          }
+
+          # The one variable. The amd64 manifest's attestation manifest holds
+          # the provenance and nothing else, so a layer cosign's library
+          # refuses is not dropped in silence beside layers that pass: the
+          # refusal reaches the message. Then the same layer with the chain
+          # annotation and nothing else changed.
+          say "the amd64 manifest, the provenance alone, without and with the chain annotation"
+          pod "${AMD64}"
+          row "amd64 provenance alone without the chain annotation" "${signer}" "${GITHUB_REF}"
+          rechain() { scripts/spike-unpack-provenance.py "${RUNNER_TEMP}/store-amd64.json" "${SPIKE_IMAGE}" "${AMD64}" "${RUNNER_TEMP}/chain.pem"; }
+          run rechain
+          note "unpack amd64 again with the chain annotation"
+          row "amd64 provenance alone with the chain annotation" "${signer}" "${GITHUB_REF}"
+
+          # The index, whose layer carries the annotation: the pass and its
+          # controls. (The `SigstoreBundle` shape finding no bundle here was
+          # measured in the first confirming run and is not repeated.)
+          say "the index, the provenance entry alone"
+          pod "${INDEX}"
+          row "index exact identity and the five expectations" "${signer}" "${GITHUB_REF}"
+          row "index a ref that was not built" "${signer}" refs/heads/main
+          row "index identity that did not sign" "${signer}-not" "${GITHUB_REF}"
+          row "index wildcard identity" "https://github.com/${GITHUB_REPOSITORY}/*" "${GITHUB_REF}"
 
           # The catalogue's rendered policy as it would read in `required`
           # mode: the signature, the SBOM, exactly one VEX, and the provenance
@@ -391,10 +441,10 @@ jobs:
           whole "${GITHUB_REF}"
           sed -n '1,200p' "${RUNNER_TEMP}/policy.yaml"
           run apply
-          note "kyverno whole policy, signature SBOM VEX and provenance"
+          note "kyverno whole policy with signature SBOM VEX and provenance"
           whole refs/heads/main
           run apply
-          note "kyverno whole policy, a ref that was not built"
+          note "kyverno whole policy with a ref that was not built"
 
       - name: gh attestation verify, from GitHub's store
         if: always()
@@ -406,12 +456,16 @@ jobs:
           set -uo pipefail
           . "${RUNNER_TEMP}/lib.sh"
           say "gh $(gh --version | head -1)"
-          run gh attestation verify "oci://${SPIKE_IMAGE}@${INDEX}" --owner "${GITHUB_REPOSITORY_OWNER}"
-          note "gh attestation verify from the store, by owner"
-          run gh attestation verify "oci://${SPIKE_IMAGE}@${INDEX}" --repo "${GITHUB_REPOSITORY}" \
+          # The first confirming run's two notices for these reads never
+          # arrived (the cause was not found; the text answer carries a check
+          # mark), so the answer is asked for as JSON and said in one line.
+          verified() { gh attestation verify "oci://${SPIKE_IMAGE}@${INDEX}" "$@" --format json | jq -c '[.[] | .verificationResult | {predicateType: .statement.predicateType, signer: .signature.certificate.subjectAlternativeName, ref: .signature.certificate.sourceRepositoryRef}]'; }
+          run verified --owner "${GITHUB_REPOSITORY_OWNER}"
+          note "gh attestation verify from the store by owner"
+          run verified --repo "${GITHUB_REPOSITORY}" \
             --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/slsa-spike.yml" \
             --predicate-type https://slsa.dev/provenance/v1
-          note "gh attestation verify from the store, repository and signer workflow"
+          note "gh attestation verify from the store by repository and signer workflow"
           say "the control: the registry holds no bundle"
           run gh attestation verify "oci://${SPIKE_IMAGE}@${INDEX}" --owner "${GITHUB_REPOSITORY_OWNER}" --bundle-from-oci
           note "gh attestation verify from the registry"
@@ -445,7 +499,7 @@ jobs:
           decoded; note "cosign provenance after the replace"
           say "the unpack a second time, from the attestation store"
           gh api "repos/${GITHUB_REPOSITORY}/attestations/${INDEX}" > "${RUNNER_TEMP}/store-index.json"
-          run scripts/spike-unpack-provenance.py "${RUNNER_TEMP}/store-index.json" "${SPIKE_IMAGE}" "${INDEX}"
+          run scripts/spike-unpack-provenance.py "${RUNNER_TEMP}/store-index.json" "${SPIKE_IMAGE}" "${INDEX}" "${RUNNER_TEMP}/chain.pem"
           note "unpack index a second time"
           run cosign verify-attestation --type slsaprovenance1 "${identity[@]}" "$ref"
           decoded; note "cosign provenance after the second unpack"

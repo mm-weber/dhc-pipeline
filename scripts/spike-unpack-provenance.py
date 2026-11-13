@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""spike-unpack-provenance.py <bundle file> <repository> <subject digest>
+"""spike-unpack-provenance.py <bundle file> <repository> <subject digest> [<chain file>]
 
 Spike only (task 18.3's confirming run on the never-merging branch); the real
 script is written by TDD once the owner has chosen the path.
@@ -16,6 +16,13 @@ Nothing is signed here and nothing is re-serialised that a signature covers:
   layer        the DSSE envelope, byte for byte as the transparency log hashed it
   annotations  the predicate type, the signing certificate (PEM), the log entry
                with its signed entry timestamp
+<chain file> (PEM, the issuing certificates, root last) becomes the layer's
+chain annotation. GitHub's bundle carries the signing certificate alone; cosign
+2.6.5 takes the certificates between it and the root from its own trust root,
+Kyverno 1.19.2 takes them from this annotation and from nowhere else (the first
+confirming run: without it the layer is dropped unread). It is a hint, never
+trust: the root a verifier accepts stays the verifier's own.
+
 A bundle whose log entry carries no signed entry timestamp (the second Rekor
 log issues none) cannot be carried by this layout and is refused by name.
 
@@ -73,7 +80,7 @@ def pick(path, subject):
     die(f"no {PROVENANCE} bundle in {path} names {subject}")
 
 
-def layer(bundle):
+def layer(bundle, chain=None):
     env = bundle["dsseEnvelope"]
     if len(env.get("signatures", [])) != 1:
         die("the envelope carries more or fewer than one signature")
@@ -109,6 +116,8 @@ def layer(bundle):
         "predicateType": PROVENANCE,
         "dev.sigstore.cosign/certificate": pem,
         "dev.sigstore.cosign/bundle": json.dumps(rekor, separators=(",", ":"))}}
+    if chain:
+        desc["annotations"]["dev.sigstore.cosign/chain"] = chain
     return raw, desc, int(t["logIndex"])
 
 
@@ -179,10 +188,15 @@ class _Redirect(urllib.request.HTTPRedirectHandler):
 
 
 def main():
-    if len(sys.argv) != 4 or not sys.argv[3].startswith("sha256:"):
-        die("usage: spike-unpack-provenance.py <bundle file> <repository> <subject digest>")
+    if len(sys.argv) not in (4, 5) or not sys.argv[3].startswith("sha256:"):
+        die("usage: spike-unpack-provenance.py <bundle file> <repository> <subject digest> [<chain file>]")
     path, repository, subject = sys.argv[1:4]
-    raw, desc, log_index = layer(pick(path, subject))
+    chain = None
+    if len(sys.argv) == 5:
+        chain = open(sys.argv[4], encoding="utf-8").read().strip() + "\n"
+        if chain.count("-----BEGIN CERTIFICATE-----") < 1:
+            die(f"{sys.argv[4]} holds no certificate")
+    raw, desc, log_index = layer(pick(path, subject), chain)
     reg = Registry(repository)
     tag = "sha256-" + subject.split(":", 1)[1] + ".att"
     r = reg.call("GET", f"{reg.base}/manifests/{tag}", accept=MANIFEST, missing_ok=True)
@@ -211,7 +225,9 @@ def main():
     print(f"envelope {desc['digest']} hashes to the logged value, log index {log_index}")
     print(f"layers before {before}, provenance layers replaced {replaced}, layers now {len(man['layers'])}:")
     for l in man["layers"]:
-        print(f"  {l.get('annotations', {}).get('predicateType')}")
+        a = l.get("annotations", {})
+        certs = a.get("dev.sigstore.cosign/chain", "").count("-----BEGIN CERTIFICATE-----")
+        print(f"  {a.get('predicateType')} (chain annotation: {certs} certificates)")
 
 
 if __name__ == "__main__":
