@@ -450,13 +450,13 @@ left of the program is the follow-up list below, one decision each.
         the unpack copies it from a layer of the manifest it edits and
         checks it against the provenance certificate.
   - [ ] The amendment of 2026-11-13 (plan task 0.5; branch
-        `provenance-release`, local, not pushed): requirements.md 2.27's
+        `provenance-release`): requirements.md 2.27's
         storage clause and the header's amendment line, Decision 15's
         amendment, ADR 0005's amendment (no second policy entry),
         tasks.md 18.1 and 18.3 to 18.5, the track's FR-1, risks and
-        phase 2 rewritten slice by slice. Waiting: the owner's approval
-        of the amendment and the plan; then the pull request with a
-        TL;DR, the owner merges.
+        phase 2 rewritten slice by slice. The owner approved the
+        amendment and the revised plan on 2026-11-13; opened as a pull
+        request with a TL;DR, the owner merges.
   - [x] Critical review of the design before approval (2026-11-13, the
         owner's request; one read-only reviewer): the idea held (trust,
         the shared `.att` manifest, the envelope bytes); six gaps in how
