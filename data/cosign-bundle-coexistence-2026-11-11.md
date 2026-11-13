@@ -379,3 +379,92 @@ for. Not measured: cosign and Kyverno end to end on a statement with several
 subjects, and GitHub's attestation store answering for each subject digest.
 The 18.3 plan measures both on the never-merging #401 branch before the
 release step is written; one statement per subject is the measured fallback.
+
+## One statement for every subject (measured 2026-11-13, plan task 2.1, the owner's go)
+
+Question: is one statement that names the index and a platform manifest
+accepted on each of the two digests by the three verifiers, and what does
+GitHub's attestation store answer once a digest has two statements?
+
+Answer: yes on both digests with all three verifiers, and every control is
+refused. The release therefore needs one attest step, whatever the number of
+platforms; the fallback (one statement per subject) is not needed. The store
+answers per subject digest and lists the newest statement first.
+
+One run of the spike workflow on the branch of #401 (never merges), package
+`ghcr.io/mm-weber/slsa-spike`, `actions/attest-build-provenance` v4.2.2 with
+`subject-checksums` (two lines, bare hex digest, one space, the repository)
+and `push-to-registry: false`:
+
+| Run | Commit | Index digest | amd64 digest |
+|---|---|---|---|
+| 43507882508 | 7e74982 | `sha256:c47ac86f0e71…` | `sha256:ac78223352dc…` |
+
+Signer: `https://github.com/mm-weber/dhc-pipeline/.github/workflows/slsa-spike.yml@refs/pull/401/merge`,
+event `pull_request`.
+
+### What the action wrote
+
+| Read | Result |
+|---|---|
+| the file behind the output `bundle-path` | 1 line, media type `application/vnd.dev.sigstore.bundle.v0.3+json`, entry `dsse` 0.0.1, signed entry timestamp and inclusion proof present, log index 3862518718 |
+| the statement's subjects | 2: the index and the amd64 manifest |
+| the signature layer's chain annotation | 2 certificates (`sigstore-intermediate`, `sigstore`); `openssl verify` of the provenance certificate against it: OK |
+| the bundle tag `sha256-<hex>` of the index | does not exist (`MANIFEST_UNKNOWN`): nothing was pushed by the action |
+
+### The same statement beside both digests
+
+The spike's unpack stored the one envelope
+(`sha256:d218cc260849…`, hashing to the logged value) as a layer of each
+digest's `.att` manifest, chain annotation included: the index went from 2
+layers (SPDX, OpenVEX) to 3, the amd64 manifest from none to 1.
+
+| Verifier | Index | amd64 manifest | Control |
+|---|---|---|---|
+| cosign 2.6.5 `verify-attestation --type slsaprovenance1`, subject check on | exit 0, the statement lists both subjects | exit 0, the same statement | an identity that did not sign: exit 1 |
+| Kyverno 1.19.2 `kyverno apply`, `Cosign` entry, the five expectations | pass | pass | a ref that was not built: exit 1 on each digest |
+| Kyverno 1.19.2, the catalogue-shaped policy (signature, SBOM, one VEX, provenance) | pass | not applicable (the index carries the catalogue's attestations) | a ref that was not built: exit 1 |
+| `gh attestation verify` against the store, by owner and by repository plus signer workflow | exit 0 both ways, one result with 2 subjects | exit 0 both ways, the same result | none run |
+
+The index's signature, SBOM and VEX still verify with cosign 2.6.5 (exit 0
+each) with the provenance layer beside them.
+
+### The store with two statements for one digest
+
+A later step attested the index alone a second time (1 line, 1 subject, log
+index 3862535824).
+
+| Read | Result |
+|---|---|
+| `GET /repos/{owner}/{repo}/attestations/{digest}` for the index after one attest | 1 entry: 2 subjects, integrated time 1794604098, log index 3862518718 |
+| the same for the amd64 manifest after one attest | the same 1 entry |
+| the index after the second attest | 2 entries, the newer first: 1 subject, integrated time 1794604165, log index 3862535824; then the two-subject entry |
+| the amd64 manifest after the second attest | still the 1 entry |
+| `gh attestation verify` on the index with two statements present | exit 0, two results (1 subject and 2 subjects) |
+| the spike's unpack fed from the store's answer for the index | took the first entry, the newer single-subject statement (envelope `sha256:3adf9583f063…`), replaced the 1 provenance layer, 3 layers; cosign exit 0 with the index as the only subject |
+| the same for the amd64 manifest | replaced 1, 1 layer, log index 3862518718; cosign exit 0 |
+
+### What this settles for the plan
+
+- The release attests once with `subject-checksums` (the index and every
+  platform manifest); `unpack-provenance.sh subjects` writes those lines
+  (slices 2.4.26 and 2.4.27).
+- Slice 2.4.21's rule, "the newest is stored" (integrated time, then log
+  index), agrees with what the store returned: the newer statement came
+  first and had the higher integrated time and log index. The production
+  script sorts and does not rely on the store's order.
+- The store's two answers were read again after the run through the same
+  API path, unchanged in shape (each entry: `bundle`, `bundle_url`,
+  `initiator`, `repository_id`). They are the suites' fixtures: the amd64
+  manifest's answer with one statement, the index's with two; the chain is
+  the signature layer's annotation. They enter the repository with the first
+  slice that reads them.
+
+### Not measured
+
+- Events other than `pull_request` (the plan's residual checks on the first
+  pushed, scheduled and dispatched release).
+- More than two subjects in one statement; the action's source allows up
+  to 1024.
+- Admission in a cluster and a catalogue image (unchanged from the sections
+  above).
