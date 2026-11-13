@@ -28,6 +28,7 @@ release:
   fail_closed: false
   publish_policy: on-change
   page: true
+  provenance: report
   schedule: &build_cron "47 4 * * *"
   platforms:
     - linux/amd64
@@ -48,6 +49,7 @@ expect "public" 0 0 "$("$RP" "$SB" public)" "true"
 [ "$("$RP" "$SB" schedule)" = "47 4 * * *" ] && pass "schedule" || fail "schedule" "$("$RP" "$SB" schedule 2>&1)"
 [ "$("$RP" "$SB" platforms | paste -sd,)" = "linux/amd64,linux/arm64" ] && pass "platforms, one per line" || fail "platforms" "$("$RP" "$SB" platforms 2>&1)"
 [ "$("$RP" "$SB" page)" = "true" ] && pass "page (Req 6.61)" || fail "page" "$("$RP" "$SB" page 2>&1)"
+[ "$("$RP" "$SB" provenance)" = "report" ] && pass "provenance (Req 2.30)" || fail "provenance" "$("$RP" "$SB" provenance 2>&1)"
 out=$("$RP" "$SB" check 2>&1); rc=$?
 expect "check passes a well-formed section, naming the values" 0 "$rc" "$out" "fail_closed=false" "publish_policy=on-change" "page=true" "2 platform(s)"
 
