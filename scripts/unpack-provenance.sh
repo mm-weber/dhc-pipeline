@@ -18,12 +18,18 @@
 # The chain annotation (the Sigstore certificates that issued the bundle's
 # certificate; Kyverno reads the intermediate from there and nowhere else) is
 # copied character for character from the first layer of the pulled manifest
-# that carries one.
+# that carries one, read before any layer is taken out.
 # The manifest is pulled as an OCI layout with crane, gets the layer appended
 # and is pushed back to the same tag. Its config is rewritten with the layer,
 # the way cosign writes it: the layer's digest one more entry of
 # rootfs.diff_ids, one more entry of history, every other field as it was; the
 # manifest names the new config blob by its digest and its byte size.
+# A second unpack replaces its own layer: every layer of the statement's
+# predicate type that is already there is taken out before the new one is
+# appended, with its digest in rootfs.diff_ids and its history entry, so a
+# re-run release never stacks statements (cosign attest --replace leaves this
+# layer alone). The layers of other predicate types stay as they were, in
+# their order; the new layer goes last.
 set -euo pipefail
 USAGE="usage: unpack-provenance.sh store <bundles> <repository> <digest>"
 # $1 is the mode, store, the only one there is
@@ -63,22 +69,34 @@ mv "$DIR/envelope" "$BLOBS/$layer"
 # digests in rootfs.diff_ids and one history entry per layer
 old=$(jq -r '.manifests[0].digest' "$DIR/index.json")
 oldconfig=$(jq -r '.config.digest' "$BLOBS/${old#sha256:}")
-jq -c --arg digest "sha256:$layer" \
-  '.rootfs.diff_ids += [$digest] | .history += [{created: "0001-01-01T00:00:00Z"}]' "$BLOBS/${oldconfig#sha256:}" > "$DIR/config"
+# the layers of the statement's predicate type that are already there (an
+# earlier unpack's), as their positions in the manifest: they are taken out of
+# the manifest and the config by position, because the history entries are
+# all alike and cannot be told apart by value
+stale=$(jq -c --arg predicate "$predicate" \
+  '[.layers | to_entries[] | select(.value.annotations.predicateType == $predicate) | .key]' "$BLOBS/${old#sha256:}")
+jq -c --arg digest "sha256:$layer" --argjson stale "$stale" \
+  'del(.rootfs.diff_ids[$stale[]], .history[$stale[]])
+   | .rootfs.diff_ids += [$digest] | .history += [{created: "0001-01-01T00:00:00Z"}]' "$BLOBS/${oldconfig#sha256:}" > "$DIR/config"
 config=$(sha256sum < "$DIR/config" | cut -d' ' -f1)
 csize=$(wc -c < "$DIR/config")
 mv "$DIR/config" "$BLOBS/$config"
 
-# the manifest with the layer appended and the new config named, as a new
-# blob the index points at. The chain is copied inside jq: through a shell
-# variable it would lose its closing newline
+# the manifest without the stale layers, with the layer appended and the new
+# config named, as a new blob the index points at. The chain is copied inside
+# jq: through a shell variable it would lose its closing newline; and it is
+# read from the layers as they were pulled, a stale layer may be the only one
+# that carries it
 jq -c --arg digest "sha256:$layer" --argjson size "$lsize" --arg predicate "$predicate" \
   --arg certificate "$certificate" --arg entry "$entry" --arg config "sha256:$config" --argjson csize "$csize" \
-  '.config.digest = $config | .config.size = $csize
+  --argjson stale "$stale" \
+  'first(.layers[].annotations."dev.sigstore.cosign/chain" | strings) as $chain
+   | .config.digest = $config | .config.size = $csize
+   | del(.layers[$stale[]])
    | .layers += [{mediaType: "application/vnd.dsse.envelope.v1+json", size: $size, digest: $digest,
                   annotations: {predicateType: $predicate, "dev.cosignproject.cosign/signature": "",
                                 "dev.sigstore.cosign/certificate": ($certificate + "\n"),
-                                "dev.sigstore.cosign/chain": first(.layers[].annotations."dev.sigstore.cosign/chain" | strings),
+                                "dev.sigstore.cosign/chain": $chain,
                                 "dev.sigstore.cosign/bundle": $entry}}]' "$BLOBS/${old#sha256:}" > "$DIR/manifest"
 manifest=$(sha256sum < "$DIR/manifest" | cut -d' ' -f1)
 msize=$(wc -c < "$DIR/manifest")

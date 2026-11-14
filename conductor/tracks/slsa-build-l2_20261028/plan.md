@@ -120,7 +120,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
   - RED: every earlier layer's descriptor (digest, size, media type, annotations) is identical and in the same order; its blob is still in the layout.
 - [x] **2.4.5 The config lists the layers the way cosign writes it**
   - RED: the pushed manifest's config has `rootfs.diff_ids` equal to the layers' digests in order and one history entry per layer.
-- [ ] **2.4.6 A second unpack replaces its own layer**
+- [x] **2.4.6 A second unpack replaces its own layer**
   - RED: a layout that already holds a provenance layer; after the unpack exactly one layer has the provenance predicate type and the other layers are as before (a re-run release never stacks statements; `cosign attest --replace` by type leaves this layer alone, measured).
 - [ ] **2.4.7 One statement serves every digest it names**
   - RED: two digests in one call; two pushes, `sha256-<a>.att` and `sha256-<b>.att`, each carrying the same envelope blob.
