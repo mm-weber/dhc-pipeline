@@ -109,8 +109,8 @@ elif query == "page":
 elif query == "provenance":
     print(provenance())
 elif query == "check":
-    pub, fc, pp, sch, pl, pg = boolean("public"), boolean("fail_closed"), publish_policy(), schedule(), platforms(), boolean("page")
-    print(f"release-policy: public={pub} fail_closed={fc} publish_policy={pp} page={pg} schedule=\"{sch}\" {len(pl)} platform(s): {', '.join(pl)}")
+    pub, fc, pp, sch, pl, pg, prov = boolean("public"), boolean("fail_closed"), publish_policy(), schedule(), platforms(), boolean("page"), provenance()
+    print(f"release-policy: public={pub} fail_closed={fc} publish_policy={pp} page={pg} provenance={prov} schedule=\"{sch}\" {len(pl)} platform(s): {', '.join(pl)}")
 else:
     refuse(f"unknown query '{query}'; one of public, fail-closed, publish-policy, schedule, platforms, page, check")
 PY

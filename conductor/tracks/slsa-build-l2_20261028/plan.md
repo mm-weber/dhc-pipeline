@@ -91,7 +91,7 @@ The suite's `policy` helper gains `provenance: report` with slice 2.2.1 (the RED
   - RED: the `provenance:` line deleted; exit 2; the message names `provenance` and `off, report or required`.
 - [x] **2.2.5 A value outside the three is refused by name**
   - RED: one loop, the shape of the suite's case 2, over `on`, `true`, `enforce`, `Report`, `"report"`; each exit 2 naming `provenance`, the value and `off, report or required`.
-- [ ] **2.2.6 `check` prints the mode and refuses its hole**
+- [x] **2.2.6 `check` prints the mode and refuses its hole**
   - RED: `check` on the well-formed section contains `provenance=report`; with the line deleted, exit 2 naming `provenance`.
 - [ ] **2.2.7 The unknown-query refusal and the usage line name the new query**
   - RED: `release-policy.sh "$SB" colour` and a call with one argument both contain `provenance`.
