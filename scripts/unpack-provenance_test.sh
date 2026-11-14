@@ -342,6 +342,17 @@ fresh; TAG=$(att_tag "$UNKNOWN"); lay_down "$TAG"
 out=$(run store "$DATA/bundle.jsonl" "$REPO" "$UNKNOWN"); rc=$?
 refused "$UNKNOWN" 'no statement' "no statement in the bundles file names the digest"
 
+# 9: refused, the statement naming the digest is of another predicate type: the
+#    unpack stores SLSA provenance v1 and nothing else. The bundles file is the
+#    fixture's bundle with its statement's predicateType set to the SBOM's (the
+#    envelope then no longer matches its signature, which nothing reads before
+#    the type); the digest is named, the manifest is there, so the refusal can
+#    only come from the type, and the error line names the type found
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+jq -c '.dsseEnvelope.payload |= (@base64d | fromjson | .predicateType = "https://spdx.dev/Document" | tojson | @base64)' "$DATA/bundle.jsonl" > "$SB/bundle-spdx.jsonl"
+out=$(run store "$SB/bundle-spdx.jsonl" "$REPO" "$INDEX"); rc=$?
+refused "$INDEX" 'https://spdx\.dev/Document' "the statement naming the digest is of another predicate type, named on the error line"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
