@@ -97,6 +97,9 @@ expect "the page switch takes only true or false" 2 "$rc" "$out" "page is 'yes'"
 fresh; sed -i "/^  page:/d" "$SB/catalogue-policy.yaml"
 out=$("$RP" "$SB" check 2>&1); rc=$?
 expect "check refuses a missing page switch" 2 "$rc" "$out" "page is missing"
+fresh; sed -i "/^  provenance:/d" "$SB/catalogue-policy.yaml"
+out=$("$RP" "$SB" provenance 2>&1); rc=$?
+expect "a missing provenance mode is refused, never defaulted" 2 "$rc" "$out" "provenance is missing" "off, report or required"
 
 # 5: platforms must be a non-empty list of os/arch pairs; the schedule a
 #    five-field cron
