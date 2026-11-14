@@ -127,6 +127,10 @@ out=$("$RP" "$SB/nope" public 2>&1); rc=$?
 expect "no policy file is refused naming the root" 2 "$rc" "$out" "catalogue-policy.yaml"
 out=$("$RP" "$SB" colour 2>&1); rc=$?
 expect "an unknown query is refused" 2 "$rc" "$out" "colour"
+# both places that list the queries name the provenance query (Req 2.30)
+expect "the unknown-query refusal names the provenance query" 2 "$rc" "$out" "provenance"
+out=$("$RP" "$SB" 2>&1); rc=$?
+expect "the usage line names the provenance query" 2 "$rc" "$out" "usage" "provenance"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
