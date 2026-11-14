@@ -10,7 +10,9 @@
 # the digest is taken; a digest no statement there names is refused with one
 # ::error:: line and exit 1, before anything is pulled or pushed for it, and
 # so is a digest whose statement is not SLSA provenance v1, the one predicate
-# type stored here.
+# type stored here, and one whose log entry carries no signed entry timestamp:
+# cosign verifies the entry in this layout by that timestamp, and the layout
+# has no place for the inclusion proof the newer log issues in its stead.
 # One statement serves every digest it names: each digest given gets the
 # layer in its own attestation manifest, one after the other, one pull and
 # one push per digest. Nothing is signed here: the
@@ -66,6 +68,11 @@ for DIGEST in "$@"; do
   # SLSA provenance v1 and nothing else is stored here
   [ "$predicate" = "https://slsa.dev/provenance/v1" ] \
     || refuse "the statement naming the digest is of predicate type ${predicate}, not https://slsa.dev/provenance/v1"
+  # the layout verifies the log entry by its signed entry timestamp: an entry
+  # without one (the newer log issues an inclusion proof only) cannot be stored
+  timestamp=$(jq -r '.verificationMaterial.tlogEntries[0].inclusionPromise.signedEntryTimestamp // ""' <<<"$bundle")
+  [ -n "$timestamp" ] \
+    || refuse "the log entry carries no signed entry timestamp, the attestation layout cannot carry such an entry"
 
   # cosign's annotations: the certificate as PEM, the log entry as JSON text.
   # logIndex is the entry's own, the one the signed entry timestamp covers
