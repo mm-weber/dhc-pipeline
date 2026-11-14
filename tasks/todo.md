@@ -476,7 +476,10 @@ left of the program is the follow-up list below, one decision each.
           `provenance-step`, one failing test before each change; the
           suite at 38 passed; `catalogue-policy.yaml` declares
           `release.provenance: report`
-    - [ ] 2.3 `attestations: write`, both sides, held by the existing lint
+    - [x] 2.3 `attestations: write`, both sides, held by the existing lint:
+          done 2026-11-14; with the line in `catalogue-policy.yaml` alone
+          `lint-workflow-policy.sh .` refuses the release job by name,
+          with the line in `build.yml` too it passes
     - [ ] 2.4 `scripts/unpack-provenance.sh`, modes `store` and
           `subjects` (twenty-eight slices: retries, the attestation
           store's answer, the last one against the real crane and cosign)

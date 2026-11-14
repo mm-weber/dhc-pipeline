@@ -3,7 +3,7 @@
 **Track ID:** slsa-build-l2_20261028
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-10-28
-**Status:** [~] in progress (phase 0 merged 2026-11-10 as #337, 09dcfdf; phase 1 measured 2026-11-11, runs 43025700201 to 43033859220 on #401, recorded in ADR 0005; spec amended 2026-11-11, one provenance mode, Req 2.30; phase 2 held 2026-11-11 on the bundle finding, re-planned 2026-11-13 at the owner's call: the provenance is unpacked into the attestation layout, task 0.5; phase 2 revised the same day after a critical review of the design, the changes listed under phase 2; 0.5 merged 2026-11-13 as #408, ff115e1; 2.1 measured the same day, run 43507882508 on #401: one statement for both subjects is accepted on both digests by all three verifiers; 2.2 the mode built 2026-11-14, slices 2.2.1 to 2.2.7, the suite at 38 passed; next 2.3, the owner's go)
+**Status:** [~] in progress (phase 0 merged 2026-11-10 as #337, 09dcfdf; phase 1 measured 2026-11-11, runs 43025700201 to 43033859220 on #401, recorded in ADR 0005; spec amended 2026-11-11, one provenance mode, Req 2.30; phase 2 held 2026-11-11 on the bundle finding, re-planned 2026-11-13 at the owner's call: the provenance is unpacked into the attestation layout, task 0.5; phase 2 revised the same day after a critical review of the design, the changes listed under phase 2; 0.5 merged 2026-11-13 as #408, ff115e1; 2.1 measured the same day, run 43507882508 on #401: one statement for both subjects is accepted on both digests by all three verifiers; 2.2 the mode built 2026-11-14, slices 2.2.1 to 2.2.7, the suite at 38 passed; 2.3 the release job's permission the same day, the lint red on the policy file alone and green with both; next 2.4, the owner's go)
 
 ## Overview
 
@@ -98,7 +98,7 @@ The suite's `policy` helper gains `provenance: report` with slice 2.2.1 (the RED
 
 #### 2.3 Permissions (by hand; no new test)
 
-- [ ] **2.3.1 `attestations: write` on the release job, both sides.** The existing lint already holds every job's permissions equal to the policy file in both directions (cases 5 and 6 of `lint-workflow-policy_test.sh`), so a new test would repeat them. Shown instead on the real files: `catalogue-policy.yaml` `workflows.build.yml.jobs.release.permissions` gains the line, `scripts/lint-workflow-policy.sh .` red by name; `build.yml`'s release job gains it, green. One commit carrying both.
+- [x] **2.3.1 `attestations: write` on the release job, both sides.** The existing lint already holds every job's permissions equal to the policy file in both directions (cases 5 and 6 of `lint-workflow-policy_test.sh`), so a new test would repeat them. Shown instead on the real files: `catalogue-policy.yaml` `workflows.build.yml.jobs.release.permissions` gains the line, `scripts/lint-workflow-policy.sh .` red by name; `build.yml`'s release job gains it, green. One commit carrying both.
 
 #### 2.4 The unpack (`scripts/unpack-provenance.sh store <bundles> <repository> <digest>...` and `scripts/unpack-provenance.sh subjects <repository> <digest>...`, suite `scripts/unpack-provenance_test.sh`)
 

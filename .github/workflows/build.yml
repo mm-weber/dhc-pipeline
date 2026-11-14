@@ -178,6 +178,7 @@ jobs:
       contents: read
       packages: write   # push to the declared registry namespace
       id-token: write    # cosign keyless (GitHub OIDC)
+      attestations: write # GitHub's provenance statement (Req 2.27, 2.30)
     strategy:
       fail-fast: false
       matrix:

@@ -240,6 +240,7 @@ workflows:
           contents: read
           packages: write
           id-token: write
+          attestations: write # GitHub's provenance statement for a release (Req 2.27, 2.30)
   rescan.yml:
     schedule: "17 6 * * *"
     inputs:
