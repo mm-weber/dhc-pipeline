@@ -22,7 +22,10 @@ att_tag() { printf 'sha256-%s.att' "${1#sha256:}"; } # cosign's attestation tag 
 fresh() {
   SB=$(mktemp -d); mkdir -p "$SB/bin" "$SB/registry" "$SB/pushed"; : > "$SB/crane.log"
   # crane as a directory: pull copies the layout laid down for the tag, push
-  # keeps the layout it was given, every call is logged
+  # keeps the layout it was given, every call is logged. A case that wants
+  # pushes to fail writes their number to $SB/push-failures: while it is above
+  # 0 a push fails the way crane does (a line on stderr, exit 1), keeps nothing
+  # and counts it down by one; with no such file no push fails
   cat > "$SB/bin/crane" <<'STUB'
 #!/usr/bin/env bash
 SB="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,6 +39,11 @@ case "$1" in
     mkdir -p "$dir" && cp -R "$SB/registry/$tag/." "$dir/" ;;
   push) # crane push <dir> <ref>
     dir="${*: -2:1}"; ref="${*: -1}"; tag="${ref##*:}"
+    left=0; [ -f "$SB/push-failures" ] && left=$(cat "$SB/push-failures")
+    if [ "$left" -gt 0 ]; then
+      echo "$((left - 1))" > "$SB/push-failures"
+      echo "Error: PUT https://${ref%%/*}/v2/.../manifests/$tag: unexpected status code 503 Service Unavailable" >&2; exit 1
+    fi
     rm -rf "$SB/pushed/$tag"; mkdir -p "$SB/pushed/$tag" && cp -R "$dir/." "$SB/pushed/$tag/" ;;
   *) echo "stub: unexpected $1" >&2; exit 2 ;;
 esac
@@ -581,6 +589,39 @@ refused "$INDEX" 'chain.*issu.*certificate|certificate.*issu.*chain' "the chain 
 fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG" # no lay_down for the second digest: the registry holds nothing at its .att tag
 out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX" "$AMD64"); rc=$?
 refused "$AMD64" 'attestation manifest.*attestations.*(first|exist)' "the second of two digests has no attestation manifest beside it, nothing is pushed for the first either"
+
+# 18: a push that fails three times fails the run naming the digest: a crane
+#     push that fails is tried again, up to three attempts,
+#     UNPACK_PROVENANCE_RETRY_DELAY seconds apart (0 in this suite, see run),
+#     the shape of fetch-sboms.sh. After the third failure the run ends with
+#     exit 1 and one error line of the unpack's own, which carries the digest,
+#     speaks of the push and names the number of attempts: crane's own words
+#     name a tag and a status, neither the digest nor how often it was tried.
+#     It is the shape of Req 2.26: nothing stored, the digest named, a red run.
+#     The attestation manifest is laid down at the index's .att tag and the
+#     bundles file is the fixture's bundle as it is, so the digest lacks
+#     nothing and is prepared in full: the failure can only come from the
+#     push. Every push fails: the stub's count of the pushes that fail is set
+#     far above any number of attempts. This is no refusal and refused cannot
+#     be used here: the push is called, three times and no more, each call in
+#     the stub's log, and nothing is kept under pushed. The pattern asks for
+#     the push and for the number beside its noun, as a figure or as a word
+#     ("3 attempts", "three times"), before the push or after it: a 3 inside
+#     the digest or the tag does not match
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+echo 99 > "$SB/push-failures" # every push fails
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+errors=$(grep '^::error::' <<<"$out"); count=$(grep -c '^::error::' <<<"$out")
+pushes=$(grep '^crane push' "$SB/crane.log"); calls=$(grep -c '^crane push' "$SB/crane.log")
+kept=$(ls -A "$SB/pushed")
+tried='\b(3|three) (attempts|times|tries)\b'
+[ "$rc" -eq 1 ] && [ "$count" -eq 1 ] && [[ "$errors" == "::error::unpack-provenance:"* ]] && [[ "$errors" == *"$INDEX"* ]] \
+  && grep -Eiq -- "push.*$tried|$tried.*push" <<<"$errors" && [ "$calls" -eq 3 ] && [ -z "$kept" ] \
+  && pass "a push that fails three times: exit 1, one ::error::unpack-provenance: line with the digest, the push and the three attempts, crane push called three times, nothing pushed" \
+  || fail "a push that fails three times: exit 1, one ::error:: line, three crane push calls, nothing pushed" "exit=$rc, wanted 1" \
+       "::error:: lines in the output: $count, wanted one, begun '::error::unpack-provenance:', carrying '$INDEX', speaking of the push and of 3 or three attempts (or times, or tries; any case):" "${errors:-none}" \
+       "crane push calls logged: $calls, wanted 3:" "${pushes:-none}" \
+       "under pushed, wanted nothing: ${kept:-nothing}" "output:" "${out:-none}"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
