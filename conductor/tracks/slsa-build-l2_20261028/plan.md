@@ -152,7 +152,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
   - RED: the stub's pull fails twice and then succeeds; exit 0; three pull calls logged; one `::warning::` line per failed attempt naming the digest.
   - GREEN: the three attempts around `crane pull`, the same delay; after the third failure 2.4.14's refusal.
 - [x] **2.4.25 A refusal from the bundle's content is not tried again** (the chain that did not issue the certificate, 2.4.16's case: one pull logged, no second attempt; a guard if 2.4.24's code already holds it)
-- [ ] **2.4.26 `subjects` writes one line per digest in the shape the action reads**
+- [x] **2.4.26 `subjects` writes one line per digest in the shape the action reads**
   - RED: `subjects ghcr.io/o/r sha256:<a> sha256:<b>` prints exactly `<a> ghcr.io/o/r` and `<b> ghcr.io/o/r`: the bare hex, one space, the repository. (attest v4.2.1 `src/subject.ts`: a line without a space is skipped silently, a digest with its `sha256:` prefix is thrown out as invalid.)
 - [ ] **2.4.27 `subjects` names a digest once and refuses what is not a digest** (the same digest twice prints one line; `sha256:xyz` or a bare tag: exit 2, nothing printed)
 - [ ] **2.4.28 The real tools accept what the script writes** (suite `scripts/provenance-real_test.sh`; the pinned crane and cosign on `PATH`, the suite refusing to run on other versions)

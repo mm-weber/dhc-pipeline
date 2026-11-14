@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # unpack-provenance.sh store <bundles> <repository> <digest>...
+# unpack-provenance.sh subjects <repository> <digest>...
 #
 # GitHub's provenance bundle (written by actions/attest-build-provenance)
 # stored as one more layer of the attestation manifest cosign keeps beside an
@@ -86,17 +87,44 @@
 # failure that is tried again is said with one ::warning:: line naming the
 # digest, the tag whose pull failed and the attempt; after the third failure
 # the digest is refused as one with no attestation manifest to pull (above).
+# The second mode, subjects, writes to stdout what the release job hands to
+# actions/attest-build-provenance as its subject-checksums file: one line per
+# digest, in the order the digests were given, the digest without its sha256:
+# (the 64 hex digits), one space, the repository, and nothing else. The shape
+# is the action's: it skips a line without a space in silence and throws out a
+# digest that keeps its sha256:. The mode reads no bundles file and asks
+# nothing of the registry.
 # A call that is wrong is no refusal of content: a mode that is missing or is
-# not store, no bundles file, repository or digest, a digest that is not
-# sha256: and 64 lowercase hex digits, or a bundles file that is not there
-# ends with the usage line on stderr and exit 2, before anything is read or
-# pulled.
+# neither store nor subjects; for store no bundles file, repository or digest,
+# a digest that is not sha256: and 64 lowercase hex digits, or a bundles file
+# that is not there; for subjects no repository or no digest. Each ends with
+# the usage lines on stderr and exit 2, before anything is read or pulled.
 set -euo pipefail
-# wrong usage: the usage line and exit 2
-usage() { echo "usage: unpack-provenance.sh store <bundles> <repository> <digest>..." >&2; exit 2; }
-# $1 is the mode, store, the only one there is; after it the bundles file, the
-# repository and the digests, at least one
-[ "$#" -ge 4 ] && [ "$1" = "store" ] && [ -n "$3" ] || usage
+# wrong usage: the usage lines, one per mode, and exit 2
+usage() {
+  echo "usage: unpack-provenance.sh store <bundles> <repository> <digest>..." >&2
+  echo "       unpack-provenance.sh subjects <repository> <digest>..." >&2
+  exit 2
+}
+# $1 is the mode, store or subjects (asked as ${1:-}: a call with no argument
+# is wrong usage, not bash's complaint about an unset parameter)
+case "${1:-}" in
+  # after it the bundles file, the repository and the digests, at least one;
+  # the rest of the script is this mode's
+  store) [ "$#" -ge 4 ] && [ -n "$3" ] || usage ;;
+  # after it the repository and the digests, at least one: a line per digest
+  # in the order given, the digest without its sha256:, one space, the
+  # repository; nothing is read and nothing is pulled
+  subjects)
+    [ "$#" -ge 3 ] && [ -n "$2" ] || usage
+    REPO="$2"
+    shift 2
+    for DIGEST in "$@"; do
+      printf '%s %s\n' "${DIGEST#sha256:}" "$REPO"
+    done
+    exit 0 ;;
+  *) usage ;;
+esac
 BUNDLES="$2"
 REPO="$3"
 shift 3
