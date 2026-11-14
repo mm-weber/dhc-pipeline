@@ -439,6 +439,24 @@ jq -c '.verificationMaterial.tlogEntries = []' "$DATA/bundle.jsonl" > "$SB/bundl
 out=$(run store "$SB/bundle-no-entry.jsonl" "$REPO" "$INDEX"); rc=$?
 refused "$INDEX" '(log entries|(one|no) log entry).*GitHub.*Sigstore instance' "the bundle carries no log entry, the likely cause named: GitHub's own Sigstore instance, which keeps no transparency log"
 
+# 14: refused, no attestation manifest beside the digest: the unpack adds its
+#     layer to the attestation manifest cosign wrote for the digest, at the tag
+#     sha256-<hex>.att, and never begins a new one. Where the registry holds no
+#     such manifest the pull fails, and the error line says what is missing and
+#     what has to happen: it speaks of the attestation manifest and says that
+#     the release's other attestations must exist first (crane's own words,
+#     MANIFEST_UNKNOWN: manifest unknown, say neither). Nothing is laid down at
+#     the digest's .att tag, so the stub's pull fails the way crane does on a
+#     missing manifest, each time it is asked; the bundles file is the
+#     fixture's bundle as it is and the digest is named there, so the refusal
+#     can only come from the manifest that is missing. The pattern asks for the
+#     attestation manifest and, after it, the attestations that must exist
+#     first: the timestamp's error line speaks of "the attestation layout" and
+#     does not match
+fresh # no lay_down: the registry holds nothing at the digest's .att tag
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+refused "$INDEX" 'attestation manifest.*attestations.*(first|exist)' "no attestation manifest beside the digest, the release's other attestations must exist first"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
