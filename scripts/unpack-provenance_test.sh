@@ -765,6 +765,55 @@ done
        "the newer statement's envelope, wanted as the one provenance layer: $newer" "the older statement's envelope:                                      $older" \
        "the envelope of the entry of the greater log index, wanted the newer: $indexed" "${found[@]}"
 
+# 22: the attestation store's answer is read like the action's file: the
+#     bundles file is the file the attest action leaves, one bundle per line.
+#     The repair path reads the same bundles from GitHub's attestation store
+#     instead, and the store answers with one JSON object over many lines,
+#     the bundles inside it:
+#     {"attestations":[{"repository_id":...,"bundle_url":...,"initiator":...,"bundle":{...}}]}.
+#     store given that answer as its bundles file does exactly what it does
+#     with the action's file. The fixture store.json is the store's answer
+#     for the amd64 manifest after the measuring run, as the store gave it
+#     but for the query string of its bundle_url, which is cut (a signed
+#     storage link): one attestation, and its bundle is the bundle of
+#     bundle.jsonl. That is asked here as well, both written compact by the
+#     same jq: were they two bundles, the layouts would differ for the
+#     fixtures' reasons. store runs twice, each run in a sandbox of its own,
+#     once with bundle.jsonl and once with store.json, with case 7's two
+#     digests, which the one statement names, and the attestation manifest
+#     laid down the same way at both .att tags. Wanted: both runs exit 0, the
+#     run with the action's file pushes something, and the run with the
+#     store's answer pushes the same, byte for byte: every file under pushed
+#     (both tags' layouts: oci-layout, index.json, every blob) is listed with
+#     its sha256 and its path, sorted by path, and the two listings are the
+#     same, so the same set of paths and the same contents. What the layout
+#     must hold is asked by the cases above; here only that the two files
+#     lead to one layout. One result line for the two runs; on a failure its
+#     detail names each run with what was found
+same=no; [ "$(jq -c '.attestations[].bundle' "$DATA/store.json")" = "$(jq -c . "$DATA/bundle.jsonl")" ] && same=yes
+ran=(); codes=(); layouts=()
+for bundles in "$DATA/bundle.jsonl" "$DATA/store.json"; do
+  fresh; TAG=$(att_tag "$INDEX"); TAG2=$(att_tag "$AMD64"); lay_down "$TAG"; lay_down "$TAG2"
+  out=$(run store "$bundles" "$REPO" "$INDEX" "$AMD64"); rc=$?
+  # every file pushed, as "<sha256>  <its path under pushed>", sorted by path;
+  # nothing when nothing was pushed
+  layout=$(cd "$SB/pushed" && find . -type f -exec sha256sum {} + | LC_ALL=C sort -k2)
+  files=0; [ -z "$layout" ] || files=$(grep -c '' <<<"$layout")
+  codes+=("$rc"); layouts+=("$layout")
+  ran+=("with ${bundles##*/}: exit=$rc, wanted 0; files pushed: $files$([ "$files" -gt 0 ] || echo ", nothing was pushed to any tag")")
+  [ -s "$SB/crane.log" ] && ran+=("$(sed 's/^/  called: /' "$SB/crane.log")") || ran+=("  called: crane never")
+  ran+=("$(sed 's/^/  output: /' <<<"${out:-none}")")
+done
+# the two listings against each other, for the detail lines: only where both
+# runs pushed something
+differ="nothing to compare, a run pushed nothing"
+[ -n "${layouts[0]}" ] && [ -n "${layouts[1]}" ] && differ=$(diff <(printf '%s\n' "${layouts[0]}") <(printf '%s\n' "${layouts[1]}"))
+[ "$same" = yes ] && [ "${codes[0]}" -eq 0 ] && [ "${codes[1]}" -eq 0 ] && [ -n "${layouts[0]}" ] && [ "${layouts[1]}" = "${layouts[0]}" ] \
+  && pass "the attestation store's answer is read like the action's file: store with store.json and with bundle.jsonl, the same two digests, each exit 0, and the layouts pushed are the same, byte for byte (every file under pushed: the same paths, the same sha256)" \
+  || fail "the attestation store's answer is read like the action's file: both runs exit 0, the layouts pushed the same, byte for byte" \
+       "the bundle in store.json is the bundle of bundle.jsonl: $same, wanted yes" "${ran[@]}" \
+       "the listing with bundle.jsonl against the one with store.json (sha256 and path of every file pushed), wanted no difference:" "${differ:-none}"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
