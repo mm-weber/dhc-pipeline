@@ -74,6 +74,16 @@ done
 fresh; sed -i "s/^  publish_policy: on-change/  publish_policy: always/" "$SB/catalogue-policy.yaml"
 [ "$("$RP" "$SB" publish-policy)" = "always" ] && pass "publish_policy: always is accepted" || fail "always accepted"
 
+# 3a: the provenance mode comes back as written, all three positions
+#     (Req 2.30): a bare `off` is a boolean to PyYAML and a string to
+#     mikefarah's yq
+for v in off required; do
+  fresh; sed -i "s/^  provenance: report/  provenance: $v/" "$SB/catalogue-policy.yaml"
+  out=$("$RP" "$SB" provenance 2>&1); rc=$?
+  if [ "$rc" -eq 0 ] && [ "$out" = "$v" ]; then pass "provenance: $v comes back as written"
+  else fail "provenance: $v comes back as written" "exit=$rc, wanted 0 and exactly '$v'" "$out"; fi
+done
+
 # 4: a missing key is a refusal, never a default
 fresh; sed -i "/^  fail_closed:/d" "$SB/catalogue-policy.yaml"
 out=$("$RP" "$SB" fail-closed 2>&1); rc=$?
