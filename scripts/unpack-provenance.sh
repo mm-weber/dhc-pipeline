@@ -7,9 +7,11 @@
 # verifiers reading that layout find the provenance next to the other
 # attestations (Req 2.27). <bundles> is the file the action leaves at its
 # bundle-path: one Sigstore bundle per line; the one whose statement names
-# the digest is taken. One statement serves every digest it names: each
-# digest given gets the layer in its own attestation manifest, one after the
-# other, one pull and one push per digest. Nothing is signed here: the
+# the digest is taken; a digest no statement there names is refused with one
+# ::error:: line and exit 1, before anything is pulled or pushed for it.
+# One statement serves every digest it names: each digest given gets the
+# layer in its own attestation manifest, one after the other, one pull and
+# one push per digest. Nothing is signed here: the
 # layer's blob is the bundle's DSSE envelope in the compact form whose sha256
 # the transparency log recorded (payload, payloadType, the signature; no
 # whitespace, no trailing newline), and its predicateType annotation is the
@@ -41,6 +43,9 @@ REPO="${3:?$USAGE}"
 : "${4:?$USAGE}" # the digests: this one and every argument after it
 shift 3
 
+# a refusal: one ::error:: line naming the digest and the reason, exit 1
+refuse() { echo "::error::unpack-provenance: ${REPO}@${DIGEST}: $1 (Req 2.27)" >&2; exit 1; }
+
 # the working directories, one per digest, all gone on exit
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -54,6 +59,7 @@ for DIGEST in "$@"; do
   # the bundle whose statement names the digest
   bundle=$(jq -c --arg hex "${DIGEST#sha256:}" \
     'select(.dsseEnvelope.payload | @base64d | fromjson | any(.subject[]; .digest.sha256 == $hex))' "$BUNDLES")
+  [ -n "$bundle" ] || refuse "no statement in the bundles file names the digest"
   predicate=$(jq -r '.dsseEnvelope.payload | @base64d | fromjson | .predicateType' <<<"$bundle")
 
   # cosign's annotations: the certificate as PEM, the log entry as JSON text.
