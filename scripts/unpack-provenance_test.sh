@@ -457,6 +457,33 @@ fresh # no lay_down: the registry holds nothing at the digest's .att tag
 out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
 refused "$INDEX" 'attestation manifest.*attestations.*(first|exist)' "no attestation manifest beside the digest, the release's other attestations must exist first"
 
+# 15: refused, no layer of the attestation manifest carries a chain: the
+#     provenance layer's dev.sigstore.cosign/chain is copied from a layer
+#     cosign wrote in the same manifest (case 3), and Kyverno reads the
+#     intermediate certificate from that annotation and from nowhere else. A
+#     manifest none of whose layers carries the annotation leaves nothing to
+#     copy, and the error line says so: it speaks of the layers and the chain
+#     none of them carries. The layout is the one lay_down writes for an SBOM
+#     layer and a vulnerability-report layer, with its manifest rewritten: the
+#     chain annotation deleted from both layers and everything else as it was
+#     (the layers' other annotations, their blobs, the config), the new blob in
+#     the place of the old one, index.json naming it by its digest and its byte
+#     size. The bundles file is the fixture's bundle as it is and the digest is
+#     named there, the manifest is there and is pulled, so the refusal can only
+#     come from the chain that is missing. The pattern asks for the layers and,
+#     after them, the chain ("no layer ... chain"): no other error line speaks
+#     of a chain
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG" "https://spdx.dev/Document" "https://cosign.sigstore.dev/attestation/vuln/v1"
+layout="$SB/registry/$TAG"
+with_chain=$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' "$layout/index.json") # the manifest as lay_down wrote it
+read -r mhex msize < <(manifest_of "$layout" | jq -c 'del(.layers[].annotations."dev.sigstore.cosign/chain")' | put_blob "$layout")
+rm "$layout/blobs/sha256/$with_chain"
+jq -c --arg manifest "sha256:$mhex" --argjson msize "$msize" \
+  '.manifests[0].digest = $manifest | .manifests[0].size = $msize' "$layout/index.json" > "$SB/index.json"
+mv "$SB/index.json" "$layout/index.json"
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+refused "$INDEX" 'no layer.*chain' "no layer of the attestation manifest carries a chain"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
