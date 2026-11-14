@@ -31,7 +31,8 @@
 # then an envelope whose sha256 is not the envelope hash the log entry records:
 # that hash is the one tie between the layer's bytes and the transparency log.
 # One statement serves every digest it names: each digest given gets the
-# layer in its own attestation manifest, one pull and one push per digest.
+# layer in its own attestation manifest, one pull and one push per digest; a
+# digest named more than once is handled once, at its first naming.
 # All or nothing across the digests: every digest is prepared and checked
 # (pulled, its layout rewritten, every refusal above and below passed) before
 # the first push, so a digest that is refused leaves every tag as it was, the
@@ -108,6 +109,8 @@ trap 'rm -rf "$TMP"' EXIT
 # pushes below need per digest, in the order the digests were given
 DIGESTS=() REFS=() DIRS=() LAYERS=()
 for DIGEST in "$@"; do
+  # a digest named more than once is handled once, at its first naming
+  [[ " ${DIGESTS[*]} " != *" $DIGEST "* ]] || continue
   REF="${REPO}:sha256-${DIGEST#sha256:}.att"
   # a working directory of its own per digest: no layout sees another's blobs
   DIR=$(mktemp -d "$TMP/XXXXXX")
