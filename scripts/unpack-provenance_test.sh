@@ -234,6 +234,48 @@ got=$(jq -cS 'del(.history, .rootfs.diff_ids)' <<<"$config" 2>/dev/null)
   && pass "everything else in the config is as it was laid down: architecture, os, created, config, rootfs.type" \
   || fail "the pushed config without history and diff_ids against the one laid down" "pushed:    ${got:-no config to read}" "laid down: $want"
 
+# 6: a second unpack replaces its own layer: a re-run release never stacks
+#    statements. cosign attest --replace replaces by predicate type and leaves
+#    this layer alone (measured), so the unpack replaces its own. Laid down
+#    with an earlier release's provenance layer (another blob than the
+#    fixture's envelope) between an SBOM layer and a vulnerability-report
+#    layer, the manifest pushed carries one provenance layer, the new one and
+#    last, the two others as they were, and the config follows
+slsa="https://slsa.dev/provenance/v1"
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG" "https://spdx.dev/Document" "$slsa" "https://cosign.sigstore.dev/attestation/vuln/v1"
+laid=$(manifest_of "$SB/registry/$TAG")
+stale=$(jq -r '.layers[1].digest' <<<"$laid") # the earlier release's statement, the layer in the middle
+provenance="sha256:$(jq -r '.verificationMaterial.tlogEntries[0].canonicalizedBody' "$DATA/bundle.jsonl" | base64 -d | jq -r '.spec.envelopeHash.value')"
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+pushed="$SB/pushed/$TAG"; manifest=$(manifest_of "$pushed"); config=$(config_of "$pushed")
+layers_words() { jq -r '.layers | to_entries[] | "layer \(.key + 1): \(.value.annotations.predicateType) \(.value.digest)"' 2>/dev/null; } # a manifest's layers for detail lines
+# the layers of the provenance type: one, the envelope the log recorded, and
+# the manifest's last (put where the stale one was, it would be the second)
+got=$(jq -c --arg type "$slsa" '[.layers[] | select(.annotations.predicateType == $type) | .digest]' <<<"$manifest" 2>/dev/null)
+last=$(jq -r '.layers[-1].digest' <<<"$manifest" 2>/dev/null)
+[ "$stale" != "$provenance" ] && [ "$got" = "[\"$provenance\"]" ] && [ "$last" = "$provenance" ] \
+  && pass "one layer of the pushed manifest is SLSA provenance: the new one, the envelope the log recorded, and it is the last layer" \
+  || fail "the pushed manifest's provenance layers: one, the new one, last" "provenance layers pushed: ${got:-none, nothing was pushed to the tag}" "wanted:                   [\"$provenance\"]" "last layer '${last:-none}', wanted the new one" "the stale layer laid down: $stale" "pushed:" "$(layers_words <<<"$manifest")" "exit=$rc" "$out"
+# the layers of any other type against the ones laid down (key-sorted on both
+# sides: the order of an object's keys is free, the order of the layers is not)
+want=$(jq -S --arg type "$slsa" '[.layers[] | select(.annotations.predicateType != $type)]' <<<"$laid")
+got=$(jq -S --arg type "$slsa" '[.layers[] | select(.annotations.predicateType != $type)]' <<<"$manifest" 2>/dev/null)
+[ "$(jq 'map(.digest) | unique | length' <<<"$want")" = 2 ] && [ -n "$got" ] && [ "$got" = "$want" ] \
+  && pass "the other layers are the two laid down around the stale one, descriptor for descriptor and in their order" \
+  || fail "the pushed manifest's layers of any other type against the ones laid down" "pushed, without the provenance type:" "$([ -n "$got" ] && jq -c '.[]?' <<<"$got" | short || echo "nothing was pushed to the tag")" "laid down, without the provenance type:" "$(jq -c '.[]' <<<"$want" | short)"
+# diff_ids against the manifest's own layers: the same digests in the same
+# order, three of them, the stale layer's not among them
+want=$(jq -c '[.layers[].digest]' <<<"$manifest" 2>/dev/null)
+got=$(jq -c '.rootfs.diff_ids' <<<"$config" 2>/dev/null)
+[ -n "$got" ] && [ "$got" = "$want" ] && [ "$(jq 'length' <<<"$got" 2>/dev/null)" = 3 ] && [ "$(jq --arg stale "$stale" 'any(.[]; . == $stale)' <<<"$got" 2>/dev/null)" = false ] \
+  && pass "rootfs.diff_ids is the pushed manifest's layers' digests in order: three, the stale layer's digest gone" \
+  || fail "rootfs.diff_ids of the pushed config against the pushed manifest's layers" "diff_ids:        ${got:-no config to read}" "layers' digests: ${want:-nothing was pushed to the tag}" "wanted three, without the stale layer's $stale"
+# history: the stale layer's entry went with it
+got=$(jq -c '.history' <<<"$config" 2>/dev/null)
+[ -n "$got" ] && [ "$(jq 'length' <<<"$got" 2>/dev/null)" = 3 ] \
+  && pass "history has three entries, one per layer: the stale layer's entry is gone" \
+  || fail "history of the pushed config: one entry per layer" "history: ${got:-no config to read}" "entries: $(jq 'length' <<<"${got:-[]}" 2>/dev/null), wanted 3 (three were laid down, one of them the stale layer's, one is new)"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
