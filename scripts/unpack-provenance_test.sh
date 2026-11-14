@@ -1123,6 +1123,74 @@ err=$(cat "$SB/stderr"); crane=$(cat "$SB/crane.log" 2>/dev/null)
        "stderr, wanted nothing:" "${err:-nothing}" \
        "crane calls logged, wanted none:" "${crane:-none}"
 
+# 28: subjects names a digest once and refuses what is not a digest (plan
+#     slice 2.4.27): the lines subjects writes are the file the action reads
+#     (case 27), and the mode gets the list of digests store gets, so it treats
+#     that list as store does. A digest named more than once is written once,
+#     at its first naming (case 23 for store): two lines for one digest are one
+#     subject named twice to the action. An argument that is not sha256: and 64
+#     lowercase hex digits makes the call a wrong call (case 19 for store): the
+#     usage on stderr, exit 2, and nothing on stdout, the lines of the
+#     well-formed digests before it included: the check comes before the first
+#     line, because a file half written is a file the action signs for. The
+#     six calls, each with the repository first:
+#     the index digest, the amd64 manifest's, the index digest again (the other
+#     digest between the two namings, as in case 23: a de-duplication of
+#     neighbours only would leave both): exit 0, stdout exactly case 27's two
+#     lines, the index's first (c4 before ac, so lines put through sort -u
+#     show), nothing on stderr;
+#     the index digest, then sha256:xyz (the prefix alone makes no digest; the
+#     well-formed digest stands before it, so a line written before the check
+#     shows on stdout);
+#     a bare tag, v1.2.3, alone;
+#     the index digest's 64 hex digits without sha256:, alone (what store
+#     refuses in case 19: a check made after the prefix is stripped, as the
+#     line is written, would let it through);
+#     the amd64 manifest's digest, then the index digest with its hex in
+#     uppercase (a registry's digest is lowercase, and a check by [[:xdigit:]]
+#     or without regard to case would write a subject no verifier finds);
+#     the index digest cut short, sha256: and its first 12 hex digits, alone (a
+#     short form copied from a log: lowercase hex after the prefix, so a check
+#     that asks for hex digits of any length would let it through).
+#     Wanted of each of the five wrong calls: exit 2; stdout empty; on stderr
+#     one line begun "usage: unpack-provenance.sh" (case 19's line). Each call
+#     is made in case 27's way: run's environment, stdout taken as the output,
+#     stderr written to a file in the sandbox. Nothing is laid down and no
+#     call may reach crane: the stub's log is read once, after the six. One
+#     result line for the six; on a failure its detail names each call with
+#     its exit code, its stdout as found and as wanted (through cat -A), its
+#     stderr, and whether it was as wanted
+calls=(); amiss=0
+subjects_call() { # what, the exit code wanted, the stdout wanted, then subjects' arguments: runs the call in the case's sandbox and notes what was found and whether it is as wanted
+  local what="$1" code="$2" lines="$3" err usage verdict="as wanted"; shift 3
+  out=$(PATH="$SB/bin:$PATH" UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" subjects "$@" 2> "$SB/stderr"); rc=$?
+  err=$(cat "$SB/stderr"); usage=$(grep -c '^usage: unpack-provenance\.sh' <<<"$err")
+  [ "$rc" -eq "$code" ] && [ "$out" = "$lines" ] || verdict="NOT as wanted"
+  # stderr: nothing from a call that is right, the usage from a wrong one, its first line once
+  if [ "$code" -eq 0 ]; then [ -z "$err" ] || verdict="NOT as wanted"; else [ "$usage" -eq 1 ] || verdict="NOT as wanted"; fi
+  [ "$verdict" = "as wanted" ] || amiss=$((amiss + 1))
+  calls+=("$verdict, $what: exit=$rc, wanted $code"
+    "$( { [ -n "$out" ] && cat -A <<<"$out" || echo "nothing"; } | sed 's/^/  stdout: /')"
+    "$( { [ -n "$lines" ] && cat -A <<<"$lines" || echo "nothing"; } | sed 's/^/  wanted: /')"
+    "$(sed 's/^/  stderr: /' <<<"${err:-nothing}")"
+    "  wanted: $([ "$code" -eq 0 ] && echo "nothing" || echo "the usage, one line begun 'usage: unpack-provenance.sh' (found: $usage)")")
+}
+fresh
+want=$(printf '%s %s\n' "${INDEX#sha256:}" "$REPO" "${AMD64#sha256:}" "$REPO")
+upper="sha256:$(tr a-f A-F <<<"${INDEX#sha256:}")"
+subjects_call "a digest named twice (the index digest, the amd64 manifest's, the index digest again)" 0 "$want" "$REPO" "$INDEX" "$AMD64" "$INDEX"
+subjects_call "sha256:xyz after the index digest" 2 "" "$REPO" "$INDEX" sha256:xyz
+subjects_call "a bare tag (v1.2.3)" 2 "" "$REPO" v1.2.3
+subjects_call "a digest without sha256: (${INDEX#sha256:})" 2 "" "$REPO" "${INDEX#sha256:}"
+subjects_call "a digest in uppercase hex after the amd64 manifest's ($upper)" 2 "" "$REPO" "$AMD64" "$upper"
+subjects_call "a digest of 12 hex digits (${INDEX:0:19})" 2 "" "$REPO" "${INDEX:0:19}"
+crane=$(cat "$SB/crane.log")
+[ "$amiss" -eq 0 ] && [ -z "$crane" ] \
+  && pass "subjects names a digest once and refuses what is not a digest: a digest named twice is one line, at its first naming, exit 0, nothing on stderr; sha256:xyz, a bare tag, a digest without sha256:, one in uppercase hex and one of 12 hex digits are each exit 2 with nothing on stdout and one line begun 'usage: unpack-provenance.sh' on stderr; crane never called" \
+  || fail "subjects names a digest once (one line, at its first naming, exit 0) and refuses what is not a digest (exit 2, nothing on stdout, the usage on stderr), no crane call" \
+       "calls not as wanted: $amiss of 6" "${calls[@]}" \
+       "crane calls logged over the six calls, wanted none:" "${crane:-none}"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
