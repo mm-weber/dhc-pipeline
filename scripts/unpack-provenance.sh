@@ -74,6 +74,10 @@
 # their order; the new layer goes last.
 # A push that fails is tried again, up to three attempts,
 # UNPACK_PROVENANCE_RETRY_DELAY seconds apart (default 10; the tests set 0).
+# Every failure that is tried again is said with one ::warning:: line naming
+# the digest and the attempt that failed: a push that goes through at the
+# second or third attempt leaves a green run, and crane's own words name a
+# tag and a status and are no annotation.
 # After the third failure the run ends with one ::error:: line naming the
 # digest and the three attempts, and exit 1: nothing more is pushed, and the
 # digests pushed before it keep their layer, which a re-run replaces.
@@ -239,14 +243,16 @@ done
 
 # no digest was refused: the prepared layouts are pushed, each to its own tag,
 # and a digest is said to be stored once its push is through. A push that
-# fails is tried again, up to three attempts; the third failure ends the run
-# with the error line of a refusal, naming the digest whose push it was
+# fails is tried again, up to three attempts, and said with a warning line
+# naming the digest and the attempt that failed; the third failure ends the
+# run with the error line of a refusal, naming the digest whose push it was
 for i in "${!DIGESTS[@]}"; do
   DIGEST="${DIGESTS[$i]}"
   for attempt in 1 2 3; do
     crane push "${DIRS[$i]}" "${REFS[$i]}" && break
     [ "$attempt" -lt 3 ] \
       || refuse "the push to ${REFS[$i]} failed 3 times, the provenance is not stored beside the digest"
+    echo "::warning::unpack-provenance: ${REPO}@${DIGEST}: the push to ${REFS[$i]} failed, attempt ${attempt} of 3, it is tried again" >&2
     sleep "${UNPACK_PROVENANCE_RETRY_DELAY:-10}"
   done
   echo "unpack-provenance: ${REPO}@${DIGESTS[$i]}: provenance stored as layer sha256:${LAYERS[$i]} of ${REFS[$i]}"

@@ -145,7 +145,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
   - RED: `store` with `store.json` pushes the same layout, byte for byte, as with `bundle.jsonl`.
 - [x] **2.4.23 A digest named twice is stored once** (a single-platform image's index digest is its platform manifest's digest, `build.yml`'s `manifests` step)
   - RED: the same digest given twice; one pull and one push logged; one provenance layer.
-- [ ] **2.4.24 A registry call that fails is tried again**
+- [x] **2.4.24 A registry call that fails is tried again**
   - RED: the stub's push fails twice and then succeeds; exit 0; three push calls logged; one `::warning::` line per failed attempt naming the digest.
   - GREEN: the three attempts around `crane pull` and `crane push`, the delay from `UNPACK_PROVENANCE_RETRY_DELAY`.
 - [ ] **2.4.25 A refusal from the bundle's content is not tried again** (the chain that did not issue the certificate, 2.4.16's case: one pull logged, no second attempt; a guard if 2.4.24's code already holds it)
