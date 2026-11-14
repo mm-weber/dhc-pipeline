@@ -8,7 +8,9 @@
 # attestations (Req 2.27). <bundles> is the file the action leaves at its
 # bundle-path: one Sigstore bundle per line; the one whose statement names
 # the digest is taken; a digest no statement there names is refused with one
-# ::error:: line and exit 1, before anything is pulled or pushed for it.
+# ::error:: line and exit 1, before anything is pulled or pushed for it, and
+# so is a digest whose statement is not SLSA provenance v1, the one predicate
+# type stored here.
 # One statement serves every digest it names: each digest given gets the
 # layer in its own attestation manifest, one after the other, one pull and
 # one push per digest. Nothing is signed here: the
@@ -61,6 +63,9 @@ for DIGEST in "$@"; do
     'select(.dsseEnvelope.payload | @base64d | fromjson | any(.subject[]; .digest.sha256 == $hex))' "$BUNDLES")
   [ -n "$bundle" ] || refuse "no statement in the bundles file names the digest"
   predicate=$(jq -r '.dsseEnvelope.payload | @base64d | fromjson | .predicateType' <<<"$bundle")
+  # SLSA provenance v1 and nothing else is stored here
+  [ "$predicate" = "https://slsa.dev/provenance/v1" ] \
+    || refuse "the statement naming the digest is of predicate type ${predicate}, not https://slsa.dev/provenance/v1"
 
   # cosign's annotations: the certificate as PEM, the log entry as JSON text.
   # logIndex is the entry's own, the one the signed entry timestamp covers
