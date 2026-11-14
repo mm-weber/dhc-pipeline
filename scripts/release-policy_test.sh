@@ -84,6 +84,15 @@ for v in off required; do
   else fail "provenance: $v comes back as written" "exit=$rc, wanted 0 and exactly '$v'" "$out"; fi
 done
 
+# 3b: one mode, three positions (Req 2.30): a spelling the two YAML readers
+#     or a human could read as one of them is not declared, and is refused
+#     naming the key, the value as written and what is accepted
+for v in on true enforce Report '"report"'; do
+  fresh; sed -i "s/^  provenance: report/  provenance: $v/" "$SB/catalogue-policy.yaml"
+  out=$("$RP" "$SB" provenance 2>&1); rc=$?
+  expect "provenance: $v is refused naming key and value" 2 "$rc" "$out" "provenance is '$v'" "off, report or required"
+done
+
 # 4: a missing key is a refusal, never a default
 fresh; sed -i "/^  fail_closed:/d" "$SB/catalogue-policy.yaml"
 out=$("$RP" "$SB" fail-closed 2>&1); rc=$?
