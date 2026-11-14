@@ -387,6 +387,26 @@ jq -c '.dsseEnvelope.signatures[0].sig |= ((if .[0:1] == "A" then "B" else "A" e
 out=$(run store "$SB/bundle-other-sig.jsonl" "$REPO" "$INDEX"); rc=$?
 refused "$INDEX" 'hash' "the envelope does not hash to the value the log entry records"
 
+# 12: refused, more or fewer than one signature on the envelope: the layer's
+#     envelope carries exactly one signature, the one the log entry recorded.
+#     A bundle whose dsseEnvelope.signatures holds two entries, or none, is
+#     refused, and the error line says so: it speaks of the signatures, not of
+#     the envelope hash (such an envelope does not hash to the logged value
+#     either, but the count is the reason and is named as the reason). The
+#     bundles file is the fixture's bundle with its one signature doubled, then
+#     with the list emptied, and everything else as it is (the payload, so the
+#     statement, its subjects and its type; the log entry with its timestamp);
+#     the digest is named, the manifest is there, so the refusal can only come
+#     from the envelope's signatures
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+jq -c '.dsseEnvelope.signatures += .dsseEnvelope.signatures' "$DATA/bundle.jsonl" > "$SB/bundle-two-signatures.jsonl"
+out=$(run store "$SB/bundle-two-signatures.jsonl" "$REPO" "$INDEX"); rc=$?
+refused "$INDEX" 'signature' "the envelope carries two signatures, not exactly one"
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+jq -c '.dsseEnvelope.signatures = []' "$DATA/bundle.jsonl" > "$SB/bundle-no-signature.jsonl"
+out=$(run store "$SB/bundle-no-signature.jsonl" "$REPO" "$INDEX"); rc=$?
+refused "$INDEX" 'signature' "the envelope carries no signature, not exactly one"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
