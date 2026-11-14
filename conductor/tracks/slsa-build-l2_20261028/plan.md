@@ -80,10 +80,10 @@ A test that comes up green at once (the earlier slice's code already covers it) 
 
 The suite's `policy` helper gains `provenance: report` with slice 2.2.1 (the RED agent's one fixture change).
 
-- [x] **2.2.1 The query `provenance` returns the declared mode** (tracer; FR-7; RED 27c6a18)
+- [x] **2.2.1 The query `provenance` returns the declared mode** (tracer; FR-7)
   - RED: `release-policy.sh "$SB" provenance` prints exactly `report`, exit 0. Fails because the query is unknown (exit 2).
   - GREEN: the query, reading `release.provenance`.
-- [ ] **2.2.2 The policy file declares `release.provenance: report`** (by hand, no test: a YAML edit with its comment block naming Req 2.30 and the three positions; then `yamllint catalogue-policy.yaml` and `scripts/release-policy.sh . provenance` printing `report`). Placed here so that the real file never fails the `check` of 2.2.5.
+- [x] **2.2.2 The policy file declares `release.provenance: report`** (by hand, no test: a YAML edit with its comment block naming Req 2.30 and the three positions; then `yamllint catalogue-policy.yaml` and `scripts/release-policy.sh . provenance` printing `report`). Placed here so that the real file never fails the `check` of 2.2.5.
 - [ ] **2.2.3 `off` and `required` come back as written**
   - RED: `provenance: off` prints `off`; `provenance: required` prints `required`. Fails if the reader hands back PyYAML's value: a bare `off` is the boolean False there and the string `off` in mikefarah's yq, the disagreement the two booleans already guard against.
   - GREEN: the raw token as written (`raw_token`), the way `boolean()` reads.

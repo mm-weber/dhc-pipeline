@@ -32,6 +32,22 @@ release:
   # run 41311884446 of 2026-11-01, the page job skipped and the served page
   # left with the previous day's data; on again here (LOG 2026-11-01).
   page: true
+  # Req 2.30/7.7: the SLSA provenance mode, one of three (design Decision
+  # 15). off = no provenance is attested, a digest releases with every other
+  # signature and attestation unchanged, and the rescan states that
+  # provenance is off and verifies none; the position for a repository
+  # GitHub offers no artifact attestations to. report = every released
+  # digest and each of its platform manifests carries provenance from the
+  # platform's signed claims (Req 2.9, 2.27), and the rescan reports daily,
+  # per supported digest, whether that provenance would be admitted, without
+  # failing on an absent one (Req 2.29). required = attested the same way,
+  # and the verification policy admits an image only with it (Req 2.28). In
+  # report and required a digest whose provenance cannot be attested gets
+  # no tag (Req 2.9). Written unquoted and in lower case: a bare off is a
+  # boolean to one of the two YAML readers in play, so
+  # scripts/release-policy.sh returns the text as written and refuses
+  # anything outside the three.
+  provenance: report
   # Req 2.14's daily rebuild cron; task 9.2 wires it into build.yml as the
   # literal GitHub requires, and lint-workflow-policy keeps the two equal.
   # Before the 06:17 rescan so the rescan sees fresh digests.
