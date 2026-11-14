@@ -76,6 +76,9 @@ manifest_of() { # layout: its manifest, found the real way: index.json names the
   cat "$1/blobs/sha256/${d#sha256:}" 2>/dev/null
 }
 
+b64_hex() { base64 -d | od -An -vtx1 | tr -d ' \n'; } # stdin base64, stdout the bytes as lowercase hex
+short() { jq -c 'walk(if type == "string" and length > 120 then "\(.[0:32])... (\(length) characters)" else . end)'; } # JSON for a detail line
+
 run() { PATH="$SB/bin:$PATH" UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" "$@" 2>&1; }
 
 # 1: the provenance becomes one more layer, the envelope byte for byte: its
@@ -98,6 +101,39 @@ sum=""; [ -n "$hex" ] && [ -f "$pushed/blobs/sha256/$hex" ] && sum=$(sha256sum <
 [ -n "$sum" ] && [ "$sum" = "$hex" ] && [ "$hex" = "$want" ] \
   && pass "the layer's blob is the envelope the log recorded: its sha256 is its name and the entry's envelopeHash" \
   || fail "the layer's blob against the log entry's envelopeHash" "layer digest '$hex'" "sha256 of the blob in the pushed layout '${sum:-no such blob}'" "envelopeHash  '$want'"
+
+# 2: the certificate and the log entry travel as cosign's annotations: the
+#    certificate as PEM, the entry as the JSON text cosign reads back, the
+#    signature annotation present and empty
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+ann=$(manifest_of "$SB/pushed/$TAG" | jq -c '.layers[-1].annotations // {}' 2>/dev/null); [ -n "$ann" ] || ann='{}'
+# DER against DER: PEM text may be wrapped one way or another, the bytes are the certificate
+want=$(jq -r '.verificationMaterial.certificate.rawBytes' "$DATA/bundle.jsonl" | base64 -d | sha256sum | cut -d' ' -f1)
+pem=$(jq -r '."dev.sigstore.cosign/certificate" | strings' <<<"$ann"); got=""
+if [ -n "$pem" ]; then got=$(openssl x509 -inform PEM -outform DER <<<"$pem" 2>/dev/null | sha256sum | cut -d' ' -f1) || got="not a PEM certificate"; fi
+[ "$got" = "$want" ] \
+  && pass "dev.sigstore.cosign/certificate is the bundle's certificate as PEM" \
+  || fail "dev.sigstore.cosign/certificate against the bundle's certificate" "sha256 of the annotation's DER '${got:-no such annotation}'" "sha256 of the bundle's rawBytes '$want'" "exit=$rc" "$out"
+# logIndex is the entry's own, .verificationMaterial.tlogEntries[0].logIndex. The
+# bundle also carries .verificationMaterial.tlogEntries[0].inclusionProof.logIndex,
+# a different number (3862518718 versus 3740614456 in the fixture), and the
+# signed entry timestamp covers the entry's own.
+want=$(jq -S --arg logid "$(jq -r '.verificationMaterial.tlogEntries[0].logId.keyId' "$DATA/bundle.jsonl" | b64_hex)" \
+  '{SignedEntryTimestamp: .verificationMaterial.tlogEntries[0].inclusionPromise.signedEntryTimestamp,
+    Payload: {body: .verificationMaterial.tlogEntries[0].canonicalizedBody,
+              integratedTime: (.verificationMaterial.tlogEntries[0].integratedTime | tonumber),
+              logIndex: (.verificationMaterial.tlogEntries[0].logIndex | tonumber),
+              logID: $logid}}' "$DATA/bundle.jsonl")
+# parsed and key-sorted on both sides: the order of keys is free, the types are not
+got=$(jq -r '."dev.sigstore.cosign/bundle" | strings' <<<"$ann" | jq -S . 2>/dev/null)
+[ -n "$got" ] && [ "$got" = "$want" ] \
+  && pass "dev.sigstore.cosign/bundle is the log entry: timestamp, body, integratedTime, the entry's own logIndex, logID in hex" \
+  || fail "dev.sigstore.cosign/bundle against the bundle's log entry" "annotation, parsed: $([ -n "$got" ] && short <<<"$got" || echo "no JSON text there, the annotation is $(jq -c '."dev.sigstore.cosign/bundle"' <<<"$ann" | cut -c1-160) (null: no such annotation)")" "wanted:             $(short <<<"$want")"
+sig=$(jq -c '."dev.cosignproject.cosign/signature"' <<<"$ann")
+[ "$sig" = '""' ] \
+  && pass "dev.cosignproject.cosign/signature is present and empty" \
+  || fail "dev.cosignproject.cosign/signature, present and empty" "the annotation as JSON: $sig (null: no such annotation)" 'wanted:                 ""'
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
