@@ -133,7 +133,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
 - [x] **2.4.14 Refused: no attestation manifest beside the digest** (the stub's pull fails on every attempt; the message says the release's other attestations must exist first)
 - [x] **2.4.15 Refused: no layer of that manifest carries a chain**
 - [x] **2.4.16 Refused: the chain did not issue the provenance certificate** (a certificate authority made with openssl inside the test)
-- [ ] **2.4.17 All or nothing across digests**
+- [x] **2.4.17 All or nothing across digests**
   - RED: two digests, the second refused (no manifest beside it); `crane push` is never called, not for the first either.
   - GREEN: every digest prepared and checked before the first push.
 - [ ] **2.4.18 A push that fails three times fails the run naming the digest** (the stub's push exits 1 every time; exit 1, the digest and the number of attempts in the message, three push calls logged; the 2.26 shape)

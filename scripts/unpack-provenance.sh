@@ -22,8 +22,12 @@
 # then an envelope whose sha256 is not the envelope hash the log entry records:
 # that hash is the one tie between the layer's bytes and the transparency log.
 # One statement serves every digest it names: each digest given gets the
-# layer in its own attestation manifest, one after the other, one pull and
-# one push per digest. Nothing is signed here: the
+# layer in its own attestation manifest, one pull and one push per digest.
+# All or nothing across the digests: every digest is prepared and checked
+# (pulled, its layout rewritten, every refusal above and below passed) before
+# the first push, so a digest that is refused leaves every tag as it was, the
+# tags of the digests before it included: a release carries its provenance
+# beside every digest or beside none. Nothing is signed here: the
 # layer's blob is the bundle's DSSE envelope in the compact form whose sha256
 # the transparency log recorded (payload, payloadType, the signature; no
 # whitespace, no trailing newline), and its predicateType annotation is the
@@ -73,6 +77,9 @@ refuse() { echo "::error::unpack-provenance: ${REPO}@${DIGEST}: $1 (Req 2.27)" >
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
+# every digest is prepared and checked here, nothing is pushed yet: what the
+# pushes below need per digest, in the order the digests were given
+DIGESTS=() REFS=() DIRS=() LAYERS=()
 for DIGEST in "$@"; do
   REF="${REPO}:sha256-${DIGEST#sha256:}.att"
   # a working directory of its own per digest: no layout sees another's blobs
@@ -185,6 +192,12 @@ for DIGEST in "$@"; do
     '.manifests[0].digest = $digest | .manifests[0].size = $size' "$DIR/index.json" > "$DIR/index.json.tmp"
   mv "$DIR/index.json.tmp" "$DIR/index.json"
 
-  crane push "$DIR" "$REF"
-  echo "unpack-provenance: ${REPO}@${DIGEST}: provenance stored as layer sha256:${layer} of ${REF}"
+  DIGESTS+=("$DIGEST"); REFS+=("$REF"); DIRS+=("$DIR"); LAYERS+=("$layer")
+done
+
+# no digest was refused: the prepared layouts are pushed, each to its own tag,
+# and a digest is said to be stored once its push is through
+for i in "${!DIGESTS[@]}"; do
+  crane push "${DIRS[$i]}" "${REFS[$i]}"
+  echo "unpack-provenance: ${REPO}@${DIGESTS[$i]}: provenance stored as layer sha256:${LAYERS[$i]} of ${REFS[$i]}"
 done
