@@ -67,13 +67,26 @@
 # After the third failure the run ends with one ::error:: line naming the
 # digest and the three attempts, and exit 1: nothing more is pushed, and the
 # digests pushed before it keep their layer, which a re-run replaces.
+# A call that is wrong is no refusal of content: a mode that is missing or is
+# not store, no bundles file, repository or digest, a digest that is not
+# sha256: and 64 lowercase hex digits, or a bundles file that is not there
+# ends with the usage line on stderr and exit 2, before anything is read or
+# pulled.
 set -euo pipefail
-USAGE="usage: unpack-provenance.sh store <bundles> <repository> <digest>..."
-# $1 is the mode, store, the only one there is
-BUNDLES="${2:?$USAGE}"
-REPO="${3:?$USAGE}"
-: "${4:?$USAGE}" # the digests: this one and every argument after it
+# wrong usage: the usage line and exit 2
+usage() { echo "usage: unpack-provenance.sh store <bundles> <repository> <digest>..." >&2; exit 2; }
+# $1 is the mode, store, the only one there is; after it the bundles file, the
+# repository and the digests, at least one
+[ "$#" -ge 4 ] && [ "$1" = "store" ] && [ -n "$3" ] || usage
+BUNDLES="$2"
+REPO="$3"
 shift 3
+# checked before anything is read or pulled: the bundles file is there, and
+# every digest is one
+[ -f "$BUNDLES" ] || usage
+for DIGEST in "$@"; do
+  [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || usage
+done
 
 # a refusal: one ::error:: line naming the digest and the reason, exit 1
 refuse() { echo "::error::unpack-provenance: ${REPO}@${DIGEST}: $1 (Req 2.27)" >&2; exit 1; }

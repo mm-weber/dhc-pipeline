@@ -137,7 +137,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
   - RED: two digests, the second refused (no manifest beside it); `crane push` is never called, not for the first either.
   - GREEN: every digest prepared and checked before the first push.
 - [x] **2.4.18 A push that fails three times fails the run naming the digest** (the stub's push exits 1 every time; exit 1, the digest and the number of attempts in the message, three push calls logged; the 2.26 shape)
-- [ ] **2.4.19 Wrong usage is refused** (no mode or an unknown one, no digest, a digest without `sha256:`, a bundle file that is missing: exit 2 with the usage line)
+- [x] **2.4.19 Wrong usage is refused** (no mode or an unknown one, no digest, a digest without `sha256:`, a bundle file that is missing: exit 2 with the usage line)
 - [ ] **2.4.20 Refused: the log entry is of another kind than `dsse`** (the fixture's entry body rewritten to `intoto`; the message names the kind found; the spike refused it by name)
 - [ ] **2.4.21 Several statements naming one digest: the newest is stored**
   - RED: `store-two.json`; exit 0; one provenance layer, and its envelope is the one whose log entry is the later (integrated time, then log index). (A release run twice on one digest leaves two statements in the attestation store; either is valid, the choice must not depend on their order in the file.)
