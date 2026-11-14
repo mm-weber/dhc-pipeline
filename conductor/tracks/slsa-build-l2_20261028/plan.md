@@ -147,7 +147,10 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
   - RED: the same digest given twice; one pull and one push logged; one provenance layer.
 - [x] **2.4.24 A registry call that fails is tried again**
   - RED: the stub's push fails twice and then succeeds; exit 0; three push calls logged; one `::warning::` line per failed attempt naming the digest.
-  - GREEN: the three attempts around `crane pull` and `crane push`, the delay from `UNPACK_PROVENANCE_RETRY_DELAY`.
+  - GREEN: the warning line in the push's attempts (the attempts and the delay from `UNPACK_PROVENANCE_RETRY_DELAY` came with 2.4.18); the pull's attempts with 2.4.24b.
+- [ ] **2.4.24b A pull that fails is tried again** (added during the step: 2.4.24's RED asks for the push alone, so the pull's attempts get a failing test of their own)
+  - RED: the stub's pull fails twice and then succeeds; exit 0; three pull calls logged; one `::warning::` line per failed attempt naming the digest.
+  - GREEN: the three attempts around `crane pull`, the same delay; after the third failure 2.4.14's refusal.
 - [ ] **2.4.25 A refusal from the bundle's content is not tried again** (the chain that did not issue the certificate, 2.4.16's case: one pull logged, no second attempt; a guard if 2.4.24's code already holds it)
 - [ ] **2.4.26 `subjects` writes one line per digest in the shape the action reads**
   - RED: `subjects ghcr.io/o/r sha256:<a> sha256:<b>` prints exactly `<a> ghcr.io/o/r` and `<b> ghcr.io/o/r`: the bare hex, one space, the repository. (attest v4.2.1 `src/subject.ts`: a line without a space is skipped silently, a digest with its `sha256:` prefix is thrown out as invalid.)
