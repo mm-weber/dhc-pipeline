@@ -17,6 +17,10 @@
 # no signed entry timestamp:
 # cosign verifies the entry in this layout by that timestamp, and the layout
 # has no place for the inclusion proof the newer log issues in its stead.
+# So is a digest whose log entry is of another kind than dsse, with the kind
+# found on the error line: the kind is read from the entry's body, which the
+# log signed (the bundle's kindVersion only repeats it), and only an entry of
+# the kind dsse records the envelope hash that ties the layer to the log.
 # Refused in the same way is an envelope that carries more or fewer than one
 # signature (the layer holds exactly one, the one the log entry recorded), and
 # then an envelope whose sha256 is not the envelope hash the log entry records:
@@ -126,6 +130,12 @@ for DIGEST in "$@"; do
   timestamp=$(jq -r '.verificationMaterial.tlogEntries[0].inclusionPromise.signedEntryTimestamp // ""' <<<"$bundle")
   [ -n "$timestamp" ] \
     || refuse "the log entry carries no signed entry timestamp, the attestation layout cannot carry such an entry"
+  # the entry's kind, read from its body, which the log signed (kindVersion is
+  # the bundle's repetition of it): only the kind dsse records the envelope
+  # hash compared below
+  kind=$(jq -r '.verificationMaterial.tlogEntries[0].canonicalizedBody | @base64d | fromjson | .kind' <<<"$bundle")
+  [ "$kind" = "dsse" ] \
+    || refuse "the log entry is of the kind ${kind}, not dsse, the one kind that records the envelope's hash"
 
   # cosign's annotations: the certificate as PEM, the log entry as JSON text.
   # logIndex is the entry's own, the one the signed entry timestamp covers
