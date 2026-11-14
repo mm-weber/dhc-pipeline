@@ -10,7 +10,11 @@
 # the digest is taken; a digest no statement there names is refused with one
 # ::error:: line and exit 1, before anything is pulled or pushed for it, and
 # so is a digest whose statement is not SLSA provenance v1, the one predicate
-# type stored here, and one whose log entry carries no signed entry timestamp:
+# type stored here, one whose bundle holds more or fewer than one log entry
+# (the layer's bundle annotation carries exactly one; for none the error line
+# adds the likely cause, the action having signed with GitHub's own Sigstore
+# instance, which keeps no transparency log), and one whose log entry carries
+# no signed entry timestamp:
 # cosign verifies the entry in this layout by that timestamp, and the layout
 # has no place for the inclusion proof the newer log issues in its stead.
 # Refused in the same way is an envelope that carries more or fewer than one
@@ -72,6 +76,15 @@ for DIGEST in "$@"; do
   # SLSA provenance v1 and nothing else is stored here
   [ "$predicate" = "https://slsa.dev/provenance/v1" ] \
     || refuse "the statement naming the digest is of predicate type ${predicate}, not https://slsa.dev/provenance/v1"
+  # exactly one log entry in the bundle, the one the bundle annotation carries;
+  # none is what the action leaves when it signs with GitHub's own Sigstore
+  # instance, and only then is that cause named
+  entries=$(jq -r '.verificationMaterial.tlogEntries | length' <<<"$bundle")
+  cause=""
+  [ "$entries" -ne 0 ] \
+    || cause=": the action has likely signed with GitHub's own Sigstore instance, which keeps no transparency log, the one it chooses when the event does not say the repository is public"
+  [ "$entries" -eq 1 ] \
+    || refuse "the bundle carries ${entries} log entries, not exactly one${cause}"
   # the layout verifies the log entry by its signed entry timestamp: an entry
   # without one (the newer log issues an inclusion proof only) cannot be stored
   timestamp=$(jq -r '.verificationMaterial.tlogEntries[0].inclusionPromise.signedEntryTimestamp // ""' <<<"$bundle")
