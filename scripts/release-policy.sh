@@ -11,6 +11,7 @@
 #   schedule         the daily rebuild's cron, five fields (2.14)
 #   platforms        the admitted platforms, os/arch, one per line (7.7)
 #   page             true|false   the catalogue page is published to Pages (6.61)
+#   provenance       off|report|required   the SLSA provenance mode of a release (2.30)
 #   check            every switch above, refusing the first hole; prints them
 #
 # Each switch is returned only when it is written exactly as the criteria
@@ -27,7 +28,7 @@ set -euo pipefail
 
 err() { printf '::error::release-policy: %s\n' "$1" >&2; }
 if [ "$#" -ne 2 ]; then
-  err "usage: release-policy.sh <root> <public|fail-closed|publish-policy|schedule|platforms|page|check>"
+  err "usage: release-policy.sh <root> <public|fail-closed|publish-policy|schedule|platforms|page|provenance|check>"
   exit 2
 fi
 ROOT="${1%/}"; QUERY="$2"
@@ -112,5 +113,5 @@ elif query == "check":
     pub, fc, pp, sch, pl, pg, prov = boolean("public"), boolean("fail_closed"), publish_policy(), schedule(), platforms(), boolean("page"), provenance()
     print(f"release-policy: public={pub} fail_closed={fc} publish_policy={pp} page={pg} provenance={prov} schedule=\"{sch}\" {len(pl)} platform(s): {', '.join(pl)}")
 else:
-    refuse(f"unknown query '{query}'; one of public, fail-closed, publish-policy, schedule, platforms, page, check")
+    refuse(f"unknown query '{query}'; one of public, fail-closed, publish-policy, schedule, platforms, page, provenance, check")
 PY
