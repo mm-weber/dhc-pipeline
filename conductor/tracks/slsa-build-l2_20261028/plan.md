@@ -141,7 +141,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
 - [x] **2.4.20 Refused: the log entry is of another kind than `dsse`** (the fixture's entry body rewritten to `intoto`; the message names the kind found; the spike refused it by name)
 - [x] **2.4.21 Several statements naming one digest: the newest is stored**
   - RED: `store-two.json`; exit 0; one provenance layer, and its envelope is the one whose log entry is the later (integrated time, then log index). (A release run twice on one digest leaves two statements in the attestation store; either is valid, the choice must not depend on their order in the file.)
-- [ ] **2.4.22 The attestation store's answer is read like the action's file** (the way back for a tagged digest whose provenance layer was lost: `gh api repos/<owner>/<repo>/attestations/<digest>` into a file, then `store`)
+- [x] **2.4.22 The attestation store's answer is read like the action's file** (the way back for a tagged digest whose provenance layer was lost: `gh api repos/<owner>/<repo>/attestations/<digest>` into a file, then `store`)
   - RED: `store` with `store.json` pushes the same layout, byte for byte, as with `bundle.jsonl`.
 - [ ] **2.4.23 A digest named twice is stored once** (a single-platform image's index digest is its platform manifest's digest, `build.yml`'s `manifests` step)
   - RED: the same digest given twice; one pull and one push logged; one provenance layer.
