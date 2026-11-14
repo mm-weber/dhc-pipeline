@@ -38,6 +38,12 @@
 # that carries one, read before any layer is taken out; a manifest none of
 # whose layers carries one is refused like the others, once it is pulled and
 # before anything of it is rewritten: there is no chain to copy.
+# That chain must have issued the bundle's certificate: openssl verify checks
+# the certificate against the chain alone (the system's trust store is kept
+# out), at the log entry's integrated time, because the certificate lives ten
+# minutes. A chain that did not issue it is refused in the same way, with what
+# openssl says as plain lines before the error line: beside that certificate
+# it would lead no verifier to it.
 # The manifest is pulled as an OCI layout with crane, gets the layer appended
 # and is pushed back to the same tag. A digest with no attestation manifest to
 # pull is refused like the others: the layer is added to the manifest cosign
@@ -130,6 +136,14 @@ for DIGEST in "$@"; do
   old=$(jq -r '.manifests[0].digest' "$DIR/index.json")
   jq -e 'any(.layers[].annotations."dev.sigstore.cosign/chain"; type == "string")' "$BLOBS/${old#sha256:}" > /dev/null \
     || refuse "no layer of the attestation manifest ${REF} carries a chain (the annotation dev.sigstore.cosign/chain), there is none to copy to the provenance layer"
+  # the chain to copy (the first one, as below) must have issued the bundle's
+  # certificate: verified against the chain alone, at the log entry's
+  # integrated time (the certificate lives ten minutes); what openssl says of
+  # a failure passes to stderr as it is
+  jq -rj 'first(.layers[].annotations."dev.sigstore.cosign/chain" | strings)' "$BLOBS/${old#sha256:}" > "$DIR.chain"
+  at=$(jq -r '.verificationMaterial.tlogEntries[0].integratedTime' <<<"$bundle")
+  openssl verify -attime "$at" -no-CApath -no-CAstore -CAfile "$DIR.chain" <<<"$certificate" > /dev/null \
+    || refuse "the chain of the attestation manifest ${REF} (the annotation dev.sigstore.cosign/chain) did not issue the provenance certificate, openssl verify fails at the log entry's integrated time ${at}"
   mv "$DIR.envelope" "$BLOBS/$layer"
 
   # the config with the layer listed, as a new blob: cosign keeps the layers'

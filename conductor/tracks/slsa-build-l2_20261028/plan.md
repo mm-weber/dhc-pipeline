@@ -132,7 +132,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
 - [x] **2.4.13 Refused: more or fewer than one log entry in the bundle** (the log-entry annotation carries exactly one; for a bundle with none the message adds the likely cause: the action signed with GitHub's own Sigstore instance, which keeps no transparency log, chosen when the event does not say the repository is public)
 - [x] **2.4.14 Refused: no attestation manifest beside the digest** (the stub's pull fails on every attempt; the message says the release's other attestations must exist first)
 - [x] **2.4.15 Refused: no layer of that manifest carries a chain**
-- [ ] **2.4.16 Refused: the chain did not issue the provenance certificate** (a certificate authority made with openssl inside the test)
+- [x] **2.4.16 Refused: the chain did not issue the provenance certificate** (a certificate authority made with openssl inside the test)
 - [ ] **2.4.17 All or nothing across digests**
   - RED: two digests, the second refused (no manifest beside it); `crane push` is never called, not for the first either.
   - GREEN: every digest prepared and checked before the first push.
