@@ -3,7 +3,7 @@
 **Track ID:** slsa-build-l2_20261028
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-10-28
-**Status:** [~] in progress (phase 0 merged 2026-11-10 as #337, 09dcfdf; phase 1 measured 2026-11-11, runs 43025700201 to 43033859220 on #401, recorded in ADR 0005; spec amended 2026-11-11, one provenance mode, Req 2.30; phase 2 held 2026-11-11 on the bundle finding, re-planned 2026-11-13 at the owner's call: the provenance is unpacked into the attestation layout, task 0.5; phase 2 revised the same day after a critical review of the design, the changes listed under phase 2; 0.5 merged 2026-11-13 as #408, ff115e1; 2.1 measured the same day, run 43507882508 on #401: one statement for both subjects is accepted on both digests by all three verifiers; next 2.2, the owner's go)
+**Status:** [~] in progress (phase 0 merged 2026-11-10 as #337, 09dcfdf; phase 1 measured 2026-11-11, runs 43025700201 to 43033859220 on #401, recorded in ADR 0005; spec amended 2026-11-11, one provenance mode, Req 2.30; phase 2 held 2026-11-11 on the bundle finding, re-planned 2026-11-13 at the owner's call: the provenance is unpacked into the attestation layout, task 0.5; phase 2 revised the same day after a critical review of the design, the changes listed under phase 2; 0.5 merged 2026-11-13 as #408, ff115e1; 2.1 measured the same day, run 43507882508 on #401: one statement for both subjects is accepted on both digests by all three verifiers; 2.2 the mode built 2026-11-14, slices 2.2.1 to 2.2.7, the suite at 38 passed; next 2.3, the owner's go)
 
 ## Overview
 

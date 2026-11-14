@@ -471,8 +471,11 @@ left of the program is the follow-up list below, one decision each.
           and a platform manifest (`subject-checksums`), unpacked beside
           both, verified on both by cosign 2.6.5, Kyverno 1.19.2 and
           `gh attestation verify`; its bundle becomes the suites' fixture
-    - [ ] 2.2 the mode in `release-policy.sh` (six slices, and the
-          policy file by hand)
+    - [x] 2.2 the mode in `release-policy.sh` (six slices, and the
+          policy file by hand): done 2026-11-14 on branch
+          `provenance-step`, one failing test before each change; the
+          suite at 38 passed; `catalogue-policy.yaml` declares
+          `release.provenance: report`
     - [ ] 2.3 `attestations: write`, both sides, held by the existing lint
     - [ ] 2.4 `scripts/unpack-provenance.sh`, modes `store` and
           `subjects` (twenty-eight slices: retries, the attestation
