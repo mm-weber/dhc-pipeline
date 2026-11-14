@@ -52,6 +52,7 @@ expect "public" 0 0 "$("$RP" "$SB" public)" "true"
 [ "$("$RP" "$SB" provenance)" = "report" ] && pass "provenance (Req 2.30)" || fail "provenance" "$("$RP" "$SB" provenance 2>&1)"
 out=$("$RP" "$SB" check 2>&1); rc=$?
 expect "check passes a well-formed section, naming the values" 0 "$rc" "$out" "fail_closed=false" "publish_policy=on-change" "page=true" "2 platform(s)"
+expect "check names the provenance mode (Req 2.30)" 0 "$rc" "$out" "provenance=report"
 
 # 2: the YAML 1.1 spellings PyYAML reads as booleans are refused: the two
 #    dialects in play (mikefarah yq on the runner, PyYAML here) disagree on
@@ -109,6 +110,8 @@ expect "check refuses a missing page switch" 2 "$rc" "$out" "page is missing"
 fresh; sed -i "/^  provenance:/d" "$SB/catalogue-policy.yaml"
 out=$("$RP" "$SB" provenance 2>&1); rc=$?
 expect "a missing provenance mode is refused, never defaulted" 2 "$rc" "$out" "provenance is missing" "off, report or required"
+out=$("$RP" "$SB" check 2>&1); rc=$?
+expect "check refuses a missing provenance mode" 2 "$rc" "$out" "provenance is missing"
 
 # 5: platforms must be a non-empty list of os/arch pairs; the schedule a
 #    five-field cron
