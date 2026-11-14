@@ -122,7 +122,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
   - RED: the pushed manifest's config has `rootfs.diff_ids` equal to the layers' digests in order and one history entry per layer.
 - [x] **2.4.6 A second unpack replaces its own layer**
   - RED: a layout that already holds a provenance layer; after the unpack exactly one layer has the provenance predicate type and the other layers are as before (a re-run release never stacks statements; `cosign attest --replace` by type leaves this layer alone, measured).
-- [ ] **2.4.7 One statement serves every digest it names**
+- [x] **2.4.7 One statement serves every digest it names**
   - RED: two digests in one call; two pushes, `sha256-<a>.att` and `sha256-<b>.att`, each carrying the same envelope blob.
 - [ ] **2.4.8 Refused: no statement in the file names the digest.** Every refusal slice asserts the same three things: exit 1; one `::error::` line naming the digest and the reason; `crane push` never called.
 - [ ] **2.4.9 Refused: the statement naming the digest is of another predicate type** (the message names the type found)
