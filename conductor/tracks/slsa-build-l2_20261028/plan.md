@@ -148,7 +148,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
 - [x] **2.4.24 A registry call that fails is tried again**
   - RED: the stub's push fails twice and then succeeds; exit 0; three push calls logged; one `::warning::` line per failed attempt naming the digest.
   - GREEN: the warning line in the push's attempts (the attempts and the delay from `UNPACK_PROVENANCE_RETRY_DELAY` came with 2.4.18); the pull's attempts with 2.4.24b.
-- [ ] **2.4.24b A pull that fails is tried again** (added during the step: 2.4.24's RED asks for the push alone, so the pull's attempts get a failing test of their own)
+- [x] **2.4.24b A pull that fails is tried again** (added during the step: 2.4.24's RED asks for the push alone, so the pull's attempts get a failing test of their own)
   - RED: the stub's pull fails twice and then succeeds; exit 0; three pull calls logged; one `::warning::` line per failed attempt naming the digest.
   - GREEN: the three attempts around `crane pull`, the same delay; after the third failure 2.4.14's refusal.
 - [ ] **2.4.25 A refusal from the bundle's content is not tried again** (the chain that did not issue the certificate, 2.4.16's case: one pull logged, no second attempt; a guard if 2.4.24's code already holds it)

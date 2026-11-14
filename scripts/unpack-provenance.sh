@@ -81,6 +81,11 @@
 # After the third failure the run ends with one ::error:: line naming the
 # digest and the three attempts, and exit 1: nothing more is pushed, and the
 # digests pushed before it keep their layer, which a re-run replaces.
+# A pull that fails is tried again in the same way, up to three attempts the
+# same delay apart: a registry that falters once is no missing manifest. Every
+# failure that is tried again is said with one ::warning:: line naming the
+# digest, the tag whose pull failed and the attempt; after the third failure
+# the digest is refused as one with no attestation manifest to pull (above).
 # A call that is wrong is no refusal of content: a mode that is missing or is
 # not store, no bundles file, repository or digest, a digest that is not
 # sha256: and 64 lowercase hex digits, or a bundles file that is not there
@@ -181,9 +186,17 @@ for DIGEST in "$@"; do
     || refuse "the envelope's sha256 ${layer} is not the envelope hash the log entry records, ${logged}"
 
   # the layer is added to the attestation manifest cosign wrote for the digest
-  # and never begins a new one: no manifest to pull, nothing is stored
-  crane pull --format oci "$REF" "$DIR" \
-    || refuse "no attestation manifest could be pulled from ${REF}, the release's other attestations must exist first"
+  # and never begins a new one: no manifest to pull, nothing is stored. A pull
+  # that fails is tried again, up to three attempts, and said with a warning
+  # line naming the digest and the attempt that failed; the third failure is
+  # the refusal
+  for attempt in 1 2 3; do
+    crane pull --format oci "$REF" "$DIR" && break
+    [ "$attempt" -lt 3 ] \
+      || refuse "no attestation manifest could be pulled from ${REF}, the release's other attestations must exist first"
+    echo "::warning::unpack-provenance: ${REPO}@${DIGEST}: the pull of ${REF} failed, attempt ${attempt} of 3, it is tried again" >&2
+    sleep "${UNPACK_PROVENANCE_RETRY_DELAY:-10}"
+  done
   # the chain is copied from a layer cosign wrote in that manifest: no layer
   # that carries one, nothing is stored
   old=$(jq -r '.manifests[0].digest' "$DIR/index.json")
