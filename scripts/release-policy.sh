@@ -89,7 +89,10 @@ def platforms():
 def provenance():
     if "provenance" not in rel:
         refuse("provenance is missing; write off, report or required (Req 2.30)")
-    return raw_token("provenance")
+    tok = raw_token("provenance")
+    if tok not in ("off", "report", "required"):
+        refuse(f"provenance is '{tok}'; write exactly off, report or required, unquoted (a bare off or on is a boolean to PyYAML and a string to mikefarah's yq, so the value is taken as written; Req 2.30)")
+    return tok
 
 if query == "public":
     print(boolean("public"))
