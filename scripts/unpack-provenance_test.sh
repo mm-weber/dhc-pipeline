@@ -407,6 +407,38 @@ jq -c '.dsseEnvelope.signatures = []' "$DATA/bundle.jsonl" > "$SB/bundle-no-sign
 out=$(run store "$SB/bundle-no-signature.jsonl" "$REPO" "$INDEX"); rc=$?
 refused "$INDEX" 'signature' "the envelope carries no signature, not exactly one"
 
+# 13: refused, more or fewer than one log entry in the bundle: the layer's
+#     bundle annotation carries exactly one log entry, so a bundle whose
+#     verificationMaterial.tlogEntries holds two entries, or none, is refused,
+#     and the error line says so: it speaks of the log entries and their
+#     number, not of a signed entry timestamp (a bundle with no entry has no
+#     timestamp either, but the count is the reason and is named as the
+#     reason). For a bundle with none the line adds the likely cause: the
+#     action signed with GitHub's own Sigstore instance, which keeps no
+#     transparency log (the instance it chooses when the event does not say the
+#     repository is public). The bundles file is the fixture's bundle with its
+#     one log entry doubled, then with the list emptied, and everything else as
+#     it is (the statement, its subjects and its type; the envelope with its
+#     one signature); the digest is named, the manifest is there, so the
+#     refusal can only come from the bundle's log entries. The patterns ask for
+#     the entries as counted ("log entries", "one log entry", "no log entry"):
+#     the timestamp's and the hash's error lines speak of "the log entry" and
+#     match neither
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+jq -c '.verificationMaterial.tlogEntries += .verificationMaterial.tlogEntries' "$DATA/bundle.jsonl" > "$SB/bundle-two-entries.jsonl"
+out=$(run store "$SB/bundle-two-entries.jsonl" "$REPO" "$INDEX"); rc=$?
+refused "$INDEX" 'log entries|(one|no) log entry' "the bundle carries two log entries, not exactly one"
+# the likely cause belongs to the bundle with no entry: named for two entries,
+# it would send the reader looking in the wrong place
+errors=$(grep '^::error::' <<<"$out")
+[ -n "$errors" ] && ! grep -Eiq 'Sigstore instance' <<<"$errors" \
+  && pass "the error line for two log entries does not name GitHub's own Sigstore instance, the cause of a bundle with none" \
+  || fail "the error line for two log entries, without the cause of a bundle with none" "::error:: lines in the output, wanted one that does not match 'Sigstore instance' (any case):" "${errors:-none}" "exit=$rc" "output:" "${out:-none}"
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+jq -c '.verificationMaterial.tlogEntries = []' "$DATA/bundle.jsonl" > "$SB/bundle-no-entry.jsonl"
+out=$(run store "$SB/bundle-no-entry.jsonl" "$REPO" "$INDEX"); rc=$?
+refused "$INDEX" '(log entries|(one|no) log entry).*GitHub.*Sigstore instance' "the bundle carries no log entry, the likely cause named: GitHub's own Sigstore instance, which keeps no transparency log"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
