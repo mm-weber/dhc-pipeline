@@ -189,6 +189,51 @@ done
   && pass "both earlier layers' blobs are still in the pushed layout, each one's sha256 its name" \
   || fail "the blobs of the layers laid down, in the pushed layout" "${lost[@]}" "intact: $kept, wanted 2"
 
+# 5: the config lists the layers the way cosign writes it: rootfs.diff_ids is
+#    the layers' digests in order and history has one entry per layer, so a
+#    layer more means a config rewritten, a new blob the manifest names by its
+#    digest and its byte size (a registry refuses a descriptor whose size is
+#    wrong); everything else in the config stays as it was laid down
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG" "https://spdx.dev/Document" "https://cosign.sigstore.dev/attestation/vuln/v1"
+config_of() { # layout: the config its manifest names, the blob as it lies there
+  local d; d=$(manifest_of "$1" | jq -r '.config.digest | strings' 2>/dev/null); [ -n "$d" ] || return 1
+  cat "$1/blobs/sha256/${d#sha256:}" 2>/dev/null
+}
+was=$(config_of "$SB/registry/$TAG")
+provenance="sha256:$(jq -r '.verificationMaterial.tlogEntries[0].canonicalizedBody' "$DATA/bundle.jsonl" | base64 -d | jq -r '.spec.envelopeHash.value')"
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+pushed="$SB/pushed/$TAG"; manifest=$(manifest_of "$pushed"); config=$(config_of "$pushed")
+# the descriptor against the blob it names
+chex=$(jq -r '.config.digest | strings | ltrimstr("sha256:")' <<<"$manifest" 2>/dev/null); csize=$(jq -r '.config.size' <<<"$manifest" 2>/dev/null)
+sum="no such blob"; bytes="no such blob"
+if [ -n "$chex" ] && [ -f "$pushed/blobs/sha256/$chex" ]; then
+  sum=$(sha256sum < "$pushed/blobs/sha256/$chex" | cut -d' ' -f1); bytes=$(wc -c < "$pushed/blobs/sha256/$chex")
+fi
+[ -n "$chex" ] && [ "$sum" = "$chex" ] && [ "$bytes" = "$csize" ] \
+  && pass "the config the pushed manifest names is a blob of the pushed layout: its sha256 is its name, its byte size is .config.size" \
+  || fail "the pushed manifest's config descriptor against the blob in the pushed layout" ".config.digest '${chex:-none, nothing was pushed to the tag}', sha256 of the blob '$sum'" ".config.size '$csize', bytes in the blob '$bytes'" "exit=$rc" "$out"
+# diff_ids against the manifest's own layers: the same digests in the same
+# order, three of them, the last the envelope the log recorded
+want=$(jq -c '[.layers[].digest]' <<<"$manifest" 2>/dev/null)
+got=$(jq -c '.rootfs.diff_ids' <<<"$config" 2>/dev/null)
+[ -n "$got" ] && [ "$got" = "$want" ] && [ "$(jq 'length' <<<"$want")" = 3 ] && [ "$(jq -r '.[-1]' <<<"$want")" = "$provenance" ] \
+  && pass "rootfs.diff_ids is the pushed manifest's layers' digests in order: three, the last the provenance layer" \
+  || fail "rootfs.diff_ids of the pushed config against the pushed manifest's layers" "diff_ids:        ${got:-no config to read}" "layers' digests: ${want:-nothing was pushed to the tag}" "wanted three, the last $provenance" "exit=$rc" "$out"
+# history: as many entries as layers, the ones laid down first and as they were
+# (key-sorted on both sides: the order of an entry's keys is free)
+want=$(jq -cS '.history' <<<"$was")
+got=$(jq -cS '.history' <<<"$config" 2>/dev/null)
+[ -n "$got" ] && [ "$(jq 'length' <<<"$got" 2>/dev/null)" = 3 ] && [ "$(jq '.layers | length' <<<"$manifest" 2>/dev/null)" = 3 ] && [ "$(jq -c '.[:2]' <<<"$got" 2>/dev/null)" = "$want" ] \
+  && pass "history has one entry per layer, three, and the two that were there are unchanged and first" \
+  || fail "history of the pushed config: one entry per layer, the entries laid down first" "history:   ${got:-no config to read}" "laid down: $want" "wanted three entries (layers in the pushed manifest: $(jq '.layers | length' <<<"$manifest" 2>/dev/null)), the first two the ones laid down" "exit=$rc" "$out"
+# everything but the two lists: architecture, os, created, config, rootfs.type
+# and no field more (parsed and key-sorted on both sides)
+want=$(jq -cS 'del(.history, .rootfs.diff_ids)' <<<"$was")
+got=$(jq -cS 'del(.history, .rootfs.diff_ids)' <<<"$config" 2>/dev/null)
+[ -n "$got" ] && [ "$got" = "$want" ] \
+  && pass "everything else in the config is as it was laid down: architecture, os, created, config, rootfs.type" \
+  || fail "the pushed config without history and diff_ids against the one laid down" "pushed:    ${got:-no config to read}" "laid down: $want"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
