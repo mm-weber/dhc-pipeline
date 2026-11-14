@@ -50,21 +50,27 @@ put_blob() { # layout: stdin becomes a blob named by its sha256; prints "<hex> <
   printf '%s %s\n' "$hex" "$(wc -c < "$dir/$hex")"
 }
 
-lay_down() { # tag: the attestation manifest cosign keeps there, in the shape crane 0.22.1 pulls it
-  local dir="$SB/registry/$1" payload lhex lsize chex csize mhex msize
+lay_down() { # tag [predicateType...]: the attestation manifest cosign keeps there, in the shape crane 0.22.1 pulls it
+  local dir="$SB/registry/$1" type payload lhex lsize chex csize mhex msize layers='[]'
+  shift; [ $# -gt 0 ] || set -- "https://spdx.dev/Document" # no type given: the one SBOM layer
   mkdir -p "$dir"
-  # one cosign-shaped layer: a small DSSE envelope, the chain in its annotation
-  payload=$(printf '{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"https://spdx.dev/Document","subject":[],"predicate":{}}' | base64 -w0)
-  read -r lhex lsize < <(printf '{"payload":"%s","payloadType":"application/vnd.in-toto+json","signatures":[{"sig":""}]}' "$payload" | put_blob "$dir")
+  # one cosign-shaped layer per predicate type: a small DSSE envelope whose
+  # statement names the type (so every layer is a blob of its own), the chain
+  # in its annotation
+  for type in "$@"; do
+    payload=$(printf '{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"%s","subject":[],"predicate":{}}' "$type" | base64 -w0)
+    read -r lhex lsize < <(printf '{"payload":"%s","payloadType":"application/vnd.in-toto+json","signatures":[{"sig":""}]}' "$payload" | put_blob "$dir")
+    layers=$(jq -c --rawfile chain "$DATA/chain.pem" --arg type "$type" --arg layer "sha256:$lhex" --argjson lsize "$lsize" \
+      '. + [{mediaType:"application/vnd.dsse.envelope.v1+json",size:$lsize,digest:$layer,
+        annotations:{predicateType:$type,"dev.cosignproject.cosign/signature":"","dev.sigstore.cosign/chain":$chain}}]' <<<"$layers")
+  done
   # the config: the layers' digests in order, one history entry per layer
-  read -r chex csize < <(jq -nc --arg layer "sha256:$lhex" \
-    '{architecture:"",created:"0001-01-01T00:00:00Z",history:[{created:"0001-01-01T00:00:00Z"}],os:"",rootfs:{type:"layers",diff_ids:[$layer]},config:{}}' | put_blob "$dir")
-  read -r mhex msize < <(jq -nc --rawfile chain "$DATA/chain.pem" \
-    --arg config "sha256:$chex" --argjson csize "$csize" --arg layer "sha256:$lhex" --argjson lsize "$lsize" \
+  read -r chex csize < <(jq -nc --argjson layers "$layers" \
+    '{architecture:"",created:"0001-01-01T00:00:00Z",history:[$layers[] | {created:"0001-01-01T00:00:00Z"}],os:"",rootfs:{type:"layers",diff_ids:[$layers[].digest]},config:{}}' | put_blob "$dir")
+  read -r mhex msize < <(jq -nc --arg config "sha256:$chex" --argjson csize "$csize" --argjson layers "$layers" \
     '{schemaVersion:2,mediaType:"application/vnd.oci.image.manifest.v1+json",
       config:{mediaType:"application/vnd.oci.image.config.v1+json",size:$csize,digest:$config},
-      layers:[{mediaType:"application/vnd.dsse.envelope.v1+json",size:$lsize,digest:$layer,
-        annotations:{predicateType:"https://spdx.dev/Document","dev.cosignproject.cosign/signature":"","dev.sigstore.cosign/chain":$chain}}]}' | put_blob "$dir")
+      layers:$layers}' | put_blob "$dir")
   jq -nc --arg manifest "sha256:$mhex" --argjson msize "$msize" \
     '{schemaVersion:2,mediaType:"application/vnd.oci.image.index.v1+json",
       manifests:[{mediaType:"application/vnd.oci.image.manifest.v1+json",size:$msize,digest:$manifest,artifactType:"application/vnd.oci.image.config.v1+json"}]}' > "$dir/index.json"
@@ -155,6 +161,33 @@ got=$(manifest_of "$SB/pushed/$TAG" | chain_of '.layers[1:][-1]')
 [ -n "$want" ] && [ -n "$got" ] && [ "$got" = "$want" ] \
   && pass "dev.sigstore.cosign/chain on the provenance layer is the string cosign's layer carries, character for character" \
   || fail "dev.sigstore.cosign/chain on the provenance layer against the layer that was already there" "on the provenance layer: $(chain_words "$got")" "on cosign's layer:       $(chain_words "$want")" "exit=$rc" "$out"
+
+# 4: the layers that were there are untouched: laid down with an SBOM layer and
+#    a vulnerability-report layer (two blobs), the manifest pushed carries both
+#    descriptors as they were (digest, size, media type, every annotation), in
+#    their order and before the new layer, and both blobs are still in the layout
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG" "https://spdx.dev/Document" "https://cosign.sigstore.dev/attestation/vuln/v1"
+# key-sorted on both sides: the order of an object's keys is free, the order of
+# the layers is not
+want=$(manifest_of "$SB/registry/$TAG" | jq -S '.layers')
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+pushed="$SB/pushed/$TAG"
+# all but the last: with no layer added, or the new one put first, these are
+# not the two laid down
+got=$(manifest_of "$pushed" | jq -S '.layers[:-1]' 2>/dev/null)
+[ "$(jq 'map(.digest) | unique | length' <<<"$want")" = 2 ] && [ -n "$got" ] && [ "$got" = "$want" ] \
+  && pass "the layers before the new one are the two laid down, descriptor for descriptor and in their order" \
+  || fail "the pushed manifest's layers except the last against the layers laid down" "pushed, all but the last:" "$([ -n "$got" ] && jq -c '.[]?' <<<"$got" | short || echo "nothing was pushed to the tag")" "laid down:" "$(jq -c '.[]' <<<"$want" | short)" "exit=$rc" "$out"
+# the blobs the laid-down layers name: each a file of the pushed layout whose
+# sha256 is its name
+kept=0; lost=()
+for hex in $(jq -r '.[].digest | ltrimstr("sha256:")' <<<"$want"); do
+  sum="no such blob"; [ -f "$pushed/blobs/sha256/$hex" ] && sum=$(sha256sum < "$pushed/blobs/sha256/$hex" | cut -d' ' -f1)
+  if [ "$sum" = "$hex" ]; then kept=$((kept + 1)); else lost+=("layer $hex: sha256 of the blob in the pushed layout '$sum', wanted its name"); fi
+done
+[ "$kept" -eq 2 ] \
+  && pass "both earlier layers' blobs are still in the pushed layout, each one's sha256 its name" \
+  || fail "the blobs of the layers laid down, in the pushed layout" "${lost[@]}" "intact: $kept, wanted 2"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
