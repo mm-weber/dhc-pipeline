@@ -623,6 +623,50 @@ tried='\b(3|three) (attempts|times|tries)\b'
        "crane push calls logged: $calls, wanted 3:" "${pushes:-none}" \
        "under pushed, wanted nothing: ${kept:-nothing}" "output:" "${out:-none}"
 
+# 19: wrong usage is refused: a call that is wrong ends with exit 2 and the
+#     usage line, the family's code for it (exit 1 is a refusal of content, the
+#     cases 8 to 17), before crane is asked for anything. The five wrong calls:
+#     no argument at all; a mode that is not store (frob in its place, the
+#     other arguments right); store with the bundles file and the repository
+#     but no digest; a digest without sha256: (the index digest's 64 hex digits
+#     alone); a bundles file that is not there (a path in the sandbox nothing
+#     was written to). Each runs in a sandbox of its own with the attestation
+#     manifest laid down at the index digest's .att tag, so that only the call
+#     is wrong: whatever is right in it could be stored. Wanted of each: exit
+#     2; a line of the output begun "usage: unpack-provenance.sh" (its
+#     beginning only, the modes and their arguments follow it; a line begun
+#     with it, so bash's own complaint about an unset parameter, which carries
+#     the text after the script's path and a line number, is not one); no crane
+#     call in the stub's log, neither a pull nor a push. This is no refusal of
+#     content and refused cannot be used here: the exit code is another and
+#     there is no ::error:: line with a digest to ask for. One result line for
+#     the five; on a failure its detail names each call with what was found
+seen=(); unrefused=0
+misused() { # what, then the call's arguments: runs it in the sandbox made before it and notes whether it was refused as wrong usage
+  local what="$1" usage="not found" crane; shift
+  out=$(run "$@"); rc=$?
+  grep -q '^usage: unpack-provenance\.sh' <<<"$out" && usage="found"
+  crane=$(cat "$SB/crane.log")
+  if [ "$rc" -eq 2 ] && [ "$usage" = "found" ] && [ -z "$crane" ]; then seen+=("refused, $what: exit 2, the usage line, no crane call"); return; fi
+  unrefused=$((unrefused + 1))
+  seen+=("NOT refused, $what: exit=$rc, wanted 2; a line begun 'usage: unpack-provenance.sh': $usage; crane calls: $(grep -c '' "$SB/crane.log"), wanted none")
+  [ -z "$crane" ] || seen+=("$(sed 's/^/  called: /' <<<"$crane")")
+  seen+=("$(sed 's/^/  output: /' <<<"${out:-none}")")
+}
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+misused "no argument"
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+misused "an unknown mode (frob in the place of store)" frob "$DATA/bundle.jsonl" "$REPO" "$INDEX"
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+misused "no digest" store "$DATA/bundle.jsonl" "$REPO"
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+misused "a digest without sha256: (${INDEX#sha256:})" store "$DATA/bundle.jsonl" "$REPO" "${INDEX#sha256:}"
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+misused "a bundles file that is missing" store "$SB/no-such-bundles.jsonl" "$REPO" "$INDEX"
+[ "$unrefused" -eq 0 ] \
+  && pass "wrong usage is refused (no argument, an unknown mode, no digest, a digest without sha256:, a bundles file that is missing): each exit 2 with a line begun 'usage: unpack-provenance.sh', crane never called" \
+  || fail "wrong usage is refused: exit 2, a line begun 'usage: unpack-provenance.sh', no crane call" "wrong calls not refused that way: $unrefused of 5" "${seen[@]}"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
