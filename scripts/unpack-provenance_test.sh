@@ -484,6 +484,89 @@ mv "$SB/index.json" "$layout/index.json"
 out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
 refused "$INDEX" 'no layer.*chain' "no layer of the attestation manifest carries a chain"
 
+# 16: refused, the chain did not issue the provenance certificate: the chain
+#     annotation is copied beside the bundle's certificate (case 3), and
+#     Kyverno takes the intermediate certificate from it, so the chain must be
+#     the one that issued that certificate. A chain that did not issue it is
+#     never copied beside it, and the error line says so: it speaks of the
+#     chain and of the certificate it did not issue. The chain here is a
+#     certificate authority of the test's own, made with openssl in the
+#     sandbox at each run (no key or certificate of it is kept in the
+#     repository): a self-signed root and an intermediate it signs, one PEM
+#     text in the order of the fixture's chain.pem, the intermediate first. It
+#     bears the names of the fixture's chain (O=sigstore.dev, CN=sigstore and
+#     CN=sigstore-intermediate) and is a certificate authority in every other
+#     respect: CA certificates that may
+#     sign certificates, the intermediate for code signing, both valid from
+#     the day before the log entry's integrated time (the moment a provenance
+#     certificate, which lives ten minutes, can be checked at) for ten years.
+#     Only its keys tell it from the real chain, so the refusal can only come
+#     from the chain not having issued the certificate, never from a name, a
+#     date or a certificate that is no authority's. openssl ca makes the
+#     certificates: of the commands OpenSSL 3.0 has, it alone takes a start
+#     date. The layout is the one lay_down writes for an SBOM layer and a
+#     vulnerability-report layer, with its manifest rewritten the way case 15
+#     does it: that chain in the annotation of both layers and everything else
+#     as it was. The bundles file is the fixture's bundle as it is and the
+#     digest is named there, the manifest is there, is pulled and carries a
+#     chain on every layer. The pattern asks for the chain, the issuing and
+#     the certificate, in either order: case 15's error line speaks of a chain
+#     but of no certificate and nothing issued, and does not match
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG" "https://spdx.dev/Document" "https://cosign.sigstore.dev/attestation/vuln/v1"
+layout="$SB/registry/$TAG"; ca="$SB/ca"; mkdir "$ca"
+at=$(jq -r '.verificationMaterial.tlogEntries[0].integratedTime' "$DATA/bundle.jsonl")
+from=$(date -u -d "@$((at - 86400))" +%Y%m%d%H%M%SZ); till=$(date -u -d "@$((at + 315360000))" +%Y%m%d%H%M%SZ)
+: > "$ca/index.txt"; echo 01 > "$ca/serial" # openssl ca's books: the certificates issued, the next serial number
+cat > "$ca/openssl.cnf" <<CNF
+[req]
+distinguished_name = dn
+[dn]
+[ca]
+default_ca = made
+[made]
+database = $ca/index.txt
+serial = $ca/serial
+new_certs_dir = $ca
+default_md = sha256
+policy = names
+[names]
+organizationName = supplied
+commonName = supplied
+[root]
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+[intermediate]
+basicConstraints = critical,CA:TRUE,pathlen:0
+keyUsage = critical,keyCertSign,cRLSign
+extendedKeyUsage = codeSigning
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid
+CNF
+# a key and a request each, then the root signs itself and the intermediate;
+# what openssl says while it works goes to a log, never to the suite's output
+openssl req -config "$ca/openssl.cnf" -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc \
+  -keyout "$ca/root.key" -subj "/O=sigstore.dev/CN=sigstore" -out "$ca/root.csr" >> "$ca/log" 2>&1
+openssl req -config "$ca/openssl.cnf" -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc \
+  -keyout "$ca/intermediate.key" -subj "/O=sigstore.dev/CN=sigstore-intermediate" -out "$ca/intermediate.csr" >> "$ca/log" 2>&1
+openssl ca -config "$ca/openssl.cnf" -batch -notext -selfsign -keyfile "$ca/root.key" -extensions root \
+  -startdate "$from" -enddate "$till" -in "$ca/root.csr" -out "$ca/root.pem" >> "$ca/log" 2>&1
+openssl ca -config "$ca/openssl.cnf" -batch -notext -cert "$ca/root.pem" -keyfile "$ca/root.key" -extensions intermediate \
+  -startdate "$from" -enddate "$till" -in "$ca/intermediate.csr" -out "$ca/intermediate.pem" >> "$ca/log" 2>&1
+cat "$ca/intermediate.pem" "$ca/root.pem" > "$ca/chain.pem" 2>> "$ca/log"
+# the authority holds on its own at the integrated time, or the refusal below
+# would prove nothing; no result line when it does
+sound=$(openssl verify -attime "$at" -no-CApath -no-CAstore -CAfile "$ca/root.pem" "$ca/intermediate.pem" 2>&1) \
+  || fail "the certificate authority made for case 16: its intermediate verifies against its root at the integrated time" "openssl verify at $at: $sound" "wanted: OK" "openssl while making it:" "$(cat "$ca/log")"
+with_fixture=$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' "$layout/index.json") # the manifest as lay_down wrote it, the fixture's chain on its layers
+read -r mhex msize < <(manifest_of "$layout" | jq -c --rawfile chain "$ca/chain.pem" '.layers[].annotations."dev.sigstore.cosign/chain" = $chain' | put_blob "$layout")
+rm "$layout/blobs/sha256/$with_fixture"
+jq -c --arg manifest "sha256:$mhex" --argjson msize "$msize" \
+  '.manifests[0].digest = $manifest | .manifests[0].size = $msize' "$layout/index.json" > "$SB/index.json"
+mv "$SB/index.json" "$layout/index.json"
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+refused "$INDEX" 'chain.*issu.*certificate|certificate.*issu.*chain' "the chain did not issue the provenance certificate"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
