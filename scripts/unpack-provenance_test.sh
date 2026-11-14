@@ -567,6 +567,21 @@ mv "$SB/index.json" "$layout/index.json"
 out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
 refused "$INDEX" 'chain.*issu.*certificate|certificate.*issu.*chain' "the chain did not issue the provenance certificate"
 
+# 17: all or nothing across digests: a release carries its provenance beside
+#     every digest (the index and each platform manifest) or beside none, so a
+#     digest that is refused leaves every tag as it was, the tags of the
+#     digests before it included. store is called with case 7's two digests,
+#     the index first and the amd64 manifest second; the fixture's one
+#     statement names both. The attestation manifest is laid down at the
+#     index's .att tag and nothing at the amd64 manifest's: the first digest
+#     lacks nothing and could be stored, the second is refused the way case
+#     14's is, with the same pattern, and the error line carries the second
+#     digest. crane push is never called, not for the first digest either:
+#     refused reads the whole call log, a push to any tag counts
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG" # no lay_down for the second digest: the registry holds nothing at its .att tag
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX" "$AMD64"); rc=$?
+refused "$AMD64" 'attestation manifest.*attestations.*(first|exist)' "the second of two digests has no attestation manifest beside it, nothing is pushed for the first either"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
