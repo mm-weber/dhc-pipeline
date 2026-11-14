@@ -480,9 +480,18 @@ left of the program is the follow-up list below, one decision each.
           done 2026-11-14; with the line in `catalogue-policy.yaml` alone
           `lint-workflow-policy.sh .` refuses the release job by name,
           with the line in `build.yml` too it passes
-    - [ ] 2.4 `scripts/unpack-provenance.sh`, modes `store` and
-          `subjects` (twenty-eight slices: retries, the attestation
-          store's answer, the last one against the real crane and cosign)
+    - [x] 2.4 `scripts/unpack-provenance.sh`, modes `store` and
+          `subjects` (twenty-nine slices, 2.4.24b added for the pull's
+          attempts: retries, the attestation store's answer, the last
+          one against the real crane and cosign): done 2026-11-14 on
+          branch `provenance-step`, one failing test or one guard
+          before each change; the stub suite at 45 passed; the
+          real-tool suite `scripts/provenance-real_test.sh` at 4 passed
+          (crane 0.22.1 stores the layer on a registry on 127.0.0.1,
+          cosign 2.6.5 accepts it offline as SLSA provenance v1, the
+          Fulcio file holding the roots only so that the chain the
+          script wrote is what the path is built from); cleanup
+          candidates recorded as plan item 2.8.2
     - [ ] 2.5 `scripts/check-provenance.sh verify` (thirteen slices:
           retries, the last one against the real cosign)
     - [ ] 2.6 the release steps in `build.yml`, the three suites in
