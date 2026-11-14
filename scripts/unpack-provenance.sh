@@ -37,7 +37,10 @@
 # copied character for character from the first layer of the pulled manifest
 # that carries one, read before any layer is taken out.
 # The manifest is pulled as an OCI layout with crane, gets the layer appended
-# and is pushed back to the same tag. Its config is rewritten with the layer,
+# and is pushed back to the same tag. A digest with no attestation manifest to
+# pull is refused like the others: the layer is added to the manifest cosign
+# wrote and never begins a new one, so the release's other attestations must
+# exist first. Its config is rewritten with the layer,
 # the way cosign writes it: the layer's digest one more entry of
 # rootfs.diff_ids, one more entry of history, every other field as it was; the
 # manifest names the new config blob by its digest and its byte size.
@@ -116,7 +119,10 @@ for DIGEST in "$@"; do
   [ "$layer" = "$logged" ] \
     || refuse "the envelope's sha256 ${layer} is not the envelope hash the log entry records, ${logged}"
 
-  crane pull --format oci "$REF" "$DIR"
+  # the layer is added to the attestation manifest cosign wrote for the digest
+  # and never begins a new one: no manifest to pull, nothing is stored
+  crane pull --format oci "$REF" "$DIR" \
+    || refuse "no attestation manifest could be pulled from ${REF}, the release's other attestations must exist first"
   mv "$DIR.envelope" "$BLOBS/$layer"
 
   # the config with the layer listed, as a new blob: cosign keeps the layers'
