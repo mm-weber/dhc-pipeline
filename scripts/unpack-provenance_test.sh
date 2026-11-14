@@ -25,7 +25,12 @@ fresh() {
   # keeps the layout it was given, every call is logged. A case that wants
   # pushes to fail writes their number to $SB/push-failures: while it is above
   # 0 a push fails the way crane does (a line on stderr, exit 1), keeps nothing
-  # and counts it down by one; with no such file no push fails
+  # and counts it down by one; with no such file no push fails. Pulls fail in
+  # the same way for a case that writes their number to $SB/pull-failures:
+  # while it is above 0 a pull fails the way crane does when the registry
+  # answers 503 (a line on stderr, exit 1), writes nothing to the target
+  # directory and counts it down by one; with no such file a pull fails only
+  # where no layout is laid down for the tag
   cat > "$SB/bin/crane" <<'STUB'
 #!/usr/bin/env bash
 SB="$(cd "$(dirname "$0")/.." && pwd)"
@@ -33,6 +38,11 @@ printf 'crane %s\n' "$*" >> "$SB/crane.log"
 case "$1" in
   pull) # crane pull --format oci <ref> <dir>
     ref="${*: -2:1}"; dir="${*: -1}"; tag="${ref##*:}"
+    left=0; [ -f "$SB/pull-failures" ] && left=$(cat "$SB/pull-failures")
+    if [ "$left" -gt 0 ]; then
+      echo "$((left - 1))" > "$SB/pull-failures"
+      echo "Error: GET https://${ref%%/*}/v2/.../manifests/$tag: unexpected status code 503 Service Unavailable" >&2; exit 1
+    fi
     if [ ! -d "$SB/registry/$tag" ]; then
       echo "Error: GET https://${ref%%/*}/v2/.../manifests/$tag: MANIFEST_UNKNOWN: manifest unknown" >&2; exit 1
     fi
@@ -920,6 +930,60 @@ done
   || fail "a push that fails twice and then goes through: exit 0, three crane push calls, one ::warning:: line per failed attempt, no ::error:: line, the layer pushed" "exit=$rc, wanted 0" \
        "crane pull calls logged: $pulls, wanted 1; crane push calls logged: $pushes, wanted 3:" "$([ -s "$SB/crane.log" ] && cat "$SB/crane.log" || echo "crane never called")" \
        "::warning:: lines in the output: $count, wanted two, each begun '::warning::unpack-provenance:', carrying '$INDEX' and speaking of the push, the first naming attempt 1 (or try 1, or the 1st or first attempt or try; any case), the second attempt 2 in the same way; lines that do, in their place: $named, wanted 2:" "${warnings:-none}" \
+       "::error:: lines in the output, wanted none:" "${errors:-none}" \
+       "layers pushed: ${after:-none, nothing was pushed to the tag}, wanted $((before + 1)); of the provenance type: ${typed:-none}, wanted 1:" "$([ -n "$manifest" ] && layers_words <<<"$manifest" || echo "nothing was pushed to the tag")" \
+       "output:" "${out:-none}"
+
+# 25: a pull that fails is tried again (plan slice 2.4.24b): a registry
+#     answers 5xx to a pull as it does to a push (cases 18 and 24), and with
+#     one attempt a registry that falters once ends the run with case 14's
+#     refusal, which speaks of an attestation manifest that is missing where
+#     one is there. The pull is tried up to three times like the push,
+#     UNPACK_PROVENANCE_RETRY_DELAY seconds apart, and each failed attempt
+#     that is tried again is said with one warning line in case 24's shape,
+#     ::warning::unpack-provenance: <repository>@<digest>: ..., which carries
+#     the digest, speaks of the pull and names the attempt that failed. The
+#     attestation manifest is laid down at the index's .att tag and the
+#     bundles file is the fixture's bundle as it is, so the digest lacks
+#     nothing; the stub's count of the pulls that fail is set to 2, so the
+#     first pull and the second fail the way crane does on a 503 and the third
+#     copies the layout. Wanted: exit 0; three crane pulls and one crane push
+#     in the stub's log; exactly two lines of the output begun ::warning::,
+#     each begun ::warning::unpack-provenance:, each carrying the digest in
+#     full and speaking of the pull, the first naming the first attempt and
+#     the second the second (case 24's patterns, $first and $second); no
+#     ::error:: line, the run did not fail; the manifest pushed has one layer
+#     more than was laid down and exactly one of the provenance type, as for a
+#     pull that goes through at once (case 1). The third and last failure is
+#     no part of this case: there case 14's refusal speaks. One result line;
+#     on a failure its detail shows the exit code, the crane calls, the
+#     warning lines found, the error lines found, the layers pushed and the
+#     output
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+before=$(manifest_of "$SB/registry/$TAG" | jq '.layers | length')
+echo 2 > "$SB/pull-failures" # the first two pulls fail, the third goes through
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+warnings=$(grep '^::warning::' <<<"$out"); count=$(grep -c '^::warning::' <<<"$out")
+errors=$(grep '^::error::' <<<"$out")
+pulls=$(grep -c '^crane pull' "$SB/crane.log"); pushes=$(grep -c '^crane push' "$SB/crane.log")
+# a tag nothing was pushed to is said so, never read
+pushed="$SB/pushed/$TAG"; manifest=""; [ -f "$pushed/index.json" ] && manifest=$(manifest_of "$pushed")
+after=$(jq '.layers | length' <<<"$manifest" 2>/dev/null)
+typed=$(jq --arg type "$slsa" '[.layers[] | select(.annotations.predicateType == $type)] | length' <<<"$manifest" 2>/dev/null)
+# the warning lines in their order, as in case 24: each is counted when it is
+# the unpack's own, carries the digest, speaks of the pull and names its attempt
+named=0
+for nth in 1 2; do
+  line=$(sed -n "${nth}p" <<<"$warnings"); which="$first"; [ "$nth" -eq 2 ] && which="$second"
+  [[ "$line" == "::warning::unpack-provenance:"* ]] && [[ "$line" == *"$INDEX"* ]] \
+    && grep -iq -- 'pull' <<<"$line" && grep -Eiq -- "$which" <<<"$line" && named=$((named + 1))
+done
+[ "$rc" -eq 0 ] && [ "$pulls" -eq 3 ] && [ "$pushes" -eq 1 ] && [ "$count" -eq 2 ] && [ "$named" -eq 2 ] && [ -z "$errors" ] \
+  && [ "$after" = "$((before + 1))" ] && [ "$typed" = 1 ] \
+  && pass "a pull that fails twice and then goes through: exit 0, three crane pulls and one crane push, two ::warning::unpack-provenance: lines with the digest and the pull, the first naming the first attempt and the second the second, no ::error:: line, the manifest pushed has one layer more and one provenance layer" \
+  || fail "a pull that fails twice and then goes through: exit 0, three crane pull calls, one ::warning:: line per failed attempt, no ::error:: line, the layer pushed" "exit=$rc, wanted 0" \
+       "crane pull calls logged: $pulls, wanted 3; crane push calls logged: $pushes, wanted 1:" "$([ -s "$SB/crane.log" ] && cat "$SB/crane.log" || echo "crane never called")" \
+       "::warning:: lines in the output: $count, wanted two, each begun '::warning::unpack-provenance:', carrying '$INDEX' and speaking of the pull, the first naming attempt 1 (or try 1, or the 1st or first attempt or try; any case), the second attempt 2 in the same way; lines that do, in their place: $named, wanted 2:" "${warnings:-none}" \
        "::error:: lines in the output, wanted none:" "${errors:-none}" \
        "layers pushed: ${after:-none, nothing was pushed to the tag}, wanted $((before + 1)); of the provenance type: ${typed:-none}, wanted 1:" "$([ -n "$manifest" ] && layers_words <<<"$manifest" || echo "nothing was pushed to the tag")" \
        "output:" "${out:-none}"
