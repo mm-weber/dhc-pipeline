@@ -449,14 +449,15 @@ left of the program is the follow-up list below, one decision each.
         the chain annotation (valkey `9-alpine3.23`, index and arm64), so
         the unpack copies it from a layer of the manifest it edits and
         checks it against the provenance certificate.
-  - [ ] The amendment of 2026-11-13 (plan task 0.5; branch
+  - [x] The amendment of 2026-11-13 (plan task 0.5; branch
         `provenance-release`): requirements.md 2.27's
         storage clause and the header's amendment line, Decision 15's
         amendment, ADR 0005's amendment (no second policy entry),
         tasks.md 18.1 and 18.3 to 18.5, the track's FR-1, risks and
         phase 2 rewritten slice by slice. The owner approved the
         amendment and the revised plan on 2026-11-13; opened as a pull
-        request with a TL;DR, the owner merges.
+        request with a TL;DR, merged by the owner the same day as #408,
+        ff115e1.
   - [x] Critical review of the design before approval (2026-11-13, the
         owner's request; one read-only reviewer): the idea held (trust,
         the shared `.att` manifest, the envelope bytes); six gaps in how
@@ -466,7 +467,7 @@ left of the program is the follow-up list below, one decision each.
         provenance cannot be produced; both scripts get retries and
         thorough tests.
   - [ ] 18.3 by the plan's phase 2, each step after the owner's go:
-    - [ ] 2.1 one measuring run on #401: one statement naming the index
+    - [x] 2.1 one measuring run on #401: one statement naming the index
           and a platform manifest (`subject-checksums`), unpacked beside
           both, verified on both by cosign 2.6.5, Kyverno 1.19.2 and
           `gh attestation verify`; its bundle becomes the suites' fixture
