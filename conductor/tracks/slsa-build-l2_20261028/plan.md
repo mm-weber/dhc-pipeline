@@ -127,7 +127,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
 - [x] **2.4.8 Refused: no statement in the file names the digest.** Every refusal slice asserts the same three things: exit 1; one `::error::` line naming the digest and the reason; `crane push` never called.
 - [x] **2.4.9 Refused: the statement naming the digest is of another predicate type** (the message names the type found)
 - [x] **2.4.10 Refused: the log entry has no signed entry timestamp** (the second Rekor log issues none; the message says the attestation layout cannot carry such an entry)
-- [ ] **2.4.11 Refused: the envelope does not hash to the value the log entry records** (one byte of the signature changed in the fixture)
+- [x] **2.4.11 Refused: the envelope does not hash to the value the log entry records** (one byte of the signature changed in the fixture)
 - [ ] **2.4.12 Refused: more or fewer than one signature on the envelope** (the layer's envelope carries exactly one)
 - [ ] **2.4.13 Refused: more or fewer than one log entry in the bundle** (the log-entry annotation carries exactly one; for a bundle with none the message adds the likely cause: the action signed with GitHub's own Sigstore instance, which keeps no transparency log, chosen when the event does not say the repository is public)
 - [ ] **2.4.14 Refused: no attestation manifest beside the digest** (the stub's pull fails on every attempt; the message says the release's other attestations must exist first)

@@ -13,6 +13,9 @@
 # type stored here, and one whose log entry carries no signed entry timestamp:
 # cosign verifies the entry in this layout by that timestamp, and the layout
 # has no place for the inclusion proof the newer log issues in its stead.
+# Refused in the same way is an envelope whose sha256 is not the envelope hash
+# the log entry records: that hash is the one tie between the layer's bytes
+# and the transparency log.
 # One statement serves every digest it names: each digest given gets the
 # layer in its own attestation manifest, one after the other, one pull and
 # one push per digest. Nothing is signed here: the
@@ -84,13 +87,18 @@ for DIGEST in "$@"; do
        Payload: {body: .canonicalizedBody, integratedTime: (.integratedTime | tonumber),
                  logIndex: (.logIndex | tonumber), logID: $logid}}' <<<"$bundle")
 
-  crane pull --format oci "$REF" "$DIR"
+  # the layer: the envelope byte for byte as the transparency log hashed it,
+  # built beside the working directory until the layout is there; its sha256
+  # is the envelope hash the log entry records, or nothing is stored
+  jq -cj '.dsseEnvelope | {payload, payloadType, signatures: [.signatures[] | {sig}]}' <<<"$bundle" > "$DIR.envelope"
+  layer=$(sha256sum < "$DIR.envelope" | cut -d' ' -f1)
+  lsize=$(wc -c < "$DIR.envelope")
+  logged=$(jq -r '.verificationMaterial.tlogEntries[0].canonicalizedBody | @base64d | fromjson | .spec.envelopeHash.value' <<<"$bundle")
+  [ "$layer" = "$logged" ] \
+    || refuse "the envelope's sha256 ${layer} is not the envelope hash the log entry records, ${logged}"
 
-  # the layer: the envelope byte for byte as the transparency log hashed it
-  jq -cj '.dsseEnvelope | {payload, payloadType, signatures: [.signatures[] | {sig}]}' <<<"$bundle" > "$DIR/envelope"
-  layer=$(sha256sum < "$DIR/envelope" | cut -d' ' -f1)
-  lsize=$(wc -c < "$DIR/envelope")
-  mv "$DIR/envelope" "$BLOBS/$layer"
+  crane pull --format oci "$REF" "$DIR"
+  mv "$DIR.envelope" "$BLOBS/$layer"
 
   # the config with the layer listed, as a new blob: cosign keeps the layers'
   # digests in rootfs.diff_ids and one history entry per layer
