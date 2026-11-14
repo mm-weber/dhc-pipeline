@@ -667,6 +667,27 @@ misused "a bundles file that is missing" store "$SB/no-such-bundles.jsonl" "$REP
   && pass "wrong usage is refused (no argument, an unknown mode, no digest, a digest without sha256:, a bundles file that is missing): each exit 2 with a line begun 'usage: unpack-provenance.sh', crane never called" \
   || fail "wrong usage is refused: exit 2, a line begun 'usage: unpack-provenance.sh', no crane call" "wrong calls not refused that way: $unrefused of 5" "${seen[@]}"
 
+# 20: refused, the log entry is of another kind than dsse: the layer's blob is
+#     the envelope, and what ties it to the transparency log is the envelope
+#     hash a log entry of the kind dsse records (case 11). An entry of the
+#     older kind intoto records something else, the layer could not be tied to
+#     it, and the error line says so: it names the kind found. The bundles
+#     file is the fixture's bundle with the entry's kind set to intoto in both
+#     places that carry it: .kind of the decoded canonicalizedBody (the rest
+#     of the body as it is, encoded back as base64 without line breaks, so the
+#     envelope hash still stands there and the envelope still hashes to it)
+#     and the entry's kindVersion.kind, so the bundle says the same whichever
+#     of the two is read. Everything else is as it is (the statement, its
+#     subjects and its type; the envelope with its one signature; the entry's
+#     timestamp); the digest is named, the manifest is there, so the refusal
+#     can only come from the kind. The pattern asks for the kind found,
+#     intoto, and beside it the word kind or the kind wanted, dsse, in either
+#     order: no other error line carries intoto
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+jq -c '.verificationMaterial.tlogEntries[0] |= (.canonicalizedBody |= (@base64d | fromjson | .kind = "intoto" | tojson | @base64) | .kindVersion.kind = "intoto")' "$DATA/bundle.jsonl" > "$SB/bundle-intoto.jsonl"
+out=$(run store "$SB/bundle-intoto.jsonl" "$REPO" "$INDEX"); rc=$?
+refused "$INDEX" '(kind|dsse).*intoto|intoto.*(kind|dsse)' "the log entry is of the kind intoto, not dsse, the kind found named on the error line"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
