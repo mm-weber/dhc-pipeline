@@ -11,6 +11,10 @@
 # bundle's DSSE envelope in the compact form whose sha256 the transparency
 # log recorded (payload, payloadType, the signature; no whitespace, no
 # trailing newline), and its predicateType annotation is the statement's own.
+# The certificate and the log entry travel as cosign's annotations: the
+# bundle's certificate as PEM, the entry as the JSON text cosign reads back
+# (the signed entry timestamp, the body, the integrated time, the entry's own
+# log index, the log's id in hex), the signature annotation present and empty.
 # The manifest is pulled as an OCI layout with crane, gets the layer appended
 # and is pushed back to the same tag.
 set -euo pipefail
@@ -30,6 +34,16 @@ bundle=$(jq -c --arg hex "${DIGEST#sha256:}" \
   'select(.dsseEnvelope.payload | @base64d | fromjson | any(.subject[]; .digest.sha256 == $hex))' "$BUNDLES")
 predicate=$(jq -r '.dsseEnvelope.payload | @base64d | fromjson | .predicateType' <<<"$bundle")
 
+# cosign's annotations: the certificate as PEM, the log entry as JSON text.
+# logIndex is the entry's own, the one the signed entry timestamp covers
+# (inclusionProof.logIndex is a different number); logID is the key id in hex
+certificate=$(jq -r '.verificationMaterial.certificate.rawBytes' <<<"$bundle" | base64 -d | openssl x509 -inform DER)
+logid=$(jq -r '.verificationMaterial.tlogEntries[0].logId.keyId' <<<"$bundle" | base64 -d | od -An -vtx1 | tr -d ' \n')
+entry=$(jq -c --arg logid "$logid" '.verificationMaterial.tlogEntries[0]
+  | {SignedEntryTimestamp: .inclusionPromise.signedEntryTimestamp,
+     Payload: {body: .canonicalizedBody, integratedTime: (.integratedTime | tonumber),
+               logIndex: (.logIndex | tonumber), logID: $logid}}' <<<"$bundle")
+
 crane pull --format oci "$REF" "$DIR"
 
 # the layer: the envelope byte for byte as the transparency log hashed it
@@ -41,8 +55,11 @@ mv "$DIR/envelope" "$BLOBS/$layer"
 # the manifest with the layer appended, as a new blob the index points at
 old=$(jq -r '.manifests[0].digest' "$DIR/index.json")
 jq -c --arg digest "sha256:$layer" --argjson size "$lsize" --arg predicate "$predicate" \
+  --arg certificate "$certificate" --arg entry "$entry" \
   '.layers += [{mediaType: "application/vnd.dsse.envelope.v1+json", size: $size, digest: $digest,
-                annotations: {predicateType: $predicate}}]' "$BLOBS/${old#sha256:}" > "$DIR/manifest"
+                annotations: {predicateType: $predicate, "dev.cosignproject.cosign/signature": "",
+                              "dev.sigstore.cosign/certificate": ($certificate + "\n"),
+                              "dev.sigstore.cosign/bundle": $entry}}]' "$BLOBS/${old#sha256:}" > "$DIR/manifest"
 manifest=$(sha256sum < "$DIR/manifest" | cut -d' ' -f1)
 msize=$(wc -c < "$DIR/manifest")
 mv "$DIR/manifest" "$BLOBS/$manifest"

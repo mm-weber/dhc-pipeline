@@ -111,7 +111,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
 - [x] **2.4.1 The provenance becomes one more layer, the envelope byte for byte** (tracer; FR-1)
   - RED: `store` for the index digest exits 0; the layout pushed to `sha256-<hex>.att` has one layer more than before; that layer has media type `application/vnd.dsse.envelope.v1+json` and the annotation `predicateType: https://slsa.dev/provenance/v1`; its blob is in the layout and its sha256 equals the `envelopeHash` in the bundle's log entry. Fails because the stub writes nothing.
   - GREEN: select the statement, write the compact envelope, append the layer, push.
-- [ ] **2.4.2 The certificate and the log entry travel as cosign's annotations**
+- [x] **2.4.2 The certificate and the log entry travel as cosign's annotations**
   - RED: `dev.sigstore.cosign/certificate` is a PEM whose DER equals the bundle's `verificationMaterial.certificate.rawBytes`; `dev.sigstore.cosign/bundle` equals `{"SignedEntryTimestamp", "Payload": {"body", "integratedTime", "logIndex", "logID"}}` built by the test from the bundle (numbers as numbers, the log id in hex); `logIndex` is the log entry's own, never `inclusionProof.logIndex` (a real bundle carries two different numbers there, 3851076632 and 3729172370 in the bundle of 2026-11-12, and the signed entry timestamp covers the entry's own; the test names the field by its full path so that test and code cannot agree on the wrong one); `dev.cosignproject.cosign/signature` is present and empty.
 - [ ] **2.4.3 The chain annotation is copied from a layer cosign wrote and checked against the certificate**
   - RED: the new layer's `dev.sigstore.cosign/chain` equals the existing layer's.
