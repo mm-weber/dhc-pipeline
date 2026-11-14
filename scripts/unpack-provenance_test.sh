@@ -1086,6 +1086,43 @@ issued='chain.*issu.*certificate|certificate.*issu.*chain' # case 16's pattern
        "the certificate authority made for this case, its intermediate against its root at the integrated time $at: $sound, wanted yes${said:+ (openssl verify: $said)}" \
        "output:" "${out:-none}"
 
+# 27: subjects writes one line per digest in the shape the action reads (plan
+#     slice 2.4.26): the release job hands the digests of an image to
+#     actions/attest-build-provenance as its subject-checksums file, and the
+#     script's second mode writes that file's lines to stdout:
+#     subjects <repository> <digest>... One line per digest: the digest's 64
+#     hex digits without sha256:, one space, the repository, the lines in the
+#     order the digests were given. The shape is asked to the character,
+#     because the action says nothing where it is missed (attest v4.2.1,
+#     src/subject.ts): a line without a space is skipped silently, and a
+#     digest with its sha256: prefix is thrown out as invalid. subjects is
+#     called with the repository and case 7's two digests, the index first and
+#     the amd64 manifest second: the index's hex begins c4 and the amd64
+#     manifest's ac, so the order given is not the sorted one and lines that
+#     were sorted would show (asked with the result line: the wanted lines are
+#     not in sorted order). The mode asks nothing of the registry and reads no
+#     bundles file: nothing is laid down in the sandbox and no file is given.
+#     run folds stderr into the output and cannot be used here, stdout is the
+#     file the action reads and must hold the lines and nothing else: the
+#     script is called with run's environment (the stub first on PATH, the
+#     delay 0), stdout taken as the output and stderr written to a file in the
+#     sandbox. Wanted: exit 0; stdout is exactly the two lines, compared as a
+#     whole; nothing on stderr; no crane call in the stub's log, neither a
+#     pull nor a push. One result line; on a failure its detail shows the exit
+#     code, stdout as found and as wanted (both through cat -A, so a tab, a
+#     trailing space or a carriage return shows), stderr and the crane calls
+fresh
+want=$(printf '%s %s\n' "${INDEX#sha256:}" "$REPO" "${AMD64#sha256:}" "$REPO")
+out=$(PATH="$SB/bin:$PATH" UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" subjects "$REPO" "$INDEX" "$AMD64" 2> "$SB/stderr"); rc=$?
+err=$(cat "$SB/stderr"); crane=$(cat "$SB/crane.log" 2>/dev/null)
+[ "$want" != "$(LC_ALL=C sort <<<"$want")" ] && [ "$rc" -eq 0 ] && [ "$out" = "$want" ] && [ -z "$err" ] && [ -z "$crane" ] \
+  && pass "subjects with the index digest and the amd64 manifest's: exit 0, stdout is one line per digest in the order given, the bare hex, one space, the repository, nothing on stderr, crane never called" \
+  || fail "subjects: exit 0, stdout one line per digest in the order given (the bare hex, one space, the repository), nothing on stderr, no crane call" "exit=$rc, wanted 0" \
+       "stdout (through cat -A: a line's end as \$, a tab as ^I):" "$([ -n "$out" ] && cat -A <<<"$out" || echo "nothing")" \
+       "wanted, the same way (not in sorted order, or sorted lines would not show):" "$(cat -A <<<"$want")" \
+       "stderr, wanted nothing:" "${err:-nothing}" \
+       "crane calls logged, wanted none:" "${crane:-none}"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
