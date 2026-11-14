@@ -87,7 +87,7 @@ def platforms():
     return out
 
 def provenance():
-    return rel["provenance"]
+    return raw_token("provenance")
 
 if query == "public":
     print(boolean("public"))
