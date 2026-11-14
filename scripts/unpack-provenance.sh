@@ -35,7 +35,9 @@
 # The chain annotation (the Sigstore certificates that issued the bundle's
 # certificate; Kyverno reads the intermediate from there and nowhere else) is
 # copied character for character from the first layer of the pulled manifest
-# that carries one, read before any layer is taken out.
+# that carries one, read before any layer is taken out; a manifest none of
+# whose layers carries one is refused like the others, once it is pulled and
+# before anything of it is rewritten: there is no chain to copy.
 # The manifest is pulled as an OCI layout with crane, gets the layer appended
 # and is pushed back to the same tag. A digest with no attestation manifest to
 # pull is refused like the others: the layer is added to the manifest cosign
@@ -123,11 +125,15 @@ for DIGEST in "$@"; do
   # and never begins a new one: no manifest to pull, nothing is stored
   crane pull --format oci "$REF" "$DIR" \
     || refuse "no attestation manifest could be pulled from ${REF}, the release's other attestations must exist first"
+  # the chain is copied from a layer cosign wrote in that manifest: no layer
+  # that carries one, nothing is stored
+  old=$(jq -r '.manifests[0].digest' "$DIR/index.json")
+  jq -e 'any(.layers[].annotations."dev.sigstore.cosign/chain"; type == "string")' "$BLOBS/${old#sha256:}" > /dev/null \
+    || refuse "no layer of the attestation manifest ${REF} carries a chain (the annotation dev.sigstore.cosign/chain), there is none to copy to the provenance layer"
   mv "$DIR.envelope" "$BLOBS/$layer"
 
   # the config with the layer listed, as a new blob: cosign keeps the layers'
   # digests in rootfs.diff_ids and one history entry per layer
-  old=$(jq -r '.manifests[0].digest' "$DIR/index.json")
   oldconfig=$(jq -r '.config.digest' "$BLOBS/${old#sha256:}")
   # the layers of the statement's predicate type that are already there (an
   # earlier unpack's), as their positions in the manifest: they are taken out of
