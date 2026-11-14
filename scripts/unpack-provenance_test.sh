@@ -688,6 +688,83 @@ jq -c '.verificationMaterial.tlogEntries[0] |= (.canonicalizedBody |= (@base64d 
 out=$(run store "$SB/bundle-intoto.jsonl" "$REPO" "$INDEX"); rc=$?
 refused "$INDEX" '(kind|dsse).*intoto|intoto.*(kind|dsse)' "the log entry is of the kind intoto, not dsse, the kind found named on the error line"
 
+# 21: several statements naming one digest, the newest is stored: a release
+#     run twice on one digest leaves two statements in GitHub's attestation
+#     store, each naming the digest and each valid, and the bundles file then
+#     holds both. One of them becomes the layer, never both (case 6: a
+#     manifest carries one provenance layer): the one whose log entry is the
+#     later, by the entry's integrated time and, were the times the same, by
+#     its log index. Which of the two comes first in the file decides nothing.
+#     The fixture store-two.json is the store's answer for the index digest
+#     after the measuring run attested it twice, the newer statement first:
+#     log index 3862535824, integrated time 1794604165, naming the index
+#     alone; then the statement of bundle.jsonl, log index 3862518718,
+#     integrated time 1794604098. The script reads bundle lines, the action's
+#     file (reading the store's answer as it is belongs to the next case), so
+#     the two bundles are taken out of the answer with jq as two lines, once
+#     in the fixture's order and once reversed, and store runs with each file
+#     in a sandbox of its own, the attestation manifest laid down at the index
+#     digest's .att tag. Each statement alone passes every refusal above (SLSA
+#     provenance v1, one log entry of the kind dsse with its timestamp, one
+#     signature, the envelope hash, the fixture's chain issuing its
+#     certificate), so nothing but the choice between the two is asked. Two
+#     more runs ask for the log index: the same two files, the older entry's
+#     integrated time raised to the newer's on the line taken out (the fixture
+#     stays as it is), so the times are the same and the log index alone tells
+#     the two apart; the statement of the greater log index is wanted, the
+#     newer one as before. The tie is made by raising the older entry's time,
+#     never by lowering the newer's: the chain is verified at the integrated
+#     time, the older certificate is still valid 67 seconds later and the
+#     newer is not yet valid at the older time. The script does not verify the
+#     signed entry timestamp, which covers the integrated time, so the changed
+#     time breaks nothing the script checks. Both orders are run with the tie
+#     as well: a choice by the integrated time alone stores the older
+#     statement in one of them, with the newer on the first line if it keeps
+#     the last of equals (as jq's max_by does), with the older there if it
+#     keeps the first. Wanted of each run: exit 0; the manifest pushed has one
+#     layer more than was laid down and exactly one of the provenance type;
+#     that layer's digest is the newer statement's envelope hash, read here
+#     from the fixture's entry of the greater integrated time (the entry of
+#     the greater log index is read as well and must be the same one), and its
+#     blob lies in the pushed layout under that sha256. One result line for
+#     the four runs; on a failure its detail names each run with what was
+#     found
+entries='[.attestations[].bundle.verificationMaterial.tlogEntries[0]]' # the fixture's two log entries
+logged='.canonicalizedBody | @base64d | fromjson | .spec.envelopeHash.value' # a log entry's envelope hash
+newer="sha256:$(jq -r "$entries | max_by(.integratedTime | tonumber) | $logged" "$DATA/store-two.json")"
+older="sha256:$(jq -r "$entries | min_by(.integratedTime | tonumber) | $logged" "$DATA/store-two.json")"
+indexed="sha256:$(jq -r "$entries | max_by(.logIndex | tonumber) | $logged" "$DATA/store-two.json")"
+tied=$(jq -r "$entries | max_by(.integratedTime | tonumber) | .integratedTime" "$DATA/store-two.json") # the newer entry's integrated time, as the bundle carries it
+found=(); unstored=0
+for order in "the newer statement on the first line, the fixture's order" "the older statement on the first line, the fixture's order reversed" \
+             "the newer statement on the first line, the fixture's order, both entries at the integrated time $tied and the log index alone telling them apart" \
+             "the older statement on the first line, the fixture's order reversed, both entries at the integrated time $tied and the log index alone telling them apart"; do
+  fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+  before=$(manifest_of "$SB/registry/$TAG" | jq '.layers | length')
+  lines='.attestations[].bundle'; [[ "$order" == *reversed* ]] && lines='.attestations | reverse | .[].bundle'
+  [[ "$order" == *apart ]] && lines="$lines | .verificationMaterial.tlogEntries[0].integratedTime = \$tied"
+  jq -c --arg tied "$tied" "$lines" "$DATA/store-two.json" > "$SB/bundles-two.jsonl"
+  out=$(run store "$SB/bundles-two.jsonl" "$REPO" "$INDEX"); rc=$?
+  # a tag nothing was pushed to is said so, never read
+  pushed="$SB/pushed/$TAG"; manifest=""; [ -f "$pushed/index.json" ] && manifest=$(manifest_of "$pushed")
+  after=$(jq '.layers | length' <<<"$manifest" 2>/dev/null)
+  got=$(jq -c --arg type "$slsa" '[.layers[] | select(.annotations.predicateType == $type) | .digest]' <<<"$manifest" 2>/dev/null)
+  hex=${newer#sha256:}; sum="no such blob"; [ -f "$pushed/blobs/sha256/$hex" ] && sum=$(sha256sum < "$pushed/blobs/sha256/$hex" | cut -d' ' -f1)
+  if [ "$rc" -eq 0 ] && [ "$after" = "$((before + 1))" ] && [ "$got" = "[\"$newer\"]" ] && [ "$sum" = "$hex" ]; then
+    found+=("stored, $order: exit 0, one layer more, one provenance layer, the newer statement's envelope"); continue
+  fi
+  unstored=$((unstored + 1))
+  found+=("NOT stored, $order: exit=$rc, wanted 0; layers pushed: ${after:-none, nothing was pushed to the tag}, wanted $((before + 1)); provenance layers pushed: ${got:-none}, wanted [\"$newer\"]; sha256 of the newer envelope's blob in the pushed layout: '$sum', wanted its name")
+  [ -z "$manifest" ] || found+=("$(layers_words <<<"$manifest" | sed 's/^/  pushed: /')")
+  [ -s "$SB/crane.log" ] && found+=("$(sed 's/^/  called: /' "$SB/crane.log")") || found+=("  called: crane never")
+  found+=("$(sed 's/^/  output: /' <<<"${out:-none}")")
+done
+[ "$newer" != "$older" ] && [ "$indexed" = "$newer" ] && [ "$unstored" -eq 0 ] \
+  && pass "two statements naming one digest, the newest is stored (the newer on the first line of the bundles file, the older there, and both again with the two at one integrated time): each exit 0, one layer more, one provenance layer, the envelope of the later log entry, by its integrated time, then its log index" \
+  || fail "two statements naming one digest: exit 0, one provenance layer, the envelope of the later log entry (integrated time, then log index), whichever statement comes first in the bundles file" "runs that did not store it that way: $unstored of 4" \
+       "the newer statement's envelope, wanted as the one provenance layer: $newer" "the older statement's envelope:                                      $older" \
+       "the envelope of the entry of the greater log index, wanted the newer: $indexed" "${found[@]}"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
