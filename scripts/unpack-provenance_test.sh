@@ -276,6 +276,44 @@ got=$(jq -c '.history' <<<"$config" 2>/dev/null)
   && pass "history has three entries, one per layer: the stale layer's entry is gone" \
   || fail "history of the pushed config: one entry per layer" "history: ${got:-no config to read}" "entries: $(jq 'length' <<<"${got:-[]}" 2>/dev/null), wanted 3 (three were laid down, one of them the stale layer's, one is new)"
 
+# 7: one statement serves every digest it names: the fixture's one statement
+#    names the index and the amd64 manifest, and store called with both
+#    digests writes the provenance beside both: one push per .att tag, the
+#    same envelope the last layer of each manifest pushed
+AMD64="sha256:ac78223352dc43ec63a57e63b45de5420722ada4f7db77f1305ab472a86d0d4e"
+fresh; TAG=$(att_tag "$INDEX"); TAG2=$(att_tag "$AMD64"); lay_down "$TAG"; lay_down "$TAG2"
+provenance="sha256:$(jq -r '.verificationMaterial.tlogEntries[0].canonicalizedBody' "$DATA/bundle.jsonl" | base64 -d | jq -r '.spec.envelopeHash.value')"
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX" "$AMD64"); rc=$?
+# the references crane push was given, sorted on both sides: the order of the
+# two pushes is free, their number and their tags are not
+want=$(printf '%s\n' "$REPO:$TAG" "$REPO:$TAG2" | sort)
+got=$(sed -n 's/^crane push .* //p' "$SB/crane.log" | sort)
+[ "$rc" -eq 0 ] && [ "$got" = "$want" ] \
+  && pass "store with two digests exits 0 and pushes twice, once to each digest's .att tag" \
+  || fail "one crane push per digest, each to its .att tag" "exit=$rc, wanted 0" "crane push went to:" "${got:-nowhere, no push at all}" "wanted, once each:" "$want" "$out"
+# the last layer of each manifest pushed: its predicateType, and the blob it
+# names against the envelope the log recorded. A tag nothing was pushed to is
+# said so, never read
+typed=0; stored=0; types=(); blobs=()
+for tag in "$TAG" "$TAG2"; do
+  pushed="$SB/pushed/$tag"; manifest=""
+  [ -f "$pushed/index.json" ] && manifest=$(manifest_of "$pushed")
+  if [ -z "$manifest" ]; then types+=("$tag: nothing pushed"); blobs+=("$tag: nothing pushed"); continue; fi
+  type=$(jq -r '.layers[-1].annotations.predicateType' <<<"$manifest" 2>/dev/null)
+  [ "$type" = "https://slsa.dev/provenance/v1" ] && typed=$((typed + 1))
+  types+=("$tag: last layer's predicateType '$type'")
+  layer=$(jq -r '.layers[-1].digest | strings' <<<"$manifest" 2>/dev/null); hex=${layer#sha256:}
+  sum="no such blob"; [ -n "$hex" ] && [ -f "$pushed/blobs/sha256/$hex" ] && sum=$(sha256sum < "$pushed/blobs/sha256/$hex" | cut -d' ' -f1)
+  [ "$layer" = "$provenance" ] && [ "$sum" = "$hex" ] && stored=$((stored + 1))
+  blobs+=("$tag: last layer '$layer', sha256 of the blob in the pushed layout '$sum'")
+done
+[ "$typed" -eq 2 ] \
+  && pass "each of the two manifests pushed ends in a layer annotated as SLSA provenance v1" \
+  || fail "the last layer's predicateType in each of the two manifests pushed" "${types[@]}" "wanted 'https://slsa.dev/provenance/v1' at both tags"
+[ "$stored" -eq 2 ] \
+  && pass "both layers name one blob, the envelope the log recorded, and it lies in each pushed layout under its sha256" \
+  || fail "the last layer's blob at each of the two tags against the log entry's envelopeHash" "${blobs[@]}" "wanted the layer $provenance at both tags, the blob's sha256 its name"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
