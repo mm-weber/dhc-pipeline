@@ -372,6 +372,21 @@ jq -c '.verificationMaterial.tlogEntries[0].inclusionPromise.signedEntryTimestam
 out=$(run store "$SB/bundle-empty-promise.jsonl" "$REPO" "$INDEX"); rc=$?
 refused "$INDEX" 'signed entry timestamp' "the log entry's signed entry timestamp is empty"
 
+# 11: refused, the envelope does not hash to the value the log entry records:
+#     the layer's blob is the envelope in the compact form, and its sha256 must
+#     be spec.envelopeHash.value of the entry's decoded canonicalizedBody. That
+#     hash is the one tie between the layer's bytes and the transparency log,
+#     so an envelope that does not match is refused before anything is pulled
+#     or pushed. The bundles file is the fixture's bundle with one character of
+#     the signature swapped for another base64 character (same length, still
+#     base64) and everything else as it is (the payload, so the statement, its
+#     subjects and its type; the log entry with its timestamp); the digest is
+#     named, the manifest is there, so the refusal can only come from the hash
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+jq -c '.dsseEnvelope.signatures[0].sig |= ((if .[0:1] == "A" then "B" else "A" end) + .[1:])' "$DATA/bundle.jsonl" > "$SB/bundle-other-sig.jsonl"
+out=$(run store "$SB/bundle-other-sig.jsonl" "$REPO" "$INDEX"); rc=$?
+refused "$INDEX" 'hash' "the envelope does not hash to the value the log entry records"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
