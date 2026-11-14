@@ -87,7 +87,7 @@ The suite's `policy` helper gains `provenance: report` with slice 2.2.1 (the RED
 - [x] **2.2.3 `off` and `required` come back as written**
   - RED: `provenance: off` prints `off`; `provenance: required` prints `required`. Fails if the reader hands back PyYAML's value: a bare `off` is the boolean False there and the string `off` in mikefarah's yq, the disagreement the two booleans already guard against.
   - GREEN: the raw token as written (`raw_token`), the way `boolean()` reads.
-- [ ] **2.2.4 A missing mode is refused, never defaulted**
+- [x] **2.2.4 A missing mode is refused, never defaulted**
   - RED: the `provenance:` line deleted; exit 2; the message names `provenance` and `off, report or required`.
 - [ ] **2.2.5 A value outside the three is refused by name**
   - RED: one loop, the shape of the suite's case 2, over `on`, `true`, `enforce`, `Report`, `"report"`; each exit 2 naming `provenance`, the value and `off, report or required`.

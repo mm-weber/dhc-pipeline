@@ -87,6 +87,8 @@ def platforms():
     return out
 
 def provenance():
+    if "provenance" not in rel:
+        refuse("provenance is missing; write off, report or required (Req 2.30)")
     return raw_token("provenance")
 
 if query == "public":
