@@ -7,7 +7,10 @@
 # verifiers reading that layout find the provenance next to the other
 # attestations (Req 2.27). <bundles> is the file the action leaves at its
 # bundle-path: one Sigstore bundle per line; the one whose statement names
-# the digest is taken; a digest no statement there names is refused with one
+# the digest is taken, and of several that name it (a release run twice
+# leaves two) the one whose log entry is the later: by the entry's integrated
+# time, then by its log index, both compared as numbers, their order in the
+# file deciding nothing; a digest no statement there names is refused with one
 # ::error:: line and exit 1, before anything is pulled or pushed for it, and
 # so is a digest whose statement is not SLSA provenance v1, the one predicate
 # type stored here, one whose bundle holds more or fewer than one log entry
@@ -108,9 +111,12 @@ for DIGEST in "$@"; do
   DIR=$(mktemp -d "$TMP/XXXXXX")
   BLOBS="$DIR/blobs/sha256"
 
-  # the bundle whose statement names the digest
+  # the bundle whose statement names the digest; of several the one whose log
+  # entry is the later, by its integrated time, then by its log index, as
+  # numbers (a bundle with no log entry counts as 0 here, it is refused below)
   bundle=$(jq -c --arg hex "${DIGEST#sha256:}" \
-    'select(.dsseEnvelope.payload | @base64d | fromjson | any(.subject[]; .digest.sha256 == $hex))' "$BUNDLES")
+    'select(.dsseEnvelope.payload | @base64d | fromjson | any(.subject[]; .digest.sha256 == $hex))' "$BUNDLES" \
+    | jq -sc 'max_by(.verificationMaterial.tlogEntries[0] | [(.integratedTime // "0" | tonumber), (.logIndex // "0" | tonumber)]) // empty')
   [ -n "$bundle" ] || refuse "no statement in the bundles file names the digest"
   predicate=$(jq -r '.dsseEnvelope.payload | @base64d | fromjson | .predicateType' <<<"$bundle")
   # SLSA provenance v1 and nothing else is stored here
