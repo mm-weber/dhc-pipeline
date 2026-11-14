@@ -92,13 +92,18 @@
 # digest, in the order the digests were given, the digest without its sha256:
 # (the 64 hex digits), one space, the repository, and nothing else. The shape
 # is the action's: it skips a line without a space in silence and throws out a
-# digest that keeps its sha256:. The mode reads no bundles file and asks
-# nothing of the registry.
+# digest that keeps its sha256:. A digest named more than once is written
+# once, at its first naming: two lines for one digest are one subject named
+# twice to the action. The mode reads no bundles file and asks nothing of the
+# registry.
 # A call that is wrong is no refusal of content: a mode that is missing or is
 # neither store nor subjects; for store no bundles file, repository or digest,
 # a digest that is not sha256: and 64 lowercase hex digits, or a bundles file
-# that is not there; for subjects no repository or no digest. Each ends with
-# the usage lines on stderr and exit 2, before anything is read or pulled.
+# that is not there; for subjects no repository or no digest, or a digest
+# that is not sha256: and 64 lowercase hex digits, checked before the first
+# line is written: a file half written is a file the action signs for. Each
+# ends with the usage lines on stderr and exit 2, before anything is read or
+# pulled.
 set -euo pipefail
 # wrong usage: the usage lines, one per mode, and exit 2
 usage() {
@@ -113,14 +118,22 @@ case "${1:-}" in
   # the rest of the script is this mode's
   store) [ "$#" -ge 4 ] && [ -n "$3" ] || usage ;;
   # after it the repository and the digests, at least one: a line per digest
-  # in the order given, the digest without its sha256:, one space, the
-  # repository; nothing is read and nothing is pulled
+  # in the order given, a digest named again left out, the digest without its
+  # sha256:, one space, the repository; nothing is read and nothing is pulled
   subjects)
     [ "$#" -ge 3 ] && [ -n "$2" ] || usage
     REPO="$2"
     shift 2
+    # checked before the first line is written: every digest is one
     for DIGEST in "$@"; do
+      [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || usage
+    done
+    DIGESTS=()
+    for DIGEST in "$@"; do
+      # a digest named more than once is written once, at its first naming
+      [[ " ${DIGESTS[*]} " != *" $DIGEST "* ]] || continue
       printf '%s %s\n' "${DIGEST#sha256:}" "$REPO"
+      DIGESTS+=("$DIGEST")
     done
     exit 0 ;;
   *) usage ;;
