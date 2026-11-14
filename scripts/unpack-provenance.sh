@@ -62,6 +62,11 @@
 # re-run release never stacks statements (cosign attest --replace leaves this
 # layer alone). The layers of other predicate types stay as they were, in
 # their order; the new layer goes last.
+# A push that fails is tried again, up to three attempts,
+# UNPACK_PROVENANCE_RETRY_DELAY seconds apart (default 10; the tests set 0).
+# After the third failure the run ends with one ::error:: line naming the
+# digest and the three attempts, and exit 1: nothing more is pushed, and the
+# digests pushed before it keep their layer, which a re-run replaces.
 set -euo pipefail
 USAGE="usage: unpack-provenance.sh store <bundles> <repository> <digest>..."
 # $1 is the mode, store, the only one there is
@@ -196,8 +201,16 @@ for DIGEST in "$@"; do
 done
 
 # no digest was refused: the prepared layouts are pushed, each to its own tag,
-# and a digest is said to be stored once its push is through
+# and a digest is said to be stored once its push is through. A push that
+# fails is tried again, up to three attempts; the third failure ends the run
+# with the error line of a refusal, naming the digest whose push it was
 for i in "${!DIGESTS[@]}"; do
-  crane push "${DIRS[$i]}" "${REFS[$i]}"
+  DIGEST="${DIGESTS[$i]}"
+  for attempt in 1 2 3; do
+    crane push "${DIRS[$i]}" "${REFS[$i]}" && break
+    [ "$attempt" -lt 3 ] \
+      || refuse "the push to ${REFS[$i]} failed 3 times, the provenance is not stored beside the digest"
+    sleep "${UNPACK_PROVENANCE_RETRY_DELAY:-10}"
+  done
   echo "unpack-provenance: ${REPO}@${DIGESTS[$i]}: provenance stored as layer sha256:${LAYERS[$i]} of ${REFS[$i]}"
 done
