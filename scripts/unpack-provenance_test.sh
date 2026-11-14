@@ -87,6 +87,25 @@ short() { jq -c 'walk(if type == "string" and length > 120 then "\(.[0:32])... (
 
 run() { PATH="$SB/bin:$PATH" UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" "$@" 2>&1; }
 
+# What every refusal shows, asserted the same way by each refusal case: exit 1;
+# exactly one ::error:: line, begun ::error::unpack-provenance:, carrying the
+# digest in full and the reason; crane push never called. Reads $rc and $out of
+# the run before it and the stub's call log.
+refused() { # digest reason-pattern [what]: the pattern is grep -Ei on the error line, what names the case in the result line
+  local digest="$1" reason="$2" what="${3:-$2}" errors count pushes ok=1
+  errors=$(grep '^::error::' <<<"$out"); count=$(grep -c '^::error::' <<<"$out")
+  pushes=$(grep '^crane push' "$SB/crane.log")
+  [ "$rc" -eq 1 ] || ok=0
+  [ "$count" -eq 1 ] && [[ "$errors" == "::error::unpack-provenance:"* ]] && [[ "$errors" == *"$digest"* ]] \
+    && grep -Eiq -- "$reason" <<<"$errors" || ok=0
+  [ -z "$pushes" ] || ok=0
+  [ "$ok" -eq 1 ] \
+    && pass "refused, $what: exit 1, one ::error::unpack-provenance: line with the digest and the reason, crane push never called" \
+    || fail "refused, $what: exit 1, one ::error:: line, no crane push" "exit=$rc, wanted 1" \
+         "::error:: lines in the output: $count, wanted one, begun '::error::unpack-provenance:', carrying '$digest' and matching '$reason' (any case):" "${errors:-none}" \
+         "crane push calls logged, wanted none:" "${pushes:-none}" "output:" "${out:-none}"
+}
+
 # 1: the provenance becomes one more layer, the envelope byte for byte: its
 #    sha256 is the envelopeHash the bundle's log entry carries
 fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
@@ -313,6 +332,15 @@ done
 [ "$stored" -eq 2 ] \
   && pass "both layers name one blob, the envelope the log recorded, and it lies in each pushed layout under its sha256" \
   || fail "the last layer's blob at each of the two tags against the log entry's envelopeHash" "${blobs[@]}" "wanted the layer $provenance at both tags, the blob's sha256 its name"
+
+# 8: refused, no statement in the bundles file names the digest: a well-formed
+#    digest that is no subject of any statement there gets no layer. The
+#    attestation manifest is laid down at its .att tag, so the refusal can only
+#    come from the bundles file, never from a manifest that is missing
+UNKNOWN="sha256:0000000000000000000000000000000000000000000000000000000000000000"
+fresh; TAG=$(att_tag "$UNKNOWN"); lay_down "$TAG"
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$UNKNOWN"); rc=$?
+refused "$UNKNOWN" 'no statement' "no statement in the bundles file names the digest"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
