@@ -135,6 +135,27 @@ sig=$(jq -c '."dev.cosignproject.cosign/signature"' <<<"$ann")
   && pass "dev.cosignproject.cosign/signature is present and empty" \
   || fail "dev.cosignproject.cosign/signature, present and empty" "the annotation as JSON: $sig (null: no such annotation)" 'wanted:                 ""'
 
+# 3: the chain annotation is copied from a layer cosign wrote: Kyverno 1.19.2
+#    reads the intermediate certificate from dev.sigstore.cosign/chain and from
+#    nowhere else, so the provenance layer carries the very string the layer
+#    that was already there carries
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+# the annotation as a JSON string, so that a newline more or less at its end
+# shows; nothing when it is absent or empty (null never equals null here)
+chain_of() { jq -c "$1"' | .annotations."dev.sigstore.cosign/chain" | strings | select(length > 0)' 2>/dev/null; }
+chain_words() { # a chain_of answer for a detail line
+  [ -n "$1" ] || { echo "no such annotation, or an empty one"; return; }
+  jq -r '"\(length) characters, \(split("-----BEGIN CERTIFICATE-----") | length - 1) certificate(s), ending in \(.[-27:] | tojson)"' <<<"$1"
+}
+# wanted: what the manifest's own first layer says, the one lay_down wrote
+want=$(manifest_of "$SB/registry/$TAG" | chain_of '.layers[0]')
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+# the last layer pushed, never the first: with no layer added there is nothing to read
+got=$(manifest_of "$SB/pushed/$TAG" | chain_of '.layers[1:][-1]')
+[ -n "$want" ] && [ -n "$got" ] && [ "$got" = "$want" ] \
+  && pass "dev.sigstore.cosign/chain on the provenance layer is the string cosign's layer carries, character for character" \
+  || fail "dev.sigstore.cosign/chain on the provenance layer against the layer that was already there" "on the provenance layer: $(chain_words "$got")" "on cosign's layer:       $(chain_words "$want")" "exit=$rc" "$out"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
