@@ -20,7 +20,10 @@
 # copied character for character from the first layer of the pulled manifest
 # that carries one.
 # The manifest is pulled as an OCI layout with crane, gets the layer appended
-# and is pushed back to the same tag.
+# and is pushed back to the same tag. Its config is rewritten with the layer,
+# the way cosign writes it: the layer's digest one more entry of
+# rootfs.diff_ids, one more entry of history, every other field as it was; the
+# manifest names the new config blob by its digest and its byte size.
 set -euo pipefail
 USAGE="usage: unpack-provenance.sh store <bundles> <repository> <digest>"
 # $1 is the mode, store, the only one there is
@@ -56,17 +59,27 @@ layer=$(sha256sum < "$DIR/envelope" | cut -d' ' -f1)
 lsize=$(wc -c < "$DIR/envelope")
 mv "$DIR/envelope" "$BLOBS/$layer"
 
-# the manifest with the layer appended, as a new blob the index points at.
-# The chain is copied inside jq: through a shell variable it would lose its
-# closing newline
+# the config with the layer listed, as a new blob: cosign keeps the layers'
+# digests in rootfs.diff_ids and one history entry per layer
 old=$(jq -r '.manifests[0].digest' "$DIR/index.json")
+oldconfig=$(jq -r '.config.digest' "$BLOBS/${old#sha256:}")
+jq -c --arg digest "sha256:$layer" \
+  '.rootfs.diff_ids += [$digest] | .history += [{created: "0001-01-01T00:00:00Z"}]' "$BLOBS/${oldconfig#sha256:}" > "$DIR/config"
+config=$(sha256sum < "$DIR/config" | cut -d' ' -f1)
+csize=$(wc -c < "$DIR/config")
+mv "$DIR/config" "$BLOBS/$config"
+
+# the manifest with the layer appended and the new config named, as a new
+# blob the index points at. The chain is copied inside jq: through a shell
+# variable it would lose its closing newline
 jq -c --arg digest "sha256:$layer" --argjson size "$lsize" --arg predicate "$predicate" \
-  --arg certificate "$certificate" --arg entry "$entry" \
-  '.layers += [{mediaType: "application/vnd.dsse.envelope.v1+json", size: $size, digest: $digest,
-                annotations: {predicateType: $predicate, "dev.cosignproject.cosign/signature": "",
-                              "dev.sigstore.cosign/certificate": ($certificate + "\n"),
-                              "dev.sigstore.cosign/chain": first(.layers[].annotations."dev.sigstore.cosign/chain" | strings),
-                              "dev.sigstore.cosign/bundle": $entry}}]' "$BLOBS/${old#sha256:}" > "$DIR/manifest"
+  --arg certificate "$certificate" --arg entry "$entry" --arg config "sha256:$config" --argjson csize "$csize" \
+  '.config.digest = $config | .config.size = $csize
+   | .layers += [{mediaType: "application/vnd.dsse.envelope.v1+json", size: $size, digest: $digest,
+                  annotations: {predicateType: $predicate, "dev.cosignproject.cosign/signature": "",
+                                "dev.sigstore.cosign/certificate": ($certificate + "\n"),
+                                "dev.sigstore.cosign/chain": first(.layers[].annotations."dev.sigstore.cosign/chain" | strings),
+                                "dev.sigstore.cosign/bundle": $entry}}]' "$BLOBS/${old#sha256:}" > "$DIR/manifest"
 manifest=$(sha256sum < "$DIR/manifest" | cut -d' ' -f1)
 msize=$(wc -c < "$DIR/manifest")
 mv "$DIR/manifest" "$BLOBS/$manifest"

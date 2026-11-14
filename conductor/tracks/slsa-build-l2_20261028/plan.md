@@ -118,7 +118,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
   - GREEN: the first chain found on a layer of the same manifest; `openssl verify` of the provenance certificate against it at the log entry's integrated time (the certificate lives ten minutes). Kyverno 1.19.2 reads the intermediate from this annotation and from nowhere else (run 43404580566).
 - [x] **2.4.4 The layers that were there are untouched**
   - RED: every earlier layer's descriptor (digest, size, media type, annotations) is identical and in the same order; its blob is still in the layout.
-- [ ] **2.4.5 The config lists the layers the way cosign writes it**
+- [x] **2.4.5 The config lists the layers the way cosign writes it**
   - RED: the pushed manifest's config has `rootfs.diff_ids` equal to the layers' digests in order and one history entry per layer.
 - [ ] **2.4.6 A second unpack replaces its own layer**
   - RED: a layout that already holds a provenance layer; after the unpack exactly one layer has the provenance predicate type and the other layers are as before (a re-run release never stacks statements; `cosign attest --replace` by type leaves this layer alone, measured).
