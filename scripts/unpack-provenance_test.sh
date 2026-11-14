@@ -862,6 +862,68 @@ done
        "tags stored once (one pull, one push, one layer more, one provenance layer): $once, wanted 2:" "${tags[@]}" \
        "output:" "${out:-none}"
 
+# 24: a push that fails and is tried again is said: a registry answers 5xx now
+#     and then, and the unpack tries a push up to three times (case 18, where
+#     every attempt fails and the run ends red). A push that needed a second
+#     or a third attempt goes through, the run is green, and then nothing of
+#     the unpack's own says that the registry faltered: crane's words name a
+#     tag and a status, and GitHub shows them as no annotation. Each failed
+#     attempt that is tried again is said with one warning line in the shape
+#     of the error lines, ::warning::unpack-provenance: <repository>@<digest>:
+#     ..., which carries the digest, speaks of the push and names the attempt
+#     that failed. The attestation manifest is laid down at the index's .att
+#     tag and the bundles file is the fixture's bundle as it is, so the digest
+#     lacks nothing and is prepared in full; the stub's count of the pushes
+#     that fail is set to 2, so the first push and the second fail the way
+#     crane does and the third goes through. Wanted: exit 0; one crane pull
+#     and three crane pushes in the stub's log; exactly two lines of the
+#     output begun ::warning::, each begun ::warning::unpack-provenance:, each
+#     carrying the digest in full and speaking of the push, the first naming
+#     the first attempt and the second the second; no ::error:: line, the run
+#     did not fail; the manifest pushed has one layer more than was laid down
+#     and exactly one of the provenance type, as for a push that goes through
+#     at once (case 1). run folds stderr into the output, so the warning lines
+#     are found on whichever of the two the script writes them. The patterns
+#     ask for the number of the failed attempt beside its noun, attempt or
+#     try: after the noun as a figure ("attempt 1", "try 2 of 3"), or before
+#     it as a figure, an ordinal or a word ("1st attempt", "second try"). A 1
+#     or a 2 inside the digest or the tag does not match, nor does a count of
+#     the attempts ("2 attempts left"). The third and last failure of case
+#     18's run is no part of this case: there the error line speaks. One
+#     result line; on a failure its detail shows the exit code, the crane
+#     calls, the warning lines found, the layers pushed and the output
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+before=$(manifest_of "$SB/registry/$TAG" | jq '.layers | length')
+echo 2 > "$SB/push-failures" # the first two pushes fail, the third goes through
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+warnings=$(grep '^::warning::' <<<"$out"); count=$(grep -c '^::warning::' <<<"$out")
+errors=$(grep '^::error::' <<<"$out")
+pulls=$(grep -c '^crane pull' "$SB/crane.log"); pushes=$(grep -c '^crane push' "$SB/crane.log")
+# a tag nothing was pushed to is said so, never read
+pushed="$SB/pushed/$TAG"; manifest=""; [ -f "$pushed/index.json" ] && manifest=$(manifest_of "$pushed")
+after=$(jq '.layers | length' <<<"$manifest" 2>/dev/null)
+typed=$(jq --arg type "$slsa" '[.layers[] | select(.annotations.predicateType == $type)] | length' <<<"$manifest" 2>/dev/null)
+# the warning lines in their order, the first against the first attempt and
+# the second against the second: each is counted when it is the unpack's own,
+# carries the digest, speaks of the push and names its attempt
+first='\b(attempt|try) 1\b|\b(1|1st|first) (attempt|try)\b'
+second='\b(attempt|try) 2\b|\b(2|2nd|second) (attempt|try)\b'
+named=0
+for nth in 1 2; do
+  line=$(sed -n "${nth}p" <<<"$warnings"); which="$first"; [ "$nth" -eq 2 ] && which="$second"
+  [[ "$line" == "::warning::unpack-provenance:"* ]] && [[ "$line" == *"$INDEX"* ]] \
+    && grep -iq -- 'push' <<<"$line" && grep -Eiq -- "$which" <<<"$line" && named=$((named + 1))
+done
+[ "$rc" -eq 0 ] && [ "$pulls" -eq 1 ] && [ "$pushes" -eq 3 ] && [ "$count" -eq 2 ] && [ "$named" -eq 2 ] && [ -z "$errors" ] \
+  && [ "$after" = "$((before + 1))" ] && [ "$typed" = 1 ] \
+  && pass "a push that fails twice and then goes through: exit 0, one crane pull and three crane pushes, two ::warning::unpack-provenance: lines with the digest and the push, the first naming the first attempt and the second the second, no ::error:: line, the manifest pushed has one layer more and one provenance layer" \
+  || fail "a push that fails twice and then goes through: exit 0, three crane push calls, one ::warning:: line per failed attempt, no ::error:: line, the layer pushed" "exit=$rc, wanted 0" \
+       "crane pull calls logged: $pulls, wanted 1; crane push calls logged: $pushes, wanted 3:" "$([ -s "$SB/crane.log" ] && cat "$SB/crane.log" || echo "crane never called")" \
+       "::warning:: lines in the output: $count, wanted two, each begun '::warning::unpack-provenance:', carrying '$INDEX' and speaking of the push, the first naming attempt 1 (or try 1, or the 1st or first attempt or try; any case), the second attempt 2 in the same way; lines that do, in their place: $named, wanted 2:" "${warnings:-none}" \
+       "::error:: lines in the output, wanted none:" "${errors:-none}" \
+       "layers pushed: ${after:-none, nothing was pushed to the tag}, wanted $((before + 1)); of the provenance type: ${typed:-none}, wanted 1:" "$([ -n "$manifest" ] && layers_words <<<"$manifest" || echo "nothing was pushed to the tag")" \
+       "output:" "${out:-none}"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
