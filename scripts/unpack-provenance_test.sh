@@ -814,6 +814,54 @@ differ="nothing to compare, a run pushed nothing"
        "the bundle in store.json is the bundle of bundle.jsonl: $same, wanted yes" "${ran[@]}" \
        "the listing with bundle.jsonl against the one with store.json (sha256 and path of every file pushed), wanted no difference:" "${differ:-none}"
 
+# 23: a digest named twice is stored once: the release job hands store the
+#     digests of an image, and its list can name one digest twice (an index of
+#     one platform whose digest reaches the call from two places, or a
+#     caller's slip). Stored twice, the digest costs two pulls and two pushes
+#     for one result, and every push more is one more that can fail (case 18).
+#     store is called with case 7's two digests, which the fixture's one
+#     statement names, as a list of three: the index, the amd64 manifest, the
+#     index again. The other digest stands between the two namings on purpose:
+#     a de-duplication that compares only neighbours (uniq without a sort)
+#     takes out a naming that follows its like at once and would pass two
+#     namings side by side; these two it leaves both. The bundles file is the
+#     fixture's bundle as it is and the attestation manifest is laid down at
+#     both .att tags, so neither digest lacks anything and nothing is refused:
+#     only the list is unusual. Wanted: exit 0; two crane pulls and two crane
+#     pushes in the stub's log, and of them one pull and one push for the
+#     index digest's tag, one of each for the amd64 manifest's (the calls are
+#     counted per tag as well, by the reference they carry: two and two in all
+#     could be one digest handled twice and the other never); at each tag the
+#     manifest pushed has one layer more than was laid down and exactly one of
+#     the provenance type, as for a digest named once (cases 1 and 7). The
+#     pushed layout alone cannot tell one push from two: the stub's push
+#     replaces what an earlier push left at the tag, so two pushes of one
+#     layout leave what one leaves, and the calls are counted in the log. One
+#     result line; on a failure its detail shows the exit code, the crane
+#     calls, each tag with its calls and the layers pushed, and the output
+fresh; TAG=$(att_tag "$INDEX"); TAG2=$(att_tag "$AMD64"); lay_down "$TAG"; lay_down "$TAG2"
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX" "$AMD64" "$INDEX"); rc=$?
+pulls=$(grep -c '^crane pull' "$SB/crane.log"); pushes=$(grep -c '^crane push' "$SB/crane.log")
+once=0; tags=()
+for tag in "$TAG" "$TAG2"; do
+  before=$(manifest_of "$SB/registry/$tag" | jq '.layers | length')
+  # the calls that carry this tag's reference, wherever it stands among their arguments
+  pulled=$(grep '^crane pull' "$SB/crane.log" | grep -cF -- "$REPO:$tag"); sent=$(grep '^crane push' "$SB/crane.log" | grep -cF -- "$REPO:$tag")
+  # a tag nothing was pushed to is said so, never read
+  pushed="$SB/pushed/$tag"; manifest=""; [ -f "$pushed/index.json" ] && manifest=$(manifest_of "$pushed")
+  after=$(jq '.layers | length' <<<"$manifest" 2>/dev/null)
+  typed=$(jq --arg type "$slsa" '[.layers[] | select(.annotations.predicateType == $type)] | length' <<<"$manifest" 2>/dev/null)
+  [ "$pulled" -eq 1 ] && [ "$sent" -eq 1 ] && [ "$after" = "$((before + 1))" ] && [ "$typed" = 1 ] && once=$((once + 1))
+  tags+=("$tag: crane pull calls $pulled, wanted 1; crane push calls $sent, wanted 1; layers pushed: ${after:-none, nothing was pushed to the tag}, wanted $((before + 1)); of the provenance type: ${typed:-none}, wanted 1")
+  [ -z "$manifest" ] || tags+=("$(layers_words <<<"$manifest" | sed 's/^/  pushed: /')")
+done
+[ "$rc" -eq 0 ] && [ "$pulls" -eq 2 ] && [ "$pushes" -eq 2 ] && [ "$once" -eq 2 ] \
+  && pass "a digest named twice is stored once: store with the index digest, the amd64 manifest's and the index digest again exits 0, two crane pulls and two crane pushes, one of each per .att tag, each manifest pushed has one layer more and one provenance layer" \
+  || fail "a digest named twice is stored once: exit 0, one crane pull and one crane push per distinct digest, at each tag one layer more and one provenance layer" "exit=$rc, wanted 0" \
+       "crane pull calls logged: $pulls, wanted 2; crane push calls logged: $pushes, wanted 2:" "$([ -s "$SB/crane.log" ] && cat "$SB/crane.log" || echo "crane never called")" \
+       "tags stored once (one pull, one push, one layer more, one provenance layer): $once, wanted 2:" "${tags[@]}" \
+       "output:" "${out:-none}"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
