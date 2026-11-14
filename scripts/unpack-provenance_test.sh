@@ -988,6 +988,104 @@ done
        "layers pushed: ${after:-none, nothing was pushed to the tag}, wanted $((before + 1)); of the provenance type: ${typed:-none}, wanted 1:" "$([ -n "$manifest" ] && layers_words <<<"$manifest" || echo "nothing was pushed to the tag")" \
        "output:" "${out:-none}"
 
+# 26: a refusal from the bundle's content is not tried again (plan slice
+#     2.4.25): the push and the pull are each tried up to three times (cases
+#     18, 24 and 25), because a registry that falters once may answer the next
+#     time. A refusal that comes from content is no such failure: the bundle
+#     and the manifest pulled are the same at every attempt, so the refusal is
+#     final at once. Nothing is asked of the registry a second time and
+#     nothing is said of an attempt. The refusal here is case 16's, a refusal
+#     of content that falls after the pull, where a loop of attempts laid
+#     around too much would reach it: the chain of the manifest pulled did not
+#     issue the provenance certificate. The setup is case 16's, its lines
+#     repeated: a certificate authority of the test's own, made with openssl
+#     in the sandbox, a root and an intermediate that bear the names of the
+#     fixture's chain and are valid at the log entry's integrated time; the
+#     layout lay_down writes for an SBOM layer and a vulnerability-report
+#     layer, with that chain in the annotation of both layers and everything
+#     else as it was. The bundles file is the fixture's bundle as it is and
+#     the digest is named there, the manifest is there and is pulled at the
+#     first attempt (the stub lets no pull and no push fail here), so the
+#     registry gives no reason for a second attempt. Wanted: exit 1; exactly
+#     one crane pull and no crane push in the stub's log; exactly one line of
+#     the output begun ::error::, begun ::error::unpack-provenance:, carrying
+#     the digest in full and matching case 16's pattern (the chain, the
+#     issuing and the certificate, in either order); no line begun
+#     ::warning:: at all, neither of a pull nor of anything else; nothing
+#     under pushed. The authority must hold on its own at the integrated time
+#     as in case 16, or the refusal would prove nothing: here that is part of
+#     the one result line. One result line; on a failure its detail shows the
+#     exit code, the crane calls, the warning lines found, the error lines
+#     found and the output
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG" "https://spdx.dev/Document" "https://cosign.sigstore.dev/attestation/vuln/v1"
+layout="$SB/registry/$TAG"; ca="$SB/ca"; mkdir "$ca"
+at=$(jq -r '.verificationMaterial.tlogEntries[0].integratedTime' "$DATA/bundle.jsonl")
+from=$(date -u -d "@$((at - 86400))" +%Y%m%d%H%M%SZ); till=$(date -u -d "@$((at + 315360000))" +%Y%m%d%H%M%SZ)
+: > "$ca/index.txt"; echo 01 > "$ca/serial" # openssl ca's books: the certificates issued, the next serial number
+cat > "$ca/openssl.cnf" <<CNF
+[req]
+distinguished_name = dn
+[dn]
+[ca]
+default_ca = made
+[made]
+database = $ca/index.txt
+serial = $ca/serial
+new_certs_dir = $ca
+default_md = sha256
+policy = names
+[names]
+organizationName = supplied
+commonName = supplied
+[root]
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+[intermediate]
+basicConstraints = critical,CA:TRUE,pathlen:0
+keyUsage = critical,keyCertSign,cRLSign
+extendedKeyUsage = codeSigning
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid
+CNF
+# a key and a request each, then the root signs itself and the intermediate;
+# what openssl says while it works goes to a log, never to the suite's output
+openssl req -config "$ca/openssl.cnf" -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc \
+  -keyout "$ca/root.key" -subj "/O=sigstore.dev/CN=sigstore" -out "$ca/root.csr" >> "$ca/log" 2>&1
+openssl req -config "$ca/openssl.cnf" -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc \
+  -keyout "$ca/intermediate.key" -subj "/O=sigstore.dev/CN=sigstore-intermediate" -out "$ca/intermediate.csr" >> "$ca/log" 2>&1
+openssl ca -config "$ca/openssl.cnf" -batch -notext -selfsign -keyfile "$ca/root.key" -extensions root \
+  -startdate "$from" -enddate "$till" -in "$ca/root.csr" -out "$ca/root.pem" >> "$ca/log" 2>&1
+openssl ca -config "$ca/openssl.cnf" -batch -notext -cert "$ca/root.pem" -keyfile "$ca/root.key" -extensions intermediate \
+  -startdate "$from" -enddate "$till" -in "$ca/intermediate.csr" -out "$ca/intermediate.pem" >> "$ca/log" 2>&1
+cat "$ca/intermediate.pem" "$ca/root.pem" > "$ca/chain.pem" 2>> "$ca/log"
+# the authority against itself at the integrated time: noted here, asked with
+# the result line below
+sound=yes; said=$(openssl verify -attime "$at" -no-CApath -no-CAstore -CAfile "$ca/root.pem" "$ca/intermediate.pem" 2>&1) || sound=no
+with_fixture=$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' "$layout/index.json") # the manifest as lay_down wrote it, the fixture's chain on its layers
+read -r mhex msize < <(manifest_of "$layout" | jq -c --rawfile chain "$ca/chain.pem" '.layers[].annotations."dev.sigstore.cosign/chain" = $chain' | put_blob "$layout")
+rm "$layout/blobs/sha256/$with_fixture"
+jq -c --arg manifest "sha256:$mhex" --argjson msize "$msize" \
+  '.manifests[0].digest = $manifest | .manifests[0].size = $msize' "$layout/index.json" > "$SB/index.json"
+mv "$SB/index.json" "$layout/index.json"
+out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+warnings=$(grep '^::warning::' <<<"$out"); warned=$(grep -c '^::warning::' <<<"$out")
+errors=$(grep '^::error::' <<<"$out"); count=$(grep -c '^::error::' <<<"$out")
+pulls=$(grep -c '^crane pull' "$SB/crane.log"); pushes=$(grep -c '^crane push' "$SB/crane.log")
+kept=$(ls -A "$SB/pushed")
+issued='chain.*issu.*certificate|certificate.*issu.*chain' # case 16's pattern
+[ "$sound" = yes ] && [ "$rc" -eq 1 ] && [ "$pulls" -eq 1 ] && [ "$pushes" -eq 0 ] \
+  && [ "$count" -eq 1 ] && [[ "$errors" == "::error::unpack-provenance:"* ]] && [[ "$errors" == *"$INDEX"* ]] \
+  && grep -Eiq -- "$issued" <<<"$errors" && [ "$warned" -eq 0 ] && [ -z "$kept" ] \
+  && pass "a refusal from content is not tried again (the chain that did not issue the provenance certificate): exit 1, one crane pull and no crane push, one ::error::unpack-provenance: line with the digest and the reason, no ::warning:: line, nothing pushed" \
+  || fail "a refusal from content is not tried again: exit 1, one crane pull call, no crane push call, one ::error:: line, no ::warning:: line, nothing pushed" "exit=$rc, wanted 1" \
+       "crane pull calls logged: $pulls, wanted 1; crane push calls logged: $pushes, wanted 0:" "$([ -s "$SB/crane.log" ] && cat "$SB/crane.log" || echo "crane never called")" \
+       "::warning:: lines in the output: $warned, wanted none:" "${warnings:-none}" \
+       "::error:: lines in the output: $count, wanted one, begun '::error::unpack-provenance:', carrying '$INDEX' and matching '$issued' (any case):" "${errors:-none}" \
+       "under pushed, wanted nothing: ${kept:-nothing}" \
+       "the certificate authority made for this case, its intermediate against its root at the integrated time $at: $sound, wanted yes${said:+ (openssl verify: $said)}" \
+       "output:" "${out:-none}"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
