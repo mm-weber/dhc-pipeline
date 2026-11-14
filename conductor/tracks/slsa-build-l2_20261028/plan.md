@@ -113,7 +113,7 @@ Fixtures under `scripts/testdata/provenance/`: `store.json`, the attestation sto
   - GREEN: select the statement, write the compact envelope, append the layer, push.
 - [x] **2.4.2 The certificate and the log entry travel as cosign's annotations**
   - RED: `dev.sigstore.cosign/certificate` is a PEM whose DER equals the bundle's `verificationMaterial.certificate.rawBytes`; `dev.sigstore.cosign/bundle` equals `{"SignedEntryTimestamp", "Payload": {"body", "integratedTime", "logIndex", "logID"}}` built by the test from the bundle (numbers as numbers, the log id in hex); `logIndex` is the log entry's own, never `inclusionProof.logIndex` (a real bundle carries two different numbers there, 3851076632 and 3729172370 in the bundle of 2026-11-12, and the signed entry timestamp covers the entry's own; the test names the field by its full path so that test and code cannot agree on the wrong one); `dev.cosignproject.cosign/signature` is present and empty.
-- [ ] **2.4.3 The chain annotation is copied from a layer cosign wrote and checked against the certificate**
+- [x] **2.4.3 The chain annotation is copied from a layer cosign wrote and checked against the certificate**
   - RED: the new layer's `dev.sigstore.cosign/chain` equals the existing layer's.
   - GREEN: the first chain found on a layer of the same manifest; `openssl verify` of the provenance certificate against it at the log entry's integrated time (the certificate lives ten minutes). Kyverno 1.19.2 reads the intermediate from this annotation and from nowhere else (run 43404580566).
 - [ ] **2.4.4 The layers that were there are untouched**

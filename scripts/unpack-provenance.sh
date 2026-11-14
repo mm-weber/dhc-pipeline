@@ -15,6 +15,10 @@
 # bundle's certificate as PEM, the entry as the JSON text cosign reads back
 # (the signed entry timestamp, the body, the integrated time, the entry's own
 # log index, the log's id in hex), the signature annotation present and empty.
+# The chain annotation (the Sigstore certificates that issued the bundle's
+# certificate; Kyverno reads the intermediate from there and nowhere else) is
+# copied character for character from the first layer of the pulled manifest
+# that carries one.
 # The manifest is pulled as an OCI layout with crane, gets the layer appended
 # and is pushed back to the same tag.
 set -euo pipefail
@@ -52,13 +56,16 @@ layer=$(sha256sum < "$DIR/envelope" | cut -d' ' -f1)
 lsize=$(wc -c < "$DIR/envelope")
 mv "$DIR/envelope" "$BLOBS/$layer"
 
-# the manifest with the layer appended, as a new blob the index points at
+# the manifest with the layer appended, as a new blob the index points at.
+# The chain is copied inside jq: through a shell variable it would lose its
+# closing newline
 old=$(jq -r '.manifests[0].digest' "$DIR/index.json")
 jq -c --arg digest "sha256:$layer" --argjson size "$lsize" --arg predicate "$predicate" \
   --arg certificate "$certificate" --arg entry "$entry" \
   '.layers += [{mediaType: "application/vnd.dsse.envelope.v1+json", size: $size, digest: $digest,
                 annotations: {predicateType: $predicate, "dev.cosignproject.cosign/signature": "",
                               "dev.sigstore.cosign/certificate": ($certificate + "\n"),
+                              "dev.sigstore.cosign/chain": first(.layers[].annotations."dev.sigstore.cosign/chain" | strings),
                               "dev.sigstore.cosign/bundle": $entry}}]' "$BLOBS/${old#sha256:}" > "$DIR/manifest"
 manifest=$(sha256sum < "$DIR/manifest" | cut -d' ' -f1)
 msize=$(wc -c < "$DIR/manifest")
