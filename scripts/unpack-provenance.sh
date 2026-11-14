@@ -13,9 +13,10 @@
 # type stored here, and one whose log entry carries no signed entry timestamp:
 # cosign verifies the entry in this layout by that timestamp, and the layout
 # has no place for the inclusion proof the newer log issues in its stead.
-# Refused in the same way is an envelope whose sha256 is not the envelope hash
-# the log entry records: that hash is the one tie between the layer's bytes
-# and the transparency log.
+# Refused in the same way is an envelope that carries more or fewer than one
+# signature (the layer holds exactly one, the one the log entry recorded), and
+# then an envelope whose sha256 is not the envelope hash the log entry records:
+# that hash is the one tie between the layer's bytes and the transparency log.
 # One statement serves every digest it names: each digest given gets the
 # layer in its own attestation manifest, one after the other, one pull and
 # one push per digest. Nothing is signed here: the
@@ -86,6 +87,11 @@ for DIGEST in "$@"; do
     | {SignedEntryTimestamp: .inclusionPromise.signedEntryTimestamp,
        Payload: {body: .canonicalizedBody, integratedTime: (.integratedTime | tonumber),
                  logIndex: (.logIndex | tonumber), logID: $logid}}' <<<"$bundle")
+
+  # exactly one signature on the envelope, the one the log entry recorded
+  signatures=$(jq -r '.dsseEnvelope.signatures | length' <<<"$bundle")
+  [ "$signatures" -eq 1 ] \
+    || refuse "the envelope carries ${signatures} signatures, not exactly one"
 
   # the layer: the envelope byte for byte as the transparency log hashed it,
   # built beside the working directory until the layout is there; its sha256
