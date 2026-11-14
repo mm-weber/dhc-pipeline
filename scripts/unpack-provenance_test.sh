@@ -353,6 +353,25 @@ jq -c '.dsseEnvelope.payload |= (@base64d | fromjson | .predicateType = "https:/
 out=$(run store "$SB/bundle-spdx.jsonl" "$REPO" "$INDEX"); rc=$?
 refused "$INDEX" 'https://spdx\.dev/Document' "the statement naming the digest is of another predicate type, named on the error line"
 
+# 10: refused, the log entry has no signed entry timestamp: cosign's old
+#     attestation layout verifies the transparency-log entry by its signed
+#     entry timestamp (inclusionPromise.signedEntryTimestamp in the bundle,
+#     SignedEntryTimestamp in the layer's bundle annotation); the newer Rekor
+#     log issues none, only an inclusion proof, and the layout has no place for
+#     that. The bundles file is the fixture's bundle with the log entry's
+#     inclusionPromise deleted and everything else as it is (the statement, its
+#     type, the envelope, the entry's body); the digest is named, the manifest
+#     is there, so the refusal can only come from the missing timestamp. The
+#     same for a promise that is there with an empty timestamp
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+jq -c 'del(.verificationMaterial.tlogEntries[0].inclusionPromise)' "$DATA/bundle.jsonl" > "$SB/bundle-no-promise.jsonl"
+out=$(run store "$SB/bundle-no-promise.jsonl" "$REPO" "$INDEX"); rc=$?
+refused "$INDEX" 'signed entry timestamp' "the log entry has no signed entry timestamp (no inclusionPromise)"
+fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+jq -c '.verificationMaterial.tlogEntries[0].inclusionPromise.signedEntryTimestamp = ""' "$DATA/bundle.jsonl" > "$SB/bundle-empty-promise.jsonl"
+out=$(run store "$SB/bundle-empty-promise.jsonl" "$REPO" "$INDEX"); rc=$?
+refused "$INDEX" 'signed entry timestamp' "the log entry's signed entry timestamp is empty"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
