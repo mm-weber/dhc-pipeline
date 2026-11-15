@@ -173,7 +173,7 @@ Retries: a cosign call that fails is tried again, up to three attempts, `CHECK_P
   - RED: the stub prints one envelope whose statement carries the five expected values; exit 0; one line naming the digest; cosign was called with `verify-attestation`, `--type slsaprovenance1`, the policy file's issuer and releaser identity, and the reference. Fails because the stub script prints nothing.
   - Sharpened 2026-11-15, before the first slice: the suite's policy file names an issuer other than GitHub's and an identity that differs from this repository's in owner, repository, workflow file and ref, and lists the `re-attester` role before the `releaser`, so that neither a value written into the script nor "the first role" passes; cosign's arguments are compared as a whole set, so that no flag that weakens the check (`--check-claims=false`, an identity by pattern) rides along.
 - [x] **2.5.2 cosign refusing three times fails the check naming the digest** (stub exit 1 every time; exit 1; the digest, the number of attempts and cosign's last message in the output; three calls logged)
-- [ ] **2.5.3 Nothing verified never passes** (finding 2.4 of the 2026-09-09 review)
+- [x] **2.5.3 Nothing verified never passes** (finding 2.4 of the 2026-09-09 review)
   - RED: the stub exits 0 printing nothing, and printing an envelope whose payload is null; both exit 1.
   - Sharpened 2026-11-15: one cosign call in each of the two. What cosign printed is judged once; only a cosign call that fails is tried again.
 - [ ] **2.5.4 A builder identity other than the build workflow's fails naming the field, found and expected**
