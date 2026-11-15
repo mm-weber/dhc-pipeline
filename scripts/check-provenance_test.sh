@@ -560,5 +560,96 @@ calls=$(grep -c '' "$SB/cosign.log")
   && pass "$what: cosign is called three times and no more" \
   || fail "$what: the cosign calls the stub logged: three" "calls logged: $calls, wanted 3"
 
+# 3: nothing verified never passes (plan slice 2.5.3). cosign ends with 0 and
+#    what it printed on stdout holds no provenance statement. Nine inputs:
+#    nothing at all; one blank line and nothing else; one line of a
+#    byte order mark and blanks and nothing else; one envelope of the
+#    shape cosign prints whose payload is null, is the empty string, is
+#    base64 of a byte order mark and blanks and nothing else, is not
+#    base64, is base64 of a text that is not JSON, or is base64 of JSON that
+#    is not an object (the array ["a"]). A self-check that passes when nothing
+#    was verified is its worst failure, and the tools at hand make it easy:
+#    with jq 1.6, `jq -e .payload` ends with 0 on no input and null decodes to
+#    a string. The array is there because a script that counts every payload
+#    that decodes to JSON would pass with nothing verified. The empty string
+#    is there because it decodes to nothing, so a judge that pipes the decoded
+#    payload to `jq -e` asks over no input: measured,
+#    `printf '' | jq -e 'type == "object"'` ends with 0 on jq 1.6 (the
+#    development machine's) and with 4 on jq 1.7.1 (the runners'). The blank
+#    line is there because a judge that asks `jq -e` on each line of stdout
+#    asks over no input as well: `printf '\n' | jq -e '.payload'` ends with 0
+#    and with 4 likewise. The byte order mark with blanks is there twice, as a
+#    line of stdout and as a decoded payload: jq reads it as no input, as it
+#    reads nothing and a blank line, while the shell finds it neither empty
+#    nor blank, so a judge that sets the empty and the blank aside and then
+#    takes the exit code of `jq -e` still passes with nothing verified.
+#    Measured: `printf '\xef\xbb\xbf \t\r\n' | jq -e '.payload'` ends with 0
+#    on jq 1.6 and with 4 on jq 1.7.1.
+#    Wanted on each of the nine: exit 1, not 0 and not the code jq or base64
+#    ended with (2 is the script's own code for wrong usage); nothing on
+#    stdout; stderr one line and no more, neither cosign's report nor a tool's
+#    complaint passed on: the script's error line, which names the reference,
+#    ends " (Req 2.28)", says "no provenance statement" and not "3 attempts";
+#    cosign called once: what it printed with exit 0 is judged once and final.
+# the question put over the sandbox as it is laid down, and the four things
+# wanted; $1 names the input in every result line
+nothing_verified() {
+  run verify "$SB/root" "$REF"
+  [ "$rc" -eq 1 ] \
+    && pass "$1: exit 1" \
+    || fail "$1: the exit code" "exit=$rc, wanted 1: nothing was verified, and the code is the script's own, not the one jq or base64 ended with" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  [ ! -s "$SB/stdout" ] \
+    && pass "$1: nothing on stdout" \
+    || fail "$1: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  lines=$(grep -c '' "$SB/stderr"); ended=$(wc -l < "$SB/stderr")
+  [ "$lines" -eq 1 ] && [ "$ended" -eq 1 ] && [[ "$err" == "::error::check-provenance: $REF: "*"no provenance statement"*" (Req 2.28)" ]] && [[ "$err" != *"3 attempts"* ]] \
+    && pass "$1: stderr is one line, the script's error line, which names the reference, says 'no provenance statement' and does not say '3 attempts'" \
+    || fail "$1: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that says 'no provenance statement' and does not say '3 attempts'" \
+         "lines on stderr: $lines, of them ended by a newline: $ended, wanted 1 and 1" "stderr:" "${err:-nothing}" \
+         "wanted: ::error::check-provenance: $REF: <why, saying 'no provenance statement' and not '3 attempts'> (Req 2.28)"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq 1 ] \
+    && pass "$1: cosign is called once and not asked again" \
+    || fail "$1: the cosign calls the stub logged: one, what cosign printed with exit 0 is judged once" "calls logged: $calls, wanted 1"
+}
+# cosign prints nothing on stdout
+fresh
+: > "$SB/envelopes.jsonl"
+nothing_verified "cosign accepting and printing nothing"
+# cosign's stdout is one blank line and nothing else: one newline byte
+fresh
+printf '\n' > "$SB/envelopes.jsonl"
+nothing_verified "cosign accepting and printing one blank line"
+# cosign's stdout is one line of a byte order mark and blanks and nothing
+# else: the bytes EF BB BF, a space, a tab, a carriage return, the newline
+fresh
+printf '\xef\xbb\xbf \t\r\n' > "$SB/envelopes.jsonl"
+nothing_verified "cosign accepting and printing one line of a byte order mark and blanks"
+# one envelope of the shape cosign prints, its payload null
+fresh
+envelopes "" | jq -c '.payload = null' > "$SB/envelopes.jsonl"
+nothing_verified "cosign accepting, its one envelope's payload null"
+# one envelope whose payload is the empty string, the base64 of nothing
+fresh
+envelopes "" > "$SB/envelopes.jsonl"
+nothing_verified "cosign accepting, its one envelope's payload the empty string"
+# one envelope whose payload is base64 of a byte order mark and blanks and
+# nothing else: 77u/IAkNCg==, which decodes to EF BB BF 20 09 0D 0A
+fresh
+envelopes $'\xef\xbb\xbf \t\r\n' > "$SB/envelopes.jsonl"
+nothing_verified "cosign accepting, its one envelope's payload base64 of a byte order mark and blanks"
+# one envelope whose payload is a string that is not base64
+fresh
+envelopes "" | jq -c '.payload = "%%%"' > "$SB/envelopes.jsonl"
+nothing_verified "cosign accepting, its one envelope's payload not base64"
+# one envelope whose payload is base64 of a text that is not JSON
+fresh
+envelopes "not a statement" > "$SB/envelopes.jsonl"
+nothing_verified "cosign accepting, its one envelope's payload base64 of a text that is not JSON"
+# one envelope whose payload is base64 of JSON that is not an object: an array
+fresh
+envelopes '["a"]' > "$SB/envelopes.jsonl"
+nothing_verified "cosign accepting, its one envelope's payload base64 of JSON that is not an object"
+
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all check-provenance tests passed"
