@@ -169,7 +169,7 @@ The core phase 3 builds its `report` and `require` modes on. ADR 0005's command:
 
 Retries: a cosign call that fails is tried again, up to three attempts, `CHECK_PROVENANCE_RETRY_DELAY` seconds apart (default 10, 0 in the suite), the shape of `fetch-sboms.sh` (Sigstore blips, the class measured on 2026-09-04). A statement that verified and misses an expectation is final at once. Phase 3's report over the supported set inherits these attempts from `verify`.
 
-- [ ] **2.5.1 A digest whose provenance meets all five passes** (tracer)
+- [x] **2.5.1 A digest whose provenance meets all five passes** (tracer)
   - RED: the stub prints one envelope whose statement carries the five expected values; exit 0; one line naming the digest; cosign was called with `verify-attestation`, `--type slsaprovenance1`, the policy file's issuer and releaser identity, and the reference. Fails because the stub script prints nothing.
   - Sharpened 2026-11-15, before the first slice: the suite's policy file names an issuer other than GitHub's and an identity that differs from this repository's in owner, repository, workflow file and ref, and lists the `re-attester` role before the `releaser`, so that neither a value written into the script nor "the first role" passes; cosign's arguments are compared as a whole set, so that no flag that weakens the check (`--check-claims=false`, an identity by pattern) rides along.
 - [ ] **2.5.2 cosign refusing three times fails the check naming the digest** (stub exit 1 every time; exit 1; the digest, the number of attempts and cosign's last message in the output; three calls logged)
