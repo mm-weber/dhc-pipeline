@@ -171,18 +171,23 @@ Retries: a cosign call that fails is tried again, up to three attempts, `CHECK_P
 
 - [ ] **2.5.1 A digest whose provenance meets all five passes** (tracer)
   - RED: the stub prints one envelope whose statement carries the five expected values; exit 0; one line naming the digest; cosign was called with `verify-attestation`, `--type slsaprovenance1`, the policy file's issuer and releaser identity, and the reference. Fails because the stub script prints nothing.
+  - Sharpened 2026-11-15, before the first slice: the suite's policy file names an issuer other than GitHub's and an identity that differs from this repository's in owner, repository, workflow file and ref, and lists the `re-attester` role before the `releaser`, so that neither a value written into the script nor "the first role" passes; cosign's arguments are compared as a whole set, so that no flag that weakens the check (`--check-claims=false`, an identity by pattern) rides along.
 - [ ] **2.5.2 cosign refusing three times fails the check naming the digest** (stub exit 1 every time; exit 1; the digest, the number of attempts and cosign's last message in the output; three calls logged)
 - [ ] **2.5.3 Nothing verified never passes** (finding 2.4 of the 2026-09-09 review)
   - RED: the stub exits 0 printing nothing, and printing an envelope whose payload is null; both exit 1.
+  - Sharpened 2026-11-15: one cosign call in each of the two. What cosign printed is judged once; only a cosign call that fails is tried again.
 - [ ] **2.5.4 A builder identity other than the build workflow's fails naming the field, found and expected**
 - [ ] **2.5.5 Another build type fails by name**
 - [ ] **2.5.6 Another source repository fails by name**
 - [ ] **2.5.7 Another workflow path fails by name**
 - [ ] **2.5.8 Another ref fails by name** (`refs/heads/feature`, the case ADR 0005 measured as exit 1)
 - [ ] **2.5.9 One admitted statement among several passes** (two envelopes, the first with another ref: exit 0; the policy rule admits on any statement that meets the conditions, and the self-check must not be stricter or laxer than the rule)
+  - Sharpened 2026-11-15, the "laxer" half: two envelopes of which the first misses the ref and the second the builder identity, so that the five are met between them and by neither: exit 1.
 - [ ] **2.5.10 A policy file without the issuer or the releaser identity is refused** (exit 2 naming the missing key)
+- [ ] **2.5.10b Anything but `verify <root> <image@sha256:digest>` over a policy file is refused as usage** (added 2026-11-15 before the first slice, the owner's wish for thorough tests of the self-check: another mode word, a missing argument, a reference that names no `sha256` digest of 64 hex characters, and a root without `catalogue-policy.yaml`; each exit 2 with one `::error::` line, cosign never called. A reference by tag would have cosign verify whatever the tag points at, and a mistyped digest would cost three attempts before the refusal.)
 - [ ] **2.5.11 A cosign call that fails is tried again**
   - RED: the stub fails twice and then prints an envelope meeting all five; exit 0; three calls logged; one `::warning::` line per failed attempt.
+  - Sharpened 2026-11-15: the delay is asserted too. A `sleep` stub on `PATH` logs its argument: two pauses of the number of seconds in `CHECK_PROVENANCE_RETRY_DELAY`, and of 10 with the variable unset.
   - GREEN: the three attempts around the cosign call, the delay from `CHECK_PROVENANCE_RETRY_DELAY`.
 - [ ] **2.5.12 A missed expectation is not tried again** (2.5.8's case: one cosign call logged; a guard if 2.5.11's code already holds it)
 - [ ] **2.5.13 What real cosign prints passes the self-check** (suite `scripts/provenance-real_test.sh`, on 2.4.28's registry)
