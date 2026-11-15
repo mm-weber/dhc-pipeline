@@ -37,7 +37,8 @@
 # from the layer's dev.sigstore.cosign/chain annotation. That is wanted: a
 # verifier configured with the roots alone must be able to build the path
 # from what the script wrote, and the stub suite can only check that the
-# annotation is there.
+# annotation is there. Case 2 holds it with a control: the same layer without
+# its chain is refused. With the intermediate back in the file, case 2 fails.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 UNPACK="$HERE/unpack-provenance.sh"
@@ -145,7 +146,8 @@ fi
 # fulcio.pem holds the two roots only, so the intermediate certificate between
 # a root and the signing certificate is the one in the layer's
 # dev.sigstore.cosign/chain annotation: the chain the script wrote there is
-# what the path is built from, and without it cosign does not accept the layer.
+# what the path is built from. Case 2 holds that with a control: the same
+# layer without its chain is refused.
 # --check-claims=false: the image asked about need not be the statement's
 # subject. The accepted envelopes go to stdout, one per line.
 verify_provenance() { # reference
@@ -201,6 +203,64 @@ statements=$(jq -c '.payload | @base64d | fromjson | {predicateType, subject: [.
   && pass "the one envelope cosign accepted is the provenance statement: predicateType SLSA provenance v1, the index digest among its subjects" \
   || fail "the envelope cosign accepted, decoded" "accepted, as predicateType and subject digests, one line each:" "${statements:-none}" \
        "wanted exactly one, of predicateType 'https://slsa.dev/provenance/v1', its subjects holding '$hex'"
+
+# 2: the control on case 1: the real cosign refuses the provenance layer
+#    without its chain. Case 1's manifest is pulled back with the real crane,
+#    the dev.sigstore.cosign/chain annotation is taken off the provenance
+#    layer alone (the suite's own layer keeps its chain; every other
+#    annotation, both layer blobs and the config stay as they are), and that
+#    copy is pushed to the .att tag of a second stand-in image. The same
+#    repository: cosign finds the manifest by the image's digest in the tag,
+#    and the blobs are already there. cosign 2.6.5, asked as in case 1, must
+#    exit non-zero and name the certificate authority. Case 1's third line
+#    shows the unchanged manifest accepted under a stand-in image's tag, so
+#    the control differs from an accepted manifest in the one annotation (and
+#    in the image whose tag it sits under). If cosign accepts the control, the
+#    intermediate certificate reaches it from somewhere other than the chain
+#    the script wrote, and case 1 no longer shows what it is there to show.
+image_layout "$SB/control-image" "provenance-real case 2, the control"
+staged=$({ crane push "$SB/control-image" "$REPO:control" && crane pull --format oci "$REPO:$TAG" "$SB/control"; } 2>&1) && staged=""
+IMAGE2=$(crane digest "$REPO:control" 2>/dev/null)
+TAG2=$(att_tag "${IMAGE2:-sha256:none}")
+pulled=$(jq -r '.manifests[0].digest' "$SB/control/index.json" 2>/dev/null)
+read -r mhex msize < <(jq -c 'del(.layers[] | select(.annotations.predicateType == "https://slsa.dev/provenance/v1") | .annotations."dev.sigstore.cosign/chain")' \
+  "$SB/control/blobs/sha256/${pulled#sha256:}" 2>/dev/null | put_blob "$SB/control")
+jq -c --arg digest "sha256:$mhex" --argjson size "${msize:-0}" '.manifests[0].digest = $digest | .manifests[0].size = $size' \
+  "$SB/control/index.json" > "$SB/control/index.json.new" 2>/dev/null && mv "$SB/control/index.json.new" "$SB/control/index.json"
+[ -n "$staged" ] || { staged=$(crane push "$SB/control" "$REPO:$TAG2" 2>&1) && staged=""; }
+# the control is read back from the registry and held to what it claims to be:
+# two layers, the suite's own first and with its chain, the provenance layer
+# second and without one, and with case 1's chain put back there it is case
+# 1's manifest again
+control=$(crane manifest "$REPO:$TAG2" 2>&1)
+exact=$(jq --argjson whole "$manifest" --arg own "$own" \
+  '(.layers | length) == 2
+   and .layers[0].digest == $own and (.layers[0].annotations | has("dev.sigstore.cosign/chain"))
+   and .layers[1].annotations.predicateType == "https://slsa.dev/provenance/v1"
+   and (.layers[1].annotations | has("dev.sigstore.cosign/chain") | not)
+   and (.layers[1].annotations."dev.sigstore.cosign/chain" = $whole.layers[1].annotations."dev.sigstore.cosign/chain") == $whole' <<<"$control" 2>/dev/null)
+verify_provenance "$REPO@$IMAGE2" > /dev/null 2> "$SB/control.err"; rc=$?
+grep -q 'certificate signed by unknown authority' "$SB/control.err" && named="yes" || named="no"
+why=("the control read back from $REPO:$TAG2 is case 1's manifest with the chain off the provenance layer alone: ${exact:-no}, wanted true"
+     "cosign's exit on $REPO@${IMAGE2:-none}: $rc, wanted non-zero"
+     "cosign names the certificate authority ('certificate signed by unknown authority'): $named, wanted yes")
+if [ "$exact" != "true" ]; then
+  why+=("the control is not the control it claims to be, so what cosign said of it says nothing about the chain"
+        "its layers as read back, predicateType and chain, one line each:"
+        "$(jq -r '.layers[] | "  \(.annotations.predicateType): \(.annotations."dev.sigstore.cosign/chain" | if . == null then "no chain" else "a chain of \(length) characters" end)"' <<<"$control" 2>/dev/null || echo "  none, no manifest was read back")"
+        "the control as read back, then case 1's manifest:" "$(short <<<"$control" || echo "$control")" "$(short <<<"$manifest" || echo "$manifest")"
+        "what a failed push or pull of the control's two layouts said:" "${staged:-nothing, all went through}")
+elif [ "$rc" -eq 0 ]; then
+  why+=("cosign ACCEPTED the provenance layer without its chain. What that means:"
+        "the chain the script writes on the provenance layer is no longer read."
+        "The intermediate certificate reaches cosign from somewhere else, most likely $ROOTS/fulcio.pem holds it again: it holds $(grep -c 'BEGIN CERTIFICATE' "$ROOTS/fulcio.pem") certificates, Fulcio's two roots alone are 2."
+        "With that, case 1 no longer shows that a verifier configured with the roots alone can build the path from what the script wrote.")
+else
+  why+=("cosign refused the control, but not for the certificate authority; the end of what it said:" "$(tail -n 8 "$SB/control.err" | cut -c1-400)")
+fi
+[ "$exact" = "true" ] && [ "$rc" -ne 0 ] && [ "$named" = "yes" ] \
+  && pass "the control: cosign refuses the same manifest with the chain off the provenance layer alone, and names the certificate authority" \
+  || fail "the control: the manifest of case 1 with the chain off the provenance layer alone, under a second stand-in image, asked of cosign as in case 1" "${why[@]}"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
