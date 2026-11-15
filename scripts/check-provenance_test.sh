@@ -10,6 +10,16 @@
 # its arguments and answers what the case laid down, in the shape cosign 2.6.5
 # prints it (measured on 2026-11-15), or crashes with what a Go program that
 # panics writes (measured too, see case 2's input with the trace).
+# Every run of the script is also watched for what it leaves behind (plan
+# slice 2.5.3b): run starts it in a working directory of its own, tells it
+# where to keep its temporary files and takes down what the case's sandbox
+# holds, before the run and after it, and the stub notes where each call's
+# stdout and stderr go. Wanted after every run: the sandbox holds what it
+# held before, with nothing new, changed or gone in the two directories, in
+# the root the script is given or beside them, apart from the files a run is
+# expected to write; no file that cosign wrote to is still there; and the
+# stub's note is there from every cosign call, since a call that left none
+# was not watched. The suite's last result line holds all the runs to that.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CHECK="$HERE/check-provenance.sh"
@@ -17,8 +27,11 @@ FAILURES=0
 pass() { echo "ok   $1"; }
 fail() { echo "FAIL $1"; shift; [ $# -gt 0 ] && printf '%s\n' "$@" | sed 's/^/    /'; FAILURES=$((FAILURES+1)); }
 
-# every sandbox lives under this one directory, removed when the suite ends
-TOP=$(mktemp -d)
+# Every sandbox lives under this one directory, removed when the suite ends.
+# Without it the suite ends here: with $TOP empty the sandboxes would be made
+# in /, where root may write, and would stay there, since the trap would have
+# nothing to remove
+TOP=$(mktemp -d) || { echo "FAIL the directory for the suite's sandboxes could not be made: the suite ends here"; exit 1; }
 trap 'rm -rf "$TOP"' EXIT
 
 # The sandbox's policy file differs from this repository's in every value the
@@ -43,7 +56,18 @@ WORKFLOW=".github/workflows/release.yml"
 GIT_REF="refs/heads/trunk"
 
 fresh() {
-  SB=$(mktemp -d "$TOP/sandbox.XXXXXX"); mkdir -p "$SB/root" "$SB/bin"; : > "$SB/cosign.log"
+  # $SB/tmp is the sandbox's own directory for the script's temporary files,
+  # $SB/cwd the working directory the script is started in, and
+  # $SB/cosign.wrote-to the stub's note of where its calls wrote, all three
+  # empty to begin with (see run). $SB is the sandbox by its full path, also
+  # when TMPDIR is a relative one: run starts the script in $SB/cwd, and from
+  # there a relative $SB leads nowhere, not to the script's root, not to the
+  # stub on PATH, not to the files its output goes to. Without a sandbox the
+  # suite ends here: run removes two directories below $SB, and with $SB
+  # empty those would be /tmp and /cwd
+  SB=$(mktemp -d "$TOP/sandbox.XXXXXX") && SB=$(cd "$SB" && pwd) \
+    || { echo "FAIL a sandbox for the case could not be made under '$TOP': the suite ends here"; exit 1; }
+  mkdir -p "$SB/root" "$SB/bin" "$SB/tmp" "$SB/cwd"; : > "$SB/cosign.log"; : > "$SB/cosign.wrote-to"
   cat > "$SB/root/catalogue-policy.yaml" <<EOF
 verification:
   issuer: $ISSUER
@@ -88,11 +112,18 @@ EOF
   # writes the file on stderr as it is and exits 2, the countdown left alone.
   # A call that neither crashes nor refuses accepts the way cosign does: on
   # stdout the lines the case laid down in $SB/envelopes.jsonl, one envelope
-  # per verified attestation, on stderr its report, exit 0
+  # per verified attestation, on stderr its report, exit 0.
+  # Whatever it answers, every call first notes where its stdout and its
+  # stderr go, a line for each: what readlink says of its own descriptors 1
+  # and 2 under /proc, a file by its path, a pipe as pipe:[...]. The note is
+  # a file of its own, $SB/cosign.wrote-to, so that the log keeps its one
+  # line per call; run reads it when the script has ended and wants both
+  # lines of every call the log shows (plan slice 2.5.3b)
   cat > "$SB/bin/cosign" <<'STUB'
 #!/usr/bin/env bash
 SB="$(cd "$(dirname "$0")/.." && pwd)"
 { printf 'cosign'; [ $# -gt 0 ] && printf ' %q' "$@"; echo; } >> "$SB/cosign.log"
+readlink "/proc/$$/fd/1" "/proc/$$/fd/2" >> "$SB/cosign.wrote-to" 2>/dev/null
 nth=$(grep -c '' "$SB/cosign.log")
 if [ -f "$SB/crash.$nth" ]; then cat "$SB/crash.$nth" >&2; exit 2; fi
 left=0; [ -f "$SB/refusals" ] && left=$(cat "$SB/refusals")
@@ -141,13 +172,168 @@ envelopes() {
   done
 }
 
+# What a sandbox holds, for run to take down before a run of the script and
+# after it (plan slice 2.5.3b): a line for every entry below $SB, its kind
+# (d a directory, f a file, l a symbolic link) and its path from the
+# sandbox's top, and for every file a second line that has the checksum of
+# its content in the kind's place. Sorted, so that two lists of one sandbox
+# differ only where the sandbox does.
+# Left out are the files at the sandbox's top that a run is expected to
+# write: the run's own stdout and stderr, the stub's log of its calls and
+# its note of where they wrote, and the number of calls to refuse, which the
+# stub counts down. This list is the one place that says which they are: a
+# later slice whose stand-in keeps a file of its own adds the name here.
+WRITTEN=(stdout stderr cosign.log cosign.wrote-to refusals)
+holds() {
+  local name; local -a spared=()
+  for name in "${WRITTEN[@]}"; do spared+=(! -path "./$name"); done
+  ( cd "$SB" && find . -mindepth 1 "${spared[@]}" -printf '%y  %p\n' -type f -exec sha256sum {} + ) | LC_ALL=C sort
+}
+
+# What differs between two such lists, $1 taken before a run and $2 after
+# it: a line for every path that only the second has (new), that only the
+# first has (gone) or that both have with another kind or another checksum
+# (changed). On each line the word, a tab and the path, without the ./ the
+# lists begin it with; sorted by path.
+differing() {
+  awk '
+    $0 == "" { next }
+    { cut = index($0, "  "); state = substr($0, 1, cut - 1); path = substr($0, cut + 4) }
+    NR == FNR { was[path] = was[path] " " state; next }
+    { now[path] = now[path] " " state }
+    END {
+      for (path in was) {
+        if (!(path in now)) print "gone\t" path
+        else if (was[path] != now[path]) print "changed\t" path
+      }
+      for (path in now) if (!(path in was)) print "new\t" path
+    }' <(printf '%s\n' "$1") <(printf '%s\n' "$2") | LC_ALL=C sort -t $'\t' -k 2
+}
+
 # The script the way the release job calls it, in the case's sandbox: the stub
 # first on PATH, no pause between attempts. stdout and stderr are kept apart:
 # in the sandbox's files stdout and stderr and, for the cases, in $out and
 # $err; the exit code in $rc. Called as a plain command, never in $( ).
+# Both files are removed before the start, so that a run that was not
+# started (its working directory gone, a file for its output not to be
+# opened) never shows the output of an earlier run in the same sandbox: $out
+# and $err are empty then, and $rc is the shell's code, not the script's.
+# Such a run gives its case nothing of the script to judge, and run says so
+# in a FAIL line of its own, the only result line it ever prints.
+# Every run is also watched for what it leaves behind (plan slice 2.5.3b).
+# The script is started in $SB/cwd, the sandbox's own working directory for
+# it (in a subshell, so that the suite stays where it is), and TMPDIR tells
+# it to keep its temporary files in $SB/tmp. So a file it writes by a
+# relative path lands in the one, not where the suite was started (on a
+# runner the checkout), and a temporary file in the other. What the sandbox
+# holds is taken down before the start and again when the script has ended
+# (see holds), and every difference counts as left behind: an entry that is
+# new, a file whose content has changed, an entry that is gone, be it in
+# either directory, in the root the script is given (on a runner the
+# checkout as well) or beside them; either directory being gone is one.
+# Each is named with its place: by its path below the directory for
+# temporary files, the working directory or the root, or else by its path
+# from the sandbox's top. What a case lays down before a run is part of what
+# the sandbox held, and is not counted against the run.
+# Left behind as well is every file a cosign call wrote to (the stub's note,
+# see fresh) that is still there, wherever it lies. A pipe cannot be left
+# behind and neither can a device such as /dev/null, and the two files this
+# run's own stdout and stderr went to are the caller's, not the script's.
+# The note is held to the stub's log, so that no run is watched blind: every
+# cosign call of this run, a line the log gained in it, must have left its
+# two lines in the note, one for its stdout and one for its stderr. A run
+# whose note holds fewer lines than that, or more, counts as one in which a
+# cosign call did not note where its output went; a run without a cosign
+# call wants no note.
+# What a run left, and a note that does not match the calls, is kept for the
+# suite's last result line (see nothing_left_behind). Both directories are
+# made anew, empty, once they are compared (so a file cosign wrote to in one
+# of them is named once, by its place), and the stub's note is begun anew, so
+# that a second run in the same sandbox answers for what it left itself.
+# What a run left or changed elsewhere in the sandbox is not undone: the next
+# run's list of what the sandbox holds is taken anew, and so each run answers
+# for what it did itself.
+RUNS=0     # the runs watched
+LEAVING=0  # of them, those that left something behind
+LEFT=""    # of the first three of those: which run it was, and what it left
+BLIND=0    # of the runs watched, those whose note does not match its calls
+UNNOTED="" # of the first three of those: which run it was, its calls and note
 run() {
-  PATH="$SB/bin:$PATH" CHECK_PROVENANCE_RETRY_DELAY=0 "$CHECK" "$@" > "$SB/stdout" 2> "$SB/stderr"; rc=$?
-  out=$(cat "$SB/stdout"); err=$(cat "$SB/stderr")
+  local was now how entry top rest place before logged noted left="" target words=""
+  [ $# -gt 0 ] && words=$(printf ' %q' "$@")
+  before=$(grep -c '' "$SB/cosign.log")
+  rm -f "$SB/stdout" "$SB/stderr"
+  was=$(holds)
+  ( cd "$SB/cwd" && PATH="$SB/bin:$PATH" CHECK_PROVENANCE_RETRY_DELAY=0 TMPDIR="$SB/tmp" "$CHECK" "$@" > "$SB/stdout" 2> "$SB/stderr" ); rc=$?
+  now=$(holds)
+  RUNS=$((RUNS + 1))
+  out=""; err=""
+  if [ -e "$SB/stdout" ] && [ -e "$SB/stderr" ]; then
+    out=$(cat "$SB/stdout"); err=$(cat "$SB/stderr")
+  else
+    fail "run $RUNS of the script is started: check-provenance.sh$words" \
+         "it was not: in its sandbox $SB the working directory cwd could not be entered, or the files stdout and stderr could not be opened for its output; the shell said which on the suite's stderr" \
+         "so \$out and \$err are empty, and \$rc is the shell's code, $rc, not the script's: the case has nothing of the script to judge"
+  fi
+  while IFS=$'\t' read -r how entry; do
+    top=${entry%%/*}; rest=""; [ "$top" != "$entry" ] && rest=${entry#*/}
+    case "$top" in
+      tmp)  place="its directory for temporary files" ;;
+      cwd)  place="its working directory" ;;
+      root) place="the root it is given" ;;
+      *)    place="its sandbox"; rest=$entry ;;
+    esac
+    if [ -z "$rest" ]; then left+="${left:+$'\n'}  $place is $how"
+    elif [ "$how" = gone ]; then left+="${left:+$'\n'}  gone from $place: $rest"
+    else left+="${left:+$'\n'}  $how in $place: $rest"
+    fi
+  done < <(differing "$was" "$now")
+  rm -rf "${SB:?}/tmp" "${SB:?}/cwd"; mkdir "$SB/tmp" "$SB/cwd"
+  while IFS= read -r target; do
+    [[ "$target" == /* ]] && [ -e "$target" ] && [ ! -c "$target" ] && [ ! "$target" -ef "$SB/stdout" ] && [ ! "$target" -ef "$SB/stderr" ] \
+      && left+="${left:+$'\n'}  a file cosign wrote to, still there: $target"
+  done < <(LC_ALL=C sort -u "$SB/cosign.wrote-to")
+  logged=$(( $(grep -c '' "$SB/cosign.log") - before )); noted=$(grep -c '' "$SB/cosign.wrote-to")
+  : > "$SB/cosign.wrote-to"
+  if [ -n "$left" ]; then
+    LEAVING=$((LEAVING + 1))
+    if [ "$LEAVING" -le 3 ]; then
+      LEFT+="${LEFT:+$'\n'}run $RUNS (exit code $rc): check-provenance.sh$words"$'\n'"$left"
+    fi
+  fi
+  if [ "$noted" -ne $((2 * logged)) ]; then
+    BLIND=$((BLIND + 1))
+    if [ "$BLIND" -le 3 ]; then
+      UNNOTED+="${UNNOTED:+$'\n'}run $RUNS (exit code $rc): check-provenance.sh$words"$'\n'"  cosign calls the stub logged in this run: $logged; lines in its note of where they wrote: $noted, wanted $((2 * logged)), one for each call's stdout and one for its stderr"
+    fi
+  fi
+}
+
+# The suite's last result line (plan slice 2.5.3b), for all the runs of the
+# script that the cases made: none of them left anything behind, neither in
+# its sandbox (its directory for temporary files, its working directory, the
+# root it is given and what lies beside them, all held to what they were
+# before the run) nor where cosign wrote, and in each every cosign call noted
+# where its output went.
+# It is called once, after the last case, so a later slice adds its case
+# above the call and leaves this alone. The line says how many runs were
+# watched, and with none watched it fails: a check that has seen no run has
+# checked nothing. A failure gives three counts: the runs watched, those that
+# left something, those in which a cosign call did not note where its output
+# went. Of the first three runs of either kind it says which run it was (its
+# number among the runs, its exit code, the call) and what it left (what is
+# new, changed or gone in its sandbox, and each file cosign wrote to that is
+# still there), or how many cosign calls the stub logged in it and how many
+# lines its note holds.
+nothing_left_behind() {
+  [ "$RUNS" -gt 0 ] && [ "$LEAVING" -eq 0 ] && [ "$BLIND" -eq 0 ] \
+    && pass "none of the $RUNS runs of the script left anything behind: after each its sandbox (its directory for temporary files, its working directory, the root it was given and what lies beside them) held what it had held before, apart from the files a run is expected to write, no file that cosign wrote to was still there, and every cosign call had noted where its output went" \
+    || fail "no run of the script leaves anything behind: after each its sandbox (its directory for temporary files, its working directory, the root it is given and what lies beside them) holds what it held before, apart from the files a run is expected to write, no file that cosign wrote to is still there, and every cosign call notes where its output goes" \
+         "runs of the script that were watched: $RUNS, wanted 1 or more" \
+         "of them, runs that left something behind: $LEAVING, wanted 0" \
+         "the first of those, three at most, each with what it left, changed or removed:" "${LEFT:-none}" \
+         "runs in which a cosign call did not note where its output went: $BLIND, wanted 0" \
+         "the first of those, three at most, each with its cosign calls and its note:" "${UNNOTED:-none}"
 }
 
 # One line of the stub's log (stdin) as what that call asked: its first
@@ -650,6 +836,11 @@ nothing_verified "cosign accepting, its one envelope's payload base64 of a text 
 fresh
 envelopes '["a"]' > "$SB/envelopes.jsonl"
 nothing_verified "cosign accepting, its one envelope's payload base64 of JSON that is not an object"
+
+# every run of the script above, held to what it left behind and to the
+# stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
+# goes above this call
+nothing_left_behind
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all check-provenance tests passed"
