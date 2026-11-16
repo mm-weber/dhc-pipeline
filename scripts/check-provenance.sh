@@ -57,17 +57,20 @@
 # yet. Nothing cosign writes is passed on as it is.
 # The statements, the value found and the value expected are each what jq
 # prints when asked, three calls in a run that gets that far. A jq call that
-# gives no answer, a jq that was killed or one that ended on an error of its
-# own, has printed nothing, and with no answer the check has failed,
-# whichever of the three calls it is: exit 1, nothing on stdout, one
-# ::error:: line on stderr naming the reference, and neither cosign nor jq is
-# asked again. After the first call nothing printed is no statement, and the
-# line is that of no statement. After the second or the third, whose answer
-# is never empty, the line holds no clause and says that jq gave no answer,
-# and to which question: an empty text is no value, so it is never compared
-# (two of them would be equal, and the check would pass unchecked), never
-# shown as found or as expected, and nothing is put in its place. What jq
-# itself writes on stderr at those two calls is not kept back yet.
+# printed nothing gave no answer, however it came to that (a jq that was
+# killed and a jq that ended on an error of its own are two ways it comes
+# about), and with no answer the check has failed, whichever of the three
+# calls it is: exit 1, nothing on stdout, one ::error:: line on stderr naming
+# the reference, and neither cosign nor jq is asked again. After the first
+# call nothing printed is no statement, and the line is that of no statement.
+# After the second or the third, whose answer is never empty, the line holds
+# no clause and says that jq gave no answer, and to which question: an empty
+# text is no value, so it is never compared (two of them would be equal, and
+# the check would pass unchecked), never shown as found or as expected, and
+# nothing is put in its place. In such a run too that line is all the
+# script's stderr holds: what jq itself writes on stderr is kept back at each
+# of the three calls, whatever it is, and of a jq that was killed the shell
+# writes no notice of its own, each call being made inside $( ).
 set -uo pipefail
 # after the mode word: the root that holds catalogue-policy.yaml, and the
 # reference cosign is asked about
@@ -135,21 +138,22 @@ unanswered() { echo "::error::check-provenance: ${REF}: the provenance statement
 # where the path cannot be walked because something on the way to the field
 # is no object: there is no value at such a path either, and jq by itself
 # would end on an error there and print nothing. Only the path is answered
-# for: an empty text is no value and is not dressed as null by the shell. It
-# is what a jq leaves that gave no answer, one that was killed or one that
-# ended on an error of its own, and it fails the check before any text is
+# for: an empty text is no value and is not dressed as null by the shell. A
+# call that printed nothing gave no answer, however it came to that (a jq
+# that was killed and a jq that ended on an error of its own are two ways it
+# comes about), and its empty text fails the check before any text is
 # compared or shown: two empty texts would be equal, and the check would pass
 # unchecked. Whether the text is empty is all that is asked, jq's exit code
-# is not read here either, and that is enough: a call without an answer has
-# printed nothing, however it ended, and an answer is never empty, since the
-# try gives a value or null for every statement and the identity always has
-# its JSON text. Both calls stay inside $( ): there bash writes no notice of
-# its own about a jq that was killed, as it does on the script's stderr for a
-# plain command. jq's stderr is not silenced at the two calls, so its words
-# reach the caller as they are
-found=$(jq -c 'try (.predicate.runDetails.builder.id) catch null' <<<"$statements")
+# is not read here either: an answer is never empty, since the try gives a
+# value or null for every statement and the identity always has its JSON
+# text. Both calls stay inside $( ): there bash writes no notice of its own
+# about a jq that was killed, as it does on the script's stderr for a plain
+# command. What jq itself writes on stderr is kept back at both, as at the
+# first call, whatever it is: with no answer the script's stderr holds the
+# one line of unanswered and no more
+found=$(jq -c 'try (.predicate.runDetails.builder.id) catch null' <<<"$statements" 2>/dev/null)
 [ -n "$found" ] || unanswered "its builder identity"
-expected=$(jq -nc --arg identity "$IDENTITY" '$identity')
+expected=$(jq -nc --arg identity "$IDENTITY" '$identity' 2>/dev/null)
 [ -n "$expected" ] || unanswered "the JSON text of the builder identity expected of it"
 if [ "$found" != "$expected" ]; then
   echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: builder identity is ${found}, expected ${expected} (Req 2.28)" >&2
