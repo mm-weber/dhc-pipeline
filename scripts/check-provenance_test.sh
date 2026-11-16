@@ -180,10 +180,11 @@ envelopes() {
 # differ only where the sandbox does.
 # Left out are the files at the sandbox's top that a run is expected to
 # write: the run's own stdout and stderr, the stub's log of its calls and
-# its note of where they wrote, and the number of calls to refuse, which the
-# stub counts down. This list is the one place that says which they are: a
-# later slice whose stand-in keeps a file of its own adds the name here.
-WRITTEN=(stdout stderr cosign.log cosign.wrote-to refusals)
+# its note of where they wrote, the number of calls to refuse, which the
+# stub counts down, and the log that case 4b's stand-in for jq keeps of its
+# calls. This list is the one place that says which they are: a later slice
+# whose stand-in keeps a file of its own adds the name here.
+WRITTEN=(stdout stderr cosign.log cosign.wrote-to refusals jq.log)
 holds() {
   local name; local -a spared=()
   for name in "${WRITTEN[@]}"; do spared+=(! -path "./$name"); done
@@ -967,6 +968,116 @@ other_builder "a statement whose runDetails is a string where an object belongs"
 # statement or under predicate), for .predicate.builder.id or for the text
 # "builder":{"id":"<identity>" in the statement's compact text
 other_builder "a statement with the releaser's identity in four decoys, the builder identity at the path another workflow's" "$(built_by "$RE_ATTESTER" | jq -c --arg r "$RELEASER" 'def decoys: {builder: {id: $r}} + . + {decoy: {id: $r}}; .predicate |= decoys | decoys')" "\"$RE_ATTESTER\""
+
+# 4b: an unanswered jq never passes (plan slice 2.5.4b). The script holds two
+#     texts that jq printed against each other, the value found and the value
+#     expected. A jq that is killed, on a runner out of memory for one, prints
+#     nothing, and two empty texts are equal: a check that takes them for
+#     values passes unchecked, also for a statement another workflow built. So
+#     a jq call that gives no answer (nothing printed, a non-zero exit code)
+#     fails the check wherever in a run it is. A stand-in for jq, first on PATH
+#     in a run, hands every call to the real jq but the ones the case names.
+#     Two statements: one that meets all five, and one built by another
+#     workflow, for the jq calls made only where an expectation is missed. For
+#     each, a control run with every call answered counts a run's jq calls;
+#     then each is named in turn, the k-th, in two families of runs: no answer
+#     from the k-th call on, each killed for real (SIGKILL, 137: of a killed
+#     child the shell may write a line of its own); none at the k-th call
+#     alone, ended with 2 after two lines on stderr (a jq that ends so says why
+#     there). Wanted in every such run: exit 1, not 0 and not the stand-in's
+#     code; nothing on stdout; stderr one line and no more, the script's error
+#     line, with no value in it that jq did not give (", expected " not in it,
+#     or once, in the clause the second statement truly misses); cosign called
+#     once; the named call reached. A result line covers every k.
+# the stand-in, laid down after fresh: $SB/bin/jq logs its call in
+# $SB/jq.log, one line per call the way the cosign stub does, and takes the
+# number of lines for the call's number in the run. From the call whose
+# number $SB/jq.no-answer-from holds, a call is killed for real: once logged,
+# the stand-in sends itself SIGKILL, as a runner's kernel does to a jq out of
+# memory. An exit with 137 would show the script the same code and no more: of
+# a child that a signal killed, the shell may write a notice of its own on the
+# script's stderr, and bash does so for a call made as a plain command and not
+# for one inside $( ), so how a killed jq shows depends on the shape of the
+# call. At the call whose number $SB/jq.no-answer-at holds, the stand-in ends
+# with 2, jq's code for an error of the system, after two lines on its stderr:
+# a jq that ends so says why there, and a stand-in without a word would fail
+# more quietly than jq does. The two lines say that they are this stand-in's.
+# The first begins jq: error: and the second does not, as with the lines of a
+# real jq, so that a script which keeps back only what begins so still passes
+# one on; and there are two, so that words passed on as they came break the
+# script's line. Nothing on stdout either time. So the one line wanted on
+# stderr also says that nothing jq writes, and nothing the shell writes of jq,
+# is passed on as it is; what the script's own line tells of them is free.
+# Every other call is the real jq's, arguments and stdin as they came: the jq
+# the suite itself finds, by its full path ($SB/jq.real), never the stand-in
+jq_stand_in() {
+  command -v jq > "$SB/jq.real"; : > "$SB/jq.log"
+  cat > "$SB/bin/jq" <<'STUB'
+#!/usr/bin/env bash
+SB="$(cd "$(dirname "$0")/.." && pwd)"
+{ printf 'jq'; [ $# -gt 0 ] && printf ' %q' "$@"; echo; } >> "$SB/jq.log"
+nth=$(grep -c '' "$SB/jq.log")
+[ -f "$SB/jq.no-answer-from" ] && [ "$nth" -ge "$(cat "$SB/jq.no-answer-from")" ] && kill -KILL $$
+if [ -f "$SB/jq.no-answer-at" ] && [ "$nth" -eq "$(cat "$SB/jq.no-answer-at")" ]; then
+  echo "jq: error: this call gets no answer (the words of the stand-in for jq in case 4b of check-provenance_test.sh, not jq's)" >&2
+  echo "The stand-in for jq in case 4b ends this call with 2, as jq does on an error of the system (its own words again, not jq's)" >&2
+  exit 2
+fi
+exec "$(cat "$SB/jq.real")" "$@"
+STUB
+  chmod +x "$SB/bin/jq"
+}
+# whether the file $1 is one line and no more, ended by its newline
+one_line() { [ "$(grep -c '' "$1")" -eq 1 ] && [ "$(wc -l < "$1")" -eq 1 ]; }
+# the control run and the two families, each run over a fresh sandbox whose
+# one envelope holds the statement $2; $1 names the statement in every result
+# line, $3 is the clause its error line holds when every jq call is answered,
+# empty for a statement that passes
+jq_gives_no_answer() {
+  local order family verdict control shows met=no n k i calls made claims
+  local -a bad wanted=("" "exit 1" "nothing on stdout" "stderr is one line, the script's error line, which names the reference and shows no value that jq did not give" "cosign is called once and not asked again" "the named jq call is reached")
+  fresh; jq_stand_in; envelopes "$2" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$REF"
+  calls=$(grep -c '' "$SB/cosign.log"); n=$(grep -c '' "$SB/jq.log"); claims=$(occurs ", expected " <<<"$err")
+  if [ -z "$3" ]; then
+    verdict="the check passes as in case 1"; shows="', expected ' not in it, since this statement misses nothing"
+    control="exit 0; stdout one line and no more, begun 'check-provenance: ' and naming the reference; nothing on stderr"
+    [ "$rc" -eq 0 ] && one_line "$SB/stdout" && [[ "$out" == "check-provenance: "*"$REF"* ]] && [ ! -s "$SB/stderr" ] && [ "$calls" -eq 1 ] && met=yes
+  else
+    verdict="the check fails as in case 4, on the one clause"; shows="', expected ' not in it, or in it once and with it the clause '$3'"
+    control="exit 1; nothing on stdout; stderr one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that holds the clause '$3' and ', expected ' once"
+    [ "$rc" -eq 1 ] && [ ! -s "$SB/stdout" ] && one_line "$SB/stderr" && [[ "$err" == "::error::check-provenance: $REF: "*"$3"*" (Req 2.28)" ]] && [ "$claims" -eq 1 ] && [ "$calls" -eq 1 ] && met=yes
+  fi
+  [ "$met" = yes ] \
+    && pass "$1, every jq call answered: $verdict" \
+    || fail "$1, every jq call answered: $verdict" "exit=$rc; cosign calls logged: $calls; times ', expected ' is on stderr: $claims" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}" "wanted: $control; cosign called once"
+  # with no jq call in the control there is none to name: nothing was asked
+  [ "$n" -ge 1 ] \
+    && pass "$1, every jq call answered: the run makes one jq call or more" \
+    || { fail "$1, every jq call answered: the run makes one jq call or more" "jq calls the stand-in logged: $n, wanted 1 or more: the runs without an answer were not made"; return; }
+  for order in from at; do
+    [ "$order" = from ] && family="no answer from the k-th jq call on" || family="no answer at the k-th jq call alone"
+    bad=()
+    for ((k = 1; k <= n; k++)); do
+      fresh; jq_stand_in; envelopes "$2" > "$SB/envelopes.jsonl"; echo "$k" > "$SB/jq.no-answer-$order"
+      run verify "$SB/root" "$REF"
+      calls=$(grep -c '' "$SB/cosign.log"); made=$(grep -c '' "$SB/jq.log"); claims=$(occurs ", expected " <<<"$err")
+      [ "$rc" -eq 1 ] || bad[1]+="k=$k: exit=$rc, wanted 1; stderr: ${err:-nothing}"$'\n'
+      [ ! -s "$SB/stdout" ] || bad[2]+="k=$k: stdout: $out, wanted: nothing"$'\n'
+      one_line "$SB/stderr" && [[ "$err" == "::error::check-provenance: $REF: "*" (Req 2.28)" ]] \
+        && { [ "$claims" -eq 0 ] || { [ -n "$3" ] && [ "$claims" -eq 1 ] && [[ "$err" == *"$3"* ]]; }; } \
+        || bad[3]+="k=$k: lines on stderr: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr"), wanted 1 and 1; times ', expected ' is there: $claims; stderr: ${err:-nothing}"$'\n'
+      [ "$calls" -eq 1 ] || bad[4]+="k=$k: cosign calls logged: $calls, wanted 1"$'\n'
+      [ "$made" -ge "$k" ] || bad[5]+="k=$k: jq calls the stand-in logged: $made, wanted $k or more: $(cat "$SB/jq.log")"$'\n'
+    done
+    [ -z "${bad[3]:-}" ] || bad[3]+="wanted at every k: ::error::check-provenance: $REF: <why> (Req 2.28), one line and no more, $shows"
+    for i in 1 2 3 4 5; do
+      [ -z "${bad[$i]:-}" ] && pass "$1, $family: ${wanted[$i]}" || fail "$1, $family: ${wanted[$i]}" "${bad[$i]%$'\n'}"
+    done
+  done
+}
+jq_gives_no_answer "a statement that meets all five" "$(built_by "$RELEASER")" ""
+jq_gives_no_answer "a statement built by another workflow" "$(built_by "$RE_ATTESTER")" "builder identity is \"$RE_ATTESTER\", expected \"$RELEASER\""
 
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
