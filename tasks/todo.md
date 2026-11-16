@@ -496,10 +496,12 @@ left of the program is the follow-up list below, one decision each.
           cleanup
           candidates recorded as plan item 2.8.2
     - [ ] 2.5 `scripts/check-provenance.sh verify` (the owner's go
-          2026-11-15, in progress; sixteen slices, 2.5.10b added before
-          the first one for wrong usage, 2.5.3b (no file left behind)
-          and 2.5.8b (several missed expectations, each named) during
-          the step: retries, the last one against the real cosign)
+          2026-11-15, in progress; seventeen slices, 2.5.10b added
+          before the first one for wrong usage, 2.5.3b (no file left
+          behind), 2.5.4b (a jq that gives no answer never passes) and
+          2.5.8b (several missed expectations, each named) during the
+          step: retries, the last one against the real cosign; 2.5.1
+          to 2.5.4 built by 2026-11-16)
     - [ ] 2.6 the release steps in `build.yml`, the three suites in
           `validate.yml`, the way out written into the manual
     - [ ] 2.7 the action's pin read by the Renovate test; a bump merged
