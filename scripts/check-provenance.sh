@@ -65,15 +65,22 @@
 # the identity, which reads https://github.com/<owner>/<repo>/<workflow
 # path>@<ref>: its scheme, its host and the first two segments of its path,
 # what stands before the third slash after the host.
-# With the three met the script ends with 0 and one line on stdout that names
-# the reference and says so. The other two expectations, workflow path and
-# ref, are not read yet, and of several statements none is chosen yet.
+# With that repository the workflow path is read the same way, which says
+# which of the repository's workflow files was run: the value at
+# .predicate.buildDefinition.externalParameters.workflow.path has to be
+# exactly the build workflow's path, the clause being "workflow path is
+# <found>, expected <expected>". That path is cut from the identity too: what
+# stands between the slash after the repository and the first @ (a ref can
+# hold an @, a workflow file's name does not in practice).
+# With the four met the script ends with 0 and one line on stdout that names
+# the reference and says so. The fifth expectation, the ref, is not read yet,
+# and of several statements none is chosen yet.
 # Nothing cosign writes is passed on as it is.
 # The statements, and of each expectation read the value found and the value
 # expected, are each what jq prints when asked, one call after another: three
 # calls in a run that ends at the builder identity, five in one that ends at
-# the build type, seven in one that reads the source repository too. A jq
-# call that
+# the build type, seven in one that ends at the source repository, nine in
+# one that reads the workflow path too. A jq call that
 # printed nothing gave no answer, however it came to that (a jq that was
 # killed and a jq that ended on an error of its own are two ways it comes
 # about), and with no answer the check has failed, whichever of the calls it
@@ -106,6 +113,10 @@ IDENTITY=$(python3 -c 'import sys,yaml; print((yaml.safe_load(open(sys.argv[1]))
 # it and without the slash before it
 SOURCE=${IDENTITY#*://*/*/*/}
 SOURCE=${IDENTITY%"/$SOURCE"}
+# the build workflow's path: what follows the repository and its slash, up to
+# the first @, where the ref begins (a ref can hold an @ of its own)
+WORKFLOW=${IDENTITY#"$SOURCE/"}
+WORKFLOW=${WORKFLOW%%@*}
 
 # where cosign's stdout is kept until it is read, gone on exit
 TMP=$(mktemp -d)
@@ -210,4 +221,17 @@ if [ "$found" != "$expected" ]; then
   echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: source repository is ${found}, expected ${expected} (Req 2.28)" >&2
   exit 1
 fi
-echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement whose builder identity is that identity, whose build type is ${BUILD_TYPE} and whose source repository is ${SOURCE}, what else the statement says is not read"
+# the workflow path says which of the repository's workflow files was run: a
+# repository holds several, the policy's rule admits the build workflow alone
+# and compares for equality here as well, so the value found is not tidied
+# before it is compared. Asked, compared and shown as the three before it;
+# the line names this miss alone
+found=$(jq -c 'try (.predicate.buildDefinition.externalParameters.workflow.path) catch null' <<<"$statements" 2>/dev/null)
+[ -n "$found" ] || unanswered "its workflow path"
+expected=$(jq -nc --arg workflow "$WORKFLOW" '$workflow' 2>/dev/null)
+[ -n "$expected" ] || unanswered "the JSON text of the workflow path expected of it"
+if [ "$found" != "$expected" ]; then
+  echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: workflow path is ${found}, expected ${expected} (Req 2.28)" >&2
+  exit 1
+fi
+echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement whose builder identity is that identity, whose build type is ${BUILD_TYPE}, whose source repository is ${SOURCE} and whose workflow path is ${WORKFLOW}, what else the statement says is not read"
