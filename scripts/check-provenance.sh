@@ -55,6 +55,19 @@
 # so. The other four expectations, build type, source repository, workflow
 # path and ref, are not read yet, and of several statements none is chosen
 # yet. Nothing cosign writes is passed on as it is.
+# The statements, the value found and the value expected are each what jq
+# prints when asked, three calls in a run that gets that far. A jq call that
+# gives no answer, a jq that was killed or one that ended on an error of its
+# own, has printed nothing, and with no answer the check has failed,
+# whichever of the three calls it is: exit 1, nothing on stdout, one
+# ::error:: line on stderr naming the reference, and neither cosign nor jq is
+# asked again. After the first call nothing printed is no statement, and the
+# line is that of no statement. After the second or the third, whose answer
+# is never empty, the line holds no clause and says that jq gave no answer,
+# and to which question: an empty text is no value, so it is never compared
+# (two of them would be equal, and the check would pass unchecked), never
+# shown as found or as expected, and nothing is put in its place. What jq
+# itself writes on stderr at those two calls is not kept back yet.
 set -uo pipefail
 # after the mode word: the root that holds catalogue-policy.yaml, and the
 # reference cosign is asked about
@@ -108,6 +121,10 @@ if [ -z "$statements" ]; then
   echo "::error::check-provenance: ${REF}: cosign ended with exit code 0 and what it printed holds no provenance statement (Req 2.28)" >&2
   exit 1
 fi
+# a jq call that gave no answer: the check has failed, and there is no clause
+# to show for it. One ::error:: line naming the reference and the question
+# ($1), exit 1; neither cosign nor jq is asked again
+unanswered() { echo "::error::check-provenance: ${REF}: the provenance statement cosign verified could not be judged: jq gave no answer when asked for $1 (Req 2.28)" >&2; exit 1; }
 # cosign has checked who signed the statement, not what it says of who built:
 # its builder identity has to be the build workflow's too, exactly the
 # identity cosign was asked under, as the policy's rule compares for equality
@@ -118,10 +135,22 @@ fi
 # where the path cannot be walked because something on the way to the field
 # is no object: there is no value at such a path either, and jq by itself
 # would end on an error there and print nothing. Only the path is answered
-# for: an empty answer is a failure of jq's and is not dressed as null by the
-# shell, and jq's stderr is not silenced, so that its words reach the caller
+# for: an empty text is no value and is not dressed as null by the shell. It
+# is what a jq leaves that gave no answer, one that was killed or one that
+# ended on an error of its own, and it fails the check before any text is
+# compared or shown: two empty texts would be equal, and the check would pass
+# unchecked. Whether the text is empty is all that is asked, jq's exit code
+# is not read here either, and that is enough: a call without an answer has
+# printed nothing, however it ended, and an answer is never empty, since the
+# try gives a value or null for every statement and the identity always has
+# its JSON text. Both calls stay inside $( ): there bash writes no notice of
+# its own about a jq that was killed, as it does on the script's stderr for a
+# plain command. jq's stderr is not silenced at the two calls, so its words
+# reach the caller as they are
 found=$(jq -c 'try (.predicate.runDetails.builder.id) catch null' <<<"$statements")
+[ -n "$found" ] || unanswered "its builder identity"
 expected=$(jq -nc --arg identity "$IDENTITY" '$identity')
+[ -n "$expected" ] || unanswered "the JSON text of the builder identity expected of it"
 if [ "$found" != "$expected" ]; then
   echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: builder identity is ${found}, expected ${expected} (Req 2.28)" >&2
   exit 1
