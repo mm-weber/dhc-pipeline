@@ -1079,6 +1079,128 @@ jq_gives_no_answer() {
 jq_gives_no_answer "a statement that meets all five" "$(built_by "$RELEASER")" ""
 jq_gives_no_answer "a statement built by another workflow" "$(built_by "$RE_ATTESTER")" "builder identity is \"$RE_ATTESTER\", expected \"$RELEASER\""
 
+# 5: a build type other than the expected one fails, naming the field, the
+#    value found and the value expected (plan slice 2.5.5). The build type
+#    says which kind of build wrote the statement, and with it what the
+#    fields under externalParameters mean. The policy rule a consumer applies
+#    compares it for equality, and a self-check laxer than the rule passes a
+#    release that the rule then refuses in the cluster. Eighteen inputs, each
+#    one envelope whose statement meets the other four expectations and
+#    holds, at .predicate.buildDefinition.buildType, not exactly the expected
+#    build type: the sixteen kinds every expectation is asked (every_kind)
+#    and two laid down by hand. Wanted on each: exit 1; nothing on stdout;
+#    stderr one line and no more, the script's error line, which holds the
+#    one clause "build type is <found>, expected <expected>", both values as
+#    JSON text the way jq -c prints it, and none of the values of the
+#    expectations the statement meets; cosign called once.
+# One input put to the script, whichever expectation it misses: a fresh
+# sandbox whose one envelope holds the statement $2, one run, the four things
+# wanted. $1 names the input in every result line, $3 is the expectation's
+# name as the clause writes it, $4 and $5 are the JSON text the clause shows
+# for the value found and for the value expected, the arguments after them
+# the values of the expectations the statement meets. All that is wanted of
+# stderr is one result line: against a script that passes the statement
+# stderr is empty, and a line of its own for "none of those values" would be
+# ok without having asked anything. Its detail says which part did not hold
+misses_one() {
+  local clause="$3 is $4, expected $5" lines ended claims calls met; local -a wrong=()
+  fresh
+  envelopes "$2" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$REF"
+  [ "$rc" -eq 1 ] \
+    && pass "$1: exit 1" \
+    || fail "$1: the exit code" "exit=$rc, wanted 1: the statement's $3 is not the expected one" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  [ ! -s "$SB/stdout" ] \
+    && pass "$1: nothing on stdout" \
+    || fail "$1: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  lines=$(grep -c '' "$SB/stderr"); ended=$(wc -l < "$SB/stderr"); claims=$(occurs ", expected " <<<"$err")
+  { [ "$lines" -eq 1 ] && [ "$ended" -eq 1 ]; } || wrong+=("lines on stderr: $lines, of them ended by a newline: $ended, wanted 1 and 1")
+  [[ "$err" == "::error::check-provenance: $REF: "*" (Req 2.28)" ]] || wrong+=("it is not begun '::error::check-provenance: ' and the reference and ended ' (Req 2.28)'")
+  [[ "$err" == *"$clause"* ]] || wrong+=("the clause is not in it")
+  [ "$claims" -eq 1 ] || wrong+=("times ', expected ' is in it: $claims, wanted 1")
+  [[ "$err" != *"3 attempts"* && "$err" != *"no provenance statement"* ]] || wrong+=("it says '3 attempts' or 'no provenance statement', wanted neither")
+  for met in "${@:6}"; do
+    [[ "$err" != *"$met"* ]] || wrong+=("it holds a value of an expectation the statement meets, wanted none of them: $met")
+  done
+  [ "${#wrong[@]}" -eq 0 ] \
+    && pass "$1: stderr is one line, the script's error line, which names the reference and holds the one clause and no value of an expectation the statement meets" \
+    || fail "$1: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that holds the clause, holds ', expected ' once, says neither '3 attempts' nor 'no provenance statement' and holds no value of an expectation the statement meets" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: $REF: <any words>$clause<any words> (Req 2.28)"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq 1 ] \
+    && pass "$1: cosign is called once and not asked again" \
+    || fail "$1: the cosign calls the stub logged: one, what cosign printed with exit 0 is judged once" "calls logged: $calls, wanted 1"
+}
+# The kinds every expectation is asked: $1 is the expectation's name, $2 its
+# path in the statement, $3 its expected value, the arguments after them the
+# values of the other four. Each kind takes the statement that meets all five
+# and puts its own value at the path; the JSON text the clause is wanted to
+# show for it is spelled by hand, never made by jq. So an expected value
+# that cannot be spelled that way is refused before any kind is laid down,
+# and the kinds of the dot and of the capital refuse one without a dot or
+# without a small letter: their input would be the expected value itself.
+# What each is there for, shortly (case 4 says it at length): a script that
+# accepts a value which only begins or ends like the expected one, or which
+# the expected one begins or ends with; one that reads the expected value as
+# a pattern, a dot for any character, or without regard to case; one that
+# has jq print the value raw and loses a blank, a line break or a NUL on the
+# way through the shell, or reads an empty line or nothing at all as nothing
+# missed; one whose error line a line break, a double quote, a backslash or
+# a tab in the value breaks in two or forges; one that asks with // and so
+# takes false for no value, or compares only a value it found; one that
+# shows an array over several lines or with a blank after its comma
+every_kind() {
+  local name=$1 path=$2 v=$3 all a b low cap; shift 3
+  local put="$path = \$v" want="\"$v\""
+  if ( LC_ALL=C; [[ "$v" == *[!\ -~]* || "$v" == *[\"\\]* ]] ); then
+    fail "the kinds of $name: the expected value can be spelled as JSON text by hand" "the expected value: $(printf '%q' "$v")" \
+         "wanted: one that holds no double quote, no backslash, no control character and no character outside ASCII; no kind was laid down"
+    return
+  fi
+  all=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")
+  a=${v:0:${#v}/2}; b=${v:${#v}/2}; low=${v%%[[:lower:]]*}; cap=${v:${#low}}; cap="$low${cap^}"
+  misses_one "a $name with something after the expected one" "$(jq -c --arg v "$v-next" "$put" <<<"$all")" "$name" "\"$v-next\"" "$want" "$@"
+  misses_one "a $name with something before the expected one" "$(jq -c --arg v "next-$v" "$put" <<<"$all")" "$name" "\"next-$v\"" "$want" "$@"
+  misses_one "a $name that is the expected one cut short by its last character" "$(jq -c --arg v "${v%?}" "$put" <<<"$all")" "$name" "\"${v%?}\"" "$want" "$@"
+  misses_one "a $name that is the expected one cut short by its first character" "$(jq -c --arg v "${v#?}" "$put" <<<"$all")" "$name" "\"${v#?}\"" "$want" "$@"
+  if [[ "$v" == *.* ]]; then
+    misses_one "a $name with a hyphen for the expected one's first dot" "$(jq -c --arg v "${v/./-}" "$put" <<<"$all")" "$name" "\"${v/./-}\"" "$want" "$@"
+  else
+    fail "a $name with a hyphen for the expected one's first dot: the input can be laid down" "the expected value holds no dot: $v" "wanted: one that holds a dot; without one the input would be the expected value itself, so it was not laid down"
+  fi
+  if [ "$low" != "$v" ]; then
+    misses_one "a $name with the expected one's first small letter as a capital" "$(jq -c --arg v "$cap" "$put" <<<"$all")" "$name" "\"$cap\"" "$want" "$@"
+  else
+    fail "a $name with the expected one's first small letter as a capital: the input can be laid down" "the expected value holds no small letter: $v" "wanted: one that holds a small letter; without one the input would be the expected value itself, so it was not laid down"
+  fi
+  misses_one "a $name that is the expected one with a blank after it" "$(jq -c --arg v "$v " "$put" <<<"$all")" "$name" "\"$v \"" "$want" "$@"
+  misses_one "a $name that is the expected one with a line break after it" "$(jq -c --arg v "$v"$'\n' "$put" <<<"$all")" "$name" "\"$v\\n\"" "$want" "$@"
+  misses_one "a $name that is the expected one with a NUL character after it" "$(jq -c --arg v "$v" "$put + \"\\u0000\"" <<<"$all")" "$name" "\"$v\\u0000\"" "$want" "$@"
+  misses_one "a $name that is the expected one with a line break before it" "$(jq -c --arg v $'\n'"$v" "$put" <<<"$all")" "$name" "\"\\n$v\"" "$want" "$@"
+  misses_one "a $name that is the expected one with a line break in its middle" "$(jq -c --arg v "$a"$'\n'"$b" "$put" <<<"$all")" "$name" "\"$a\\n$b\"" "$want" "$@"
+  misses_one "a $name that is the expected one with a double quote, a backslash and a tab in its middle" "$(jq -c --arg v "$a"$'"\\\t'"$b" "$put" <<<"$all")" "$name" "\"$a"'\"\\\t'"$b\"" "$want" "$@"
+  misses_one "a $name that is the empty string" "$(jq -c --arg v "" "$put" <<<"$all")" "$name" '""' "$want" "$@"
+  misses_one "a statement whose $name is false" "$(jq -c "$path = false" <<<"$all")" "$name" false "$want" "$@"
+  misses_one "a statement whose $name is an array that holds the expected one twice" "$(jq -c --arg v "$v" "$path = [\$v, \$v]" <<<"$all")" "$name" "[\"$v\",\"$v\"]" "$want" "$@"
+  misses_one "a statement without a $name" "$(jq -c "del($path)" <<<"$all")" "$name" null "$want" "$@"
+}
+every_kind "build type" .predicate.buildDefinition.buildType "$BUILD_TYPE" "$RELEASER" "$SOURCE" "$WORKFLOW" "$GIT_REF"
+# another build type as a whole, where the kinds above all vary the expected
+# one
+other_type="https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1"
+misses_one "a build type that is another one" "$(statement "$RELEASER" "$other_type" "$SOURCE" "$WORKFLOW" "$GIT_REF")" \
+  "build type" "\"$other_type\"" "\"$BUILD_TYPE\"" "$RELEASER" "$SOURCE" "$WORKFLOW" "$GIT_REF"
+# the expected build type at other places than the path, while the build type
+# at the path is that other one. Four decoys, as in case 4: the statement's
+# first key (buildDefinition, an object whose buildType it is) and its last
+# (decoy, such an object too), the predicate's first key (buildType itself)
+# and its last (decoy again). So the value at the path is neither the first
+# nor the last buildType in the statement or under predicate, and a script
+# that does not walk the path passes this statement
+misses_one "a statement with the expected build type in four decoys, the build type at the path another one" \
+  "$(statement "$RELEASER" "$other_type" "$SOURCE" "$WORKFLOW" "$GIT_REF" | jq -c --arg t "$BUILD_TYPE" '{buildDefinition: {buildType: $t}} + . + {decoy: {buildType: $t}} | .predicate |= {buildType: $t} + . + {decoy: {buildType: $t}}')" \
+  "build type" "\"$other_type\"" "\"$BUILD_TYPE\"" "$RELEASER" "$SOURCE" "$WORKFLOW" "$GIT_REF"
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
