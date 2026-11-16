@@ -501,7 +501,9 @@ left of the program is the follow-up list below, one decision each.
           behind), 2.5.4b (a jq that gives no answer never passes) and
           2.5.8b (several missed expectations, each named) during the
           step: retries, the last one against the real cosign; 2.5.1
-          to 2.5.4b built by 2026-11-16)
+          to 2.5.4b built by 2026-11-16; slice 2.5.5's failing test
+          committed that day as 1c4edc6, its code not built yet; the
+          work paused there on 2026-11-16 at the owner's word)
     - [ ] 2.6 the release steps in `build.yml`, the three suites in
           `validate.yml`, the way out written into the manual
     - [ ] 2.7 the action's pin read by the Renovate test; a bump merged
