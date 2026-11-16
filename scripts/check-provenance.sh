@@ -38,10 +38,10 @@
 # line on stderr naming the reference, and exit 1; cosign is not asked again,
 # what it printed with 0 is its answer and no failed attempt.
 # With a statement the other half is asked, what the statement says: cosign
-# has checked who signed it, not what it says of who built. Of the five
-# expectations (ADR 0005, decision 5) three are read so far. First the builder
-# identity: the value at .predicate.runDetails.builder.id has to be the build
-# workflow's identity, exactly the one cosign was asked under, as the policy's
+# has checked who signed it, not what it says of who built. The five
+# expectations (ADR 0005, decision 5) are read one after another. First the
+# builder identity: the value at .predicate.runDetails.builder.id has to be
+# the build workflow's identity, exactly the one cosign was asked under, as the policy's
 # rule compares for equality (Req 2.28). With another value there, one that
 # only begins or ends like that identity as much as any other, or with no
 # value there, the check has failed: one ::error:: line on stderr naming the
@@ -72,15 +72,21 @@
 # <found>, expected <expected>". That path is cut from the identity too: what
 # stands between the slash after the repository and the first @ (a ref can
 # hold an @, a workflow file's name does not in practice).
-# With the four met the script ends with 0 and one line on stdout that names
-# the reference and says so. The fifth expectation, the ref, is not read yet,
-# and of several statements none is chosen yet.
+# With that path the ref is read the same way, which says from which branch
+# or tag the workflow file was taken: the value at
+# .predicate.buildDefinition.externalParameters.workflow.ref has to be
+# exactly the build workflow's ref, the clause being "ref is <found>,
+# expected <expected>". That ref is cut from the identity too: all that
+# stands after the first @, the @ at which the workflow path ends.
+# With the five met the script ends with 0 and one line on stdout that names
+# the reference and says so. Of several statements none is chosen yet.
 # Nothing cosign writes is passed on as it is.
 # The statements, and of each expectation read the value found and the value
 # expected, are each what jq prints when asked, one call after another: three
 # calls in a run that ends at the builder identity, five in one that ends at
 # the build type, seven in one that ends at the source repository, nine in
-# one that reads the workflow path too. A jq call that
+# one that ends at the workflow path, eleven in one that reads the ref too.
+# A jq call that
 # printed nothing gave no answer, however it came to that (a jq that was
 # killed and a jq that ended on an error of its own are two ways it comes
 # about), and with no answer the check has failed, whichever of the calls it
@@ -117,6 +123,8 @@ SOURCE=${IDENTITY%"/$SOURCE"}
 # the first @, where the ref begins (a ref can hold an @ of its own)
 WORKFLOW=${IDENTITY#"$SOURCE/"}
 WORKFLOW=${WORKFLOW%%@*}
+# the build workflow's ref: all that follows that first @
+WORKFLOW_REF=${IDENTITY#*@}
 
 # where cosign's stdout is kept until it is read, gone on exit
 TMP=$(mktemp -d)
@@ -234,4 +242,17 @@ if [ "$found" != "$expected" ]; then
   echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: workflow path is ${found}, expected ${expected} (Req 2.28)" >&2
   exit 1
 fi
-echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement whose builder identity is that identity, whose build type is ${BUILD_TYPE}, whose source repository is ${SOURCE} and whose workflow path is ${WORKFLOW}, what else the statement says is not read"
+# the ref says from which branch or tag the workflow file was taken: the
+# policy's rule admits the release branch alone and compares for equality
+# here as well, so the same file run from another branch is a miss, and the
+# value found is not tidied before it is compared. Asked, compared and shown
+# as the four before it; the line names this miss alone
+found=$(jq -c 'try (.predicate.buildDefinition.externalParameters.workflow.ref) catch null' <<<"$statements" 2>/dev/null)
+[ -n "$found" ] || unanswered "its ref"
+expected=$(jq -nc --arg ref "$WORKFLOW_REF" '$ref' 2>/dev/null)
+[ -n "$expected" ] || unanswered "the JSON text of the ref expected of it"
+if [ "$found" != "$expected" ]; then
+  echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: ref is ${found}, expected ${expected} (Req 2.28)" >&2
+  exit 1
+fi
+echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement whose builder identity is that identity, whose build type is ${BUILD_TYPE}, whose source repository is ${SOURCE}, whose workflow path is ${WORKFLOW} and whose ref is ${WORKFLOW_REF}, what else the statement says is not read"
