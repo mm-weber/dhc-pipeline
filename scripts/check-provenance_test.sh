@@ -1334,6 +1334,53 @@ second_identity_inputs() {
 }
 under_second_identity second_identity_inputs
 
+# 8: a ref other than the build workflow's fails, naming the field, the value
+#    found and the value expected (plan slice 2.5.8). The ref says from which
+#    branch or tag the workflow file was taken: a release is admitted from
+#    the release branch alone, and the same workflow file run from a feature
+#    branch, where anyone with push rights can change it, must not pass. The
+#    policy rule a consumer applies compares this field for equality.
+#    Twenty-one inputs, all under the second releaser identity (its ref holds
+#    a dot, which the dot kind needs; the first one's holds none), each one
+#    envelope whose statement meets the other four expectations and holds, at
+#    the path below, not exactly $GIT_REF, the ref part of the releaser's
+#    identity: the sixteen kinds (every_kind) and five laid down by hand.
+#    Wanted on each what misses_one asks, the clause being "ref is <found>,
+#    expected <expected>". Every statement of the case holds the expected ref
+#    at other places by itself, at the end of the builder identity and of
+#    resolvedDependencies[0].uri: a script that searches its text passes them all.
+first_ref=$GIT_REF
+ref_path=.predicate.buildDefinition.externalParameters.workflow.ref
+# one input laid down by hand: $1 names it, $2 is the value at the path, put
+# there in the statement that meets all five, $3 a jq filter for what else
+# the statement is to hold (the decoys), . where there is nothing
+other_ref() {
+  misses_one "$1" "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF" | jq -c --arg v "$2" --arg r "$GIT_REF" "$ref_path = \$v | $3")" \
+    "ref" "\"$2\"" "\"$GIT_REF\"" "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW"
+}
+ref_inputs() {
+  every_kind "ref" "$ref_path" "$GIT_REF" "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW"
+  # a feature branch of the same repository, the case the field is there for
+  other_ref "a ref that is another branch" "refs/heads/feature" .
+  # two ways a ref gets tidied before it is compared: a script that compares
+  # the last segment alone, or drops the kind of ref, passes these
+  other_ref "a ref that is the branch's name alone" "${GIT_REF##*/}" .
+  other_ref "a ref that is the tag of the same name" "refs/tags/${GIT_REF#refs/heads/}" .
+  # the expected ref is the ref of the identity in the policy file: a script
+  # with the first identity's ref written into it passes this statement
+  other_ref "a ref that is the first identity's" "$first_ref" .
+  # the expected ref at other places than the path, while the value at the
+  # path is the other branch. Seven decoys, placed as cases 6 and 7 place
+  # theirs: ref as the first key and decoy.workflow.ref as the last, of the
+  # statement and of its predicate; ref as the first key of buildDefinition
+  # and workflow.ref (the path without externalParameters) as its last; ref
+  # (the path without workflow) as the first key of externalParameters
+  other_ref "a statement with the expected ref in seven decoys, the ref at the path the other branch" "refs/heads/feature" \
+    'def decoys: {ref: $r} + . + {decoy: {workflow: {ref: $r}}}; .predicate.buildDefinition.externalParameters |= {ref: $r} + .
+     | .predicate.buildDefinition |= {ref: $r} + . + {workflow: {ref: $r}} | .predicate |= decoys | decoys'
+}
+under_second_identity ref_inputs
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
