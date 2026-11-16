@@ -36,10 +36,25 @@
 # statement the check has failed, though cosign ended with 0: a self-check
 # that passes when nothing was verified has checked nothing. One ::error::
 # line on stderr naming the reference, and exit 1; cosign is not asked again,
-# what it printed with 0 is its answer and no failed attempt. With one
-# statement or more the script ends with 0 and one line on stdout that names
-# the reference and says so. What a statement says is not read yet. Nothing
-# cosign writes is passed on as it is.
+# what it printed with 0 is its answer and no failed attempt.
+# With a statement the other half is asked, what the statement says: cosign
+# has checked who signed it, not what it says of who built. Of the five
+# expectations (ADR 0005, decision 5) one is read so far, the builder
+# identity: the value at .predicate.runDetails.builder.id has to be the build
+# workflow's identity, exactly the one cosign was asked under, as the policy's
+# rule compares for equality (Req 2.28). With another value there, one that
+# only begins or ends like that identity as much as any other, or with no such
+# field, the check has failed: one ::error:: line on stderr naming the
+# reference and holding the clause "builder identity is <found>, expected
+# <expected>", and exit 1; cosign is not asked again. Both values stand in the
+# clause as the JSON text jq prints on one line: a value found shows as it is,
+# a line break in it as \n, and never breaks the line in two; null stands for
+# no such field. A path that cannot be walked, the builder a string for one,
+# fails too, but not yet in that one line. With that identity at the path the
+# script ends with 0 and one line on stdout that names the reference and says
+# so. The other four expectations, build type, source repository, workflow
+# path and ref, are not read yet, and of several statements none is chosen
+# yet. Nothing cosign writes is passed on as it is.
 set -uo pipefail
 # after the mode word: the root that holds catalogue-policy.yaml, and the
 # reference cosign is asked about
@@ -93,4 +108,17 @@ if [ -z "$statements" ]; then
   echo "::error::check-provenance: ${REF}: cosign ended with exit code 0 and what it printed holds no provenance statement (Req 2.28)" >&2
   exit 1
 fi
-echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement, what a statement says is not read"
+# cosign has checked who signed the statement, not what it says of who built:
+# its builder identity has to be the build workflow's too, exactly the
+# identity cosign was asked under, as the policy's rule compares for equality
+# (Req 2.28). The two are compared as the JSON text jq prints on one line: so
+# nothing of the value found is lost on its way through the shell, and the
+# error line shows it as it is without ever breaking in two. null is what jq
+# prints where the statement has no such field
+found=$(jq -c '.predicate.runDetails.builder.id' <<<"$statements")
+expected=$(jq -nc --arg identity "$IDENTITY" '$identity')
+if [ "$found" != "$expected" ]; then
+  echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: builder identity is ${found}, expected ${expected} (Req 2.28)" >&2
+  exit 1
+fi
+echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement whose builder identity is that identity, what else the statement says is not read"
