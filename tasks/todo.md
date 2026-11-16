@@ -501,8 +501,8 @@ left of the program is the follow-up list below, one decision each.
           behind), 2.5.4b (a jq that gives no answer never passes) and
           2.5.8b (several missed expectations, each named) during the
           step: retries, the last one against the real cosign; 2.5.1
-          to 2.5.6 built by 2026-11-16, the suite at 327 passed;
-          next the failing test of 2.5.7)
+          to 2.5.7 built by 2026-11-16, the suite at 407 passed;
+          next the guard 2.5.7b, added that day: a second identity)
     - [ ] 2.6 the release steps in `build.yml`, the three suites in
           `validate.yml`, the way out written into the manual
     - [ ] 2.7 the action's pin read by the Renovate test; a bump merged
