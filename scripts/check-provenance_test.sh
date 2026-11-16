@@ -837,6 +837,137 @@ fresh
 envelopes '["a"]' > "$SB/envelopes.jsonl"
 nothing_verified "cosign accepting, its one envelope's payload base64 of JSON that is not an object"
 
+# 4: a builder identity other than the build workflow's fails, naming the
+#    field, the value found and the value expected (plan slice 2.5.4). cosign
+#    has checked who signed; whether the signed statement says the build
+#    workflow built it is the script's own first check, and the policy rule a
+#    consumer applies compares for equality: a check laxer than that admits
+#    what the rule refuses. Twenty inputs, each one envelope whose statement
+#    carries the other four expected values and, at
+#    .predicate.runDetails.builder.id, not exactly the releaser's identity;
+#    what an input is there for is said where it is laid down.
+#    Wanted on each: exit 1; nothing on stdout; stderr one line and no more,
+#    the script's error line; cosign called once, its answer with exit 0 is
+#    judged once. The error line names the reference, ends " (Req 2.28)",
+#    says neither "3 attempts" nor "no provenance statement" and holds the
+#    clause "builder identity is <found>, expected <expected>", both values
+#    as JSON text the way jq -c prints it, on one line: a string in double
+#    quotes with JSON's escapes, null where the path holds no value. The
+#    clause is fixed so that a line naming several missed expectations (later
+#    slices) ties each value to its field and tells found from expected. An
+#    input here misses one expectation, so its line holds the one clause and
+#    no second one: ", expected " stands in it once.
+# a statement that carries the other four expected values, its builder
+# identity $1
+built_by() { statement "$1" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF"; }
+# the question put over a fresh sandbox whose one envelope holds the
+# statement $2, and the four things wanted; $1 names the input in every
+# result line, $3 is the JSON text the clause shows for the value found
+other_builder() {
+  local clause="builder identity is $3, expected \"$RELEASER\""
+  fresh
+  envelopes "$2" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$REF"
+  [ "$rc" -eq 1 ] \
+    && pass "$1: exit 1" \
+    || fail "$1: the exit code" "exit=$rc, wanted 1: the statement's builder identity is not the releaser's" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  [ ! -s "$SB/stdout" ] \
+    && pass "$1: nothing on stdout" \
+    || fail "$1: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  lines=$(grep -c '' "$SB/stderr"); ended=$(wc -l < "$SB/stderr")
+  [ "$lines" -eq 1 ] && [ "$ended" -eq 1 ] && [[ "$err" == "::error::check-provenance: $REF: "*"$clause"*" (Req 2.28)" ]] \
+    && [[ "$err" != *", expected "*", expected "* && "$err" != *"3 attempts"* && "$err" != *"no provenance statement"* ]] \
+    && pass "$1: stderr is one line, the script's error line, which names the reference and holds the one clause: the value found, then the value expected" \
+    || fail "$1: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that holds the clause, holds ', expected ' once and says neither '3 attempts' nor 'no provenance statement'" \
+         "lines on stderr: $lines, of them ended by a newline: $ended, wanted 1 and 1" "stderr:" "${err:-nothing}" \
+         "wanted: ::error::check-provenance: $REF: <any words>$clause<any words> (Req 2.28)"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq 1 ] \
+    && pass "$1: cosign is called once and not asked again" \
+    || fail "$1: the cosign calls the stub logged: one, what cosign printed with exit 0 is judged once" "calls logged: $calls, wanted 1"
+}
+# another workflow of the same repository at the same ref
+other_builder "a builder identity that is another workflow of the repository" "$(built_by "$RE_ATTESTER")" "\"$RE_ATTESTER\""
+# the identity with something after it, and with something before it: a
+# script that accepts a value that begins with the expected one, that ends
+# with it or that contains it passes one of the two or both
+other_builder "a builder identity with something after the releaser's" "$(built_by "${RELEASER}-next")" "\"${RELEASER}-next\""
+other_builder "a builder identity with something before the releaser's" "$(built_by "next-${RELEASER}")" "\"next-${RELEASER}\""
+# the identity cut short by its last character, and by its first, the other
+# way round: the expected value begins with the found one, or ends with it
+other_builder "a builder identity that is the releaser's cut short by its last character" "$(built_by "${RELEASER%?}")" "\"${RELEASER%?}\""
+other_builder "a builder identity that is the releaser's cut short by its first character" "$(built_by "${RELEASER#?}")" "\"${RELEASER#?}\""
+# the identity with the dot of release.yml replaced: a script that uses the
+# expected value as a pattern, where a dot stands for any character, passes
+# this statement
+altered=${RELEASER/release.yml/release-yml}
+other_builder "a builder identity with a hyphen for the dot of release.yml" "$(built_by "$altered")" "\"$altered\""
+# the identity with one letter in the other case
+altered=${RELEASER/release.yml/Release.yml}
+other_builder "a builder identity with one letter in the other case" "$(built_by "$altered")" "\"$altered\""
+# the identity with a blank, a line break or a NUL character after it, inside
+# the JSON string: none of the three is the releaser's identity. A script
+# that prints the value with jq and compares it in the shell passes what the
+# shell drops on the way: read the NUL, what follows a line break and,
+# without IFS=, the blank; $( ) the NUL and the line break at the end;
+# read -d '' what follows the NUL. The NUL is written as its escape in jq's
+# program, never as the character itself in an argument
+other_builder "a builder identity that is the releaser's with a blank after it" "$(built_by "$RELEASER ")" "\"$RELEASER \""
+other_builder "a builder identity that is the releaser's with a line break after it" "$(built_by "$RELEASER"$'\n')" "\"$RELEASER\\n\""
+other_builder "a builder identity that is the releaser's with a NUL character after it" "$(built_by "$RELEASER" | jq -c '.predicate.runDetails.builder.id += "\u0000"')" "\"$RELEASER\\u0000\""
+# the identity with a line break before it: of what jq prints raw for this
+# value the first line is empty and the last is the releaser's identity. A
+# script that takes the last line for the value found passes this statement,
+# and so does one that reads the first line and takes an empty one for
+# nothing missed
+other_builder "a builder identity that is the releaser's with a line break before it" "$(built_by $'\n'"$RELEASER")" "\"\\n$RELEASER\""
+# the identity with a line break in its middle, before the @: a value found
+# never breaks the error line in two, the clause shows the break as \n
+other_builder "a builder identity that is the releaser's with a line break in its middle" "$(built_by "${RELEASER%@*}"$'\n'"@${RELEASER#*@}")" "\"${RELEASER%@*}\\n@${RELEASER#*@}\""
+# the identity with a double quote, a backslash and a tab in its middle,
+# before the @, shown as \", \\ and \t: a value shown as JSON text never
+# poses as the clause's own punctuation, and a script that escapes by hand
+# only the characters it has met so far puts these three into the line as
+# they are
+other_builder "a builder identity that is the releaser's with a double quote, a backslash and a tab in its middle" "$(built_by "${RELEASER%@*}"$'"\\\t'"@${RELEASER#*@}")" "\"${RELEASER%@*}"'\"\\\t'"@${RELEASER#*@}\""
+# the empty string, shown "": the one value here that jq prints raw as an
+# empty line and nothing more. A script that has jq print the value raw
+# where it is not the releaser's identity and takes nothing read for nothing
+# missed passes this statement
+other_builder "a builder identity that is the empty string" "$(built_by "")" '""'
+# a value at the path that is not a string, shown as jq -c prints it. false:
+# jq's // takes false for no value as it takes null, so a script that asks
+# with "// null" shows null where the statement says false, and one that asks
+# with "// empty" and compares only a value it found passes the statement.
+# An array that holds the releaser's identity twice, shown on one line with
+# no blank after its comma: plain jq, without -c, prints an array over
+# several lines, and python's json.dumps puts a blank after the comma. No
+# other input shows either, since the strings here, null and false print the
+# same all three ways
+other_builder "a statement whose builder identity is false" "$(built_by "$RELEASER" | jq -c '.predicate.runDetails.builder.id = false')" false
+other_builder "a statement whose builder identity is an array that holds the releaser's twice" "$(built_by "$RELEASER" | jq -c '.predicate.runDetails.builder.id |= [., .]')" "[\"$RELEASER\",\"$RELEASER\"]"
+# no value at the path, shown as null. The field absent: a script that
+# compares only a value it found passes this statement. The path not to be
+# walked, at its last step (builder is a string, the releaser's identity,
+# where an object belongs) and at an earlier one (runDetails is that
+# string): jq ends with an error there and prints nothing, so a script that
+# asks jq for the misses and takes nothing printed for nothing missed passes
+# both, and one that guards the last step alone (.id?) passes the second
+other_builder "a statement without a builder identity" "$(built_by "$RELEASER" | jq -c 'del(.predicate.runDetails.builder.id)')" null
+other_builder "a statement whose builder is a string where an object belongs" "$(built_by "$RELEASER" | jq -c '.predicate.runDetails.builder |= .id')" null
+other_builder "a statement whose runDetails is a string where an object belongs" "$(built_by "$RELEASER" | jq -c '.predicate.runDetails |= .builder.id')" null
+# the releaser's identity at other places than the path, while the builder
+# identity at the path is another workflow's. Four decoys, each an object
+# whose id is the releaser's identity: the first key (builder) and the last
+# (decoy) of the statement, and the same two of its predicate. So the value
+# at the path is neither the first nor the last id met in the statement or
+# under predicate. A script that does not walk the path passes this
+# statement, whether it looks for the identity anywhere in the statement,
+# for a key id (any of them, the first or the last it meets, in the
+# statement or under predicate), for .predicate.builder.id or for the text
+# "builder":{"id":"<identity>" in the statement's compact text
+other_builder "a statement with the releaser's identity in four decoys, the builder identity at the path another workflow's" "$(built_by "$RE_ATTESTER" | jq -c --arg r "$RELEASER" 'def decoys: {builder: {id: $r}} + . + {decoy: {id: $r}}; .predicate |= decoys | decoys')" "\"$RE_ATTESTER\""
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
