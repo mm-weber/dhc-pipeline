@@ -1288,6 +1288,52 @@ other_workflow "a statement with the expected workflow path in seven decoys, the
   'def decoys: {path: $w} + . + {decoy: {workflow: {path: $w}}}; .predicate.buildDefinition.externalParameters |= {path: $w} + .
    | .predicate.buildDefinition |= {path: $w} + . + {workflow: {path: $w}} | .predicate |= decoys | decoys'
 
+# 7b: the cut values come from the releaser identity (plan slice 2.5.7b, a
+#     guard). The source repository and the workflow path the script expects
+#     are the parts of the releaser identity in the policy file it is given,
+#     whatever that identity is: not written into the script, not taken from
+#     the image reference or from another role. The cases above have one
+#     identity, and $REF shares its owner and repository name, so they cannot
+#     tell. Three inputs under a second identity, every part of which differs
+#     from the first one's and from $REF's, owner and repository with a hyphen
+#     and a dot: a statement that meets its five values passes, and one from
+#     the first identity's repository, or built by the first identity's
+#     workflow path, misses by name. The inputs of slice 2.5.8 (the ref) run
+#     under the same identity, through the same function.
+first_source=$SOURCE; first_workflow=$WORKFLOW
+# runs the command it is given with the second identity in the suite's
+# values: fresh, statement and the helpers called below it read these
+under_second_identity() {
+  local SOURCE="https://github.com/acme-corp/widgets.io" WORKFLOW=".github/workflows/publish.yml" GIT_REF="refs/heads/release-1.x"
+  local RELEASER="$SOURCE/$WORKFLOW@$GIT_REF" RE_ATTESTER="$SOURCE/.github/workflows/rescan.yml@$GIT_REF"
+  "$@"
+}
+second_identity_inputs() {
+  local name="under a second releaser identity, a statement that meets its five values" all lines ended calls want got
+  all=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")
+  fresh
+  envelopes "$all" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$REF"
+  [ "$rc" -eq 0 ] && pass "$name: exit 0" \
+    || fail "$name: the exit code" "exit=$rc, wanted 0" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  lines=$(grep -c '' "$SB/stdout"); ended=$(wc -l < "$SB/stdout")
+  [ "$lines" -eq 1 ] && [ "$ended" -eq 1 ] && [[ "$out" == "check-provenance: "* ]] && [[ "$out" == *"$REF"* ]] \
+    && pass "$name: stdout is one line, begun 'check-provenance: ' and naming the reference in full" \
+    || fail "$name: stdout: one line, begun 'check-provenance: ' and naming the reference in full" "lines on stdout: $lines, of them ended by a newline: $ended, wanted 1 and 1" "stdout:" "${out:-nothing}" "wanted: one line begun 'check-provenance: ' that carries $REF"
+  [ ! -s "$SB/stderr" ] && pass "$name: nothing on stderr" \
+    || fail "$name: stderr: nothing" "stderr:" "$(cat "$SB/stderr")" "wanted: nothing"
+  calls=$(grep -c '' "$SB/cosign.log"); got=$(head -n 1 "$SB/cosign.log" | asked)
+  want=$(echo verify-attestation; printf '%s\n' "--type slsaprovenance1" "--certificate-oidc-issuer $ISSUER" "--certificate-identity $RELEASER" "$REF" | LC_ALL=C sort)
+  [ "$calls" -eq 1 ] && [ "$got" = "$want" ] \
+    && pass "$name: cosign is called once, under the second identity and with not one argument more" \
+    || fail "$name: the cosign calls the stub logged: one, asked under the second identity" "calls logged: $calls, wanted 1; what the first asked:" "${got:-nothing}" "wanted:" "$want"
+  misses_one "under a second releaser identity, a statement from the first identity's repository" "$(jq -c --arg v "$first_source" "$source_path = \$v" <<<"$all")" \
+    "source repository" "\"$first_source\"" "\"$SOURCE\"" "$RELEASER" "$BUILD_TYPE" "$WORKFLOW" "$GIT_REF"
+  misses_one "under a second releaser identity, a statement built by the first identity's workflow path" "$(jq -c --arg v "$first_workflow" "$workflow_path = \$v" <<<"$all")" \
+    "workflow path" "\"$first_workflow\"" "\"$WORKFLOW\"" "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$GIT_REF"
+}
+under_second_identity second_identity_inputs
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
