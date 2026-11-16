@@ -1201,6 +1201,51 @@ misses_one "a statement with the expected build type in four decoys, the build t
   "$(statement "$RELEASER" "$other_type" "$SOURCE" "$WORKFLOW" "$GIT_REF" | jq -c --arg t "$BUILD_TYPE" '{buildDefinition: {buildType: $t}} + . + {decoy: {buildType: $t}} | .predicate |= {buildType: $t} + . + {decoy: {buildType: $t}}')" \
   "build type" "\"$other_type\"" "\"$BUILD_TYPE\"" "$RELEASER" "$SOURCE" "$WORKFLOW" "$GIT_REF"
 
+# 6: a source repository other than the build workflow's fails, naming the
+#    field, the value found and the value expected (plan slice 2.5.6). The
+#    source repository says whose workflow file was run. cosign has checked
+#    the identity in the signing certificate; the policy rule a consumer
+#    applies also compares this field of the statement for equality, and a
+#    self-check laxer than the rule passes a release that the rule then
+#    refuses in the cluster. Twenty inputs, each one envelope whose statement
+#    meets the other four expectations and holds, at the path below, not
+#    exactly $SOURCE, the repository part of the releaser's identity: the
+#    sixteen kinds (every_kind) and four laid down by hand. Wanted on each
+#    what misses_one asks, the clause being "source repository is <found>,
+#    expected <expected>". Every statement of the case holds the expected
+#    repository at other places by itself, in resolvedDependencies[0].uri, in
+#    runDetails.metadata.invocationId and as the beginning of the builder
+#    identity (see statement): a script that searches its text passes them all.
+source_path=.predicate.buildDefinition.externalParameters.workflow.repository
+every_kind "source repository" "$source_path" "$SOURCE" "$RELEASER" "$BUILD_TYPE" "$WORKFLOW" "$GIT_REF"
+# one input laid down by hand: $1 names it, $2 is the value at the path, put
+# there in the statement that meets all five, $3 a jq filter for what else
+# the statement is to hold (the decoys), . where there is nothing
+other_source() {
+  misses_one "$1" "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF" | jq -c --arg v "$2" --arg s "$SOURCE" "$source_path = \$v | $3")" \
+    "source repository" "\"$2\"" "\"$SOURCE\"" "$RELEASER" "$BUILD_TYPE" "$WORKFLOW" "$GIT_REF"
+}
+# a fork has the same repository name under another owner: a script that
+# compares the name alone, the last part of the URL, passes this statement
+fork="${SOURCE%/*/*}/umbrella/${SOURCE##*/}"
+other_source "a source repository that is a fork: another owner, the same repository name" "$fork" .
+# the two ways a URL gets tidied before it is compared: a script that drops
+# a .git or a slash at the end of the value found passes these statements
+other_source "a source repository that is the expected one with .git after it" "$SOURCE.git" .
+other_source "a source repository that is the expected one with a slash after it" "$SOURCE/" .
+# the expected repository at other places than the path, while the value at
+# the path is the fork. Seven decoys: repository as the first key and
+# decoy.workflow.repository as the last, of the statement and of its
+# predicate; repository as the first key of buildDefinition and
+# workflow.repository (the path without externalParameters) as its last;
+# repository (the path without workflow) as the first key of
+# externalParameters. So the value at the path is neither the first nor the
+# last repository in the statement, and a script that does not walk the
+# whole path passes this statement
+other_source "a statement with the expected source repository in seven decoys, the source repository at the path the fork" "$fork" \
+  'def decoys: {repository: $s} + . + {decoy: {workflow: {repository: $s}}}; .predicate.buildDefinition.externalParameters |= {repository: $s} + .
+   | .predicate.buildDefinition |= {repository: $s} + . + {workflow: {repository: $s}} | .predicate |= decoys | decoys'
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
