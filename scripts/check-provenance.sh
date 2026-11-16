@@ -39,7 +39,7 @@
 # what it printed with 0 is its answer and no failed attempt.
 # With a statement the other half is asked, what the statement says: cosign
 # has checked who signed it, not what it says of who built. Of the five
-# expectations (ADR 0005, decision 5) one is read so far, the builder
+# expectations (ADR 0005, decision 5) two are read so far. First the builder
 # identity: the value at .predicate.runDetails.builder.id has to be the build
 # workflow's identity, exactly the one cosign was asked under, as the policy's
 # rule compares for equality (Req 2.28). With another value there, one that
@@ -50,32 +50,43 @@
 # clause as the JSON text jq prints on one line: a value found shows as it is,
 # a line break in it as \n, and never breaks the line in two; null stands for
 # no value there: no such field, or a path that cannot be walked, the builder
-# a string where an object belongs for one. With that identity at the path the
-# script ends with 0 and one line on stdout that names the reference and says
-# so. The other four expectations, build type, source repository, workflow
-# path and ref, are not read yet, and of several statements none is chosen
-# yet. Nothing cosign writes is passed on as it is.
-# The statements, the value found and the value expected are each what jq
-# prints when asked, three calls in a run that gets that far. A jq call that
+# a string where an object belongs for one. With that identity at the path
+# the build type is read the same way: the value at
+# .predicate.buildDefinition.buildType has to be exactly GitHub's build type
+# for a workflow run, which says what the fields under externalParameters
+# mean. Anything else there fails the check as the builder identity does, the
+# clause being "build type is <found>, expected <expected>", and the line
+# holds that clause alone: nothing of an expectation the statement meets.
+# With both met the script ends with 0 and one line on stdout that names the
+# reference and says so. The other three expectations, source repository,
+# workflow path and ref, are not read yet, and of several statements none is
+# chosen yet. Nothing cosign writes is passed on as it is.
+# The statements, and of each expectation read the value found and the value
+# expected, are each what jq prints when asked, one call after another: three
+# calls in a run that ends at the builder identity, five in one that reads
+# the build type too. A jq call that
 # printed nothing gave no answer, however it came to that (a jq that was
 # killed and a jq that ended on an error of its own are two ways it comes
-# about), and with no answer the check has failed, whichever of the three
-# calls it is: exit 1, nothing on stdout, one ::error:: line on stderr naming
+# about), and with no answer the check has failed, whichever of the calls it
+# is: exit 1, nothing on stdout, one ::error:: line on stderr naming
 # the reference, and neither cosign nor jq is asked again. After the first
 # call nothing printed is no statement, and the line is that of no statement.
-# After the second or the third, whose answer is never empty, the line holds
+# After each later one, whose answer is never empty, the line holds
 # no clause and says that jq gave no answer, and to which question: an empty
 # text is no value, so it is never compared (two of them would be equal, and
 # the check would pass unchecked), never shown as found or as expected, and
 # nothing is put in its place. In such a run too that line is all the
-# script's stderr holds: what jq itself writes on stderr is kept back at each
-# of the three calls, whatever it is, and of a jq that was killed the shell
+# script's stderr holds: what jq itself writes on stderr is kept back at
+# every call, whatever it is, and of a jq that was killed the shell
 # writes no notice of its own, each call being made inside $( ).
 set -uo pipefail
 # after the mode word: the root that holds catalogue-policy.yaml, and the
 # reference cosign is asked about
 ROOT="$2"
 REF="$3"
+# the build type GitHub's provenance service writes for a workflow run (ADR
+# 0005, decision 5)
+BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
 
 ISSUER=$(python3 -c 'import sys,yaml; print((yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("issuer",""))' "$ROOT/catalogue-policy.yaml")
 # the role named releaser, whatever its place and whatever it attests
@@ -159,4 +170,16 @@ if [ "$found" != "$expected" ]; then
   echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: builder identity is ${found}, expected ${expected} (Req 2.28)" >&2
   exit 1
 fi
-echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement whose builder identity is that identity, what else the statement says is not read"
+# the build type says which kind of build wrote the statement, and with it
+# what the fields under externalParameters mean: the policy's rule compares it
+# for equality too. Asked, compared and shown as the builder identity is; the
+# line names this miss alone, the identity the statement meets is not in it
+found=$(jq -c 'try (.predicate.buildDefinition.buildType) catch null' <<<"$statements" 2>/dev/null)
+[ -n "$found" ] || unanswered "its build type"
+expected=$(jq -nc --arg type "$BUILD_TYPE" '$type' 2>/dev/null)
+[ -n "$expected" ] || unanswered "the JSON text of the build type expected of it"
+if [ "$found" != "$expected" ]; then
+  echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: build type is ${found}, expected ${expected} (Req 2.28)" >&2
+  exit 1
+fi
+echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement whose builder identity is that identity and whose build type is ${BUILD_TYPE}, what else the statement says is not read"
