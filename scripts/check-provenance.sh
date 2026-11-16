@@ -43,14 +43,14 @@
 # identity: the value at .predicate.runDetails.builder.id has to be the build
 # workflow's identity, exactly the one cosign was asked under, as the policy's
 # rule compares for equality (Req 2.28). With another value there, one that
-# only begins or ends like that identity as much as any other, or with no such
-# field, the check has failed: one ::error:: line on stderr naming the
+# only begins or ends like that identity as much as any other, or with no
+# value there, the check has failed: one ::error:: line on stderr naming the
 # reference and holding the clause "builder identity is <found>, expected
 # <expected>", and exit 1; cosign is not asked again. Both values stand in the
 # clause as the JSON text jq prints on one line: a value found shows as it is,
 # a line break in it as \n, and never breaks the line in two; null stands for
-# no such field. A path that cannot be walked, the builder a string for one,
-# fails too, but not yet in that one line. With that identity at the path the
+# no value there: no such field, or a path that cannot be walked, the builder
+# a string where an object belongs for one. With that identity at the path the
 # script ends with 0 and one line on stdout that names the reference and says
 # so. The other four expectations, build type, source repository, workflow
 # path and ref, are not read yet, and of several statements none is chosen
@@ -114,8 +114,13 @@ fi
 # (Req 2.28). The two are compared as the JSON text jq prints on one line: so
 # nothing of the value found is lost on its way through the shell, and the
 # error line shows it as it is without ever breaking in two. null is what jq
-# prints where the statement has no such field
-found=$(jq -c '.predicate.runDetails.builder.id' <<<"$statements")
+# prints where the statement has no such field, and what the try answers
+# where the path cannot be walked because something on the way to the field
+# is no object: there is no value at such a path either, and jq by itself
+# would end on an error there and print nothing. Only the path is answered
+# for: an empty answer is a failure of jq's and is not dressed as null by the
+# shell, and jq's stderr is not silenced, so that its words reach the caller
+found=$(jq -c 'try (.predicate.runDetails.builder.id) catch null' <<<"$statements")
 expected=$(jq -nc --arg identity "$IDENTITY" '$identity')
 if [ "$found" != "$expected" ]; then
   echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: builder identity is ${found}, expected ${expected} (Req 2.28)" >&2
