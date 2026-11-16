@@ -1246,6 +1246,48 @@ other_source "a statement with the expected source repository in seven decoys, t
   'def decoys: {repository: $s} + . + {decoy: {workflow: {repository: $s}}}; .predicate.buildDefinition.externalParameters |= {repository: $s} + .
    | .predicate.buildDefinition |= {repository: $s} + . + {workflow: {repository: $s}} | .predicate |= decoys | decoys'
 
+# 7: a workflow path other than the build workflow's fails, naming the field,
+#    the value found and the value expected (plan slice 2.5.7). The workflow
+#    path says which workflow file of the repository built the image: a
+#    repository holds several, and the policy admits the release workflow
+#    alone. The policy rule a consumer applies compares this field for
+#    equality, and a self-check laxer than the rule passes a release that the
+#    rule then refuses in the cluster. Twenty inputs, each one envelope whose
+#    statement meets the other four expectations and holds, at the path
+#    below, not exactly $WORKFLOW, the workflow path part of the releaser's
+#    identity: the sixteen kinds (every_kind) and four laid down by hand.
+#    Wanted on each what misses_one asks, the clause being "workflow path is
+#    <found>, expected <expected>". Every statement of the case holds the
+#    expected workflow path at another place by itself, inside the builder
+#    identity: a script that searches its text passes all twenty.
+workflow_path=.predicate.buildDefinition.externalParameters.workflow.path
+every_kind "workflow path" "$workflow_path" "$WORKFLOW" "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$GIT_REF"
+# one input laid down by hand: $1 names it, $2 is the value at the path, put
+# there in the statement that meets all five, $3 a jq filter for what else
+# the statement is to hold (the decoys), . where there is nothing
+other_workflow() {
+  misses_one "$1" "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF" | jq -c --arg v "$2" --arg w "$WORKFLOW" "$workflow_path = \$v | $3")" \
+    "workflow path" "\"$2\"" "\"$WORKFLOW\"" "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$GIT_REF"
+}
+# the re-attester's workflow lies in the same directory of the same
+# repository: a script that compares the directory alone passes this statement
+rescan="${WORKFLOW%/*}/rescan.yml"
+other_workflow "a workflow path that is another workflow of the same repository" "$rescan" .
+# two ways a path gets tidied before it is compared: a script that drops a
+# slash at the beginning, or compares the file name alone, passes these
+other_workflow "a workflow path that is the expected one with a slash before it" "/$WORKFLOW" .
+other_workflow "a workflow path that is the file name alone" "${WORKFLOW##*/}" .
+# the expected workflow path at other places than the path, while the value
+# at the path is the other workflow's. Seven decoys, placed as case 6 places
+# its own: path as the first key and decoy.workflow.path as the last, of the
+# statement and of its predicate; path as the first key of buildDefinition
+# and workflow.path (the path without externalParameters) as its last; path
+# (the path without workflow) as the first key of externalParameters. So the
+# value at the path is neither the first nor the last path in the statement
+other_workflow "a statement with the expected workflow path in seven decoys, the workflow path at the path the other workflow's" "$rescan" \
+  'def decoys: {path: $w} + . + {decoy: {workflow: {path: $w}}}; .predicate.buildDefinition.externalParameters |= {path: $w} + .
+   | .predicate.buildDefinition |= {path: $w} + . + {workflow: {path: $w}} | .predicate |= decoys | decoys'
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
