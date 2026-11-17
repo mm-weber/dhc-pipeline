@@ -225,6 +225,10 @@ jobs:
           registry=$(yq '.verification.registry' catalogue-policy.yaml | tr -d '"')
           fail_closed=$(scripts/release-policy.sh . fail-closed)
           publish_policy=$(scripts/release-policy.sh . publish-policy)
+          # Req 2.30: the provenance mode, off, report or required, through
+          # the same reader; the three provenance steps before the tags run
+          # unless it is off.
+          provenance=$(scripts/release-policy.sh . provenance)
           # tr strips quotes so this works under either yq (mikefarah on the
           # runner emits raw scalars; python-yq would quote them).
           img=$(yq '.image' "$f" | tr -d '"')
@@ -240,6 +244,7 @@ jobs:
           echo "registry=$registry" >> "$GITHUB_OUTPUT"
           echo "fail_closed=$fail_closed" >> "$GITHUB_OUTPUT"
           echo "publish_policy=$publish_policy" >> "$GITHUB_OUTPUT"
+          echo "provenance=$provenance" >> "$GITHUB_OUTPUT"
           # Req 2.1: main builds every platform the definition declares. The
           # policy file ADMITS platforms (Req 7.7), so a declared platform the
           # policy does not admit is refused here by name, rather than
@@ -310,12 +315,17 @@ jobs:
       # match its `cosign-release:` line. The v2 line stays deliberate (ADR
       # 0003, measured): cosign v3 writes a bundle layout Kyverno 1.18.2 and
       # Trivy 0.72.0 cannot find, so v3 waits behind the major gate.
-      - name: install cosign
+      #
+      # crane beside it since task 18.3: scripts/unpack-provenance.sh pulls
+      # and pushes the attestation manifest with it (Req 2.27). It reads the
+      # registry login from docker's config, the one the login step wrote.
+      - name: install cosign and crane
         if: github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
           mkdir -p "${RUNNER_TEMP}/bin"
           scripts/install-tool.sh cosign "${RUNNER_TEMP}/bin"
+          scripts/install-tool.sh crane "${RUNNER_TEMP}/bin"
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
       # ---- Daily rebuild, publish-on-change (task 9.2, Req 2.14-2.17) ----
@@ -1114,8 +1124,79 @@ jobs:
           # digest, because with several `trivy --vex oci` applies one at random).
           cosign attest --yes --type openvex --predicate "$doc" "$index"
 
+      # ---- provenance (task 18.3; Req 2.9, 2.27, 2.30) ----
+      # Unless the declared mode is off, the release carries one provenance
+      # statement from GitHub's provenance service, naming the index and
+      # every platform manifest. The action signs it and keeps it in GitHub's
+      # attestation store alone (push-to-registry: false: no Sigstore bundle
+      # beside a digest, ADR 0005 as amended 2026-11-13);
+      # scripts/unpack-provenance.sh then stores that one signed envelope as
+      # one more layer of the attestation manifest cosign wrote beside each
+      # digest in the step above, which is why these steps come after it; and
+      # scripts/check-provenance.sh asks each digest, the way a consumer
+      # would, whether its provenance is one the policy would admit. A
+      # failure in any of them stops the job before the tags: the digest
+      # stays pushed, signed and attested, and no tag moves (Req 2.9; report
+      # withholds like required does, docs/user-manual.md, "A release
+      # stopped at the provenance steps").
+      #
+      # A `uses:` step cannot loop over a definition's platforms, so the
+      # subjects go to the action as one file: one line per digest, written
+      # by the script whose other mode reads the statement back.
+      - name: name the provenance subjects (Req 2.27)
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true') && steps.meta.outputs.provenance != 'off'
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          MANIFESTS: ${{ steps.manifests.outputs.digests }}
+        run: |
+          set -euo pipefail
+          mapfile -t manifests < <(printf '%s\n' "$MANIFESTS")
+          scripts/unpack-provenance.sh subjects "$IMAGE" "$DIGEST" "${manifests[@]}" \
+            > "${RUNNER_TEMP}/provenance-subjects.txt"
+          cat "${RUNNER_TEMP}/provenance-subjects.txt"
+
+      # A bump of this action is merged by hand and watched: the suites read
+      # a bundle recorded with v4.2.2, and this step runs on main only, so a
+      # green pull request says nothing about what a new version emits.
+      - name: attest provenance for the index and every platform manifest (Req 2.9, 2.27)
+        id: provenance
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true') && steps.meta.outputs.provenance != 'off'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: ${{ runner.temp }}/provenance-subjects.txt
+          push-to-registry: false
+
+      - name: store the provenance beside each digest (Req 2.27)
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true') && steps.meta.outputs.provenance != 'off'
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          MANIFESTS: ${{ steps.manifests.outputs.digests }}
+          BUNDLES: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          mapfile -t manifests < <(printf '%s\n' "$MANIFESTS")
+          scripts/unpack-provenance.sh store "$BUNDLES" "$IMAGE" "$DIGEST" "${manifests[@]}"
+
+      # The release's self-check, before any tag: every digest a tag or a
+      # platform pull can resolve to is asked on its own.
+      - name: verify the provenance of each digest (Req 2.9, 2.28)
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true') && steps.meta.outputs.provenance != 'off'
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          MANIFESTS: ${{ steps.manifests.outputs.digests }}
+        run: |
+          set -euo pipefail
+          mapfile -t manifests < <(printf '%s\n' "$MANIFESTS")
+          for d in "$DIGEST" "${manifests[@]}"; do
+            scripts/check-provenance.sh verify . "${IMAGE}@${d}"
+          done
+
       # Req 2.7/2.9: the tag is the promise, so it is applied only now, after the
-      # scan, the signature and every attestation exist. imagetools create writes
+      # scan, the signature and every attestation exist and the provenance,
+      # unless its mode is off, has passed the release's own check. imagetools create writes
       # a new index from the same children, so the run asserts the tag resolves
       # to the digest that was actually signed: a tag pointing at anything else
       # would publish an unsigned artifact under a promised name.
