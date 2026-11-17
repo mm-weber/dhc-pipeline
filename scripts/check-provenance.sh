@@ -49,7 +49,8 @@
 # That holds as well where python cannot read the file down to the key (a
 # string where a mapping belongs): it prints no value then, and its own words
 # on stderr are kept back, the line being all there is.
-# A file that is no YAML gives no key at all, and is told by that cause, not
+# A file that is no YAML, or no UTF-8 text, gives no key at all, and is told
+# by that cause, not
 # by a key: one ::error:: line on stderr naming the file and saying that it
 # cannot be read as YAML, and exit 2, before cosign is asked. Whoever repairs
 # the release is to look at the file's syntax, not for a key it seems to lack.
@@ -208,20 +209,22 @@ BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
 # below says what is missing. A file that yaml cannot parse is another cause
 # and has to be told from that: python ends with 3 there, a code of its own
 # (a trace ends with 1), so the shell reads the cause from the exit code and
-# never from the text, which is the file's value
+# never from the text, which is the file's value. The file is handed to yaml
+# as bytes: bytes that are no UTF-8 are then yaml's to refuse as well,
+# whatever the locale would have made of them
 ISSUER=$(python3 -c 'import sys,yaml
-try: d=yaml.safe_load(open(sys.argv[1]))
+try: d=yaml.safe_load(open(sys.argv[1],"rb"))
 except yaml.YAMLError: sys.exit(3)
 v=(d or {}).get("verification",{}).get("issuer"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml" 2>/dev/null)
-# no YAML, no key: the file's syntax is at fault, and the line says so
-# instead of naming a key the file would seem to lack
-[ "$?" -ne 3 ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' cannot be read as YAML, its syntax is at fault and no key of it is read (Req 2.28)" >&2; exit 2; }
+# no YAML, no key: the file's syntax or its encoding is at fault, and the
+# line says so instead of naming a key the file would seem to lack
+[ "$?" -ne 3 ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' cannot be read as YAML, its syntax or its encoding is at fault and no key of it is read (Req 2.28)" >&2; exit 2; }
 # without an issuer there is no question to put to cosign: the file cannot
 # serve, and whoever broke it is told which key
 [ -n "$ISSUER" ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives no verification.issuer, which has to be a string that is not empty (Req 2.28)" >&2; exit 2; }
 # the role named releaser, whatever its place and whatever it attests; only a
 # string is its identity, as with the issuer
-IDENTITY=$(python3 -c 'import sys,yaml; v=(yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("roles",{}).get("releaser",{}).get("identity"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml" 2>/dev/null)
+IDENTITY=$(python3 -c 'import sys,yaml; v=(yaml.safe_load(open(sys.argv[1],"rb")) or {}).get("verification",{}).get("roles",{}).get("releaser",{}).get("identity"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml" 2>/dev/null)
 # without an identity cosign would be asked about nobody: the file cannot
 # serve here either, and no other role's identity stands in
 [ -n "$IDENTITY" ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives no verification.roles.releaser.identity, which has to be a string that is not empty (Req 2.28)" >&2; exit 2; }
