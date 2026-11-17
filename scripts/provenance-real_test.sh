@@ -262,6 +262,80 @@ fi
   && pass "the control: cosign refuses the same manifest with the chain off the provenance layer alone, and names the certificate authority" \
   || fail "the control: the manifest of case 1 with the chain off the provenance layer alone, under a second stand-in image, asked of cosign as in case 1" "${why[@]}"
 
+# 3: what the real cosign prints passes the self-check (Req 2.28). The suite of
+#    scripts/check-provenance.sh knows cosign from a stand-in only: one JSON
+#    line per verified attestation on stdout, the statement base64 in .payload,
+#    a refusal as words on stderr and exit 1. Here the script meets cosign
+#    2.6.5 itself and the real statement, case 1's stand-in image. The policy
+#    root gives the fixture certificate's issuer and subject as the releaser's
+#    identity, so the five values the script cuts from it are the statement's
+#    own: the check passes, on one call that carries the exact identity. With
+#    the identity's ref changed, cosign refuses the certificate on each of the
+#    three attempts and the check fails with cosign's reason. The script finds
+#    a wrapper named cosign first on PATH, in its runs alone: it logs the
+#    arguments it was given, one line per call, and hands them to the real
+#    cosign with what only this offline, throwaway setting needs.
+CHECK="$HERE/check-provenance.sh"
+ISSUER="https://token.actions.githubusercontent.com"
+SIGNER="https://github.com/mm-weber/dhc-pipeline/.github/workflows/slsa-spike.yml"
+REAL_COSIGN=$(command -v cosign) # the pinned one, found before the wrapper's directory is on PATH
+mkdir "$SB/wrap"
+# Added to the script's own arguments, none of them by the release's call:
+# --offline, TUF_ROOT at the empty directory and the three trust-root files, as
+# in verify_provenance (no network, no cached trust root); --check-claims=false
+# since the stand-in image is not the statement's subject;
+# --allow-insecure-registry since the throwaway registry speaks plain HTTP.
+cat > "$SB/wrap/cosign" <<WRAP
+#!/usr/bin/env bash
+{ printf 'cosign'; [ \$# -gt 0 ] && printf ' %q' "\$@"; echo; } >> $(printf '%q' "$SB/wrap.log")
+TUF_ROOT=$(printf '%q' "$SB/tuf") SIGSTORE_ROOT_FILE=$(printf '%q' "$ROOTS/fulcio.pem") \\
+  SIGSTORE_REKOR_PUBLIC_KEY=$(printf '%q' "$ROOTS/rekor0.pem") SIGSTORE_CT_LOG_PUBLIC_KEY_FILE=$(printf '%q' "$ROOTS/ctfe1.pem") \\
+  exec $(printf '%q' "$REAL_COSIGN") "\$@" --offline --check-claims=false --allow-insecure-registry
+WRAP
+chmod +x "$SB/wrap/cosign"
+policy() { # root ref: a policy root whose releaser is the fixture's workflow at that ref, beside a second role
+  mkdir "$1"
+  printf 'verification:\n  issuer: %s\n  roles:\n    releaser:\n      identity: %s\n      attests: [spdxjson, cyclonedx]\n    re-attester:\n      identity: %s\n      attests: [vuln, openvex]\n' \
+    "$ISSUER" "$SIGNER@$2" "https://github.com/mm-weber/dhc-pipeline/.github/workflows/rescan.yml@refs/heads/main" > "$1/catalogue-policy.yaml"
+}
+self_check() { # root: one run of the self-check over the wrapper, stdout and stderr apart; sets rc and calls
+  : > "$SB/wrap.log"
+  CHECK_PROVENANCE_RETRY_DELAY=0 PATH="$SB/wrap:$PATH" "$CHECK" verify "$1" "$REPO@$IMAGE" > "$SB/check.out" 2> "$SB/check.err"; rc=$?
+  calls=$(grep -c '' "$SB/wrap.log")
+}
+arguments() { # stdin, one logged call: its arguments one per line, a flag together with its value, sorted
+  local w i=1; read -ra w
+  while [ "$i" -lt "${#w[@]}" ]; do
+    if [[ ${w[i]} == --* && ${w[i+1]-} != --* && -n ${w[i+1]-} ]]; then echo "${w[i]} ${w[i+1]}"; i=$((i+2)); else echo "${w[i]}"; i=$((i+1)); fi
+  done | LC_ALL=C sort
+}
+said() { echo "stdout:" "$(cut -c1-400 "$SB/check.out")" "stderr:" "$(cut -c1-400 "$SB/check.err")"; } # what the run printed, for a detail
+name="the self-check over the real cosign passes the stand-in image"
+policy "$SB/policy" refs/pull/401/merge
+self_check "$SB/policy"
+[ "$rc" -eq 0 ] && pass "$name: exit 0" || fail "$name: exit code" "exit=$rc, wanted 0" "$(said)"
+[ "$(grep -c '' "$SB/check.out")" -eq 1 ] && grep -q '^check-provenance: ' "$SB/check.out" && grep -qF -- "$REPO@$IMAGE" "$SB/check.out" \
+  && pass "$name: stdout is one line, begun 'check-provenance: ' and naming the reference" \
+  || fail "$name: stdout" "wanted one line, begun 'check-provenance: ' and holding '$REPO@$IMAGE'; it is:" "$(cut -c1-400 "$SB/check.out")"
+[ ! -s "$SB/check.err" ] && pass "$name: stderr is empty" || fail "$name: stderr" "wanted nothing; it is:" "$(cut -c1-400 "$SB/check.err")"
+wanted=$(printf 'cosign verify-attestation --type slsaprovenance1 --certificate-oidc-issuer %q --certificate-identity %q %q\n' \
+  "$ISSUER" "$SIGNER@refs/pull/401/merge" "$REPO@$IMAGE" | arguments)
+[ "$calls" -eq 1 ] && [ "$(arguments < "$SB/wrap.log")" = "$wanted" ] \
+  && pass "$name: cosign was called once, with verify-attestation, the type, the policy file's issuer, its exact identity and the reference, and no argument more" \
+  || fail "$name: the call" "calls: $calls, wanted 1" "the arguments logged, as a set:" "$(head -n 1 "$SB/wrap.log" | arguments)" "wanted, as a set:" "$wanted"
+name="with the identity's ref changed to refs/heads/main the self-check fails"
+reason="none of the expected identities matched what was in the certificate"
+policy "$SB/policy-main" refs/heads/main
+self_check "$SB/policy-main"
+[ "$rc" -eq 1 ] && pass "$name: exit 1" || fail "$name: exit code" "exit=$rc, wanted 1" "$(said)"
+[ ! -s "$SB/check.out" ] && pass "$name: nothing on stdout" || fail "$name: stdout" "wanted nothing; it is:" "$(cut -c1-400 "$SB/check.out")"
+mapfile -t lines < "$SB/check.err"
+[ "${#lines[@]}" -eq 3 ] && [[ ${lines[0]} == "::warning::check-provenance: "* && ${lines[1]} == "::warning::check-provenance: "* ]] \
+  && [[ ${lines[2]} == "::error::check-provenance: "*"3 attempts"* && ${lines[2]} == *"$reason"* ]] \
+  && pass "$name: stderr is two warnings and then the error line, which says 3 attempts and carries cosign's reason" \
+  || fail "$name: stderr" "lines: ${#lines[@]}, wanted 3: two begun '::warning::check-provenance: ', then one begun '::error::check-provenance: ' holding '3 attempts' and '$reason'; it is:" "$(cut -c1-400 "$SB/check.err")"
+[ "$calls" -eq 3 ] && pass "$name: cosign was called three times" || fail "$name: the calls" "calls: $calls, wanted 3; logged:" "$(cut -c1-400 "$SB/wrap.log")"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all provenance-real tests passed"
