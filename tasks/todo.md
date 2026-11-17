@@ -504,8 +504,11 @@ left of the program is the follow-up list below, one decision each.
           the self-check's suite at 903 passed under jq 1.6 and jq
           1.7.1, the real-tool suite at 13 against cosign 2.6.5; 2.6
           waits for the owner's go)
-    - [ ] 2.6 the release steps in `build.yml`, the three suites in
-          `validate.yml`, the way out written into the manual
+    - [x] 2.6 the release steps in `build.yml`, the three suites in
+          `validate.yml`, the way out written into the manual (the
+          owner's go 2026-11-17; four steps before the tags, the
+          subjects file in a step of its own; nothing of it has run on
+          a runner yet; 2.7 waits for the owner's go)
     - [ ] 2.7 the action's pin read by the Renovate test; a bump merged
           by hand and watched
     - [ ] 2.8 the refactor commit
