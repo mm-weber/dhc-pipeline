@@ -91,7 +91,10 @@
 # one: the run ends with 0 there, the statements after it are not read, and
 # nothing is said of what those before it miss. When none meets all five the
 # check has failed, also when the five are met between two statements and by
-# neither; the error line then holds the clauses of the last statement read.
+# neither. What each statement misses is kept until all are read, and the one
+# error line then says it per statement: each one's clauses together behind
+# "statement <i>: ", <i> its place in cosign's order, counted from 1. A lone
+# statement has no other to be told from, and its line carries no such text.
 # Nothing cosign writes is passed on as it is.
 # The statements, and of each expectation read the value found and the value
 # expected, are each what jq prints when asked, one call after another:
@@ -190,8 +193,11 @@ unanswered() { echo "::error::check-provenance: ${REF}: the provenance statement
 # the others, and the self-check is neither stricter nor laxer than the rule.
 # They are read on a file descriptor of the loop's own: a jq started inside
 # inherits the loop's stdin, and one that read it would eat the statements
-# still to come
+# still to come. Each is counted, its number being its name in the error line
+count=0
+misses=""
 while IFS= read -r statement <&3; do
+  count=$((count + 1))
   # cosign has checked who signed the statement, not what it says of who built:
   # its builder identity has to be the build workflow's too, exactly the
   # identity cosign was asked under, as the policy's rule compares for equality
@@ -263,11 +269,18 @@ while IFS= read -r statement <&3; do
   # a statement that misses nothing is the admitted one: the others are not
   # read, and nothing is said of those read before it
   [ -n "$missed" ] || break
+  # what this one misses is kept under its number: should none meet all five,
+  # the line has to say of each statement what is wrong with it
+  misses="${misses:+$misses; }statement ${count}: ${missed}"
 done 3<<<"$statements"
-# no statement met all five, the last one read neither: one line with the
-# clause of each one it missed, and the check has failed; cosign is not asked
-# again
+# no statement met all five, the last one read neither, and the check has
+# failed; cosign is not asked again. One line: of a lone statement the clause
+# of each expectation it missed, of several the same for each under its number
 if [ -n "$missed" ]; then
+  if [ "$count" -gt 1 ]; then
+    echo "::error::check-provenance: ${REF}: none of the ${count} provenance statements cosign verified is one the catalogue's verification policy would admit: ${misses} (Req 2.28)" >&2
+    exit 1
+  fi
   echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: ${missed} (Req 2.28)" >&2
   exit 1
 fi
