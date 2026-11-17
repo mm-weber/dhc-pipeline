@@ -508,9 +508,10 @@ left of the program is the follow-up list below, one decision each.
           `validate.yml`, the way out written into the manual (the
           owner's go 2026-11-17; four steps before the tags, the
           subjects file in a step of its own; nothing of it has run on
-          a runner yet; 2.7 waits for the owner's go)
-    - [ ] 2.7 the action's pin read by the Renovate test; a bump merged
-          by hand and watched
+          a runner yet)
+    - [x] 2.7 the action's pin read by the Renovate test; a bump merged
+          by hand and watched (the owner's go 2026-11-17; the test at
+          206 passed; 2.8 waits for the owner's go)
     - [ ] 2.8 the refactor commit
     - [ ] the first pushed, the first scheduled and the first dispatched
           release read; Kyverno on the first released digest (one run of
