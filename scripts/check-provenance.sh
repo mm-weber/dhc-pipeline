@@ -59,6 +59,10 @@
 # ::error:: line on stderr naming the file and saying that it cannot be
 # opened, and exit 2, before cosign is asked. The place to look is the file's
 # mode and owner, not what stands in it.
+# A python3 whose import of yaml fails reads no file at all and is told by
+# that cause as well: one ::error:: line on stderr naming python3 and its
+# yaml module, and exit 2, before cosign is asked. The place to look is the
+# machine the check runs on, not the policy file.
 # The identity has to hold an @ with something after it besides: the workflow
 # path ends and the ref begins at its first @, and an identity without one,
 # or with nothing after it, gives no ref. Before that first @ it has to read
@@ -215,18 +219,24 @@ BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
 # and has to be told from that: python ends with 3 there, a code of its own
 # (a trace ends with 1), so the shell reads the cause from the exit code and
 # never from the text, which is the file's value. A file that cannot be
-# opened is a third cause, told the same way: python ends with 4 there. The
+# opened is a third cause, told the same way: python ends with 4 there. A
+# python whose import of yaml fails is a fourth, and no fault of the file's:
+# python ends with 5 there. The
 # file is handed to yaml as bytes: bytes that are no UTF-8 are then yaml's to
 # refuse as well, whatever the locale would have made of them
-ISSUER=$(python3 -c 'import sys,yaml
+ISSUER=$(python3 -c 'import sys
+try: import yaml
+except ImportError: sys.exit(5)
 try: d=yaml.safe_load(open(sys.argv[1],"rb"))
 except OSError: sys.exit(4)
 except yaml.YAMLError: sys.exit(3)
 v=(d or {}).get("verification",{}).get("issuer"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml" 2>/dev/null)
-# no file to read or no YAML in it, no key: the file's mode or owner, or its
-# syntax or its encoding, is at fault, and the line says which instead of
-# naming a key the file would seem to lack
+# no yaml to read with, no file to read or no YAML in it, no key: the
+# machine's python, the file's mode or owner, or its syntax or its encoding,
+# is at fault, and the line says which instead of naming a key the file
+# would seem to lack
 case $? in
+  5) echo "::error::check-provenance: python3 cannot import its yaml module, so '$ROOT/catalogue-policy.yaml' is not read, the module has to be installed where the check runs (Req 2.28)" >&2; exit 2 ;;
   4) echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' cannot be opened, the file is there and this user has no permission to read it, so no key of it is read (Req 2.28)" >&2; exit 2 ;;
   3) echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' cannot be read as YAML, its syntax or its encoding is at fault and no key of it is read (Req 2.28)" >&2; exit 2 ;;
 esac
