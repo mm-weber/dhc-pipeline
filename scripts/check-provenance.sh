@@ -41,23 +41,22 @@
 # has checked who signed it, not what it says of who built. The five
 # expectations (ADR 0005, decision 5) are read one after another. First the
 # builder identity: the value at .predicate.runDetails.builder.id has to be
-# the build workflow's identity, exactly the one cosign was asked under, as the policy's
-# rule compares for equality (Req 2.28). With another value there, one that
-# only begins or ends like that identity as much as any other, or with no
-# value there, the check has failed: one ::error:: line on stderr naming the
-# reference and holding the clause "builder identity is <found>, expected
-# <expected>", and exit 1; cosign is not asked again. Both values stand in the
+# the build workflow's identity, exactly the one cosign was asked under, as
+# the policy's rule compares for equality (Req 2.28). With another value
+# there, one that only begins or ends like that identity as much as any
+# other, or with no value there, the statement misses the expectation, and
+# the clause "builder identity is <found>, expected <expected>" is kept for
+# the error line. Both values stand in the
 # clause as the JSON text jq prints on one line: a value found shows as it is,
 # a line break in it as \n, and never breaks the line in two; null stands for
 # no value there: no such field, or a path that cannot be walked, the builder
-# a string where an object belongs for one. With that identity at the path
-# the build type is read the same way: the value at
+# a string where an object belongs for one. Met or missed, the build type is
+# read next, the same way: the value at
 # .predicate.buildDefinition.buildType has to be exactly GitHub's build type
 # for a workflow run, which says what the fields under externalParameters
-# mean. Anything else there fails the check as the builder identity does, the
-# clause being "build type is <found>, expected <expected>", and the line
-# holds that clause alone: nothing of an expectation the statement meets.
-# With that build type the source repository is read the same way, which says
+# mean. Anything else there is a miss as with the builder identity, the
+# clause being "build type is <found>, expected <expected>".
+# Then the source repository is read the same way, which says
 # whose workflow file was run: the value at
 # .predicate.buildDefinition.externalParameters.workflow.repository has to be
 # exactly the build workflow's repository, the clause being "source
@@ -65,27 +64,32 @@
 # the identity, which reads https://github.com/<owner>/<repo>/<workflow
 # path>@<ref>: its scheme, its host and the first two segments of its path,
 # what stands before the third slash after the host.
-# With that repository the workflow path is read the same way, which says
+# Then the workflow path is read the same way, which says
 # which of the repository's workflow files was run: the value at
 # .predicate.buildDefinition.externalParameters.workflow.path has to be
 # exactly the build workflow's path, the clause being "workflow path is
 # <found>, expected <expected>". That path is cut from the identity too: what
 # stands between the slash after the repository and the first @ (a ref can
 # hold an @, a workflow file's name does not in practice).
-# With that path the ref is read the same way, which says from which branch
+# Then the ref is read the same way, which says from which branch
 # or tag the workflow file was taken: the value at
 # .predicate.buildDefinition.externalParameters.workflow.ref has to be
 # exactly the build workflow's ref, the clause being "ref is <found>,
 # expected <expected>". That ref is cut from the identity too: all that
 # stands after the first @, the @ at which the workflow path ends.
+# A miss does not end the run where it is found: all five are read, since a
+# release run is expensive and one failed check has to show all that is wrong
+# with the statement, so that one fix and one more run are enough. With one
+# or more missed the check has failed: one ::error:: line on stderr naming
+# the reference and holding the clause of each expectation missed, each once,
+# and nothing of an expectation the statement meets, and exit 1; cosign is
+# not asked again.
 # With the five met the script ends with 0 and one line on stdout that names
 # the reference and says so. Of several statements none is chosen yet.
 # Nothing cosign writes is passed on as it is.
 # The statements, and of each expectation read the value found and the value
-# expected, are each what jq prints when asked, one call after another: three
-# calls in a run that ends at the builder identity, five in one that ends at
-# the build type, seven in one that ends at the source repository, nine in
-# one that ends at the workflow path, eleven in one that reads the ref too.
+# expected, are each what jq prints when asked, one call after another:
+# eleven calls in every run that has a statement, whatever it misses.
 # A jq call that
 # printed nothing gave no answer, however it came to that (a jq that was
 # killed and a jq that ended on an error of its own are two ways it comes
@@ -94,7 +98,8 @@
 # the reference, and neither cosign nor jq is asked again. After the first
 # call nothing printed is no statement, and the line is that of no statement.
 # After each later one, whose answer is never empty, the line holds
-# no clause and says that jq gave no answer, and to which question: an empty
+# no clause, not one kept before that call either, and says that jq gave no
+# answer, and to which question: an empty
 # text is no value, so it is never compared (two of them would be equal, and
 # the check would pass unchecked), never shown as found or as expected, and
 # nothing is put in its place. In such a run too that line is all the
@@ -195,64 +200,56 @@ unanswered() { echo "::error::check-provenance: ${REF}: the provenance statement
 # about a jq that was killed, as it does on the script's stderr for a plain
 # command. What jq itself writes on stderr is kept back at both, as at the
 # first call, whatever it is: with no answer the script's stderr holds the
-# one line of unanswered and no more
+# one line of unanswered and no more. A miss does not end the run: its clause
+# is kept and the next expectation is read, so that the one error line after
+# the fifth names all that the statement misses
+missed=""
 found=$(jq -c 'try (.predicate.runDetails.builder.id) catch null' <<<"$statements" 2>/dev/null)
 [ -n "$found" ] || unanswered "its builder identity"
 expected=$(jq -nc --arg identity "$IDENTITY" '$identity' 2>/dev/null)
 [ -n "$expected" ] || unanswered "the JSON text of the builder identity expected of it"
-if [ "$found" != "$expected" ]; then
-  echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: builder identity is ${found}, expected ${expected} (Req 2.28)" >&2
-  exit 1
-fi
+[ "$found" = "$expected" ] || missed="${missed:+$missed; }builder identity is ${found}, expected ${expected}"
 # the build type says which kind of build wrote the statement, and with it
 # what the fields under externalParameters mean: the policy's rule compares it
-# for equality too. Asked, compared and shown as the builder identity is; the
-# line names this miss alone, the identity the statement meets is not in it
+# for equality too. Asked, compared and kept as the builder identity is: an
+# expectation the statement meets leaves nothing for the line
 found=$(jq -c 'try (.predicate.buildDefinition.buildType) catch null' <<<"$statements" 2>/dev/null)
 [ -n "$found" ] || unanswered "its build type"
 expected=$(jq -nc --arg type "$BUILD_TYPE" '$type' 2>/dev/null)
 [ -n "$expected" ] || unanswered "the JSON text of the build type expected of it"
-if [ "$found" != "$expected" ]; then
-  echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: build type is ${found}, expected ${expected} (Req 2.28)" >&2
-  exit 1
-fi
+[ "$found" = "$expected" ] || missed="${missed:+$missed; }build type is ${found}, expected ${expected}"
 # the source repository says whose workflow file was run, and the policy's
 # rule compares it for equality as well: a fork, or the URL with something
 # after it, is another repository, so the value found is compared as it is.
-# Asked, compared and shown as the two before it; the line names this miss
-# alone
+# Asked, compared and kept as the two before it
 found=$(jq -c 'try (.predicate.buildDefinition.externalParameters.workflow.repository) catch null' <<<"$statements" 2>/dev/null)
 [ -n "$found" ] || unanswered "its source repository"
 expected=$(jq -nc --arg source "$SOURCE" '$source' 2>/dev/null)
 [ -n "$expected" ] || unanswered "the JSON text of the source repository expected of it"
-if [ "$found" != "$expected" ]; then
-  echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: source repository is ${found}, expected ${expected} (Req 2.28)" >&2
-  exit 1
-fi
+[ "$found" = "$expected" ] || missed="${missed:+$missed; }source repository is ${found}, expected ${expected}"
 # the workflow path says which of the repository's workflow files was run: a
 # repository holds several, the policy's rule admits the build workflow alone
 # and compares for equality here as well, so the value found is not tidied
-# before it is compared. Asked, compared and shown as the three before it;
-# the line names this miss alone
+# before it is compared. Asked, compared and kept as the three before it
 found=$(jq -c 'try (.predicate.buildDefinition.externalParameters.workflow.path) catch null' <<<"$statements" 2>/dev/null)
 [ -n "$found" ] || unanswered "its workflow path"
 expected=$(jq -nc --arg workflow "$WORKFLOW" '$workflow' 2>/dev/null)
 [ -n "$expected" ] || unanswered "the JSON text of the workflow path expected of it"
-if [ "$found" != "$expected" ]; then
-  echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: workflow path is ${found}, expected ${expected} (Req 2.28)" >&2
-  exit 1
-fi
+[ "$found" = "$expected" ] || missed="${missed:+$missed; }workflow path is ${found}, expected ${expected}"
 # the ref says from which branch or tag the workflow file was taken: the
 # policy's rule admits the release branch alone and compares for equality
 # here as well, so the same file run from another branch is a miss, and the
-# value found is not tidied before it is compared. Asked, compared and shown
-# as the four before it; the line names this miss alone
+# value found is not tidied before it is compared. Asked, compared and kept
+# as the four before it
 found=$(jq -c 'try (.predicate.buildDefinition.externalParameters.workflow.ref) catch null' <<<"$statements" 2>/dev/null)
 [ -n "$found" ] || unanswered "its ref"
 expected=$(jq -nc --arg ref "$WORKFLOW_REF" '$ref' 2>/dev/null)
 [ -n "$expected" ] || unanswered "the JSON text of the ref expected of it"
-if [ "$found" != "$expected" ]; then
-  echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: ref is ${found}, expected ${expected} (Req 2.28)" >&2
+[ "$found" = "$expected" ] || missed="${missed:+$missed; }ref is ${found}, expected ${expected}"
+# all five are read: one line with the clause of each one missed, and the
+# check has failed; cosign is not asked again
+if [ -n "$missed" ]; then
+  echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: ${missed} (Req 2.28)" >&2
   exit 1
 fi
 echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement whose builder identity is that identity, whose build type is ${BUILD_TYPE}, whose source repository is ${SOURCE}, whose workflow path is ${WORKFLOW} and whose ref is ${WORKFLOW_REF}, what else the statement says is not read"
