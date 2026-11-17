@@ -54,6 +54,11 @@
 # by a key: one ::error:: line on stderr naming the file and saying that it
 # cannot be read as YAML, and exit 2, before cosign is asked. Whoever repairs
 # the release is to look at the file's syntax, not for a key it seems to lack.
+# A file that is there and cannot be opened, this user having no permission
+# to read it, gives no key either and is told by that cause the same way: one
+# ::error:: line on stderr naming the file and saying that it cannot be
+# opened, and exit 2, before cosign is asked. The place to look is the file's
+# mode and owner, not what stands in it.
 # The identity has to hold an @ with something after it besides: the workflow
 # path ends and the ref begins at its first @, and an identity without one,
 # or with nothing after it, gives no ref. Before that first @ it has to read
@@ -209,16 +214,22 @@ BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
 # below says what is missing. A file that yaml cannot parse is another cause
 # and has to be told from that: python ends with 3 there, a code of its own
 # (a trace ends with 1), so the shell reads the cause from the exit code and
-# never from the text, which is the file's value. The file is handed to yaml
-# as bytes: bytes that are no UTF-8 are then yaml's to refuse as well,
-# whatever the locale would have made of them
+# never from the text, which is the file's value. A file that cannot be
+# opened is a third cause, told the same way: python ends with 4 there. The
+# file is handed to yaml as bytes: bytes that are no UTF-8 are then yaml's to
+# refuse as well, whatever the locale would have made of them
 ISSUER=$(python3 -c 'import sys,yaml
 try: d=yaml.safe_load(open(sys.argv[1],"rb"))
+except OSError: sys.exit(4)
 except yaml.YAMLError: sys.exit(3)
 v=(d or {}).get("verification",{}).get("issuer"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml" 2>/dev/null)
-# no YAML, no key: the file's syntax or its encoding is at fault, and the
-# line says so instead of naming a key the file would seem to lack
-[ "$?" -ne 3 ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' cannot be read as YAML, its syntax or its encoding is at fault and no key of it is read (Req 2.28)" >&2; exit 2; }
+# no file to read or no YAML in it, no key: the file's mode or owner, or its
+# syntax or its encoding, is at fault, and the line says which instead of
+# naming a key the file would seem to lack
+case $? in
+  4) echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' cannot be opened, the file is there and this user has no permission to read it, so no key of it is read (Req 2.28)" >&2; exit 2 ;;
+  3) echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' cannot be read as YAML, its syntax or its encoding is at fault and no key of it is read (Req 2.28)" >&2; exit 2 ;;
+esac
 # without an issuer there is no question to put to cosign: the file cannot
 # serve, and whoever broke it is told which key
 [ -n "$ISSUER" ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives no verification.issuer, which has to be a string that is not empty (Req 2.28)" >&2; exit 2; }
