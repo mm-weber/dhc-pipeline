@@ -39,12 +39,16 @@ The subject names follow design.md: the CI Pipeline (`build.yml`), the Scan Pipe
 
 WHEN criterion 2.9 attests a pushed digest and the policy file's provenance mode is not off THE CI Pipeline SHALL attest to that digest and to each platform manifest, before the tags, a SLSA provenance attestation (predicate type `https://slsa.dev/provenance/v1`) generated from the build platform's signed workload identity token, signed keyless under the build workflow's identity at refs/heads/main and stored in the declared registry namespace beside that digest, in the attestation layout the other attestations use, with no Sigstore bundle beside that digest (amended 2026-11-13); IF that attestation or its storing fails THEN THE CI Pipeline SHALL apply no tag and SHALL name the digest.
 
+IF the release's self-check of a pushed digest cannot be made, because its call, the policy file, a value it reads from the policy file or from the environment, or a tool it needs cannot serve, THEN THE CI Pipeline SHALL apply no tag, SHALL ask no verifier about that digest, and SHALL name what could not serve (the argument, the file, the key, the variable or the tool), each cause told apart from every other cause and from a provenance statement that fails the check (added 2026-11-17, the owner's call after the report on plan step 2.5).
+
 **Acceptance criteria:**
 
 - [ ] A release run whose digest and every platform manifest carry the attestation, verified with ADR 0005's verifier against the declared identity and expectations
 - [ ] The builder identity, build type, repository, workflow path, ref and commit in the predicate equal the token's claims (read from the run)
 - [ ] On that released digest cosign 2.6.5 still verifies the signature and every other attestation, and no `sha256-<hex>` tag without a suffix exists (added 2026-11-13)
 - [ ] `unpack-provenance_test.sh` and `check-provenance_test.sh` green: the layer's five parts, the other layers untouched, a second unpack replacing its own layer, each refusal by name with nothing written (added 2026-11-13)
+- [ ] `check-provenance_test.sh`: a policy file that cannot be opened, one that cannot be read as YAML, a `python3` without its yaml module, a tool missing from `PATH` (`cosign`, `jq`, `python3`) and a `mktemp` that fails each end the self-check with exit 2 and one line that names that cause and no other, before cosign is asked (added 2026-11-17; plan 2.5.14)
+- [ ] `check-provenance_test.sh`: a releaser identity without a scheme, a reference whose image name holds an `@`, and a pause between attempts that is no whole number of seconds are refused the same way; a pause variable that is not set, or set and empty, means 10 seconds (added 2026-11-17; plan 2.5.15)
 - [ ] `lint-workflow-policy.sh .` green with `attestations: write` declared; the rescan workflow attests no provenance
 
 ### FR-2: The declaration and the policy rule (Req 2.23, 2.28, 7.7)
