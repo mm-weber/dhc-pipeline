@@ -15,6 +15,13 @@
 # its attests list names cosign's own attestation types, the provenance not
 # among them. cosign gets exactly these arguments: no flag that weakens the
 # check rides along.
+# The reference has to name the image by a sha256 digest: it ends in @sha256:
+# and 64 lower-case hex characters, after a name that is not empty. By a tag
+# cosign would verify whatever the tag points at, which need not be the digest
+# the release pushed, and a mistyped digest would cost three attempts. Any
+# other reference is wrong usage: one ::error:: line on stderr holding the
+# reference as it was given, and exit 2, before the policy file is read and
+# before cosign is asked.
 # Each of the two has to be there as a string that is not empty: an empty one
 # handed to cosign is a question about nobody, and a mapping or a number
 # printed as text one about an issuer or a signer of that name. A policy file
@@ -133,6 +140,10 @@ set -uo pipefail
 # reference cosign is asked about
 ROOT="$2"
 REF="$3"
+# only a digest pins what the release pushed: a tag can be moved, and cosign
+# would verify whatever it points at. The hex digits are written out, a range
+# like a-f taking in capitals under some locales
+[[ "$REF" =~ ^.+@sha256:[0123456789abcdef]{64}$ ]] || { echo "::error::check-provenance: '$REF' does not name an image by a sha256 digest, which reads <image>@sha256: and 64 lower-case hex characters (Req 2.28)" >&2; exit 2; }
 # the build type GitHub's provenance service writes for a workflow run (ADR
 # 0005, decision 5)
 BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
