@@ -263,14 +263,17 @@ LEFT=""    # of the first three of those: which run it was, and what it left
 BLIND=0    # of the runs watched, those whose note does not match its calls
 UNNOTED="" # of the first three of those: which run it was, its calls and note
 run() {
-  local was now how entry top rest place before logged noted left="" target words=""
+  local was now how entry top rest place before logged noted left="" target words="" dirs=$PATH
   [ $# -gt 0 ] && words=$(printf ' %q' "$@")
   before=$(grep -c '' "$SB/cosign.log")
   rm -f "$SB/stdout" "$SB/stderr"
   was=$(holds)
   # the pause between attempts is $PAUSE seconds where a case sets it, 0
   # otherwise; with the word unset the script is started without the variable
-  ( cd "$SB/cwd" && export CHECK_PROVENANCE_RETRY_DELAY="${PAUSE:-0}" && { [ "${PAUSE:-}" != unset ] || unset CHECK_PROVENANCE_RETRY_DELAY; } && PATH="$SB/bin:$PATH" TMPDIR="$SB/tmp" "$CHECK" "$@" > "$SB/stdout" 2> "$SB/stderr" ); rc=$?
+  # with the tool a case names in $HIDE on none of the directories after the
+  # stub's (see path_without, at case 14); with none named, the suite's PATH
+  [ -z "${HIDE:-}" ] || dirs=$(path_without "$HIDE")
+  ( cd "$SB/cwd" && export CHECK_PROVENANCE_RETRY_DELAY="${PAUSE:-0}" && { [ "${PAUSE:-}" != unset ] || unset CHECK_PROVENANCE_RETRY_DELAY; } && PATH="$SB/bin:$dirs" TMPDIR="$SB/tmp" "$CHECK" "$@" > "$SB/stdout" 2> "$SB/stderr" ); rc=$?
   now=$(holds)
   RUNS=$((RUNS + 1))
   out=""; err=""
@@ -2012,6 +2015,107 @@ run verify "$SB/root" "$REF"; tried "a refused attempt that printed a statement 
 retry_sandbox 1; printed_by_refused; off_branch; HOLD=("" "${NAMED[1]}" "$off"); LACK=("" "${NAMED[2]}")
 run verify "$SB/root" "$REF"; tried "a refused attempt that printed a statement which meets all five, then an answer that misses the ref" 1 1 2
 one_clause "a refused attempt that printed a statement which meets all five, then an answer that misses the ref"
+
+# 14: what cannot serve is told by its cause (plan slice 2.5.14, FR-1). When
+#    the self-check cannot be made, because the policy file cannot be read or
+#    a tool it needs is missing or fails, the line has to name that cause and
+#    no other: a file that is no YAML and a python without its yaml module
+#    both read "gives no verification.issuer" otherwise, a missing jq "no
+#    provenance statement", a missing cosign costs three attempts, and whoever
+#    repairs the release looks in the wrong place. Eight inputs under the
+#    first identity, each over a fresh sandbox and one envelope whose
+#    statement meets all five, so that a script that goes on gets an answer
+#    that passes. Wanted: exit 2; nothing on stdout; stderr one line, begun
+#    '::error::check-provenance: ', that holds the two phrases of its cause,
+#    no phrase of another cause or of another failure and nothing of a tool's
+#    own words; cosign never called.
+# The suite's PATH with the tool $1 on none of its directories and every other
+# program as before: for each directory that holds the tool stands one made
+# under $TOP, outside any sandbox, with a link to each of its other entries.
+# Made once per tool and kept in $TOP/without.<tool>/path; printed on stdout
+path_without() {
+  local at="$TOP/without.$1" dir n=0 path=""
+  if [ ! -f "$at/path" ]; then
+    mkdir -p "$at"
+    while IFS= read -r -d : dir; do
+      if [ -n "$dir" ] && { [ -e "$dir/$1" ] || [ -L "$dir/$1" ]; }; then
+        n=$((n + 1)); mkdir "$at/$n"
+        find "$(cd "$dir" && pwd -P)" -mindepth 1 -maxdepth 1 ! -name "$1" -exec ln -s -t "$at/$n" {} +
+        dir="$at/$n"
+      fi
+      path+="$dir:"
+    done <<<"$PATH:"
+    printf '%s' "${path%:}" > "$at/path"
+  fi
+  cat "$at/path"
+}
+# a fresh sandbox with the one envelope; the input's fault is laid down after
+cause_sandbox() {
+  fresh
+  envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+}
+# the second phrase of each cause; the first is the file's or the tool's name
+CAUSES=("cannot be opened" "cannot be read as YAML" "yaml module" "not found on PATH" "no directory for temporary files")
+# after an input's run: $1 names the input, $2 and $3 are its cause's phrases
+told_by_cause() {
+  local name=$1 each calls; local -a wrong=()
+  exit_is "$name" 2
+  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
+    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
+  [[ "$err" == "::error::check-provenance: "* ]] || wrong+=("it is not begun '::error::check-provenance: '")
+  for each in "$2" "$3"; do [[ "$err" == *"$each"* ]] || wrong+=("it does not hold '$each'"); done
+  for each in "${CAUSES[@]}"; do
+    [ "$each" = "$3" ] || [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', the phrase of another cause")
+  done
+  for each in "gives no verification." "no provenance statement" "gave no answer" "3 attempts"; do
+    [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', the line of another failure")
+  done
+  for each in "Traceback" "ModuleNotFoundError" "command not found" "No such file" "Permission denied" "failed to create"; do
+    [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', a tool's own words")
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which holds '$2' and '$3', no phrase of another cause or failure and nothing of a tool's own words" \
+    || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that holds '$2' and '$3', no phrase of another cause or failure and nothing of a tool's own words" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason that holds $2 and $3>"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq 0 ] && pass "$name: cosign is never called" \
+    || fail "$name: the cosign calls the stub logged: none, what cannot be made ends before cosign is asked" "calls logged: $calls, wanted 0:" "$(cat "$SB/cosign.log")"
+}
+cause_sandbox; echo "verification: [not closed" > "$SB/root/catalogue-policy.yaml"
+run verify "$SB/root" "$REF"; told_by_cause "the policy file is no YAML, a bracket not closed" catalogue-policy.yaml "cannot be read as YAML"
+# the byte 0xFF, which no UTF-8 text holds, before the file as fresh writes it
+cause_sandbox; { printf '\xff'; policy_with "  issuer: $ISSUER" "      identity: $RELEASER"; } > "$SB/root/catalogue-policy.yaml"
+run verify "$SB/root" "$REF"; told_by_cause "the policy file is not UTF-8" catalogue-policy.yaml "cannot be read as YAML"
+# the file as fresh writes it, its mode taken off for the run and put back
+# after it. The watch inside run cannot read it either: it holds the file by
+# its kind and its path in this run, not by its checksum, and its sha256sum
+# says so on stderr, once before the run and once after it. Those two lines
+# are kept back by the redirection on this one call of run, so that the
+# suite's own stderr stays empty; on this call alone, since on every other
+# what the watch or the shell writes there is a fault to be seen. As root no
+# file mode keeps a file from being read: the input cannot be laid down
+# there, is not run, and one line says so in the place of its four
+if [ "$(id -u)" -eq 0 ]; then
+  pass "the policy file cannot be opened: not asked here, the suite runs as root and no file mode keeps root from reading"
+else
+  cause_sandbox; mode=$(stat -c %a "$SB/root/catalogue-policy.yaml"); chmod 000 "$SB/root/catalogue-policy.yaml"
+  run verify "$SB/root" "$REF" 2>/dev/null; chmod "$mode" "$SB/root/catalogue-policy.yaml"
+  told_by_cause "the policy file cannot be opened" catalogue-policy.yaml "cannot be opened"
+fi
+# a stand-in that starts the real python3, arguments as they came, with a
+# directory first among its modules' whose yaml.py raises what a python
+# without the module raises; python is told to write no cache beside it
+cause_sandbox; mkdir "$SB/no-yaml"; echo "raise ModuleNotFoundError(\"No module named 'yaml'\")" > "$SB/no-yaml/yaml.py"
+printf '#!/usr/bin/env bash\nPYTHONDONTWRITEBYTECODE=1 PYTHONPATH=%q exec %q "$@"\n' "$SB/no-yaml" "$(command -v python3)" > "$SB/bin/python3"; chmod +x "$SB/bin/python3"
+run verify "$SB/root" "$REF"; told_by_cause "python3 has no yaml module" python3 "yaml module"
+cause_sandbox; HIDE=python3 run verify "$SB/root" "$REF"; told_by_cause "python3 is not on PATH" python3 "not found on PATH"
+cause_sandbox; HIDE=jq run verify "$SB/root" "$REF"; told_by_cause "jq is not on PATH" jq "not found on PATH"
+# the stub is no cosign on PATH either: it is taken out of the sandbox
+cause_sandbox; rm "$SB/bin/cosign"
+HIDE=cosign run verify "$SB/root" "$REF"; told_by_cause "cosign is not on PATH" cosign "not found on PATH"
+# a stand-in that fails in GNU mktemp's words
+cause_sandbox; printf '%s\n' '#!/usr/bin/env bash' "echo \"mktemp: failed to create directory via template '/tmp/tmp.XXXXXXXXXX': No such file or directory\" >&2" 'exit 1' > "$SB/bin/mktemp"; chmod +x "$SB/bin/mktemp"
+run verify "$SB/root" "$REF"; told_by_cause "mktemp fails" mktemp "no directory for temporary files"
 
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
