@@ -495,17 +495,12 @@ left of the program is the follow-up list below, one decision each.
           in which cosign refuses the same layer without its chain);
           cleanup
           candidates recorded as plan item 2.8.2
-    - [ ] 2.5 `scripts/check-provenance.sh verify` (the owner's go
-          2026-11-15, in progress; seventeen slices, 2.5.10b added
-          before the first one for wrong usage, 2.5.3b (no file left
-          behind), 2.5.4b (a jq that gives no answer never passes) and
-          2.5.8b (several missed expectations, each named) during the
-          step: retries, the last one against the real cosign; 2.5.1
-          to 2.5.12 built by 2026-11-17 with the guards 2.5.7b, 2.5.9c
-          and 2.5.12: the five expectations, every miss named,
-          several statements, what cannot serve refused, a failed
-          attempt warned of and tried again, the suite at 833 passed;
-          next 2.5.13, the real cosign)
+    - [x] 2.5 `scripts/check-provenance.sh verify` (the owner's go
+          2026-11-15; built by 2026-11-17: slices 2.5.1 to 2.5.13 and
+          eight added ones, one failing test or one guard before each
+          change; the self-check's suite at 833 passed under jq 1.6
+          and jq 1.7.1, the real-tool suite at 13 against cosign
+          2.6.5; 2.6 waits for the owner's go)
     - [ ] 2.6 the release steps in `build.yml`, the three suites in
           `validate.yml`, the way out written into the manual
     - [ ] 2.7 the action's pin read by the Renovate test; a bump merged
