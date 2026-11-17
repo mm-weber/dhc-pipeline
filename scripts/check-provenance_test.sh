@@ -1619,6 +1619,30 @@ lines_no_json() {
 }
 lines_no_json
 
+# 9c: the self-check reads the five and nothing else (plan slice 2.5.9c, a
+#    guard). The policy rule a consumer applies admits on the five conditions,
+#    and a self-check that asks more than the rule fails a release the rule
+#    would admit. One input under the first identity: the statement that
+#    meets all five, in which all that statement writes beside the five
+#    values is another thing (the subjects, the resolved dependency, the
+#    invocation id, GitHub's internal parameters) and which holds a key of no
+#    name known today at six places. The five values and the paths to them
+#    are as they were. Wanted: exit 0; stdout the one passing line; nothing
+#    on stderr; cosign called once.
+all_else=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF" | jq -c '
+  .subject = [{name: "ghcr.io/other/gadgets", digest: .subject[0].digest},
+              {name: "ghcr.io/other/gizmos", digest: {sha256: "7c5d3b1a0f8e6c4a2b9d7e3f1c0eae559371d8b6f4e2c9a0e6381e7d4c9a2f0b"}}]
+  | .predicate.buildDefinition.resolvedDependencies = [{uri: "git+https://github.com/other/gadgets@refs/tags/v9", digest: {gitCommit: "fedcba9876543210fedcba9876543210fedcba98"}}]
+  | .predicate.runDetails.metadata.invocationId = "https://github.com/other/gadgets/actions/runs/77/attempts/3"
+  | .predicate.buildDefinition.internalParameters.github = {event_name: "pull_request", repository_id: "901", repository_owner_id: "902", runner_environment: "self-hosted"}
+  | .unknownToday = "top"
+  | .predicate.unknownToday = {under: "predicate"}
+  | .predicate.buildDefinition.unknownToday = ["under buildDefinition"]
+  | .predicate.buildDefinition.externalParameters.unknownToday = "under externalParameters"
+  | .predicate.buildDefinition.externalParameters.workflow.unknownToday = "under workflow"
+  | .predicate.runDetails.unknownToday = "under runDetails"')
+one_of_several "a statement that meets all five and differs in all else" "$all_else"
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
