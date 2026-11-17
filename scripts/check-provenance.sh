@@ -35,6 +35,13 @@
 # other reference is wrong usage: one ::error:: line on stderr holding the
 # reference as it was given, and exit 2, before the policy file is read and
 # before cosign is asked.
+# The pause between two attempts, CHECK_PROVENANCE_RETRY_DELAY, is 10 seconds
+# where the variable is not set or is empty; otherwise it has to be a whole
+# number of seconds, digits alone. Anything else cannot be used: sleep would
+# fail on it, the attempts would follow each other at once and nobody would
+# be told. One ::error:: line on stderr naming the variable and holding the
+# value as given, and exit 2, at the start, also in a run in which no attempt
+# would fail, before the policy file is read and before cosign is asked.
 # The root has to hold the policy file, catalogue-policy.yaml: a root without
 # it is wrong usage as well, one ::error:: line on stderr naming the file and
 # no key of it, and exit 2, before anything is read from it and before cosign
@@ -96,7 +103,8 @@
 # a registry that does not answer for a moment. Asking again at once would
 # mostly meet the same blip, so a failed attempt that another follows is
 # answered by a pause, sleep called with the seconds held in
-# CHECK_PROVENANCE_RETRY_DELAY, 10 where it is not set, and before the pause
+# CHECK_PROVENANCE_RETRY_DELAY, 10 where it is not set or is empty, and before
+# the pause
 # by one ::warning:: line on stderr naming the reference, the attempt and
 # what cosign said in it: the line shows in the release's log that an attempt
 # was lost, and why. After the third failure there is neither, the
@@ -219,6 +227,13 @@ REF="$3"
 # it either: an image's name holds none, the digest begins at the one @, and
 # cosign cannot read a reference with two
 [[ "$REF" =~ ^[^[:space:]@]+@sha256:[0123456789abcdef]{64}$ ]] || { echo "::error::check-provenance: '$REF' does not name an image by a sha256 digest, which reads <image>@sha256: and 64 lower-case hex characters (Req 2.28)" >&2; exit 2; }
+# the pause between two attempts, 10 seconds unless the caller sets another.
+# Seconds in digits alone, the digits written out as above: sleep fails on
+# anything else, and the attempts would follow at once with nobody told. It
+# is tested here, not where an attempt fails: most runs never get there, and
+# a value that cannot be used would wait unseen for the run that does
+PAUSE="${CHECK_PROVENANCE_RETRY_DELAY:-10}"
+[[ "$PAUSE" =~ ^[0123456789]+$ ]] || { echo "::error::check-provenance: CHECK_PROVENANCE_RETRY_DELAY is '$PAUSE', which is no pause between attempts, it has to be a whole number of seconds in digits alone, or not set or empty for 10 seconds (Req 2.28)" >&2; exit 2; }
 # a root without the policy file is the caller's slip, told as that: read all
 # the same, a file would seem to lack a key where it is the file that is
 # missing
@@ -324,8 +339,8 @@ for attempt in 1 2 3; do
   # another attempt follows: the warning shows in the release's log that this
   # one was lost, and why; then the pause, which reads no stdin either
   if [ "$attempt" -lt 3 ]; then
-    echo "::warning::check-provenance: ${REF}: cosign failed on attempt ${attempt} of 3 and is asked again after ${CHECK_PROVENANCE_RETRY_DELAY:-10} seconds, it said:" "${words[@]}" >&2
-    sleep "${CHECK_PROVENANCE_RETRY_DELAY:-10}" </dev/null
+    echo "::warning::check-provenance: ${REF}: cosign failed on attempt ${attempt} of 3 and is asked again after ${PAUSE} seconds, it said:" "${words[@]}" >&2
+    sleep "$PAUSE" </dev/null
     continue
   fi
   # 1 whatever code cosign ended with: the code says that the check failed,
