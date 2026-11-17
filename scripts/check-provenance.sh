@@ -27,7 +27,9 @@
 # The reference has to name the image by a sha256 digest: it ends in @sha256:
 # and 64 lower-case hex characters, after a name that is not empty and holds
 # no white space, one reference being one word: with two in the one argument
-# the first would pass for part of the second's name. By a tag
+# the first would pass for part of the second's name. Nor does the name hold
+# an @: the digest begins at the reference's one @, and with a second the
+# name would end at one place for this test and at another for cosign. By a tag
 # cosign would verify whatever the tag points at, which need not be the digest
 # the release pushed, and a mistyped digest would cost three attempts. Any
 # other reference is wrong usage: one ::error:: line on stderr holding the
@@ -213,8 +215,10 @@ REF="$3"
 # only a digest pins what the release pushed: a tag can be moved, and cosign
 # would verify whatever it points at. The hex digits are written out, a range
 # like a-f taking in capitals under some locales. No white space in the name:
-# a second reference behind a blank is no part of one image's name
-[[ "$REF" =~ ^[^[:space:]]+@sha256:[0123456789abcdef]{64}$ ]] || { echo "::error::check-provenance: '$REF' does not name an image by a sha256 digest, which reads <image>@sha256: and 64 lower-case hex characters (Req 2.28)" >&2; exit 2; }
+# a second reference behind a blank is no part of one image's name. No @ in
+# it either: an image's name holds none, the digest begins at the one @, and
+# cosign cannot read a reference with two
+[[ "$REF" =~ ^[^[:space:]@]+@sha256:[0123456789abcdef]{64}$ ]] || { echo "::error::check-provenance: '$REF' does not name an image by a sha256 digest, which reads <image>@sha256: and 64 lower-case hex characters (Req 2.28)" >&2; exit 2; }
 # a root without the policy file is the caller's slip, told as that: read all
 # the same, a file would seem to lack a key where it is the file that is
 # missing
