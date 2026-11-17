@@ -85,11 +85,18 @@
 # and nothing of an expectation the statement meets, and exit 1; cosign is
 # not asked again.
 # With the five met the script ends with 0 and one line on stdout that names
-# the reference and says so. Of several statements none is chosen yet.
+# the reference and says so.
+# Several statements are judged one by one, in the order cosign printed them,
+# each by itself as told above. The first that meets all five is the admitted
+# one: the run ends with 0 there, the statements after it are not read, and
+# nothing is said of what those before it miss. When none meets all five the
+# check has failed, also when the five are met between two statements and by
+# neither; the error line then holds the clauses of the last statement read.
 # Nothing cosign writes is passed on as it is.
 # The statements, and of each expectation read the value found and the value
 # expected, are each what jq prints when asked, one call after another:
-# eleven calls in every run that has a statement, whatever it misses.
+# one call for the statements and ten for each statement judged, whatever it
+# misses: eleven in a run over one statement.
 # A jq call that
 # printed nothing gave no answer, however it came to that (a jq that was
 # killed and a jq that ended on an error of its own are two ways it comes
@@ -178,76 +185,88 @@ fi
 # to show for it. One ::error:: line naming the reference and the question
 # ($1), exit 1; neither cosign nor jq is asked again
 unanswered() { echo "::error::check-provenance: ${REF}: the provenance statement cosign verified could not be judged: jq gave no answer when asked for $1 (Req 2.28)" >&2; exit 1; }
-# cosign has checked who signed the statement, not what it says of who built:
-# its builder identity has to be the build workflow's too, exactly the
-# identity cosign was asked under, as the policy's rule compares for equality
-# (Req 2.28). The two are compared as the JSON text jq prints on one line: so
-# nothing of the value found is lost on its way through the shell, and the
-# error line shows it as it is without ever breaking in two. null is what jq
-# prints where the statement has no such field, and what the try answers
-# where the path cannot be walked because something on the way to the field
-# is no object: there is no value at such a path either, and jq by itself
-# would end on an error there and print nothing. Only the path is answered
-# for: an empty text is no value and is not dressed as null by the shell. A
-# call that printed nothing gave no answer, however it came to that (a jq
-# that was killed and a jq that ended on an error of its own are two ways it
-# comes about), and its empty text fails the check before any text is
-# compared or shown: two empty texts would be equal, and the check would pass
-# unchecked. Whether the text is empty is all that is asked, jq's exit code
-# is not read here either: an answer is never empty, since the try gives a
-# value or null for every statement and the identity always has its JSON
-# text. Both calls stay inside $( ): there bash writes no notice of its own
-# about a jq that was killed, as it does on the script's stderr for a plain
-# command. What jq itself writes on stderr is kept back at both, as at the
-# first call, whatever it is: with no answer the script's stderr holds the
-# one line of unanswered and no more. A miss does not end the run: its clause
-# is kept and the next expectation is read, so that the one error line after
-# the fifth names all that the statement misses
-missed=""
-found=$(jq -c 'try (.predicate.runDetails.builder.id) catch null' <<<"$statements" 2>/dev/null)
-[ -n "$found" ] || unanswered "its builder identity"
-expected=$(jq -nc --arg identity "$IDENTITY" '$identity' 2>/dev/null)
-[ -n "$expected" ] || unanswered "the JSON text of the builder identity expected of it"
-[ "$found" = "$expected" ] || missed="${missed:+$missed; }builder identity is ${found}, expected ${expected}"
-# the build type says which kind of build wrote the statement, and with it
-# what the fields under externalParameters mean: the policy's rule compares it
-# for equality too. Asked, compared and kept as the builder identity is: an
-# expectation the statement meets leaves nothing for the line
-found=$(jq -c 'try (.predicate.buildDefinition.buildType) catch null' <<<"$statements" 2>/dev/null)
-[ -n "$found" ] || unanswered "its build type"
-expected=$(jq -nc --arg type "$BUILD_TYPE" '$type' 2>/dev/null)
-[ -n "$expected" ] || unanswered "the JSON text of the build type expected of it"
-[ "$found" = "$expected" ] || missed="${missed:+$missed; }build type is ${found}, expected ${expected}"
-# the source repository says whose workflow file was run, and the policy's
-# rule compares it for equality as well: a fork, or the URL with something
-# after it, is another repository, so the value found is compared as it is.
-# Asked, compared and kept as the two before it
-found=$(jq -c 'try (.predicate.buildDefinition.externalParameters.workflow.repository) catch null' <<<"$statements" 2>/dev/null)
-[ -n "$found" ] || unanswered "its source repository"
-expected=$(jq -nc --arg source "$SOURCE" '$source' 2>/dev/null)
-[ -n "$expected" ] || unanswered "the JSON text of the source repository expected of it"
-[ "$found" = "$expected" ] || missed="${missed:+$missed; }source repository is ${found}, expected ${expected}"
-# the workflow path says which of the repository's workflow files was run: a
-# repository holds several, the policy's rule admits the build workflow alone
-# and compares for equality here as well, so the value found is not tidied
-# before it is compared. Asked, compared and kept as the three before it
-found=$(jq -c 'try (.predicate.buildDefinition.externalParameters.workflow.path) catch null' <<<"$statements" 2>/dev/null)
-[ -n "$found" ] || unanswered "its workflow path"
-expected=$(jq -nc --arg workflow "$WORKFLOW" '$workflow' 2>/dev/null)
-[ -n "$expected" ] || unanswered "the JSON text of the workflow path expected of it"
-[ "$found" = "$expected" ] || missed="${missed:+$missed; }workflow path is ${found}, expected ${expected}"
-# the ref says from which branch or tag the workflow file was taken: the
-# policy's rule admits the release branch alone and compares for equality
-# here as well, so the same file run from another branch is a miss, and the
-# value found is not tidied before it is compared. Asked, compared and kept
-# as the four before it
-found=$(jq -c 'try (.predicate.buildDefinition.externalParameters.workflow.ref) catch null' <<<"$statements" 2>/dev/null)
-[ -n "$found" ] || unanswered "its ref"
-expected=$(jq -nc --arg ref "$WORKFLOW_REF" '$ref' 2>/dev/null)
-[ -n "$expected" ] || unanswered "the JSON text of the ref expected of it"
-[ "$found" = "$expected" ] || missed="${missed:+$missed; }ref is ${found}, expected ${expected}"
-# all five are read: one line with the clause of each one missed, and the
-# check has failed; cosign is not asked again
+# the statements are judged one by one, each by itself: the policy's rule
+# admits on any statement that meets the conditions, wherever it stands among
+# the others, and the self-check is neither stricter nor laxer than the rule.
+# They are read on a file descriptor of the loop's own: a jq started inside
+# inherits the loop's stdin, and one that read it would eat the statements
+# still to come
+while IFS= read -r statement <&3; do
+  # cosign has checked who signed the statement, not what it says of who built:
+  # its builder identity has to be the build workflow's too, exactly the
+  # identity cosign was asked under, as the policy's rule compares for equality
+  # (Req 2.28). The two are compared as the JSON text jq prints on one line: so
+  # nothing of the value found is lost on its way through the shell, and the
+  # error line shows it as it is without ever breaking in two. null is what jq
+  # prints where the statement has no such field, and what the try answers
+  # where the path cannot be walked because something on the way to the field
+  # is no object: there is no value at such a path either, and jq by itself
+  # would end on an error there and print nothing. Only the path is answered
+  # for: an empty text is no value and is not dressed as null by the shell. A
+  # call that printed nothing gave no answer, however it came to that (a jq
+  # that was killed and a jq that ended on an error of its own are two ways it
+  # comes about), and its empty text fails the check before any text is
+  # compared or shown: two empty texts would be equal, and the check would pass
+  # unchecked. Whether the text is empty is all that is asked, jq's exit code
+  # is not read here either: an answer is never empty, since the try gives a
+  # value or null for every statement and the identity always has its JSON
+  # text. Both calls stay inside $( ): there bash writes no notice of its own
+  # about a jq that was killed, as it does on the script's stderr for a plain
+  # command. What jq itself writes on stderr is kept back at both, as at the
+  # first call, whatever it is: with no answer the script's stderr holds the
+  # one line of unanswered and no more. A miss does not end the run: its clause
+  # is kept and the next expectation is read, so that the one error line after
+  # the fifth names all that the statement misses
+  missed=""
+  found=$(jq -c 'try (.predicate.runDetails.builder.id) catch null' <<<"$statement" 2>/dev/null)
+  [ -n "$found" ] || unanswered "its builder identity"
+  expected=$(jq -nc --arg identity "$IDENTITY" '$identity' 2>/dev/null)
+  [ -n "$expected" ] || unanswered "the JSON text of the builder identity expected of it"
+  [ "$found" = "$expected" ] || missed="${missed:+$missed; }builder identity is ${found}, expected ${expected}"
+  # the build type says which kind of build wrote the statement, and with it
+  # what the fields under externalParameters mean: the policy's rule compares
+  # it for equality too. Asked, compared and kept as the builder identity is:
+  # an expectation the statement meets leaves nothing for the line
+  found=$(jq -c 'try (.predicate.buildDefinition.buildType) catch null' <<<"$statement" 2>/dev/null)
+  [ -n "$found" ] || unanswered "its build type"
+  expected=$(jq -nc --arg type "$BUILD_TYPE" '$type' 2>/dev/null)
+  [ -n "$expected" ] || unanswered "the JSON text of the build type expected of it"
+  [ "$found" = "$expected" ] || missed="${missed:+$missed; }build type is ${found}, expected ${expected}"
+  # the source repository says whose workflow file was run, and the policy's
+  # rule compares it for equality as well: a fork, or the URL with something
+  # after it, is another repository, so the value found is compared as it is.
+  # Asked, compared and kept as the two before it
+  found=$(jq -c 'try (.predicate.buildDefinition.externalParameters.workflow.repository) catch null' <<<"$statement" 2>/dev/null)
+  [ -n "$found" ] || unanswered "its source repository"
+  expected=$(jq -nc --arg source "$SOURCE" '$source' 2>/dev/null)
+  [ -n "$expected" ] || unanswered "the JSON text of the source repository expected of it"
+  [ "$found" = "$expected" ] || missed="${missed:+$missed; }source repository is ${found}, expected ${expected}"
+  # the workflow path says which of the repository's workflow files was run: a
+  # repository holds several, the policy's rule admits the build workflow alone
+  # and compares for equality here as well, so the value found is not tidied
+  # before it is compared. Asked, compared and kept as the three before it
+  found=$(jq -c 'try (.predicate.buildDefinition.externalParameters.workflow.path) catch null' <<<"$statement" 2>/dev/null)
+  [ -n "$found" ] || unanswered "its workflow path"
+  expected=$(jq -nc --arg workflow "$WORKFLOW" '$workflow' 2>/dev/null)
+  [ -n "$expected" ] || unanswered "the JSON text of the workflow path expected of it"
+  [ "$found" = "$expected" ] || missed="${missed:+$missed; }workflow path is ${found}, expected ${expected}"
+  # the ref says from which branch or tag the workflow file was taken: the
+  # policy's rule admits the release branch alone and compares for equality
+  # here as well, so the same file run from another branch is a miss, and the
+  # value found is not tidied before it is compared. Asked, compared and kept
+  # as the four before it
+  found=$(jq -c 'try (.predicate.buildDefinition.externalParameters.workflow.ref) catch null' <<<"$statement" 2>/dev/null)
+  [ -n "$found" ] || unanswered "its ref"
+  expected=$(jq -nc --arg ref "$WORKFLOW_REF" '$ref' 2>/dev/null)
+  [ -n "$expected" ] || unanswered "the JSON text of the ref expected of it"
+  [ "$found" = "$expected" ] || missed="${missed:+$missed; }ref is ${found}, expected ${expected}"
+  # a statement that misses nothing is the admitted one: the others are not
+  # read, and nothing is said of those read before it
+  [ -n "$missed" ] || break
+done 3<<<"$statements"
+# no statement met all five, the last one read neither: one line with the
+# clause of each one it missed, and the check has failed; cosign is not asked
+# again
 if [ -n "$missed" ]; then
   echo "::error::check-provenance: ${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: ${missed} (Req 2.28)" >&2
   exit 1
