@@ -33,7 +33,13 @@
 # other reference is wrong usage: one ::error:: line on stderr holding the
 # reference as it was given, and exit 2, before the policy file is read and
 # before cosign is asked.
-# Each of the two has to be there as a string that is not empty: an empty one
+# The root has to hold the policy file, catalogue-policy.yaml: a root without
+# it is wrong usage as well, one ::error:: line on stderr naming the file and
+# no key of it, and exit 2, before anything is read from it and before cosign
+# is asked. A file that is not there gives no key, and the caller is to look
+# at the root he handed over, not into a policy file.
+# The issuer and the identity each have to be there as a string that is not
+# empty: an empty one
 # handed to cosign is a question about nobody, and a mapping or a number
 # printed as text one about an issuer or a signer of that name. A policy file
 # that does not give one of them cannot serve, which is another thing than a
@@ -164,6 +170,10 @@ REF="$3"
 # like a-f taking in capitals under some locales. No white space in the name:
 # a second reference behind a blank is no part of one image's name
 [[ "$REF" =~ ^[^[:space:]]+@sha256:[0123456789abcdef]{64}$ ]] || { echo "::error::check-provenance: '$REF' does not name an image by a sha256 digest, which reads <image>@sha256: and 64 lower-case hex characters (Req 2.28)" >&2; exit 2; }
+# a root without the policy file is the caller's slip, told as that: read all
+# the same, a file would seem to lack a key where it is the file that is
+# missing
+[ -f "$ROOT/catalogue-policy.yaml" ] || { echo "::error::check-provenance: '$ROOT' holds no catalogue-policy.yaml, the root has to be the directory that holds it (Req 2.28)" >&2; exit 2; }
 # the build type GitHub's provenance service writes for a workflow run (ADR
 # 0005, decision 5)
 BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
