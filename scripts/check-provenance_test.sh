@@ -1381,6 +1381,80 @@ ref_inputs() {
 }
 under_second_identity ref_inputs
 
+# 8b: a statement that misses several expectations names each (plan slice
+#     2.5.8b). A release run is expensive: one failed check has to show all
+#     that is wrong with the statement, not the first thing, so that one fix
+#     and one more run are enough. Seven inputs under the first identity,
+#     each one envelope whose statement misses more than one expectation: by
+#     other values, or by a string where an object belongs on the way to
+#     several fields. There is no value at a path that cannot be walked, so
+#     each field below that place shows null as found, and the line never
+#     ends in a jq error. Wanted on each: exit 1; nothing on stdout; stderr
+#     one line and no more, the script's error line, which holds one clause
+#     "<name> is <found>, expected <expected>" for each expectation missed,
+#     each once, ", expected " as many times as there are clauses, and
+#     "<name> is " of no expectation the statement meets; cosign called once.
+#     The order of the clauses and the words around them are free.
+# One input: $1 names it, $2 is the statement, the arguments up to -- are the
+# clauses wanted, those after it the names of the expectations it meets. A
+# met one's value may stand in the line: the builder identity holds three
+misses_several() {
+  local name=$1 held=$2 lines ended claims calls each n; local -a clauses=() wrong=()
+  shift 2
+  while [ $# -gt 0 ] && [ "$1" != -- ]; do clauses+=("$1"); shift; done
+  shift
+  fresh
+  envelopes "$held" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$REF"
+  [ "$rc" -eq 1 ] && pass "$name: exit 1" \
+    || fail "$name: the exit code" "exit=$rc, wanted 1: the statement misses ${#clauses[@]} expectations" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
+    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  lines=$(grep -c '' "$SB/stderr"); ended=$(wc -l < "$SB/stderr"); claims=$(occurs ", expected " <<<"$err")
+  { [ "$lines" -eq 1 ] && [ "$ended" -eq 1 ]; } || wrong+=("lines on stderr: $lines, of them ended by a newline: $ended, wanted 1 and 1")
+  [[ "$err" == "::error::check-provenance: $REF: "*" (Req 2.28)" ]] || wrong+=("it is not begun '::error::check-provenance: ' and the reference and ended ' (Req 2.28)'")
+  for each in "${clauses[@]}"; do
+    n=$(occurs "$each" <<<"$err"); [ "$n" -eq 1 ] || wrong+=("times this clause is in it: $n, wanted 1: $each")
+  done
+  [ "$claims" -eq "${#clauses[@]}" ] || wrong+=("times ', expected ' is in it: $claims, wanted ${#clauses[@]}, one for each clause")
+  [[ "$err" != *"3 attempts"* && "$err" != *"no provenance statement"* ]] || wrong+=("it says '3 attempts' or 'no provenance statement', wanted neither")
+  for each in "$@"; do
+    [[ "$err" != *"$each is "* ]] || wrong+=("it holds '$each is ', of an expectation the statement meets, wanted nothing of it")
+  done
+  [ "${#wrong[@]}" -eq 0 ] \
+    && pass "$name: stderr is one line, the script's error line, which names the reference and holds one clause for each expectation missed and none for one the statement meets" \
+    || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that holds each of the ${#clauses[@]} clauses once, holds ', expected ' ${#clauses[@]} times, says neither '3 attempts' nor 'no provenance statement' and holds '<name> is ' of no expectation the statement meets" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted, in any order and with any words around them, the clauses:" "${clauses[@]}"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq 1 ] && pass "$name: cosign is called once and not asked again" \
+    || fail "$name: the cosign calls the stub logged: one, what cosign printed with exit 0 is judged once" "calls logged: $calls, wanted 1"
+}
+several_inputs() {
+  local met type="https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1" fork="${SOURCE%/*/*}/umbrella/${SOURCE##*/}" rescan="${WORKFLOW%/*}/rescan.yml"
+  local b="builder identity is" t="build type is" s="source repository is" w="workflow path is" r="ref is"
+  local eb=", expected \"$RELEASER\"" et=", expected \"$BUILD_TYPE\"" es=", expected \"$SOURCE\"" ew=", expected \"$WORKFLOW\"" er=", expected \"$GIT_REF\""
+  met=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")
+  # other values at the paths: all five, two that the script does not read one
+  # after the other, and two more with one it meets between them
+  misses_several "a statement that misses all five" "$(statement "$RE_ATTESTER" "$type" "$fork" "$rescan" "refs/heads/feature")" \
+    "$b \"$RE_ATTESTER\"$eb" "$t \"$type\"$et" "$s \"$fork\"$es" "$w \"$rescan\"$ew" "$r \"refs/heads/feature\"$er" --
+  misses_several "a statement that misses the build type and the ref" "$(statement "$RELEASER" "$type" "$SOURCE" "$WORKFLOW" "refs/heads/feature")" \
+    "$t \"$type\"$et" "$r \"refs/heads/feature\"$er" -- "builder identity" "source repository" "workflow path"
+  misses_several "a statement that misses the builder identity and the source repository" "$(statement "$RE_ATTESTER" "$BUILD_TYPE" "$fork" "$WORKFLOW" "$GIT_REF")" \
+    "$b \"$RE_ATTESTER\"$eb" "$s \"$fork\"$es" -- "build type" "workflow path" "ref"
+  # a string where an object belongs, ever further down the statement that
+  # meets all five: every field below it has no value, null in its clause
+  misses_several "a statement whose predicate is a string" "$(jq -c '.predicate = "a string"' <<<"$met")" \
+    "$b null$eb" "$t null$et" "$s null$es" "$w null$ew" "$r null$er" --
+  misses_several "a statement whose buildDefinition is a string" "$(jq -c '.predicate.buildDefinition = "a string"' <<<"$met")" \
+    "$t null$et" "$s null$es" "$w null$ew" "$r null$er" -- "builder identity"
+  misses_several "a statement whose externalParameters is a string" "$(jq -c '.predicate.buildDefinition.externalParameters = "a string"' <<<"$met")" \
+    "$s null$es" "$w null$ew" "$r null$er" -- "builder identity" "build type"
+  misses_several "a statement whose workflow is a string" "$(jq -c '.predicate.buildDefinition.externalParameters.workflow = "a string"' <<<"$met")" \
+    "$s null$es" "$w null$ew" "$r null$er" -- "builder identity" "build type"
+}
+several_inputs
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
