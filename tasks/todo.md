@@ -501,9 +501,10 @@ left of the program is the follow-up list below, one decision each.
           behind), 2.5.4b (a jq that gives no answer never passes) and
           2.5.8b (several missed expectations, each named) during the
           step: retries, the last one against the real cosign; 2.5.1
-          to 2.5.8 built by 2026-11-16 with the guard 2.5.7b added that
-          day, all five expectations read, the suite at 503 passed;
-          next the failing test of 2.5.8b)
+          to 2.5.8b built by 2026-11-17 with the guard 2.5.7b added on
+          the 16th: all five expectations read, every miss named in the
+          one line, the suite at 531 passed; next the failing test of
+          2.5.9)
     - [ ] 2.6 the release steps in `build.yml`, the three suites in
           `validate.yml`, the way out written into the manual
     - [ ] 2.7 the action's pin read by the Renovate test; a bump merged
