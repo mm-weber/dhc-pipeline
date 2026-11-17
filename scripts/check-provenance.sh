@@ -15,6 +15,12 @@
 # its attests list names cosign's own attestation types, the provenance not
 # among them. cosign gets exactly these arguments: no flag that weakens the
 # check rides along.
+# The issuer has to be there as a string that is not empty: an empty one
+# handed to cosign is a question about nobody, and a mapping or a number
+# printed as text one about an issuer of that name. A policy file that gives
+# none cannot serve, which is another thing than a statement that fails the
+# check: one ::error:: line on stderr naming the file and the key
+# verification.issuer, and exit 2, before cosign is asked.
 # The answer is read in three places: cosign's exit code, its stderr when it
 # fails, its stdout when it ends with 0. Any code but 0 is a failed attempt,
 # a crash of cosign's as much as a refusal, and a failed attempt is tried
@@ -127,7 +133,12 @@ REF="$3"
 # 0005, decision 5)
 BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
 
-ISSUER=$(python3 -c 'import sys,yaml; print((yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("issuer",""))' "$ROOT/catalogue-policy.yaml")
+# only a string is the issuer: anything else the key holds, python would
+# print as text, and cosign would be asked under an issuer nobody wrote
+ISSUER=$(python3 -c 'import sys,yaml; v=(yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("issuer"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml")
+# without an issuer there is no question to put to cosign: the file cannot
+# serve, and whoever broke it is told which key
+[ -n "$ISSUER" ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives no verification.issuer, which has to be a string that is not empty (Req 2.28)" >&2; exit 2; }
 # the role named releaser, whatever its place and whatever it attests
 IDENTITY=$(python3 -c 'import sys,yaml; print((yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("roles",{}).get("releaser",{}).get("identity",""))' "$ROOT/catalogue-policy.yaml")
 
