@@ -54,7 +54,9 @@
 # or with nothing after it, gives no ref. Before that first @ it has to read
 # as the cuts take it, <scheme>://<host>/<owner>/<repo>/ and then the workflow
 # path, which ends in no slash: with the @ right after the repository, or
-# after its slash, there is no workflow path. Cut all
+# after its slash, there is no workflow path. Host, owner and repository are
+# each a segment, not empty and holding no slash: where two slashes stand
+# together a segment is empty, and the cuts would take the next for it. Cut all
 # the same it would give nonsense, and the error line would blame the
 # statement for the policy file's fault. Such a file cannot serve either: one
 # ::error:: line on stderr naming the file and the key and holding the
@@ -207,10 +209,12 @@ IDENTITY=$(python3 -c 'import sys,yaml; v=(yaml.safe_load(open(sys.argv[1])) or 
 # or with nothing after it, has no ref. The workflow path ends at that @, and
 # begins after the repository's slash, the one the first cut below looks for:
 # without that slash before the @, or with it right before the @, there is
-# no path. What the cuts below made of either would be held against every
+# no path. Host, owner and repository are counted as segments, each one or
+# more characters that are no slash: a * would take an empty one, or two for
+# one. What the cuts below made of any of these would be held against every
 # statement,
 # which is not at fault. The file cannot serve, as above
-[[ "$IDENTITY" == *@?* && "${IDENTITY%%@*}" == *://*/*/*/*[!/] ]] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives a verification.roles.releaser.identity that cannot be cut into its parts, '$IDENTITY' holds no workflow path before its first @ or no ref after it, the form is <scheme>://<host>/<owner>/<repo>/<workflow path>@<ref> (Req 2.28)" >&2; exit 2; }
+[[ "$IDENTITY" == *@?* && "${IDENTITY%%@*}" == *://+([!/])/+([!/])/+([!/])/*[!/] ]] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives a verification.roles.releaser.identity that cannot be cut into its parts, '$IDENTITY' holds no host, owner, repository and workflow path before its first @ or no ref after it, the form is <scheme>://<host>/<owner>/<repo>/<workflow path>@<ref> (Req 2.28)" >&2; exit 2; }
 
 # the build workflow's repository, cut from the identity in two steps: what
 # follows scheme, host, owner and repository, and then the identity without
