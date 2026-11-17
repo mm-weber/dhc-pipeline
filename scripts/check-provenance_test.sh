@@ -113,6 +113,8 @@ EOF
   # A call that neither crashes nor refuses accepts the way cosign does: on
   # stdout the lines the case laid down in $SB/envelopes.jsonl, one envelope
   # per verified attestation, on stderr its report, exit 0.
+  # A refusing call prints on its stdout, before it ends, the case's file
+  # $SB/refused.stdout.<n> where the case laid one down for that n-th call.
   # Whatever it answers, every call first notes where its stdout and its
   # stderr go, a line for each: what readlink says of its own descriptors 1
   # and 2 under /proc, a file by its path, a pipe as pipe:[...]. The note is
@@ -129,6 +131,7 @@ if [ -f "$SB/crash.$nth" ]; then cat "$SB/crash.$nth" >&2; exit 2; fi
 left=0; [ -f "$SB/refusals" ] && left=$(cat "$SB/refusals")
 if [ "$left" -gt 0 ]; then
   echo "$((left - 1))" > "$SB/refusals"
+  [ -f "$SB/refused.stdout.$nth" ] && cat "$SB/refused.stdout.$nth"
   { printf 'Error: '; cat "$SB/refusal.$nth"; printf 'error during command execution: '; cat "$SB/refusal.$nth"; } >&2
   exit 1
 fi
@@ -1970,6 +1973,45 @@ exit_is "the pause is CHECK_PROVENANCE_RETRY_DELAY seconds" 0; pauses "the pause
 retry_sandbox 2; PAUSE=unset run verify "$SB/root" "$REF"
 exit_is "the pause is 10 seconds with the variable not set" 0; pauses "the pause is 10 seconds with the variable not set" 2 10
 retry_sandbox 0; run verify "$SB/root" "$REF"; pauses "cosign accepting at once" 0 0
+
+# 12: only a cosign call that fails is tried again, and what a failed attempt
+#    printed is never read (plan slice 2.5.12, a guard). What cosign printed
+#    with exit 0 is its answer and is judged once: a statement that misses an
+#    expectation, and an answer with no statement in it, are final at once,
+#    also when an attempt failed before. Asking again does not change a
+#    statement that was signed and stored, it only costs the release two
+#    pauses; and a statement left over from an attempt cosign itself gave up
+#    on was never verified. Five inputs, each through case 11's retry_sandbox
+#    and judged by tried. For the last two the first call, which refuses,
+#    prints on its stdout an envelope whose statement meets all five (the
+#    stub's refused.stdout.<n>, see fresh).
+# the clause of a statement built from another branch
+off='ref is "refs/heads/feature", expected "'"$GIT_REF"'"'
+# an accepting call answers with that statement and no other
+off_branch() { envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" refs/heads/feature)" > "$SB/envelopes.jsonl"; }
+# the first call, refusing, prints the envelope retry_sandbox laid down, whose
+# statement meets all five
+printed_by_refused() { cp "$SB/envelopes.jsonl" "$SB/refused.stdout.1"; }
+# beside tried, and heard only when it fails: stderr's last line, the error
+# line, holds ', expected ' once, so one clause and no more
+one_clause() {
+  local claims; claims=$(tail -n 1 "$SB/stderr" | occurs ", expected ")
+  [ "$claims" -eq 1 ] || fail "$1: the error line holds one clause and no more" "times ', expected ' is in the last line of stderr: $claims, wanted 1" "stderr:" "${err:-nothing}"
+}
+# cosign accepts at once: no warning, no pause, no second call
+retry_sandbox 0; off_branch; HOLD=("" "$off"); LACK=()
+run verify "$SB/root" "$REF"; tried "an answer that misses the ref, at the first attempt" 1 0 1
+# the first call refuses, the second accepts: no third call, one pause
+retry_sandbox 1; off_branch; HOLD=("" "${NAMED[1]}" "$off"); LACK=("" "${NAMED[2]}")
+run verify "$SB/root" "$REF"; tried "one refusal, then an answer that misses the ref" 1 1 2
+retry_sandbox 1; : > "$SB/envelopes.jsonl"; HOLD=("" "${NAMED[1]}" "no provenance statement"); LACK=("" "${NAMED[2]}")
+run verify "$SB/root" "$REF"; tried "one refusal, then an answer with no statement" 1 1 2
+# a script that reads what the failed attempt printed passes this digest
+retry_sandbox 1; printed_by_refused; : > "$SB/envelopes.jsonl"; HOLD=("" "${NAMED[1]}" "no provenance statement"); LACK=("" "${NAMED[2]}")
+run verify "$SB/root" "$REF"; tried "a refused attempt that printed a statement which meets all five, then an accepting attempt that prints nothing" 1 1 2
+retry_sandbox 1; printed_by_refused; off_branch; HOLD=("" "${NAMED[1]}" "$off"); LACK=("" "${NAMED[2]}")
+run verify "$SB/root" "$REF"; tried "a refused attempt that printed a statement which meets all five, then an answer that misses the ref" 1 1 2
+one_clause "a refused attempt that printed a statement which meets all five, then an answer that misses the ref"
 
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
