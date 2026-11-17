@@ -15,12 +15,13 @@
 # its attests list names cosign's own attestation types, the provenance not
 # among them. cosign gets exactly these arguments: no flag that weakens the
 # check rides along.
-# The issuer has to be there as a string that is not empty: an empty one
+# Each of the two has to be there as a string that is not empty: an empty one
 # handed to cosign is a question about nobody, and a mapping or a number
-# printed as text one about an issuer of that name. A policy file that gives
-# none cannot serve, which is another thing than a statement that fails the
-# check: one ::error:: line on stderr naming the file and the key
-# verification.issuer, and exit 2, before cosign is asked.
+# printed as text one about an issuer or a signer of that name. A policy file
+# that does not give one of them cannot serve, which is another thing than a
+# statement that fails the check: one ::error:: line on stderr naming the
+# file and the key, verification.issuer or
+# verification.roles.releaser.identity, and exit 2, before cosign is asked.
 # The answer is read in three places: cosign's exit code, its stderr when it
 # fails, its stdout when it ends with 0. Any code but 0 is a failed attempt,
 # a crash of cosign's as much as a refusal, and a failed attempt is tried
@@ -139,8 +140,12 @@ ISSUER=$(python3 -c 'import sys,yaml; v=(yaml.safe_load(open(sys.argv[1])) or {}
 # without an issuer there is no question to put to cosign: the file cannot
 # serve, and whoever broke it is told which key
 [ -n "$ISSUER" ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives no verification.issuer, which has to be a string that is not empty (Req 2.28)" >&2; exit 2; }
-# the role named releaser, whatever its place and whatever it attests
-IDENTITY=$(python3 -c 'import sys,yaml; print((yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("roles",{}).get("releaser",{}).get("identity",""))' "$ROOT/catalogue-policy.yaml")
+# the role named releaser, whatever its place and whatever it attests; only a
+# string is its identity, as with the issuer
+IDENTITY=$(python3 -c 'import sys,yaml; v=(yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("roles",{}).get("releaser",{}).get("identity"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml")
+# without an identity cosign would be asked about nobody: the file cannot
+# serve here either, and no other role's identity stands in
+[ -n "$IDENTITY" ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives no verification.roles.releaser.identity, which has to be a string that is not empty (Req 2.28)" >&2; exit 2; }
 
 # the build workflow's repository, cut from the identity in two steps: what
 # follows scheme, host, owner and repository, and then the identity without
