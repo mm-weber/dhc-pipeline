@@ -184,7 +184,7 @@ envelopes() {
 # stub counts down, and the log that case 4b's stand-in for jq keeps of its
 # calls. This list is the one place that says which they are: a later slice
 # whose stand-in keeps a file of its own adds the name here.
-WRITTEN=(stdout stderr cosign.log cosign.wrote-to refusals jq.log)
+WRITTEN=(stdout stderr cosign.log cosign.wrote-to refusals jq.log sleep.log)
 holds() {
   local name; local -a spared=()
   for name in "${WRITTEN[@]}"; do spared+=(! -path "./$name"); done
@@ -265,7 +265,9 @@ run() {
   before=$(grep -c '' "$SB/cosign.log")
   rm -f "$SB/stdout" "$SB/stderr"
   was=$(holds)
-  ( cd "$SB/cwd" && PATH="$SB/bin:$PATH" CHECK_PROVENANCE_RETRY_DELAY=0 TMPDIR="$SB/tmp" "$CHECK" "$@" > "$SB/stdout" 2> "$SB/stderr" ); rc=$?
+  # the pause between attempts is $PAUSE seconds where a case sets it, 0
+  # otherwise; with the word unset the script is started without the variable
+  ( cd "$SB/cwd" && export CHECK_PROVENANCE_RETRY_DELAY="${PAUSE:-0}" && { [ "${PAUSE:-}" != unset ] || unset CHECK_PROVENANCE_RETRY_DELAY; } && PATH="$SB/bin:$PATH" TMPDIR="$SB/tmp" "$CHECK" "$@" > "$SB/stdout" 2> "$SB/stderr" ); rc=$?
   now=$(holds)
   RUNS=$((RUNS + 1))
   out=""; err=""
@@ -1858,6 +1860,116 @@ identity_forms() {
   identity_with_form "an identity whose repository is named .github" "$owner/.github" "$WORKFLOW" "$GIT_REF"
 }
 identity_forms
+
+# 11: a cosign call that fails is tried again, after a pause and with a warning
+#    (plan slice 2.5.11). What makes cosign fail can go away by itself (a
+#    registry or Sigstore that does not answer for a moment), and asking again
+#    at once mostly meets the same blip; the warning is what shows in the
+#    release's log that an attempt was lost, and why. Wanted after a failed
+#    attempt that another follows: ONE line on stderr, begun
+#    "::warning::check-provenance: " and the reference, that carries what
+#    cosign said in that attempt and neither of cosign's prefixes; then a
+#    pause of CHECK_PROVENANCE_RETRY_DELAY seconds, 10 with the variable not
+#    set; then the next attempt, three at most. An attempt that succeeds is
+#    judged as always, and stderr holds the warnings before it and no more.
+#    After the third failed attempt neither warning nor pause: case 2's error
+#    line follows. Seven inputs, said where they are run. sleep is a stand-in,
+#    so no test waits: it logs its call in $SB/sleep.log and ends with 0
+sleep_stand_in() {
+  : > "$SB/sleep.log"
+  cat > "$SB/bin/sleep" <<'STUB'
+#!/usr/bin/env bash
+SB="$(cd "$(dirname "$0")/.." && pwd)"
+{ printf 'sleep'; [ $# -gt 0 ] && printf ' %q' "$@"; echo; } >> "$SB/sleep.log"
+exit 0
+STUB
+  chmod +x "$SB/bin/sleep"
+}
+# A fresh sandbox with the stand-in and one envelope whose statement meets all
+# five, what an accepting call answers. The first $1 cosign calls refuse, each
+# with a message of two lines naming another workflow file, NAMED[n] the n-th's
+declare -a NAMED=() HOLD=() LACK=()
+retry_sandbox() {
+  local nth=0 file
+  fresh; sleep_stand_in
+  envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+  [ "$1" -gt 0 ] && echo "$1" > "$SB/refusals"
+  for file in first second third fourth fifth; do
+    nth=$((nth + 1)); NAMED[$nth]="$SOURCE/.github/workflows/$file.yml@$GIT_REF"
+    printf '%s\n' "no matching attestations: offline verification failed" " none of the expected identities matched what was in the certificate, got subjects [${NAMED[$nth]}] with issuer $ISSUER" > "$SB/refusal.$nth"
+  done
+}
+exit_is() {
+  [ "$rc" -eq "$2" ] && pass "$1: exit $2" \
+    || fail "$1: the exit code" "exit=$rc, wanted $2" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+}
+# the stand-in's log after a run: $2 calls, each as "sleep $3"
+pauses() {
+  local wanted="" i
+  for ((i = 0; i < $2; i++)); do wanted+="${wanted:+$'\n'}sleep $3"; done
+  [ "$(cat "$SB/sleep.log")" = "$wanted" ] && pass "$1: sleep is called $2 times${wanted:+, each time as 'sleep $3'}" \
+    || fail "$1: the calls of sleep the stand-in logged: $2${wanted:+, each as 'sleep $3'}" "calls logged:" "$([ -s "$SB/sleep.log" ] && cat "$SB/sleep.log" || echo "sleep was never called")" "wanted:" "${wanted:-no call}"
+}
+# The five result lines of a run named $1: exit code $2; stdout the passing
+# line, or nothing where $2 is 1; stderr exactly $3 warnings, each a whole line
+# begun "::warning::check-provenance: $REF: " without a prefix of cosign's,
+# and where $2 is 1 the error line after them; line k holds every text of
+# HOLD[k] and none of LACK[k] (a | between texts); cosign called $4 times,
+# each with case 1's argument set; sleep called $3 times as "sleep 0"
+tried() {
+  local name=$1 warnings=$3 total=$3 k line each begun lines ended calls same=0; local -a wrong=() on=() texts=()
+  [ "$2" -eq 1 ] && total=$((warnings + 1))
+  exit_is "$name" "$2"
+  if [ "$2" -eq 1 ]; then
+    [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
+      || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  else
+    one_line "$SB/stdout" && [[ "$out" == "check-provenance: "* ]] && [[ "$out" == *"$REF"* ]] \
+      && pass "$name: stdout is one line, begun 'check-provenance: ' and naming the reference in full" \
+      || fail "$name: stdout: one line, ended by its newline, begun 'check-provenance: ' and naming the reference in full" "stdout:" "${out:-nothing}" "wanted: one line begun 'check-provenance: ' that carries $REF"
+  fi
+  lines=$(grep -c '' "$SB/stderr"); ended=$(wc -l < "$SB/stderr"); mapfile -t on < "$SB/stderr"
+  [ "$lines" -eq "$total" ] && [ "$ended" -eq "$total" ] || wrong+=("lines on stderr: $lines, of them ended by a newline: $ended, wanted $total and $total")
+  for ((k = 1; k <= total; k++)); do
+    line=${on[$((k - 1))]:-}; begun="::warning::check-provenance: $REF: "; [ "$k" -gt "$warnings" ] && begun="::error::check-provenance: $REF: "
+    [[ "$line" == "$begun"* ]] || wrong+=("line $k is not begun '$begun'")
+    IFS='|' read -ra texts <<<"${HOLD[$k]:-}"
+    for each in "${texts[@]}"; do [[ "$line" == *"$each"* ]] || wrong+=("line $k does not carry '$each'"); done
+    IFS='|' read -ra texts <<<"${LACK[$k]:-}"
+    for each in "${texts[@]}"; do [[ "$line" != *"$each"* ]] || wrong+=("line $k carries '$each', which is another attempt's"); done
+    [ "$k" -le "$warnings" ] && [[ "$line" == *"Error: "* || "$line" == *"error during command execution"* ]] && wrong+=("line $k holds one of cosign's prefixes 'Error: ' and 'error during command execution'")
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is exactly $total lines: $warnings warnings, each carrying what cosign said in its attempt$([ "$total" -gt "$warnings" ] && echo ", then the error line of the third attempt")" \
+    || fail "$name: stderr: exactly $total lines, each ended by its newline: $warnings begun '::warning::check-provenance: $REF: ' that carry what cosign said in their attempt and no prefix of cosign's$([ "$total" -gt "$warnings" ] && echo ", then one begun '::error::check-provenance: $REF: ' that says '3 attempts' and carries the third attempt's words")" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}"
+  calls=$(grep -c '' "$SB/cosign.log")
+  for ((k = 1; k <= $4; k++)); do [ "$(sed -n "${k}p" "$SB/cosign.log" | asked)" = "$want" ] && same=$((same + 1)); done
+  [ "$calls" -eq "$4" ] && [ "$same" -eq "$4" ] && pass "$name: cosign is called $4 times, each time with the whole argument set case 1 holds" \
+    || fail "$name: the cosign calls the stub logged: $4, each with the argument set case 1 holds" "calls logged: $calls, wanted $4; of the first $4, those with that set: $same, wanted $4" "$([ -s "$SB/cosign.log" ] && cat "$SB/cosign.log" || echo "cosign was never called")"
+  pauses "$name" "$warnings" 0
+}
+# the first two calls refuse, each naming its own workflow file; the third accepts
+retry_sandbox 2; HOLD=("" "${NAMED[1]}" "${NAMED[2]}"); LACK=("" "${NAMED[2]}" "${NAMED[1]}")
+run verify "$SB/root" "$REF"; tried "cosign refusing twice, then accepting" 0 2 3
+retry_sandbox 1; HOLD=("" "${NAMED[1]}"); LACK=("" "${NAMED[2]}")
+run verify "$SB/root" "$REF"; tried "cosign refusing once, then accepting" 0 1 2
+# the first call ends as a Go program that panics does (case 2's trace, exit 2):
+# the one warning carries a word of the trace's first line and one of its last
+retry_sandbox 0; HOLD=("" "dereference|main.go:14"); LACK=()
+{
+  printf '%s\n' "panic: runtime error: invalid memory address or nil pointer dereference" "[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x46fb80]" "" "goroutine 1 [running]:"
+  printf '%s\n\t%s\n' "main.subject(0x0?)" "example.test/crash/main.go:9" "main.verify(0x475f00?)" "example.test/crash/main.go:12 +0x13" "main.main()" "example.test/crash/main.go:14 +0x15"
+} > "$SB/crash.1"
+run verify "$SB/root" "$REF"; tried "cosign crashing once, then accepting" 0 1 2
+# five calls would refuse: two warnings, the error line, no pause after the third
+retry_sandbox 5; HOLD=("" "${NAMED[1]}" "${NAMED[2]}" "3 attempts|${NAMED[3]}"); LACK=("" "${NAMED[2]}" "${NAMED[1]}")
+run verify "$SB/root" "$REF"; tried "cosign refusing on every attempt" 1 2 3
+# the first input again, started with the variable 7, then with it not set
+retry_sandbox 2; PAUSE=7 run verify "$SB/root" "$REF"
+exit_is "the pause is CHECK_PROVENANCE_RETRY_DELAY seconds" 0; pauses "the pause is CHECK_PROVENANCE_RETRY_DELAY seconds" 2 7
+retry_sandbox 2; PAUSE=unset run verify "$SB/root" "$REF"
+exit_is "the pause is 10 seconds with the variable not set" 0; pauses "the pause is 10 seconds with the variable not set" 2 10
+retry_sandbox 0; run verify "$SB/root" "$REF"; pauses "cosign accepting at once" 0 0
 
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
