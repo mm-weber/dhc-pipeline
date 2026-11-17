@@ -1723,6 +1723,83 @@ policy_faults() {
 }
 policy_faults
 
+# 10b: anything but 'verify <root> <image@sha256:digest>' over a policy file is
+#    refused as usage (plan slice 2.5.10b). The script has one mode, verify,
+#    and takes exactly two arguments after it: a root, a directory that holds
+#    catalogue-policy.yaml, and a reference that names an image by a sha256
+#    digest of 64 lower-case hex characters. By a tag cosign would verify
+#    whatever the tag points at, not the digest the release pushed; a mistyped
+#    digest would cost three cosign attempts; and a caller's mistake has to
+#    read as that, not as the shell's "unbound variable" or as a statement
+#    that fails the check. 20 inputs under the first identity, each over a
+#    fresh sandbox and one envelope whose statement meets all five, so that a
+#    script that asks cosign anyway gets an answer that passes. Wanted: exit
+#    2; nothing on stdout; stderr one line, begun '::error::check-provenance: ',
+#    that holds what was wrong (the reference as given, the usage form, or
+#    catalogue-policy.yaml) and nothing of the shell's or python's own words;
+#    cosign never called.
+# One input: $1 names it, $2 is what its line holds (empty: nothing is asked
+# of it), $3 says what the root is (dir: as fresh writes it; no-policy: the
+# policy file removed; absent: a path never made; file: a file), the arguments
+# after them go to the script as they are, the word ROOT standing for the root.
+# Where the root is no dir the line must not hold 'verification.' either: with
+# no policy file there to be read, no key of it is at fault
+refused_as_usage() {
+  local name=$1 held=$2 kind=$3 root each calls shows; local -a args=() wrong=(); shift 3
+  fresh; root="$SB/root"
+  case "$kind" in
+    no-policy) rm "$SB/root/catalogue-policy.yaml" ;;
+    absent)    root="$SB/root/never-made" ;;
+    file)      root="$SB/root/a-file"; echo "a file, no directory" > "$root" ;;
+  esac
+  for each in "$@"; do [ "$each" = ROOT ] && each=$root; args+=("$each"); done
+  envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+  run ${args[@]+"${args[@]}"}
+  [ "$rc" -eq 2 ] && pass "$name: exit 2" || fail "$name: the exit code" "exit=$rc, wanted 2" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
+    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
+  [[ "$err" == "::error::check-provenance: "* ]] || wrong+=("it is not begun '::error::check-provenance: '")
+  [ -z "$held" ] || [[ "$err" == *"$held"* ]] || wrong+=("it does not hold '$held'")
+  [ "$kind" = dir ] || [[ "$err" != *"verification."* ]] || wrong+=("it holds 'verification.': it names a key of a file that is not there")
+  for each in "unbound variable" "Traceback" "No such file"; do
+    [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', the shell's or python's own words")
+  done
+  shows="${held:+holds '$held' and }"; [ "$kind" = dir ] || shows+="names no key of it by 'verification.' and "
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which ${shows}holds nothing of the shell's or python's" \
+    || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that ${shows}holds neither 'unbound variable' nor 'Traceback' nor 'No such file'" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason${held:+ that holds $held}>"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq 0 ] && pass "$name: cosign is never called" \
+    || fail "$name: the cosign calls the stub logged: none, what is no usage is refused before cosign is asked" "calls logged: $calls, wanted 0:" "$(cat "$SB/cosign.log")"
+}
+# a reference ($2) that names no image by a sha256 digest; its line holds it
+no_reference() { refused_as_usage "the reference is $1" "$2" dir verify ROOT "$2"; }
+usage_inputs() {
+  local image=${REF%@*} hex=${REF##*:} form='verify <root> <image@sha256:digest>' policy=catalogue-policy.yaml
+  no_reference "by tag, the image's name, a colon and a tag, no digest" "$image:1.2.3"
+  no_reference "the image's name alone" "$image"
+  no_reference "a digest of 63 hex characters" "${REF%?}"
+  no_reference "a digest of 65 hex characters" "${REF}0"
+  no_reference "a digest with a g in its middle, no hex digit" "$image@sha256:${hex:0:32}g${hex:33}"
+  no_reference "the digest's letters as capitals" "$image@sha256:${hex^^}"
+  no_reference "by another algorithm, @sha512: and 128 hex characters" "$image@sha512:$hex$hex"
+  no_reference "the reference, a blank and a second reference, in the one argument" "$REF ghcr.io/acme/gadgets@sha256:$hex"
+  no_reference "@sha256: and the 64 characters, no image name before the @" "@sha256:$hex"
+  no_reference "the empty string" ""
+  refused_as_usage "the mode word is check, the root and the reference after it" "$form" dir check ROOT "$REF"
+  refused_as_usage "the mode word is in capitals, VERIFY" "$form" dir VERIFY ROOT "$REF"
+  refused_as_usage "no mode word, the root and the reference alone" "$form" dir ROOT "$REF"
+  refused_as_usage "no argument at all" "$form" dir
+  refused_as_usage "verify alone, no root and no reference" "$form" dir verify
+  refused_as_usage "verify and the root, no reference" "$form" dir verify ROOT
+  refused_as_usage "a fourth argument, the reference given twice" "$form" dir verify ROOT "$REF" "$REF"
+  refused_as_usage "the root holds no $policy" "$policy" no-policy verify ROOT "$REF"
+  refused_as_usage "the root does not exist" "$policy" absent verify ROOT "$REF"
+  refused_as_usage "the root is a file, no directory" "$policy" file verify ROOT "$REF"
+}
+usage_inputs
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
