@@ -493,7 +493,13 @@ design (Req 2.7 to 2.13; "look first, sign what you looked at, label last"):
    manifest); per manifest, Syft's SPDX and CycloneDX SBOMs and the one
    OpenVEX document; on the index, each platform's SPDX and the same OpenVEX
    document (ADR 0003: exactly one VEX document per digest).
-8. **Tags last.** The definition-derived tags move to the new digest, and the
+8. **Provenance**, unless `release.provenance` is `off`: GitHub's provenance
+   service signs one statement naming the index and every platform manifest,
+   `unpack-provenance.sh` stores it beside each digest as one more layer of
+   cosign's attestation manifest, and `check-provenance.sh` verifies each
+   digest before any tag (Req 2.9, 2.27). A stop here is described in
+   [A release stopped at the provenance steps](#a-release-stopped-at-the-provenance-steps).
+9. **Tags last.** The definition-derived tags move to the new digest, and the
    run re-reads each tag and asserts it resolves to the digest that was
    signed; any mismatch is a red run with the tags untouched.
 
@@ -617,6 +623,72 @@ scheduled run reads the declared feed and publishes (register row M26,
 tasks 16.8 and 16.3). A
 healthy quiet day is: Renovate runs green and opens nothing; rescan runs
 green, files nothing, and its compile report shows every statement applied.
+
+### A release stopped at the provenance steps
+
+Unless `release.provenance` is `off`, a release runs four steps between
+"sign and attest" and the tags (`build.yml`; Req 2.9, 2.27, 2.28):
+
+1. **Name the subjects**: `unpack-provenance.sh subjects` writes one line per
+   digest, the index and every platform manifest.
+2. **Attest**: `actions/attest-build-provenance` has GitHub's provenance
+   service sign one statement naming all of them. It is kept in GitHub's
+   attestation store, not in the registry.
+3. **Store**: `unpack-provenance.sh store` adds that signed statement as one
+   more layer of the attestation manifest cosign wrote beside each digest.
+4. **Verify**: `check-provenance.sh verify` asks each digest, the way a
+   consumer would, whether its provenance is one the policy would admit.
+
+**What a stop looks like.** A failure in any of the four ends the job before
+the tags:
+
+- the run is red, and the failing step's `::error::` line names the digest
+  and the cause;
+- the new digest is in the registry, signed, with its SBOMs, its scan report
+  and its OpenVEX document, and no tag points at it;
+- every tag still resolves to the previous digest, so consumers pull what
+  they pulled yesterday;
+- nothing needs undoing. The next scheduled rebuild tries again by itself
+  whenever the new package set differs from the tagged digest's (it compares
+  against the digest the tag points at, which is still the old one); a
+  dispatch of `build` for the image releases at once, whatever the
+  comparison would say.
+
+**The mode does not soften this.** `report` withholds such a release exactly
+like `required` does (Req 2.9): the two differ in what the verification
+policy and the rescan ask afterwards, not in what a release must carry. Only
+`off` releases without provenance.
+
+**Reading the error line.**
+
+| Step that failed | The line says | Usual cause |
+|------------------|---------------|-------------|
+| Attest | the action's own error | GitHub's attestation service or Sigstore is down; or the repository has no artifact attestations (a private repository on a plan without them) |
+| Store | `unpack-provenance: <image>@<digest>: ...` | the registry refused the pull or the push three times; or the bundle holds no log entry, which is the action having signed with GitHub's own Sigstore instance because the event did not say the repository is public |
+| Verify, exit 1 | `check-provenance: ...: cosign failed on each of 3 attempts`, or `... is not one the catalogue's verification policy would admit: <field> is <found>, expected <expected>` | Sigstore or the registry unreachable; or a statement whose builder identity, build type, source repository, workflow path or ref is not the build workflow's on main |
+| Verify, exit 2 | `check-provenance: ...` naming a tool, the policy file, a key of it or a variable | the check could not be made at all: nothing was judged, and the line names what could not serve |
+
+**When the cause passes** (an outage, a registry blip): do nothing, or
+dispatch `build` for the image.
+
+**When the cause lasts**: set `release.provenance: off` in
+`catalogue-policy.yaml` through a pull request. The next release skips the
+four steps and is unchanged in everything else: signature, SBOMs, scan
+report, OpenVEX, tags (Req 2.30). Set it back the same way once the cause is
+gone. A refusal is never loosened to get a release through.
+
+**A tagged digest that lost its provenance layer.** The statement is still in
+GitHub's attestation store, and `store` reads the store's answer like the
+action's file. With crane logged in to the registry with write access to the
+package:
+
+```bash
+gh api "repos/mm-weber/dhc-pipeline/attestations/sha256:<hex>" > answer.json
+scripts/unpack-provenance.sh store answer.json ghcr.io/mm-weber/dhc/<name> sha256:<hex>
+scripts/check-provenance.sh verify . "ghcr.io/mm-weber/dhc/<name>@sha256:<hex>"
+```
+
+Once per digest that lost it: the index and each platform manifest.
 
 ### Handling Renovate PRs
 
@@ -1311,6 +1383,8 @@ documentation — each states what it enforces and why it exists.
 | `lint-workflow-policy.sh` | `[root]` | Every workflow's cron and permissions equal the policy file's declarations, both directions (Req 7.10) |
 | `lint-rescan-steps.sh` | `[workflow]` | Every rescan step after the scan runs regardless of earlier failures (review D1) |
 | `release-policy.sh` | `<root> <query>` | The one reader of the policy's `release` section, the page switch included; a misspelt switch is a refusal (Req 2.13, 2.14, 2.17, 6.61, 7.7) |
+| `unpack-provenance.sh` | `store <bundles> <repository> <digest>…` / `subjects <repository> <digest>…` | Names the provenance subjects for the action, and stores GitHub's signed provenance statement as one more layer of cosign's attestation manifest beside each digest; signs nothing (Req 2.27) |
+| `check-provenance.sh` | `verify <root> <image@sha256:digest>` | The release's self-check: cosign under the declared issuer and build identity, then the statement's builder identity, build type, source repository, workflow path and ref; exit 1 for a statement that fails, exit 2 when the check could not be made (Req 2.9, 2.28) |
 | `render-verification.sh` | `[--check] [root]` | Renders the two Kyverno policies and the consumer recipe from the policy file; `--check` fails on drift (Req 7.8, 7.9) |
 | `render-tracking.sh` | `[--check] [root]` | Renders the active set into Renovate's ignore block; `--check` fails on drift (Req 1.14) |
 | `check-authenticity.sh` | `<root> <out.jsonl>` | Daily re-verification of every active definition's authenticity signal and the compat clocks (Req 3.10, 4.9) |
