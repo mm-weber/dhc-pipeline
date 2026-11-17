@@ -1465,6 +1465,96 @@ several_inputs() {
 }
 several_inputs
 
+# 9: several statements are judged one by one (plan slice 2.5.9). cosign
+#    prints one envelope per attestation it verified, and a digest can carry
+#    more than one provenance statement. The policy rule a consumer applies
+#    admits on any statement that meets the conditions, and the self-check is
+#    neither stricter nor laxer than the rule: it passes when at least one
+#    statement meets all five, wherever it stands among the others, and fails
+#    when none does, also when the five are met between two statements and by
+#    neither. Five inputs under the first identity. Wanted on the three that
+#    pass: exit 0; stdout the one passing line; nothing on stderr; cosign
+#    called once. On the two that fail: exit 1; nothing on stdout; stderr the
+#    one error line, in which each statement's clauses stand together behind
+#    "statement <i>: ", <i> counted from 1 in the order cosign printed them:
+#    each such text once and in rising order, and from it to the next one
+#    each clause of statement i once and ", expected " once per clause;
+#    cosign called once.
+# One input that passes: $1 names it, the arguments after it are the statements
+one_of_several() {
+  local name=$1 calls; shift
+  fresh
+  envelopes "$@" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$REF"
+  [ "$rc" -eq 0 ] && pass "$name: exit 0" || fail "$name: the exit code" "exit=$rc, wanted 0: one of the $# statements meets all five" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  one_line "$SB/stdout" && [[ "$out" == "check-provenance: "* ]] && [[ "$out" == *"$REF"* ]] \
+    && pass "$name: stdout is one line, begun 'check-provenance: ' and naming the reference in full" \
+    || fail "$name: stdout: one line and no more, begun 'check-provenance: ' and naming the reference in full" "stdout:" "${out:-nothing}" "wanted: one line, ended by its newline, begun 'check-provenance: ' that carries $REF"
+  [ ! -s "$SB/stderr" ] && pass "$name: nothing on stderr" \
+    || fail "$name: stderr: nothing, a statement that misses an expectation is not told of when another meets all five" "stderr:" "$(cat "$SB/stderr")" "wanted: nothing"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq 1 ] && pass "$name: cosign is called once" || fail "$name: the cosign calls the stub logged: one" "calls logged: $calls, wanted 1"
+}
+# One input that fails: $1 names it; then for each statement, in cosign's
+# order, the statement, the clauses wanted of it and --. A statement's part of
+# the line: from its "statement <i>: " to the next one's, or to the line's end
+none_of_several() {
+  local name=$1 calls i k rest part each; local -a held=() wanted=() wrong=(); shift
+  while [ $# -gt 0 ]; do
+    held+=("$1"); shift; each=""
+    while [ $# -gt 0 ] && [ "$1" != -- ]; do each+="$1"$'\n'; shift; done
+    wanted+=("$each"); shift
+  done
+  local n=${#held[@]}
+  fresh
+  envelopes "${held[@]}" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$REF"
+  [ "$rc" -eq 1 ] && pass "$name: exit 1" || fail "$name: the exit code" "exit=$rc, wanted 1: none of the $n statements meets all five" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
+    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr")")
+  [[ "$err" == "::error::check-provenance: $REF: "*" (Req 2.28)" ]] || wrong+=("it is not begun '::error::check-provenance: ' and the reference and ended ' (Req 2.28)'")
+  [[ "$err" != *"3 attempts"* && "$err" != *"no provenance statement"* ]] || wrong+=("it says '3 attempts' or 'no provenance statement', wanted neither")
+  [[ "$err" != *"statement $((n + 1)): "* ]] || wrong+=("it holds 'statement $((n + 1)): ', and cosign printed $n statements")
+  for ((i = 1; i <= n; i++)); do
+    k=$(occurs "statement $i: " <<<"$err"); [ "$k" -eq 1 ] || { wrong+=("times 'statement $i: ' is in it: $k, wanted 1; its part was not read"); continue; }
+    rest=${err#*"statement $i: "}; part=$rest
+    [ "$i" -eq "$n" ] || part=${rest%%"statement $((i + 1)): "*}
+    [ "$i" -eq "$n" ] || [ "$part" != "$rest" ] || wrong+=("'statement $((i + 1)): ' does not stand behind 'statement $i: ', wanted the statements in rising order")
+    k=0
+    while IFS= read -r each; do
+      [ -n "$each" ] || continue; k=$((k + 1))
+      [ "$(occurs "$each" <<<"$part")" -eq 1 ] || wrong+=("times this clause is in the part of statement $i: $(occurs "$each" <<<"$part"), wanted 1: $each")
+    done <<<"${wanted[i - 1]}"
+    [ "$(occurs ", expected " <<<"$part")" -eq "$k" ] || wrong+=("times ', expected ' is in the part of statement $i: $(occurs ", expected " <<<"$part"), wanted $k, one for each of its clauses")
+  done
+  [ "${#wrong[@]}" -eq 0 ] \
+    && pass "$name: stderr is one line, the script's error line, which names the reference and holds behind 'statement <i>: ', for each of the $n statements in turn, the clauses of what that statement misses and no others" \
+    || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that says neither '3 attempts' nor 'no provenance statement' and holds 'statement <i>: ' once for each of the $n statements, in rising order, each followed up to the next one by that statement's clauses, each once, and by ', expected ' once per clause" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted, the clauses of each statement in any order and with any words around them:" \
+         "$(for ((i = 1; i <= n; i++)); do printf 'statement %s: %s\n' "$i" "$(printf '%s' "${wanted[i - 1]}" | paste -sd '|')"; done)"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq 1 ] && pass "$name: cosign is called once and not asked again" \
+    || fail "$name: the cosign calls the stub logged: one, what cosign printed with exit 0 is judged once" "calls logged: $calls, wanted 1"
+}
+several_statements() {
+  local met feature type="https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1"
+  local eb=", expected \"$RELEASER\"" et=", expected \"$BUILD_TYPE\"" es=", expected \"$SOURCE\"" ew=", expected \"$WORKFLOW\"" er=", expected \"$GIT_REF\""
+  met=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")
+  feature=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "refs/heads/feature")
+  one_of_several "two statements, the first with another ref, the second meets all five" "$feature" "$met"
+  one_of_several "two statements, the first meets all five, the second's predicate is a string" "$met" "$(jq -c '.predicate = "a string"' <<<"$met")"
+  one_of_several "three statements, the one in the middle meets all five" "$(built_by "$RE_ATTESTER")" "$met" "$(statement "$RELEASER" "$type" "$SOURCE" "$WORKFLOW" "$GIT_REF")"
+  none_of_several "two statements that meet the five between them and neither alone" \
+    "$feature" "ref is \"refs/heads/feature\"$er" -- \
+    "$(built_by "$RE_ATTESTER")" "builder identity is \"$RE_ATTESTER\"$eb" --
+  none_of_several "three statements, none meets all five" \
+    "$(statement "$RELEASER" "$type" "$SOURCE" "$WORKFLOW" "refs/heads/feature")" "build type is \"$type\"$et" "ref is \"refs/heads/feature\"$er" -- \
+    "$(jq -c '.predicate.buildDefinition = "a string"' <<<"$met")" "build type is null$et" "source repository is null$es" "workflow path is null$ew" "ref is null$er" -- \
+    "$feature" "ref is \"refs/heads/feature\"$er" --
+}
+several_statements
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
