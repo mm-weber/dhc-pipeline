@@ -495,18 +495,15 @@ left of the program is the follow-up list below, one decision each.
           in which cosign refuses the same layer without its chain);
           cleanup
           candidates recorded as plan item 2.8.2
-    - [ ] 2.5 `scripts/check-provenance.sh verify` (the owner's go
-          2026-11-15; slices 2.5.1 to 2.5.13 and eight added ones
-          built by 2026-11-17, the self-check's suite at 833 passed
-          under jq 1.6 and jq 1.7.1, the real-tool suite at 13;
-          reopened that day at the owner's call on the step's report:
-          - [x] 2.5.14 what cannot serve is told by its cause (a
-                policy file python cannot read, a tool that is
-                missing, a mktemp that fails)
-          - [ ] 2.5.15 a value the script cannot use is refused (an
-                identity without a scheme, an @ in the image's name,
-                a pause that is no whole number)
-          the track's spec amended first, FR-1)
+    - [x] 2.5 `scripts/check-provenance.sh verify` (the owner's go
+          2026-11-15; built by 2026-11-17: slices 2.5.1 to 2.5.13 and
+          eight added ones, then at the owner's call on the step's
+          report, the track's spec amended first (FR-1):
+          - [x] 2.5.14 what cannot serve is told by its cause
+          - [x] 2.5.15 a value the script cannot use is refused
+          the self-check's suite at 903 passed under jq 1.6 and jq
+          1.7.1, the real-tool suite at 13 against cosign 2.6.5; 2.6
+          waits for the owner's go)
     - [ ] 2.6 the release steps in `build.yml`, the three suites in
           `validate.yml`, the way out written into the manual
     - [ ] 2.7 the action's pin read by the Renovate test; a bump merged
