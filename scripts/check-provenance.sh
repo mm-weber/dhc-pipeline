@@ -51,7 +51,9 @@
 # then, and its own words on stderr are kept back, the line being all there is.
 # The identity has to hold an @ with something after it besides: the workflow
 # path ends and the ref begins at its first @, and an identity without one,
-# or with nothing after it, gives no ref. Cut all
+# or with nothing after it, gives no ref. Nor may a slash stand right before
+# that first @: the workflow path is what follows the repository's slash, and
+# with the @ next to a slash there is none. Cut all
 # the same it would give nonsense, and the error line would blame the
 # statement for the policy file's fault. Such a file cannot serve either: one
 # ::error:: line on stderr naming the file and the key and holding the
@@ -201,10 +203,11 @@ IDENTITY=$(python3 -c 'import sys,yaml; v=(yaml.safe_load(open(sys.argv[1])) or 
 # serve here either, and no other role's identity stands in
 [ -n "$IDENTITY" ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives no verification.roles.releaser.identity, which has to be a string that is not empty (Req 2.28)" >&2; exit 2; }
 # the ref is what follows the identity's first @: an identity without one,
-# or with nothing after it, has no ref, and what the cuts below made of it
-# would be held against every statement, which is not at fault. The file
-# cannot serve, as above
-[[ "$IDENTITY" == *@?* ]] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives a verification.roles.releaser.identity that cannot be cut into its parts, '$IDENTITY' holds no @ with a ref after it, the form is <scheme>://<host>/<owner>/<repo>/<workflow path>@<ref> (Req 2.28)" >&2; exit 2; }
+# or with nothing after it, has no ref. The workflow path ends at that @, and
+# begins after a slash: with the slash right before the @ there is no path.
+# What the cuts below made of either would be held against every statement,
+# which is not at fault. The file cannot serve, as above
+[[ "$IDENTITY" == *@?* && "${IDENTITY%%@*}" != */ ]] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives a verification.roles.releaser.identity that cannot be cut into its parts, '$IDENTITY' holds no workflow path before its first @ or no ref after it, the form is <scheme>://<host>/<owner>/<repo>/<workflow path>@<ref> (Req 2.28)" >&2; exit 2; }
 
 # the build workflow's repository, cut from the identity in two steps: what
 # follows scheme, host, owner and repository, and then the identity without
