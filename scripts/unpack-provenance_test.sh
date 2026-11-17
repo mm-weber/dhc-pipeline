@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
-# Tests for scripts/unpack-provenance.sh: GitHub's provenance bundle (written
-# by actions/attest-build-provenance) is stored as one more layer of the
-# attestation manifest cosign keeps beside an image digest, at the tag
-# sha256-<hex>.att (Req 2.27). Nothing is signed here: the layer's blob is the
-# envelope the transparency log recorded, byte for byte. crane is stubbed, a
-# directory stands in for the registry; the bundle and the chain are the real
-# ones of the measuring run of 2026-11-13 (scripts/testdata/provenance).
+# Tests for scripts/unpack-provenance.sh, both its modes. store (cases 1 to
+# 26): GitHub's provenance bundle (written by actions/attest-build-provenance)
+# is stored as one more layer of the attestation manifest cosign keeps beside
+# an image digest, at the tag sha256-<hex>.att (Req 2.27). Nothing is signed
+# here: the layer's blob is the envelope the transparency log recorded, byte
+# for byte. subjects (cases 27 and 28): the digests of an image are written
+# to stdout as the lines the action reads as its subject-checksums file.
+# crane is stubbed, a directory stands in for the registry; the bundle and the
+# chain are the real ones of the measuring run of 2026-11-13
+# (scripts/testdata/provenance).
+# The cases are numbered as they were built. Cases 1 to 24 are the plan's
+# slices 2.4.1 to 2.4.24; from case 25 on a case's number is one above its
+# slice's, because a slice 2.4.24b was added (case 25), and each of those
+# cases names its slice.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 UNPACK="$HERE/unpack-provenance.sh"
@@ -14,13 +21,26 @@ FAILURES=0
 pass() { echo "ok   $1"; }
 fail() { echo "FAIL $1"; shift; [ $# -gt 0 ] && printf '%s\n' "$@" | sed 's/^/    /'; FAILURES=$((FAILURES+1)); }
 
+# Every sandbox lives under this one directory, removed when the suite ends:
+# the trap takes nothing from the suite's exit code. Without the directory
+# the suite ends here: with $TOP empty the sandboxes would be made in /, where
+# root may write, and would stay there, since the trap would have nothing to
+# remove
+TOP=$(mktemp -d) || { echo "FAIL the directory for the suite's sandboxes could not be made: the suite ends here"; exit 1; }
+trap 'rm -rf "$TOP"' EXIT
+
 # the repository and the index digest the fixture's statement names
 REPO="ghcr.io/mm-weber/slsa-spike"
 INDEX="sha256:c47ac86f0e7100538371e5836d2608bbb9abec15c5589d5bbc34bc9cad3619b2"
 att_tag() { printf 'sha256-%s.att' "${1#sha256:}"; } # cosign's attestation tag for a digest
 
 fresh() {
-  SB=$(mktemp -d); mkdir -p "$SB/bin" "$SB/registry" "$SB/pushed"; : > "$SB/crane.log"
+  # the one place where a sandbox is made, under $TOP. Without a sandbox the
+  # suite ends here: with $SB empty the stub, the registry and what is pushed
+  # would be laid down in /bin, /registry and /pushed
+  SB=$(mktemp -d "$TOP/sandbox.XXXXXX") \
+    || { echo "FAIL a sandbox for the case could not be made under '$TOP': the suite ends here"; exit 1; }
+  mkdir -p "$SB/bin" "$SB/registry" "$SB/pushed"; : > "$SB/crane.log"
   # crane as a directory: pull copies the layout laid down for the tag, push
   # keeps the layout it was given, every call is logged. A case that wants
   # pushes to fail writes their number to $SB/push-failures: while it is above
@@ -101,6 +121,9 @@ manifest_of() { # layout: its manifest, found the real way: index.json names the
 }
 
 b64_hex() { base64 -d | od -An -vtx1 | tr -d ' \n'; } # stdin base64, stdout the bytes as lowercase hex
+# the envelope hash the log entry of the fixture's bundle records, the bare
+# hex: what the layer stored for that bundle must be named by
+logged_hash() { jq -r '.verificationMaterial.tlogEntries[0].canonicalizedBody' "$DATA/bundle.jsonl" | base64 -d | jq -r '.spec.envelopeHash.value'; }
 short() { jq -c 'walk(if type == "string" and length > 120 then "\(.[0:32])... (\(length) characters)" else . end)'; } # JSON for a detail line
 
 run() { PATH="$SB/bin:$PATH" UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" "$@" 2>&1; }
@@ -128,7 +151,7 @@ refused() { # digest reason-pattern [what]: the pattern is grep -Ei on the error
 #    sha256 is the envelopeHash the bundle's log entry carries
 fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
 before=$(manifest_of "$SB/registry/$TAG" | jq '.layers | length')
-want=$(jq -r '.verificationMaterial.tlogEntries[0].canonicalizedBody' "$DATA/bundle.jsonl" | base64 -d | jq -r '.spec.envelopeHash.value')
+want=$(logged_hash)
 out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
 pushed="$SB/pushed/$TAG"; manifest=$(manifest_of "$pushed")
 after=$(jq '.layers | length' <<<"$manifest")
@@ -237,7 +260,7 @@ config_of() { # layout: the config its manifest names, the blob as it lies there
   cat "$1/blobs/sha256/${d#sha256:}" 2>/dev/null
 }
 was=$(config_of "$SB/registry/$TAG")
-provenance="sha256:$(jq -r '.verificationMaterial.tlogEntries[0].canonicalizedBody' "$DATA/bundle.jsonl" | base64 -d | jq -r '.spec.envelopeHash.value')"
+provenance="sha256:$(logged_hash)"
 out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
 pushed="$SB/pushed/$TAG"; manifest=$(manifest_of "$pushed"); config=$(config_of "$pushed")
 # the descriptor against the blob it names
@@ -282,7 +305,7 @@ slsa="https://slsa.dev/provenance/v1"
 fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG" "https://spdx.dev/Document" "$slsa" "https://cosign.sigstore.dev/attestation/vuln/v1"
 laid=$(manifest_of "$SB/registry/$TAG")
 stale=$(jq -r '.layers[1].digest' <<<"$laid") # the earlier release's statement, the layer in the middle
-provenance="sha256:$(jq -r '.verificationMaterial.tlogEntries[0].canonicalizedBody' "$DATA/bundle.jsonl" | base64 -d | jq -r '.spec.envelopeHash.value')"
+provenance="sha256:$(logged_hash)"
 out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
 pushed="$SB/pushed/$TAG"; manifest=$(manifest_of "$pushed"); config=$(config_of "$pushed")
 layers_words() { jq -r '.layers | to_entries[] | "layer \(.key + 1): \(.value.annotations.predicateType) \(.value.digest)"' 2>/dev/null; } # a manifest's layers for detail lines
@@ -319,7 +342,7 @@ got=$(jq -c '.history' <<<"$config" 2>/dev/null)
 #    same envelope the last layer of each manifest pushed
 AMD64="sha256:ac78223352dc43ec63a57e63b45de5420722ada4f7db77f1305ab472a86d0d4e"
 fresh; TAG=$(att_tag "$INDEX"); TAG2=$(att_tag "$AMD64"); lay_down "$TAG"; lay_down "$TAG2"
-provenance="sha256:$(jq -r '.verificationMaterial.tlogEntries[0].canonicalizedBody' "$DATA/bundle.jsonl" | base64 -d | jq -r '.spec.envelopeHash.value')"
+provenance="sha256:$(logged_hash)"
 out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX" "$AMD64"); rc=$?
 # the references crane push was given, sorted on both sides: the order of the
 # two pushes is free, their number and their tags are not
@@ -492,13 +515,20 @@ refused "$INDEX" 'attestation manifest.*attestations.*(first|exist)' "no attesta
 #     after them, the chain ("no layer ... chain"): no other error line speaks
 #     of a chain
 fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG" "https://spdx.dev/Document" "https://cosign.sigstore.dev/attestation/vuln/v1"
-layout="$SB/registry/$TAG"
-with_chain=$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' "$layout/index.json") # the manifest as lay_down wrote it
-read -r mhex msize < <(manifest_of "$layout" | jq -c 'del(.layers[].annotations."dev.sigstore.cosign/chain")' | put_blob "$layout")
-rm "$layout/blobs/sha256/$with_chain"
-jq -c --arg manifest "sha256:$mhex" --argjson msize "$msize" \
-  '.manifests[0].digest = $manifest | .manifests[0].size = $msize' "$layout/index.json" > "$SB/index.json"
-mv "$SB/index.json" "$layout/index.json"
+# a layout's manifest rewritten, for this case and for the cases 16 and 26:
+# the manifest as lay_down wrote it is put through jq, the new blob takes the
+# place of the old one and index.json names it by its digest and its byte
+# size; the layers' blobs and the config stay as they were
+rewrite_manifest() { # layout, then jq's arguments: the filter that rewrites the manifest, with the options it needs
+  local layout="$1" was mhex msize; shift
+  was=$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' "$layout/index.json") # the manifest as lay_down wrote it
+  read -r mhex msize < <(manifest_of "$layout" | jq -c "$@" | put_blob "$layout")
+  rm "$layout/blobs/sha256/$was"
+  jq -c --arg manifest "sha256:$mhex" --argjson msize "$msize" \
+    '.manifests[0].digest = $manifest | .manifests[0].size = $msize' "$layout/index.json" > "$SB/index.json"
+  mv "$SB/index.json" "$layout/index.json"
+}
+rewrite_manifest "$SB/registry/$TAG" 'del(.layers[].annotations."dev.sigstore.cosign/chain")'
 out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
 refused "$INDEX" 'no layer.*chain' "no layer of the attestation manifest carries a chain"
 
@@ -508,34 +538,46 @@ refused "$INDEX" 'no layer.*chain' "no layer of the attestation manifest carries
 #     the one that issued that certificate. A chain that did not issue it is
 #     never copied beside it, and the error line says so: it speaks of the
 #     chain and of the certificate it did not issue. The chain here is a
-#     certificate authority of the test's own, made with openssl in the
-#     sandbox at each run (no key or certificate of it is kept in the
-#     repository): a self-signed root and an intermediate it signs, one PEM
-#     text in the order of the fixture's chain.pem, the intermediate first. It
-#     bears the names of the fixture's chain (O=sigstore.dev, CN=sigstore and
-#     CN=sigstore-intermediate) and is a certificate authority in every other
-#     respect: CA certificates that may
-#     sign certificates, the intermediate for code signing, both valid from
-#     the day before the log entry's integrated time (the moment a provenance
-#     certificate, which lives ten minutes, can be checked at) for ten years.
-#     Only its keys tell it from the real chain, so the refusal can only come
-#     from the chain not having issued the certificate, never from a name, a
-#     date or a certificate that is no authority's. openssl ca makes the
-#     certificates: of the commands OpenSSL 3.0 has, it alone takes a start
-#     date. The layout is the one lay_down writes for an SBOM layer and a
-#     vulnerability-report layer, with its manifest rewritten the way case 15
-#     does it: that chain in the annotation of both layers and everything else
-#     as it was. The bundles file is the fixture's bundle as it is and the
+#     certificate authority of the test's own, made by make_authority below
+#     (what it is made of, how and why stands there): it bears the names of
+#     the fixture's chain, is valid at the log entry's integrated time and is
+#     a certificate authority in every other respect. Only its keys tell it
+#     from the real chain, so the refusal can only come from the chain not
+#     having issued the certificate, never from a name, a date or a
+#     certificate that is no authority's. The layout is the one lay_down
+#     writes for an SBOM layer and a vulnerability-report layer, with its
+#     manifest rewritten the way case 15 does it (rewrite_manifest): that
+#     chain in the annotation of both layers and everything else as it was.
+#     The bundles file is the fixture's bundle as it is and the
 #     digest is named there, the manifest is there, is pulled and carries a
 #     chain on every layer. The pattern asks for the chain, the issuing and
 #     the certificate, in either order: case 15's error line speaks of a chain
 #     but of no certificate and nothing issued, and does not match
 fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG" "https://spdx.dev/Document" "https://cosign.sigstore.dev/attestation/vuln/v1"
-layout="$SB/registry/$TAG"; ca="$SB/ca"; mkdir "$ca"
-at=$(jq -r '.verificationMaterial.tlogEntries[0].integratedTime' "$DATA/bundle.jsonl")
-from=$(date -u -d "@$((at - 86400))" +%Y%m%d%H%M%SZ); till=$(date -u -d "@$((at + 315360000))" +%Y%m%d%H%M%SZ)
-: > "$ca/index.txt"; echo 01 > "$ca/serial" # openssl ca's books: the certificates issued, the next serial number
-cat > "$ca/openssl.cnf" <<CNF
+# A certificate authority of the test's own, made with openssl in the sandbox
+# at each run (no key or certificate of it is kept in the repository): a
+# self-signed root and an intermediate it signs, one PEM text in the order of
+# the fixture's chain.pem, the intermediate first ($ca/chain.pem). It bears
+# the names of the fixture's chain (O=sigstore.dev, CN=sigstore and
+# CN=sigstore-intermediate) and is a certificate authority in every other
+# respect: CA certificates that may sign certificates, the intermediate for
+# code signing, both valid from the day before the log entry's integrated
+# time (the moment a provenance certificate, which lives ten minutes, can be
+# checked at) for ten years. openssl ca makes the certificates: of the
+# commands OpenSSL 3.0 has, it alone takes a start date. This case and case
+# 26 use it, each in the sandbox made before the call. It sets ca (the
+# authority's directory, $SB/ca), at (the integrated time), and sound and
+# said: whether the authority holds on its own at the integrated time, its
+# intermediate verified against its root (yes or no), and what openssl verify
+# said of it. Each of the two cases asks for sound in its own way: with an
+# authority that does not hold, the refusal would prove nothing
+make_authority() {
+  local from till
+  ca="$SB/ca"; mkdir "$ca"
+  at=$(jq -r '.verificationMaterial.tlogEntries[0].integratedTime' "$DATA/bundle.jsonl")
+  from=$(date -u -d "@$((at - 86400))" +%Y%m%d%H%M%SZ); till=$(date -u -d "@$((at + 315360000))" +%Y%m%d%H%M%SZ)
+  : > "$ca/index.txt"; echo 01 > "$ca/serial" # openssl ca's books: the certificates issued, the next serial number
+  cat > "$ca/openssl.cnf" <<CNF
 [req]
 distinguished_name = dn
 [dn]
@@ -561,27 +603,28 @@ extendedKeyUsage = codeSigning
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid
 CNF
-# a key and a request each, then the root signs itself and the intermediate;
-# what openssl says while it works goes to a log, never to the suite's output
-openssl req -config "$ca/openssl.cnf" -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc \
-  -keyout "$ca/root.key" -subj "/O=sigstore.dev/CN=sigstore" -out "$ca/root.csr" >> "$ca/log" 2>&1
-openssl req -config "$ca/openssl.cnf" -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc \
-  -keyout "$ca/intermediate.key" -subj "/O=sigstore.dev/CN=sigstore-intermediate" -out "$ca/intermediate.csr" >> "$ca/log" 2>&1
-openssl ca -config "$ca/openssl.cnf" -batch -notext -selfsign -keyfile "$ca/root.key" -extensions root \
-  -startdate "$from" -enddate "$till" -in "$ca/root.csr" -out "$ca/root.pem" >> "$ca/log" 2>&1
-openssl ca -config "$ca/openssl.cnf" -batch -notext -cert "$ca/root.pem" -keyfile "$ca/root.key" -extensions intermediate \
-  -startdate "$from" -enddate "$till" -in "$ca/intermediate.csr" -out "$ca/intermediate.pem" >> "$ca/log" 2>&1
-cat "$ca/intermediate.pem" "$ca/root.pem" > "$ca/chain.pem" 2>> "$ca/log"
+  # a key and a request each, then the root signs itself and the
+  # intermediate; what openssl says while it works goes to a log, never to
+  # the suite's output
+  openssl req -config "$ca/openssl.cnf" -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc \
+    -keyout "$ca/root.key" -subj "/O=sigstore.dev/CN=sigstore" -out "$ca/root.csr" >> "$ca/log" 2>&1
+  openssl req -config "$ca/openssl.cnf" -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc \
+    -keyout "$ca/intermediate.key" -subj "/O=sigstore.dev/CN=sigstore-intermediate" -out "$ca/intermediate.csr" >> "$ca/log" 2>&1
+  openssl ca -config "$ca/openssl.cnf" -batch -notext -selfsign -keyfile "$ca/root.key" -extensions root \
+    -startdate "$from" -enddate "$till" -in "$ca/root.csr" -out "$ca/root.pem" >> "$ca/log" 2>&1
+  openssl ca -config "$ca/openssl.cnf" -batch -notext -cert "$ca/root.pem" -keyfile "$ca/root.key" -extensions intermediate \
+    -startdate "$from" -enddate "$till" -in "$ca/intermediate.csr" -out "$ca/intermediate.pem" >> "$ca/log" 2>&1
+  cat "$ca/intermediate.pem" "$ca/root.pem" > "$ca/chain.pem" 2>> "$ca/log"
+  # the authority against itself at the integrated time: noted here, asked by
+  # the case
+  sound=yes; said=$(openssl verify -attime "$at" -no-CApath -no-CAstore -CAfile "$ca/root.pem" "$ca/intermediate.pem" 2>&1) || sound=no
+}
+make_authority
 # the authority holds on its own at the integrated time, or the refusal below
 # would prove nothing; no result line when it does
-sound=$(openssl verify -attime "$at" -no-CApath -no-CAstore -CAfile "$ca/root.pem" "$ca/intermediate.pem" 2>&1) \
-  || fail "the certificate authority made for case 16: its intermediate verifies against its root at the integrated time" "openssl verify at $at: $sound" "wanted: OK" "openssl while making it:" "$(cat "$ca/log")"
-with_fixture=$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' "$layout/index.json") # the manifest as lay_down wrote it, the fixture's chain on its layers
-read -r mhex msize < <(manifest_of "$layout" | jq -c --rawfile chain "$ca/chain.pem" '.layers[].annotations."dev.sigstore.cosign/chain" = $chain' | put_blob "$layout")
-rm "$layout/blobs/sha256/$with_fixture"
-jq -c --arg manifest "sha256:$mhex" --argjson msize "$msize" \
-  '.manifests[0].digest = $manifest | .manifests[0].size = $msize' "$layout/index.json" > "$SB/index.json"
-mv "$SB/index.json" "$layout/index.json"
+[ "$sound" = yes ] \
+  || fail "the certificate authority made for case 16: its intermediate verifies against its root at the integrated time" "openssl verify at $at: $said" "wanted: OK" "openssl while making it:" "$(cat "$ca/log")"
+rewrite_manifest "$SB/registry/$TAG" --rawfile chain "$ca/chain.pem" '.layers[].annotations."dev.sigstore.cosign/chain" = $chain'
 out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
 refused "$INDEX" 'chain.*issu.*certificate|certificate.*issu.*chain' "the chain did not issue the provenance certificate"
 
@@ -635,22 +678,25 @@ tried='\b(3|three) (attempts|times|tries)\b'
 
 # 19: wrong usage is refused: a call that is wrong ends with exit 2 and the
 #     usage line, the family's code for it (exit 1 is a refusal of content, the
-#     cases 8 to 17), before crane is asked for anything. The five wrong calls:
-#     no argument at all; a mode that is not store (frob in its place, the
-#     other arguments right); store with the bundles file and the repository
-#     but no digest; a digest without sha256: (the index digest's 64 hex digits
-#     alone); a bundles file that is not there (a path in the sandbox nothing
-#     was written to). Each runs in a sandbox of its own with the attestation
-#     manifest laid down at the index digest's .att tag, so that only the call
-#     is wrong: whatever is right in it could be stored. Wanted of each: exit
-#     2; a line of the output begun "usage: unpack-provenance.sh" (its
-#     beginning only, the modes and their arguments follow it; a line begun
-#     with it, so bash's own complaint about an unset parameter, which carries
-#     the text after the script's path and a line number, is not one); no crane
-#     call in the stub's log, neither a pull nor a push. This is no refusal of
-#     content and refused cannot be used here: the exit code is another and
-#     there is no ::error:: line with a digest to ask for. One result line for
-#     the five; on a failure its detail names each call with what was found
+#     cases 8 to 17), before crane is asked for anything. The script has two
+#     modes, store and subjects; the five wrong calls here are those of a call
+#     with no mode and of store (the wrong calls of subjects are case 28's):
+#     no argument at all; a mode that is neither store nor subjects (frob in
+#     the place of store, the other arguments right); store with the bundles
+#     file and the repository but no digest; a digest without sha256: (the
+#     index digest's 64 hex digits alone); a bundles file that is not there (a
+#     path in the sandbox nothing was written to). Each runs in a sandbox of
+#     its own with the attestation manifest laid down at the index digest's
+#     .att tag, so that only the call is wrong: whatever is right in it could
+#     be stored. Wanted of each: exit 2; a line of the output begun "usage:
+#     unpack-provenance.sh" (its beginning only, the modes and their arguments
+#     follow it; a line begun with it, so bash's own complaint about an unset
+#     parameter, which carries the text after the script's path and a line
+#     number, is not one); no crane call in the stub's log, neither a pull nor
+#     a push. This is no refusal of content and refused cannot be used here:
+#     the exit code is another and there is no ::error:: line with a digest to
+#     ask for. One result line for the five; on a failure its detail names
+#     each call with what was found
 seen=(); unrefused=0
 misused() { # what, then the call's arguments: runs it in the sandbox made before it and notes whether it was refused as wrong usage
   local what="$1" usage="not found" crane; shift
@@ -918,12 +964,16 @@ typed=$(jq --arg type "$slsa" '[.layers[] | select(.annotations.predicateType ==
 # carries the digest, speaks of the push and names its attempt
 first='\b(attempt|try) 1\b|\b(1|1st|first) (attempt|try)\b'
 second='\b(attempt|try) 2\b|\b(2|2nd|second) (attempt|try)\b'
-named=0
-for nth in 1 2; do
-  line=$(sed -n "${nth}p" <<<"$warnings"); which="$first"; [ "$nth" -eq 2 ] && which="$second"
-  [[ "$line" == "::warning::unpack-provenance:"* ]] && [[ "$line" == *"$INDEX"* ]] \
-    && grep -iq -- 'push' <<<"$line" && grep -Eiq -- "$which" <<<"$line" && named=$((named + 1))
-done
+named_attempts() { # push or pull, the call the lines must speak of: prints how many of the first two lines of $warnings are counted, each in its place
+  local call="$1" nth line which named=0
+  for nth in 1 2; do
+    line=$(sed -n "${nth}p" <<<"$warnings"); which="$first"; [ "$nth" -eq 2 ] && which="$second"
+    [[ "$line" == "::warning::unpack-provenance:"* ]] && [[ "$line" == *"$INDEX"* ]] \
+      && grep -iq -- "$call" <<<"$line" && grep -Eiq -- "$which" <<<"$line" && named=$((named + 1))
+  done
+  echo "$named"
+}
+named=$(named_attempts push)
 [ "$rc" -eq 0 ] && [ "$pulls" -eq 1 ] && [ "$pushes" -eq 3 ] && [ "$count" -eq 2 ] && [ "$named" -eq 2 ] && [ -z "$errors" ] \
   && [ "$after" = "$((before + 1))" ] && [ "$typed" = 1 ] \
   && pass "a push that fails twice and then goes through: exit 0, one crane pull and three crane pushes, two ::warning::unpack-provenance: lines with the digest and the push, the first naming the first attempt and the second the second, no ::error:: line, the manifest pushed has one layer more and one provenance layer" \
@@ -970,14 +1020,10 @@ pulls=$(grep -c '^crane pull' "$SB/crane.log"); pushes=$(grep -c '^crane push' "
 pushed="$SB/pushed/$TAG"; manifest=""; [ -f "$pushed/index.json" ] && manifest=$(manifest_of "$pushed")
 after=$(jq '.layers | length' <<<"$manifest" 2>/dev/null)
 typed=$(jq --arg type "$slsa" '[.layers[] | select(.annotations.predicateType == $type)] | length' <<<"$manifest" 2>/dev/null)
-# the warning lines in their order, as in case 24: each is counted when it is
-# the unpack's own, carries the digest, speaks of the pull and names its attempt
-named=0
-for nth in 1 2; do
-  line=$(sed -n "${nth}p" <<<"$warnings"); which="$first"; [ "$nth" -eq 2 ] && which="$second"
-  [[ "$line" == "::warning::unpack-provenance:"* ]] && [[ "$line" == *"$INDEX"* ]] \
-    && grep -iq -- 'pull' <<<"$line" && grep -Eiq -- "$which" <<<"$line" && named=$((named + 1))
-done
+# the warning lines in their order, as in case 24 and by its named_attempts:
+# each is counted when it is the unpack's own, carries the digest, speaks of
+# the pull and names its attempt
+named=$(named_attempts pull)
 [ "$rc" -eq 0 ] && [ "$pulls" -eq 3 ] && [ "$pushes" -eq 1 ] && [ "$count" -eq 2 ] && [ "$named" -eq 2 ] && [ -z "$errors" ] \
   && [ "$after" = "$((before + 1))" ] && [ "$typed" = 1 ] \
   && pass "a pull that fails twice and then goes through: exit 0, three crane pulls and one crane push, two ::warning::unpack-provenance: lines with the digest and the pull, the first naming the first attempt and the second the second, no ::error:: line, the manifest pushed has one layer more and one provenance layer" \
@@ -997,10 +1043,11 @@ done
 #     nothing is said of an attempt. The refusal here is case 16's, a refusal
 #     of content that falls after the pull, where a loop of attempts laid
 #     around too much would reach it: the chain of the manifest pulled did not
-#     issue the provenance certificate. The setup is case 16's, its lines
-#     repeated: a certificate authority of the test's own, made with openssl
-#     in the sandbox, a root and an intermediate that bear the names of the
-#     fixture's chain and are valid at the log entry's integrated time; the
+#     issue the provenance certificate. The setup is case 16's, made by the
+#     same two helpers (make_authority, rewrite_manifest): a certificate
+#     authority of the test's own, made with openssl in the sandbox, a root
+#     and an intermediate that bear the names of the fixture's chain and are
+#     valid at the log entry's integrated time; the
 #     layout lay_down writes for an SBOM layer and a vulnerability-report
 #     layer, with that chain in the annotation of both layers and everything
 #     else as it was. The bundles file is the fixture's bundle as it is and
@@ -1016,64 +1063,21 @@ done
 #     as in case 16, or the refusal would prove nothing: here that is part of
 #     the one result line. One result line; on a failure its detail shows the
 #     exit code, the crane calls, the warning lines found, the error lines
-#     found and the output
+#     found and the output, and the line about the authority only where the
+#     authority does not hold
 fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG" "https://spdx.dev/Document" "https://cosign.sigstore.dev/attestation/vuln/v1"
-layout="$SB/registry/$TAG"; ca="$SB/ca"; mkdir "$ca"
-at=$(jq -r '.verificationMaterial.tlogEntries[0].integratedTime' "$DATA/bundle.jsonl")
-from=$(date -u -d "@$((at - 86400))" +%Y%m%d%H%M%SZ); till=$(date -u -d "@$((at + 315360000))" +%Y%m%d%H%M%SZ)
-: > "$ca/index.txt"; echo 01 > "$ca/serial" # openssl ca's books: the certificates issued, the next serial number
-cat > "$ca/openssl.cnf" <<CNF
-[req]
-distinguished_name = dn
-[dn]
-[ca]
-default_ca = made
-[made]
-database = $ca/index.txt
-serial = $ca/serial
-new_certs_dir = $ca
-default_md = sha256
-policy = names
-[names]
-organizationName = supplied
-commonName = supplied
-[root]
-basicConstraints = critical,CA:TRUE
-keyUsage = critical,keyCertSign,cRLSign
-subjectKeyIdentifier = hash
-[intermediate]
-basicConstraints = critical,CA:TRUE,pathlen:0
-keyUsage = critical,keyCertSign,cRLSign
-extendedKeyUsage = codeSigning
-subjectKeyIdentifier = hash
-authorityKeyIdentifier = keyid
-CNF
-# a key and a request each, then the root signs itself and the intermediate;
-# what openssl says while it works goes to a log, never to the suite's output
-openssl req -config "$ca/openssl.cnf" -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc \
-  -keyout "$ca/root.key" -subj "/O=sigstore.dev/CN=sigstore" -out "$ca/root.csr" >> "$ca/log" 2>&1
-openssl req -config "$ca/openssl.cnf" -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc \
-  -keyout "$ca/intermediate.key" -subj "/O=sigstore.dev/CN=sigstore-intermediate" -out "$ca/intermediate.csr" >> "$ca/log" 2>&1
-openssl ca -config "$ca/openssl.cnf" -batch -notext -selfsign -keyfile "$ca/root.key" -extensions root \
-  -startdate "$from" -enddate "$till" -in "$ca/root.csr" -out "$ca/root.pem" >> "$ca/log" 2>&1
-openssl ca -config "$ca/openssl.cnf" -batch -notext -cert "$ca/root.pem" -keyfile "$ca/root.key" -extensions intermediate \
-  -startdate "$from" -enddate "$till" -in "$ca/intermediate.csr" -out "$ca/intermediate.pem" >> "$ca/log" 2>&1
-cat "$ca/intermediate.pem" "$ca/root.pem" > "$ca/chain.pem" 2>> "$ca/log"
-# the authority against itself at the integrated time: noted here, asked with
-# the result line below
-sound=yes; said=$(openssl verify -attime "$at" -no-CApath -no-CAstore -CAfile "$ca/root.pem" "$ca/intermediate.pem" 2>&1) || sound=no
-with_fixture=$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' "$layout/index.json") # the manifest as lay_down wrote it, the fixture's chain on its layers
-read -r mhex msize < <(manifest_of "$layout" | jq -c --rawfile chain "$ca/chain.pem" '.layers[].annotations."dev.sigstore.cosign/chain" = $chain' | put_blob "$layout")
-rm "$layout/blobs/sha256/$with_fixture"
-jq -c --arg manifest "sha256:$mhex" --argjson msize "$msize" \
-  '.manifests[0].digest = $manifest | .manifests[0].size = $msize' "$layout/index.json" > "$SB/index.json"
-mv "$SB/index.json" "$layout/index.json"
+make_authority # whether the authority holds on its own (sound) is asked with the result line below
+rewrite_manifest "$SB/registry/$TAG" --rawfile chain "$ca/chain.pem" '.layers[].annotations."dev.sigstore.cosign/chain" = $chain'
 out=$(run store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
 warnings=$(grep '^::warning::' <<<"$out"); warned=$(grep -c '^::warning::' <<<"$out")
 errors=$(grep '^::error::' <<<"$out"); count=$(grep -c '^::error::' <<<"$out")
 pulls=$(grep -c '^crane pull' "$SB/crane.log"); pushes=$(grep -c '^crane push' "$SB/crane.log")
 kept=$(ls -A "$SB/pushed")
 issued='chain.*issu.*certificate|certificate.*issu.*chain' # case 16's pattern
+# the detail's line about the authority: there only when it does not hold
+unsound=()
+[ "$sound" = yes ] \
+  || unsound=("the certificate authority made for this case, its intermediate against its root at the integrated time $at: $sound, wanted yes${said:+ (openssl verify: $said)}")
 [ "$sound" = yes ] && [ "$rc" -eq 1 ] && [ "$pulls" -eq 1 ] && [ "$pushes" -eq 0 ] \
   && [ "$count" -eq 1 ] && [[ "$errors" == "::error::unpack-provenance:"* ]] && [[ "$errors" == *"$INDEX"* ]] \
   && grep -Eiq -- "$issued" <<<"$errors" && [ "$warned" -eq 0 ] && [ -z "$kept" ] \
@@ -1082,8 +1086,7 @@ issued='chain.*issu.*certificate|certificate.*issu.*chain' # case 16's pattern
        "crane pull calls logged: $pulls, wanted 1; crane push calls logged: $pushes, wanted 0:" "$([ -s "$SB/crane.log" ] && cat "$SB/crane.log" || echo "crane never called")" \
        "::warning:: lines in the output: $warned, wanted none:" "${warnings:-none}" \
        "::error:: lines in the output: $count, wanted one, begun '::error::unpack-provenance:', carrying '$INDEX' and matching '$issued' (any case):" "${errors:-none}" \
-       "under pushed, wanted nothing: ${kept:-nothing}" \
-       "the certificate authority made for this case, its intermediate against its root at the integrated time $at: $sound, wanted yes${said:+ (openssl verify: $said)}" \
+       "under pushed, wanted nothing: ${kept:-nothing}" "${unsound[@]}" \
        "output:" "${out:-none}"
 
 # 27: subjects writes one line per digest in the shape the action reads (plan
@@ -1106,14 +1109,16 @@ issued='chain.*issu.*certificate|certificate.*issu.*chain' # case 16's pattern
 #     file the action reads and must hold the lines and nothing else: the
 #     script is called with run's environment (the stub first on PATH, the
 #     delay 0), stdout taken as the output and stderr written to a file in the
-#     sandbox. Wanted: exit 0; stdout is exactly the two lines, compared as a
-#     whole; nothing on stderr; no crane call in the stub's log, neither a
-#     pull nor a push. One result line; on a failure its detail shows the exit
-#     code, stdout as found and as wanted (both through cat -A, so a tab, a
-#     trailing space or a carriage return shows), stderr and the crane calls
+#     sandbox (run_apart). Wanted: exit 0; stdout is exactly the two lines,
+#     compared as a whole; nothing on stderr; no crane call in the stub's
+#     log, neither a pull nor a push. One result line; on a failure its detail
+#     shows the exit code, stdout as found and as wanted (both through cat -A,
+#     so a tab, a trailing space or a carriage return shows), stderr and the
+#     crane calls
+run_apart() { PATH="$SB/bin:$PATH" UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" "$@" 2> "$SB/stderr"; } # run's environment, stdout the output, stderr to a file in the sandbox
 fresh
 want=$(printf '%s %s\n' "${INDEX#sha256:}" "$REPO" "${AMD64#sha256:}" "$REPO")
-out=$(PATH="$SB/bin:$PATH" UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" subjects "$REPO" "$INDEX" "$AMD64" 2> "$SB/stderr"); rc=$?
+out=$(run_apart subjects "$REPO" "$INDEX" "$AMD64"); rc=$?
 err=$(cat "$SB/stderr"); crane=$(cat "$SB/crane.log" 2>/dev/null)
 [ "$want" != "$(LC_ALL=C sort <<<"$want")" ] && [ "$rc" -eq 0 ] && [ "$out" = "$want" ] && [ -z "$err" ] && [ -z "$crane" ] \
   && pass "subjects with the index digest and the amd64 manifest's: exit 0, stdout is one line per digest in the order given, the bare hex, one space, the repository, nothing on stderr, crane never called" \
@@ -1154,16 +1159,16 @@ err=$(cat "$SB/stderr"); crane=$(cat "$SB/crane.log" 2>/dev/null)
 #     that asks for hex digits of any length would let it through).
 #     Wanted of each of the five wrong calls: exit 2; stdout empty; on stderr
 #     one line begun "usage: unpack-provenance.sh" (case 19's line). Each call
-#     is made in case 27's way: run's environment, stdout taken as the output,
-#     stderr written to a file in the sandbox. Nothing is laid down and no
-#     call may reach crane: the stub's log is read once, after the six. One
-#     result line for the six; on a failure its detail names each call with
-#     its exit code, its stdout as found and as wanted (through cat -A), its
-#     stderr, and whether it was as wanted
+#     is made in case 27's way, by its run_apart: run's environment, stdout
+#     taken as the output, stderr written to a file in the sandbox. Nothing
+#     is laid down and no call may reach crane: the stub's log is read once,
+#     after the six. One result line for the six; on a failure its detail
+#     names each call with its exit code, its stdout as found and as wanted
+#     (through cat -A), its stderr, and whether it was as wanted
 calls=(); amiss=0
 subjects_call() { # what, the exit code wanted, the stdout wanted, then subjects' arguments: runs the call in the case's sandbox and notes what was found and whether it is as wanted
   local what="$1" code="$2" lines="$3" err usage verdict="as wanted"; shift 3
-  out=$(PATH="$SB/bin:$PATH" UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" subjects "$@" 2> "$SB/stderr"); rc=$?
+  out=$(run_apart subjects "$@"); rc=$?
   err=$(cat "$SB/stderr"); usage=$(grep -c '^usage: unpack-provenance\.sh' <<<"$err")
   [ "$rc" -eq "$code" ] && [ "$out" = "$lines" ] || verdict="NOT as wanted"
   # stderr: nothing from a call that is right, the usage from a wrong one, its first line once

@@ -55,6 +55,15 @@ SOURCE="https://github.com/acme/widgets"
 WORKFLOW=".github/workflows/release.yml"
 GIT_REF="refs/heads/trunk"
 
+# The policy file's text, with $1 for the issuer's line and $2 for the line
+# of the releaser's identity (either can be several lines, or empty: the key
+# is absent). fresh writes it with both lines as they belong; cases 10 and
+# 14 write it with a fault in one of them
+policy_with() {
+  printf 'verification:\n%s  roles:\n    re-attester:\n      identity: %s\n      attests: [spdxjson, cyclonedx, vuln, openvex]\n    releaser:\n%s      attests: [spdxjson, cyclonedx, vuln, openvex]\n' \
+    "${1:+$1$'\n'}" "$RE_ATTESTER" "${2:+$2$'\n'}"
+}
+
 fresh() {
   # $SB/tmp is the sandbox's own directory for the script's temporary files,
   # $SB/cwd the working directory the script is started in, and
@@ -68,17 +77,7 @@ fresh() {
   SB=$(mktemp -d "$TOP/sandbox.XXXXXX") && SB=$(cd "$SB" && pwd) \
     || { echo "FAIL a sandbox for the case could not be made under '$TOP': the suite ends here"; exit 1; }
   mkdir -p "$SB/root" "$SB/bin" "$SB/tmp" "$SB/cwd"; : > "$SB/cosign.log"; : > "$SB/cosign.wrote-to"
-  cat > "$SB/root/catalogue-policy.yaml" <<EOF
-verification:
-  issuer: $ISSUER
-  roles:
-    re-attester:
-      identity: $RE_ATTESTER
-      attests: [spdxjson, cyclonedx, vuln, openvex]
-    releaser:
-      identity: $RELEASER
-      attests: [spdxjson, cyclonedx, vuln, openvex]
-EOF
+  policy_with "  issuer: $ISSUER" "      identity: $RELEASER" > "$SB/root/catalogue-policy.yaml"
   # what cosign 2.6.5 writes on stderr when it accepts, begun with an empty
   # line: the reference, the signing certificate's subject and issuer, then
   # the certificate's GitHub fields
@@ -164,6 +163,11 @@ statement() {
           metadata: {invocationId: "\($repository)/actions/runs/1/attempts/1"}}}}'
 }
 
+# The statement that meets all five: each value as the releaser identity
+# gives it. The values are read when it is called, so under a second identity
+# (case 7b) it is the statement that meets that identity's five
+all_five() { statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF"; }
+
 # Statements the way cosign prints the attestations it verified: one compact
 # envelope per line, the statement base64 in .payload, no line break inside
 # the base64.
@@ -184,9 +188,9 @@ envelopes() {
 # Left out are the files at the sandbox's top that a run is expected to
 # write: the run's own stdout and stderr, the stub's log of its calls and
 # its note of where they wrote, the number of calls to refuse, which the
-# stub counts down, and the log that case 4b's stand-in for jq keeps of its
-# calls. This list is the one place that says which they are: a later slice
-# whose stand-in keeps a file of its own adds the name here.
+# stub counts down, and the logs that the stand-ins for jq (case 4b) and for
+# sleep (case 11) keep of their calls. This list is the one place that says
+# which they are: a stand-in that keeps a file of its own has its name here.
 WRITTEN=(stdout stderr cosign.log cosign.wrote-to refusals jq.log sleep.log)
 holds() {
   local name; local -a spared=()
@@ -269,9 +273,9 @@ run() {
   rm -f "$SB/stdout" "$SB/stderr"
   was=$(holds)
   # the pause between attempts is $PAUSE seconds where a case sets it, 0
-  # otherwise; with the word unset the script is started without the variable,
-  # with the word empty with the variable set to the empty string;
-  # with the tool a case names in $HIDE on none of the directories after the
+  # otherwise; with the word unset the script is started without the
+  # variable, with the word empty with the variable set to the empty string.
+  # The tool a case names in $HIDE is on none of the directories after the
   # stub's (see path_without, at case 14); with none named, the suite's PATH
   [ -z "${HIDE:-}" ] || dirs=$(path_without "$HIDE")
   ( cd "$SB/cwd" && export CHECK_PROVENANCE_RETRY_DELAY="${PAUSE:-0}" && { [ "${PAUSE:-}" != unset ] || unset CHECK_PROVENANCE_RETRY_DELAY; } && { [ "${PAUSE:-}" != empty ] || CHECK_PROVENANCE_RETRY_DELAY=""; } && PATH="$SB/bin:$dirs" TMPDIR="$SB/tmp" "$CHECK" "$@" > "$SB/stdout" 2> "$SB/stderr" ); rc=$?
@@ -366,6 +370,45 @@ asked() {
   done | LC_ALL=C sort
 }
 
+# What many cases ask of a run in the same words, each a result line of its
+# own; $1 names the input in the line.
+# The exit code is $2; $3, where it is given, is why that code is wanted,
+# for the FAIL line's detail
+exit_is() {
+  [ "$rc" -eq "$2" ] && pass "$1: exit $2" \
+    || fail "$1: the exit code" "exit=$rc, wanted $2${3:+: $3}" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+}
+# nothing on stdout: no line there says the digest passed
+no_stdout() {
+  [ ! -s "$SB/stdout" ] && pass "$1: nothing on stdout" \
+    || fail "$1: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+}
+# the cosign calls the stub logged are $2; $3 is how the ok line says it,
+# $4 how the FAIL line does
+cosign_calls() {
+  local calls; calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq "$2" ] && pass "$1: $3" \
+    || fail "$1: the cosign calls the stub logged: $4" "calls logged: $calls, wanted $2"
+}
+# one call and no second: what cosign printed with exit 0 is its answer
+judged_once() { cosign_calls "$1" 1 "cosign is called once and not asked again" "one, what cosign printed with exit 0 is judged once"; }
+# no call at all; $2 is why none is wanted, and the FAIL line shows the calls
+never_asked() {
+  local calls; calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq 0 ] && pass "$1: cosign is never called" \
+    || fail "$1: the cosign calls the stub logged: none, $2" "calls logged: $calls, wanted 0:" "$(cat "$SB/cosign.log")"
+}
+# For the helpers that gather in their list wrong what stderr's one line
+# lacks and say it in one result line, each adds its line to that list.
+# The frame of the error line of a check that failed: the reference after
+# the script's name, the requirement at the end
+in_frame() { [[ "$err" == "::error::check-provenance: $REF: "*" (Req 2.28)" ]] || wrong+=("it is not begun '::error::check-provenance: ' and the reference and ended ' (Req 2.28)'"); }
+# the line of a statement that misses an expectation is neither the line of
+# three failed attempts nor that of no statement
+no_other_failure() { [[ "$err" != *"3 attempts"* && "$err" != *"no provenance statement"* ]] || wrong+=("it says '3 attempts' or 'no provenance statement', wanted neither"); }
+# the beginning of the error line of a refusal, which names no reference
+begun_error() { [[ "$err" == "::error::check-provenance: "* ]] || wrong+=("it is not begun '::error::check-provenance: '"); }
+
 # 1: a digest whose provenance meets all five passes (plan slice 2.5.1, the
 #    tracer). cosign answers one envelope whose statement carries the five
 #    values the releaser identity gives: the identity itself as the builder,
@@ -392,11 +435,9 @@ asked() {
 #    releaser's both times. The second time holds what the roles' order and
 #    names can change: the exit code, and the one call with the same arguments
 fresh
-envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+envelopes "$(all_five)" > "$SB/envelopes.jsonl"
 run verify "$SB/root" "$REF"
-[ "$rc" -eq 0 ] \
-  && pass "a digest whose provenance meets all five expectations: exit 0" \
-  || fail "a digest whose provenance meets all five expectations: the exit code" "exit=$rc, wanted 0" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+exit_is "a digest whose provenance meets all five expectations" 0
 lines=$(grep -c '' "$SB/stdout"); ended=$(wc -l < "$SB/stdout")
 [ "$lines" -eq 1 ] && [ "$ended" -eq 1 ] && [[ "$out" == "check-provenance: "* ]] && [[ "$out" == *"$REF"* ]] \
   && pass "stdout is one line, begun 'check-provenance: ' and naming the reference in full" \
@@ -431,11 +472,9 @@ verification:
       identity: $RE_ATTESTER
       attests: [spdxjson, cyclonedx, vuln, openvex]
 EOF
-envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+envelopes "$(all_five)" > "$SB/envelopes.jsonl"
 run verify "$SB/root" "$REF"
-[ "$rc" -eq 0 ] \
-  && pass "the releaser listed first and the other role named scanner: exit 0" \
-  || fail "the releaser listed first and the other role named scanner: the exit code" "exit=$rc, wanted 0" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+exit_is "the releaser listed first and the other role named scanner" 0
 calls=$(grep -c '' "$SB/cosign.log")
 [ "$calls" -eq 1 ] \
   && pass "the releaser listed first and the other role named scanner: cosign is called once" \
@@ -462,7 +501,7 @@ got=$(head -n 1 "$SB/cosign.log" | asked)
 #    third attempt, the last; every line on stderr the script's own, begun
 #    "::error::check-provenance: " or "::warning::check-provenance: " and
 #    ended by its newline, cosign's lines not passed on (the warning after a
-#    failed attempt that another follows comes with slice 2.5.11: here it is
+#    failed attempt that another follows is case 11's to hold: here it is
 #    neither wanted nor refused); cosign called three times and no more, each
 #    time with the whole argument set case 1 holds, so that no attempt asks a
 #    weaker question than the first.
@@ -498,7 +537,7 @@ error_line() {
 # another was asked for. Each of the five calls names another workflow file
 # in it: the error line must carry the third call's and none of the other four
 fresh
-envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl" # what a sixth call is answered
+envelopes "$(all_five)" > "$SB/envelopes.jsonl" # what a sixth call is answered
 echo 5 > "$SB/refusals"
 lead="no matching attestations: offline verification failed"
 mismatch="none of the expected identities matched what was in the certificate"
@@ -511,12 +550,8 @@ for file in first second third fourth fifth; do
 done
 run verify "$SB/root" "$REF"
 what="cosign refusing on every attempt"
-[ "$rc" -eq 1 ] \
-  && pass "$what: exit 1" \
-  || fail "$what: the exit code" "exit=$rc, wanted 1" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
-[ ! -s "$SB/stdout" ] \
-  && pass "$what: nothing on stdout" \
-  || fail "$what: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+exit_is "$what" 1
+no_stdout "$what"
 error_line
 [ "$shaped" = yes ] \
   && pass "$what: one error line on stderr, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that says '3 attempts'" \
@@ -563,15 +598,13 @@ for nth in 1 2 3; do [ "$(sed -n "${nth}p" "$SB/cosign.log" | asked)" = "$want" 
 # are told that the registry does not answer, in cosign's words for a
 # registry asked by its name, each time under another address
 fresh
-envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+envelopes "$(all_five)" > "$SB/envelopes.jsonl"
 echo 5 > "$SB/refusals"
 for nth in 1 2 4 5; do unanswered "$nth" > "$SB/refusal.$nth"; done
 printf '%s\n' "no matching attestations: " > "$SB/refusal.3"
 run verify "$SB/root" "$REF"
 what="cosign refusing, its message one line that ends in a blank"
-[ "$rc" -eq 1 ] \
-  && pass "$what: exit 1" \
-  || fail "$what: the exit code" "exit=$rc, wanted 1" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+exit_is "$what" 1
 error_line
 said=$(occurs "no matching attestations:" <<<"$errors")
 [[ "$errors" == *"connection refused"* ]] && unreachable=yes || unreachable=no
@@ -584,10 +617,7 @@ said=$(occurs "no matching attestations:" <<<"$errors")
        "one of the prefixes 'Error: ' and 'error during command execution' in it: $framed, wanted no" \
        "two blanks in a row in it, as the message's own blank before ' (Req 2.28)' would make them: $doubled, wanted no" \
        "stderr:" "${err:-nothing}"
-calls=$(grep -c '' "$SB/cosign.log")
-[ "$calls" -eq 3 ] \
-  && pass "$what: cosign is called three times and no more" \
-  || fail "$what: the cosign calls the stub logged: three" "calls logged: $calls, wanted 3"
+cosign_calls "$what" 3 "cosign is called three times and no more" three
 # a message of four lines on the third call, a reason for each of four
 # attestations, the same reason in its first three, its second and third line
 # alike. The first call is told that nothing is stored beside the digest, the
@@ -595,7 +625,7 @@ calls=$(grep -c '' "$SB/cosign.log")
 # either as after any other refusal. The fourth and the fifth call are told
 # that the registry does not answer
 fresh
-envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+envelopes "$(all_five)" > "$SB/envelopes.jsonl"
 echo 5 > "$SB/refusals"
 printf '%s\n' "no matching attestations: " > "$SB/refusal.1"
 printf '%s\n' "$denied" > "$SB/refusal.2"
@@ -603,9 +633,7 @@ for nth in 4 5; do unanswered "$nth" > "$SB/refusal.$nth"; done
 printf '%s\n' "$lead" " offline verification failed" " offline verification failed" " ${reasons[3]}" > "$SB/refusal.3"
 run verify "$SB/root" "$REF"
 what="cosign refusing, its message four lines, two of them alike"
-[ "$rc" -eq 1 ] \
-  && pass "$what: exit 1" \
-  || fail "$what: the exit code" "exit=$rc, wanted 1" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+exit_is "$what" 1
 error_line
 offline=$(occurs "offline verification failed" <<<"$errors"); named=$(occurs "${reasons[3]}" <<<"$errors")
 [[ "$errors" == *"DENIED"* || "$errors" == *"connection refused"* ]] && others=yes || others=no
@@ -619,22 +647,17 @@ offline=$(occurs "offline verification failed" <<<"$errors"); named=$(occurs "${
        "one of the prefixes 'Error: ' and 'error during command execution' in it: $framed, wanted no" \
        "two blanks in a row in it: $doubled, wanted no" \
        "stderr:" "${err:-nothing}"
-calls=$(grep -c '' "$SB/cosign.log")
-[ "$calls" -eq 3 ] \
-  && pass "$what: cosign is called three times and no more" \
-  || fail "$what: the cosign calls the stub logged: three" "calls logged: $calls, wanted 3"
+cosign_calls "$what" 3 "cosign is called three times and no more" three
 # the registry not answering on any call, the cause the three attempts are
 # there for, each call under another address; the message has quotation marks
 # in it
 fresh
-envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+envelopes "$(all_five)" > "$SB/envelopes.jsonl"
 echo 5 > "$SB/refusals"
 for nth in 1 2 3 4 5; do unanswered "$nth" > "$SB/refusal.$nth"; done
 run verify "$SB/root" "$REF"
 what="cosign refusing because the registry does not answer"
-[ "$rc" -eq 1 ] \
-  && pass "$what: exit 1" \
-  || fail "$what: the exit code" "exit=$rc, wanted 1" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+exit_is "$what" 1
 error_line
 third=$(unanswered 3)
 whole=$(occurs "$third" <<<"$errors"); refused=$(occurs "connection refused" <<<"$errors")
@@ -647,24 +670,19 @@ whole=$(occurs "$third" <<<"$errors"); refused=$(occurs "connection refused" <<<
        "one of the prefixes 'Error: ' and 'error during command execution' in it: $framed, wanted no" \
        "two blanks in a row in it: $doubled, wanted no" \
        "stderr:" "${err:-nothing}"
-calls=$(grep -c '' "$SB/cosign.log")
-[ "$calls" -eq 3 ] \
-  && pass "$what: cosign is called three times and no more" \
-  || fail "$what: the cosign calls the stub logged: three" "calls logged: $calls, wanted 3"
+cosign_calls "$what" 3 "cosign is called three times and no more" three
 # the registry refusing the request on the third call, in cosign's words for
 # ghcr.io asked without a login for a package that is not public, the address
 # in them written with percent signs; the other four calls are told that the
 # registry does not answer
 fresh
-envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+envelopes "$(all_five)" > "$SB/envelopes.jsonl"
 echo 5 > "$SB/refusals"
 for nth in 1 2 4 5; do unanswered "$nth" > "$SB/refusal.$nth"; done
 printf '%s\n' "$denied" > "$SB/refusal.3"
 run verify "$SB/root" "$REF"
 what="cosign refusing because the registry refuses the request"
-[ "$rc" -eq 1 ] \
-  && pass "$what: exit 1" \
-  || fail "$what: the exit code" "exit=$rc, wanted 1" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+exit_is "$what" 1
 error_line
 whole=$(occurs "$denied" <<<"$errors")
 [[ "$errors" == *"connection refused"* ]] && unreachable=yes || unreachable=no
@@ -677,10 +695,7 @@ whole=$(occurs "$denied" <<<"$errors")
        "one of the prefixes 'Error: ' and 'error during command execution' in it: $framed, wanted no" \
        "two blanks in a row in it: $doubled, wanted no" \
        "stderr:" "${err:-nothing}"
-calls=$(grep -c '' "$SB/cosign.log")
-[ "$calls" -eq 3 ] \
-  && pass "$what: cosign is called three times and no more" \
-  || fail "$what: the cosign calls the stub logged: three" "calls logged: $calls, wanted 3"
+cosign_calls "$what" 3 "cosign is called three times and no more" three
 # cosign failing other than by refusing: crashing, the way a Go program that
 # panics does, and cosign is a Go program. On each of the five calls nothing
 # on stdout, on stderr a trace, in which neither of cosign's two prefixes is,
@@ -696,20 +711,18 @@ calls=$(grep -c '' "$SB/cosign.log")
 # first line is wanted in it, once. What becomes of the trace's other lines
 # is the script's to choose, as long as none is passed on to stderr as it is
 fresh
-envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+envelopes "$(all_five)" > "$SB/envelopes.jsonl"
 panic="panic: runtime error: invalid memory address or nil pointer dereference"
-for nth in 1 2 3 4 5; do
-  {
-    printf '%s\n' "$panic" "[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x46fb80]" "" "goroutine 1 [running]:"
-    # a frame is two lines: the function, and after a tab the place in its file
-    printf '%s\n\t%s\n' "main.subject(0x0?)" "example.test/crash/main.go:9" "main.verify(0x475f00?)" "example.test/crash/main.go:12 +0x13" "main.main()" "example.test/crash/main.go:14 +0x15"
-  } > "$SB/crash.$nth"
-done
+# the trace as a whole, on stdout; case 11 lays it down once more
+go_trace() {
+  printf '%s\n' "$panic" "[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x46fb80]" "" "goroutine 1 [running]:"
+  # a frame is two lines: the function, and after a tab the place in its file
+  printf '%s\n\t%s\n' "main.subject(0x0?)" "example.test/crash/main.go:9" "main.verify(0x475f00?)" "example.test/crash/main.go:12 +0x13" "main.main()" "example.test/crash/main.go:14 +0x15"
+}
+for nth in 1 2 3 4 5; do go_trace > "$SB/crash.$nth"; done
 run verify "$SB/root" "$REF"
 what="cosign crashing on every attempt"
-[ "$rc" -eq 1 ] \
-  && pass "$what: exit 1" \
-  || fail "$what: the exit code" "exit=$rc, wanted 1: cosign ended with 2 on every call, and 2 is the self-check's own code for wrong usage; three failed attempts are exit 1 whatever cosign ended with" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+exit_is "$what" 1 "cosign ended with 2 on every call, and 2 is the self-check's own code for wrong usage; three failed attempts are exit 1 whatever cosign ended with"
 error_line
 whole=$(occurs "$panic" <<<"$errors")
 other=$(grep -vc -e '^::error::check-provenance: ' -e '^::warning::check-provenance: ' "$SB/stderr")
@@ -720,10 +733,7 @@ other=$(grep -vc -e '^::error::check-provenance: ' -e '^::warning::check-provena
        "times the first line of what cosign wrote is in it: $whole, wanted 1 ('$panic')" \
        "lines on stderr begun otherwise than '::error::check-provenance: ' or '::warning::check-provenance: ', the trace's own lines passed on: $other, wanted 0" \
        "stderr:" "${err:-nothing}"
-calls=$(grep -c '' "$SB/cosign.log")
-[ "$calls" -eq 3 ] \
-  && pass "$what: cosign is called three times and no more" \
-  || fail "$what: the cosign calls the stub logged: three" "calls logged: $calls, wanted 3"
+cosign_calls "$what" 3 "cosign is called three times and no more" three
 # cosign failing without a word: on each of the five calls nothing on stdout
 # and nothing on stderr, the call's crash file being empty. It stands for a
 # process that ends before it has written anything, as one the kernel kills
@@ -736,13 +746,11 @@ calls=$(grep -c '' "$SB/cosign.log")
 # cosign wrote out of an array with nothing in it. How the error line reads
 # where the message would be is the script's to choose
 fresh
-envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+envelopes "$(all_five)" > "$SB/envelopes.jsonl"
 for nth in 1 2 3 4 5; do : > "$SB/crash.$nth"; done
 run verify "$SB/root" "$REF"
 what="cosign failing without a word on every attempt"
-[ "$rc" -eq 1 ] \
-  && pass "$what: exit 1" \
-  || fail "$what: the exit code" "exit=$rc, wanted 1" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+exit_is "$what" 1
 error_line
 other=$(grep -vc -e '^::error::check-provenance: ' -e '^::warning::check-provenance: ' "$SB/stderr")
 [ "$shaped" = yes ] && [ "$other" -eq 0 ] \
@@ -751,24 +759,21 @@ other=$(grep -vc -e '^::error::check-provenance: ' -e '^::warning::check-provena
        "one line begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that says '3 attempts': $shaped, wanted yes (lines begun '::error::check-provenance: ': $count)" \
        "lines on stderr begun otherwise than '::error::check-provenance: ' or '::warning::check-provenance: ', a complaint of the shell's for one: $other, wanted 0" \
        "stderr:" "${err:-nothing}"
-calls=$(grep -c '' "$SB/cosign.log")
-[ "$calls" -eq 3 ] \
-  && pass "$what: cosign is called three times and no more" \
-  || fail "$what: the cosign calls the stub logged: three" "calls logged: $calls, wanted 3"
+cosign_calls "$what" 3 "cosign is called three times and no more" three
 
 # 3: nothing verified never passes (plan slice 2.5.3). cosign ends with 0 and
 #    what it printed on stdout holds no provenance statement. Nine inputs:
-#    nothing at all; one blank line and nothing else; one line of a
-#    byte order mark and blanks and nothing else; one envelope of the
-#    shape cosign prints whose payload is null, is the empty string, is
-#    base64 of a byte order mark and blanks and nothing else, is not
-#    base64, is base64 of a text that is not JSON, or is base64 of JSON that
-#    is not an object (the array ["a"]). A self-check that passes when nothing
-#    was verified is its worst failure, and the tools at hand make it easy:
-#    with jq 1.6, `jq -e .payload` ends with 0 on no input and null decodes to
-#    a string. The array is there because a script that counts every payload
-#    that decodes to JSON would pass with nothing verified. The empty string
-#    is there because it decodes to nothing, so a judge that pipes the decoded
+#    nothing at all; one blank line and nothing else; one line of a byte order
+#    mark and blanks and nothing else; one envelope of the shape cosign prints
+#    whose payload is null, is the empty string, is base64 of a byte order
+#    mark and blanks and nothing else, is not base64, is base64 of a text that
+#    is not JSON, or is base64 of JSON that is not an object (the array
+#    ["a"]). A self-check that passes when nothing was verified is its worst
+#    failure, and the tools at hand make it easy: with jq 1.6,
+#    `jq -e .payload` ends with 0 on no input and null decodes to a string.
+#    The array is there because a script that counts every payload that
+#    decodes to JSON would pass with nothing verified. The empty string is
+#    there because it decodes to nothing, so a judge that pipes the decoded
 #    payload to `jq -e` asks over no input: measured,
 #    `printf '' | jq -e 'type == "object"'` ends with 0 on jq 1.6 (the
 #    development machine's) and with 4 on jq 1.7.1 (the runners'). The blank
@@ -791,22 +796,15 @@ calls=$(grep -c '' "$SB/cosign.log")
 # wanted; $1 names the input in every result line
 nothing_verified() {
   run verify "$SB/root" "$REF"
-  [ "$rc" -eq 1 ] \
-    && pass "$1: exit 1" \
-    || fail "$1: the exit code" "exit=$rc, wanted 1: nothing was verified, and the code is the script's own, not the one jq or base64 ended with" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
-  [ ! -s "$SB/stdout" ] \
-    && pass "$1: nothing on stdout" \
-    || fail "$1: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  exit_is "$1" 1 "nothing was verified, and the code is the script's own, not the one jq or base64 ended with"
+  no_stdout "$1"
   lines=$(grep -c '' "$SB/stderr"); ended=$(wc -l < "$SB/stderr")
   [ "$lines" -eq 1 ] && [ "$ended" -eq 1 ] && [[ "$err" == "::error::check-provenance: $REF: "*"no provenance statement"*" (Req 2.28)" ]] && [[ "$err" != *"3 attempts"* ]] \
     && pass "$1: stderr is one line, the script's error line, which names the reference, says 'no provenance statement' and does not say '3 attempts'" \
     || fail "$1: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that says 'no provenance statement' and does not say '3 attempts'" \
          "lines on stderr: $lines, of them ended by a newline: $ended, wanted 1 and 1" "stderr:" "${err:-nothing}" \
          "wanted: ::error::check-provenance: $REF: <why, saying 'no provenance statement' and not '3 attempts'> (Req 2.28)"
-  calls=$(grep -c '' "$SB/cosign.log")
-  [ "$calls" -eq 1 ] \
-    && pass "$1: cosign is called once and not asked again" \
-    || fail "$1: the cosign calls the stub logged: one, what cosign printed with exit 0 is judged once" "calls logged: $calls, wanted 1"
+  judged_once "$1"
 }
 # cosign prints nothing on stdout
 fresh
@@ -863,8 +861,8 @@ nothing_verified "cosign accepting, its one envelope's payload base64 of JSON th
 #    clause "builder identity is <found>, expected <expected>", both values
 #    as JSON text the way jq -c prints it, on one line: a string in double
 #    quotes with JSON's escapes, null where the path holds no value. The
-#    clause is fixed so that a line naming several missed expectations (later
-#    slices) ties each value to its field and tells found from expected. An
+#    clause is fixed so that a line naming several missed expectations (cases
+#    8b and 9) ties each value to its field and tells found from expected. An
 #    input here misses one expectation, so its line holds the one clause and
 #    no second one: ", expected " stands in it once.
 # a statement that carries the other four expected values, its builder
@@ -878,12 +876,8 @@ other_builder() {
   fresh
   envelopes "$2" > "$SB/envelopes.jsonl"
   run verify "$SB/root" "$REF"
-  [ "$rc" -eq 1 ] \
-    && pass "$1: exit 1" \
-    || fail "$1: the exit code" "exit=$rc, wanted 1: the statement's builder identity is not the releaser's" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
-  [ ! -s "$SB/stdout" ] \
-    && pass "$1: nothing on stdout" \
-    || fail "$1: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  exit_is "$1" 1 "the statement's builder identity is not the releaser's"
+  no_stdout "$1"
   lines=$(grep -c '' "$SB/stderr"); ended=$(wc -l < "$SB/stderr")
   [ "$lines" -eq 1 ] && [ "$ended" -eq 1 ] && [[ "$err" == "::error::check-provenance: $REF: "*"$clause"*" (Req 2.28)" ]] \
     && [[ "$err" != *", expected "*", expected "* && "$err" != *"3 attempts"* && "$err" != *"no provenance statement"* ]] \
@@ -891,10 +885,7 @@ other_builder() {
     || fail "$1: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that holds the clause, holds ', expected ' once and says neither '3 attempts' nor 'no provenance statement'" \
          "lines on stderr: $lines, of them ended by a newline: $ended, wanted 1 and 1" "stderr:" "${err:-nothing}" \
          "wanted: ::error::check-provenance: $REF: <any words>$clause<any words> (Req 2.28)"
-  calls=$(grep -c '' "$SB/cosign.log")
-  [ "$calls" -eq 1 ] \
-    && pass "$1: cosign is called once and not asked again" \
-    || fail "$1: the cosign calls the stub logged: one, what cosign printed with exit 0 is judged once" "calls logged: $calls, wanted 1"
+  judged_once "$1"
 }
 # another workflow of the same repository at the same ref
 other_builder "a builder identity that is another workflow of the repository" "$(built_by "$RE_ATTESTER")" "\"$RE_ATTESTER\""
@@ -1112,22 +1103,18 @@ jq_gives_no_answer "a statement built by another workflow" "$(built_by "$RE_ATTE
 # stderr is empty, and a line of its own for "none of those values" would be
 # ok without having asked anything. Its detail says which part did not hold
 misses_one() {
-  local clause="$3 is $4, expected $5" lines ended claims calls met; local -a wrong=()
+  local clause="$3 is $4, expected $5" lines ended claims met; local -a wrong=()
   fresh
   envelopes "$2" > "$SB/envelopes.jsonl"
   run verify "$SB/root" "$REF"
-  [ "$rc" -eq 1 ] \
-    && pass "$1: exit 1" \
-    || fail "$1: the exit code" "exit=$rc, wanted 1: the statement's $3 is not the expected one" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
-  [ ! -s "$SB/stdout" ] \
-    && pass "$1: nothing on stdout" \
-    || fail "$1: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  exit_is "$1" 1 "the statement's $3 is not the expected one"
+  no_stdout "$1"
   lines=$(grep -c '' "$SB/stderr"); ended=$(wc -l < "$SB/stderr"); claims=$(occurs ", expected " <<<"$err")
   { [ "$lines" -eq 1 ] && [ "$ended" -eq 1 ]; } || wrong+=("lines on stderr: $lines, of them ended by a newline: $ended, wanted 1 and 1")
-  [[ "$err" == "::error::check-provenance: $REF: "*" (Req 2.28)" ]] || wrong+=("it is not begun '::error::check-provenance: ' and the reference and ended ' (Req 2.28)'")
+  in_frame
   [[ "$err" == *"$clause"* ]] || wrong+=("the clause is not in it")
   [ "$claims" -eq 1 ] || wrong+=("times ', expected ' is in it: $claims, wanted 1")
-  [[ "$err" != *"3 attempts"* && "$err" != *"no provenance statement"* ]] || wrong+=("it says '3 attempts' or 'no provenance statement', wanted neither")
+  no_other_failure
   for met in "${@:6}"; do
     [[ "$err" != *"$met"* ]] || wrong+=("it holds a value of an expectation the statement meets, wanted none of them: $met")
   done
@@ -1135,10 +1122,7 @@ misses_one() {
     && pass "$1: stderr is one line, the script's error line, which names the reference and holds the one clause and no value of an expectation the statement meets" \
     || fail "$1: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that holds the clause, holds ', expected ' once, says neither '3 attempts' nor 'no provenance statement' and holds no value of an expectation the statement meets" \
          "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: $REF: <any words>$clause<any words> (Req 2.28)"
-  calls=$(grep -c '' "$SB/cosign.log")
-  [ "$calls" -eq 1 ] \
-    && pass "$1: cosign is called once and not asked again" \
-    || fail "$1: the cosign calls the stub logged: one, what cosign printed with exit 0 is judged once" "calls logged: $calls, wanted 1"
+  judged_once "$1"
 }
 # The kinds every expectation is asked: $1 is the expectation's name, $2 its
 # path in the statement, $3 its expected value, the arguments after them the
@@ -1166,7 +1150,7 @@ every_kind() {
          "wanted: one that holds no double quote, no backslash, no control character and no character outside ASCII; no kind was laid down"
     return
   fi
-  all=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")
+  all=$(all_five)
   a=${v:0:${#v}/2}; b=${v:${#v}/2}; low=${v%%[[:lower:]]*}; cap=${v:${#low}}; cap="$low${cap^}"
   misses_one "a $name with something after the expected one" "$(jq -c --arg v "$v-next" "$put" <<<"$all")" "$name" "\"$v-next\"" "$want" "$@"
   misses_one "a $name with something before the expected one" "$(jq -c --arg v "next-$v" "$put" <<<"$all")" "$name" "\"next-$v\"" "$want" "$@"
@@ -1193,12 +1177,24 @@ every_kind() {
   misses_one "a statement whose $name is an array that holds the expected one twice" "$(jq -c --arg v "$v" "$path = [\$v, \$v]" <<<"$all")" "$name" "[\"$v\",\"$v\"]" "$want" "$@"
   misses_one "a statement without a $name" "$(jq -c "del($path)" <<<"$all")" "$name" null "$want" "$@"
 }
-every_kind "build type" .predicate.buildDefinition.buildType "$BUILD_TYPE" "$RELEASER" "$SOURCE" "$WORKFLOW" "$GIT_REF"
+# One input laid down by hand, whichever expectation it misses: $1 is the
+# expectation's name, $2 its path, $3 its expected value, $4 to $7 are the
+# values of the other four. Then $8 names the input, $9 is the value at the
+# path, put there in the statement that meets all five, and ${10} is a jq
+# filter for what else the statement is to hold (the decoys, which read the
+# expected value as $e), . where there is nothing
+other_value() {
+  misses_one "$8" "$(all_five | jq -c --arg v "$9" --arg e "$3" "$2 = \$v | ${10}")" "$1" "\"$9\"" "\"$3\"" "${@:4:4}"
+}
+type_path=.predicate.buildDefinition.buildType
+every_kind "build type" "$type_path" "$BUILD_TYPE" "$RELEASER" "$SOURCE" "$WORKFLOW" "$GIT_REF"
+# the hand-laid inputs of this case: $1 names one, $2 is the value at the
+# path, $3 the filter for what else the statement holds
+other_build_type() { other_value "build type" "$type_path" "$BUILD_TYPE" "$RELEASER" "$SOURCE" "$WORKFLOW" "$GIT_REF" "$@"; }
 # another build type as a whole, where the kinds above all vary the expected
 # one
 other_type="https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1"
-misses_one "a build type that is another one" "$(statement "$RELEASER" "$other_type" "$SOURCE" "$WORKFLOW" "$GIT_REF")" \
-  "build type" "\"$other_type\"" "\"$BUILD_TYPE\"" "$RELEASER" "$SOURCE" "$WORKFLOW" "$GIT_REF"
+other_build_type "a build type that is another one" "$other_type" .
 # the expected build type at other places than the path, while the build type
 # at the path is that other one. Four decoys, as in case 4: the statement's
 # first key (buildDefinition, an object whose buildType it is) and its last
@@ -1206,9 +1202,8 @@ misses_one "a build type that is another one" "$(statement "$RELEASER" "$other_t
 # and its last (decoy again). So the value at the path is neither the first
 # nor the last buildType in the statement or under predicate, and a script
 # that does not walk the path passes this statement
-misses_one "a statement with the expected build type in four decoys, the build type at the path another one" \
-  "$(statement "$RELEASER" "$other_type" "$SOURCE" "$WORKFLOW" "$GIT_REF" | jq -c --arg t "$BUILD_TYPE" '{buildDefinition: {buildType: $t}} + . + {decoy: {buildType: $t}} | .predicate |= {buildType: $t} + . + {decoy: {buildType: $t}}')" \
-  "build type" "\"$other_type\"" "\"$BUILD_TYPE\"" "$RELEASER" "$SOURCE" "$WORKFLOW" "$GIT_REF"
+other_build_type "a statement with the expected build type in four decoys, the build type at the path another one" "$other_type" \
+  '{buildDefinition: {buildType: $e}} + . + {decoy: {buildType: $e}} | .predicate |= {buildType: $e} + . + {decoy: {buildType: $e}}'
 
 # 6: a source repository other than the build workflow's fails, naming the
 #    field, the value found and the value expected (plan slice 2.5.6). The
@@ -1227,13 +1222,9 @@ misses_one "a statement with the expected build type in four decoys, the build t
 #    identity (see statement): a script that searches its text passes them all.
 source_path=.predicate.buildDefinition.externalParameters.workflow.repository
 every_kind "source repository" "$source_path" "$SOURCE" "$RELEASER" "$BUILD_TYPE" "$WORKFLOW" "$GIT_REF"
-# one input laid down by hand: $1 names it, $2 is the value at the path, put
-# there in the statement that meets all five, $3 a jq filter for what else
-# the statement is to hold (the decoys), . where there is nothing
-other_source() {
-  misses_one "$1" "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF" | jq -c --arg v "$2" --arg s "$SOURCE" "$source_path = \$v | $3")" \
-    "source repository" "\"$2\"" "\"$SOURCE\"" "$RELEASER" "$BUILD_TYPE" "$WORKFLOW" "$GIT_REF"
-}
+# the hand-laid inputs of this case: $1 names one, $2 is the value at the
+# path, $3 the filter for what else the statement holds (see other_value)
+other_source() { other_value "source repository" "$source_path" "$SOURCE" "$RELEASER" "$BUILD_TYPE" "$WORKFLOW" "$GIT_REF" "$@"; }
 # a fork has the same repository name under another owner: a script that
 # compares the name alone, the last part of the URL, passes this statement
 fork="${SOURCE%/*/*}/umbrella/${SOURCE##*/}"
@@ -1252,8 +1243,8 @@ other_source "a source repository that is the expected one with a slash after it
 # last repository in the statement, and a script that does not walk the
 # whole path passes this statement
 other_source "a statement with the expected source repository in seven decoys, the source repository at the path the fork" "$fork" \
-  'def decoys: {repository: $s} + . + {decoy: {workflow: {repository: $s}}}; .predicate.buildDefinition.externalParameters |= {repository: $s} + .
-   | .predicate.buildDefinition |= {repository: $s} + . + {workflow: {repository: $s}} | .predicate |= decoys | decoys'
+  'def decoys: {repository: $e} + . + {decoy: {workflow: {repository: $e}}}; .predicate.buildDefinition.externalParameters |= {repository: $e} + .
+   | .predicate.buildDefinition |= {repository: $e} + . + {workflow: {repository: $e}} | .predicate |= decoys | decoys'
 
 # 7: a workflow path other than the build workflow's fails, naming the field,
 #    the value found and the value expected (plan slice 2.5.7). The workflow
@@ -1271,13 +1262,9 @@ other_source "a statement with the expected source repository in seven decoys, t
 #    identity: a script that searches its text passes all twenty.
 workflow_path=.predicate.buildDefinition.externalParameters.workflow.path
 every_kind "workflow path" "$workflow_path" "$WORKFLOW" "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$GIT_REF"
-# one input laid down by hand: $1 names it, $2 is the value at the path, put
-# there in the statement that meets all five, $3 a jq filter for what else
-# the statement is to hold (the decoys), . where there is nothing
-other_workflow() {
-  misses_one "$1" "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF" | jq -c --arg v "$2" --arg w "$WORKFLOW" "$workflow_path = \$v | $3")" \
-    "workflow path" "\"$2\"" "\"$WORKFLOW\"" "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$GIT_REF"
-}
+# the hand-laid inputs of this case: $1 names one, $2 is the value at the
+# path, $3 the filter for what else the statement holds (see other_value)
+other_workflow() { other_value "workflow path" "$workflow_path" "$WORKFLOW" "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$GIT_REF" "$@"; }
 # the re-attester's workflow lies in the same directory of the same
 # repository: a script that compares the directory alone passes this statement
 rescan="${WORKFLOW%/*}/rescan.yml"
@@ -1294,8 +1281,8 @@ other_workflow "a workflow path that is the file name alone" "${WORKFLOW##*/}" .
 # (the path without workflow) as the first key of externalParameters. So the
 # value at the path is neither the first nor the last path in the statement
 other_workflow "a statement with the expected workflow path in seven decoys, the workflow path at the path the other workflow's" "$rescan" \
-  'def decoys: {path: $w} + . + {decoy: {workflow: {path: $w}}}; .predicate.buildDefinition.externalParameters |= {path: $w} + .
-   | .predicate.buildDefinition |= {path: $w} + . + {workflow: {path: $w}} | .predicate |= decoys | decoys'
+  'def decoys: {path: $e} + . + {decoy: {workflow: {path: $e}}}; .predicate.buildDefinition.externalParameters |= {path: $e} + .
+   | .predicate.buildDefinition |= {path: $e} + . + {workflow: {path: $e}} | .predicate |= decoys | decoys'
 
 # 7b: the cut values come from the releaser identity (plan slice 2.5.7b, a
 #     guard). The source repository and the workflow path the script expects
@@ -1319,12 +1306,11 @@ under_second_identity() {
 }
 second_identity_inputs() {
   local name="under a second releaser identity, a statement that meets its five values" all lines ended calls want got
-  all=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")
+  all=$(all_five)
   fresh
   envelopes "$all" > "$SB/envelopes.jsonl"
   run verify "$SB/root" "$REF"
-  [ "$rc" -eq 0 ] && pass "$name: exit 0" \
-    || fail "$name: the exit code" "exit=$rc, wanted 0" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  exit_is "$name" 0
   lines=$(grep -c '' "$SB/stdout"); ended=$(wc -l < "$SB/stdout")
   [ "$lines" -eq 1 ] && [ "$ended" -eq 1 ] && [[ "$out" == "check-provenance: "* ]] && [[ "$out" == *"$REF"* ]] \
     && pass "$name: stdout is one line, begun 'check-provenance: ' and naming the reference in full" \
@@ -1336,10 +1322,8 @@ second_identity_inputs() {
   [ "$calls" -eq 1 ] && [ "$got" = "$want" ] \
     && pass "$name: cosign is called once, under the second identity and with not one argument more" \
     || fail "$name: the cosign calls the stub logged: one, asked under the second identity" "calls logged: $calls, wanted 1; what the first asked:" "${got:-nothing}" "wanted:" "$want"
-  misses_one "under a second releaser identity, a statement from the first identity's repository" "$(jq -c --arg v "$first_source" "$source_path = \$v" <<<"$all")" \
-    "source repository" "\"$first_source\"" "\"$SOURCE\"" "$RELEASER" "$BUILD_TYPE" "$WORKFLOW" "$GIT_REF"
-  misses_one "under a second releaser identity, a statement built by the first identity's workflow path" "$(jq -c --arg v "$first_workflow" "$workflow_path = \$v" <<<"$all")" \
-    "workflow path" "\"$first_workflow\"" "\"$WORKFLOW\"" "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$GIT_REF"
+  other_source "under a second releaser identity, a statement from the first identity's repository" "$first_source" .
+  other_workflow "under a second releaser identity, a statement built by the first identity's workflow path" "$first_workflow" .
 }
 under_second_identity second_identity_inputs
 
@@ -1360,13 +1344,9 @@ under_second_identity second_identity_inputs
 #    resolvedDependencies[0].uri: a script that searches its text passes them all.
 first_ref=$GIT_REF
 ref_path=.predicate.buildDefinition.externalParameters.workflow.ref
-# one input laid down by hand: $1 names it, $2 is the value at the path, put
-# there in the statement that meets all five, $3 a jq filter for what else
-# the statement is to hold (the decoys), . where there is nothing
-other_ref() {
-  misses_one "$1" "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF" | jq -c --arg v "$2" --arg r "$GIT_REF" "$ref_path = \$v | $3")" \
-    "ref" "\"$2\"" "\"$GIT_REF\"" "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW"
-}
+# the hand-laid inputs of this case: $1 names one, $2 is the value at the
+# path, $3 the filter for what else the statement holds (see other_value)
+other_ref() { other_value "ref" "$ref_path" "$GIT_REF" "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$@"; }
 ref_inputs() {
   every_kind "ref" "$ref_path" "$GIT_REF" "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW"
   # a feature branch of the same repository, the case the field is there for
@@ -1385,8 +1365,8 @@ ref_inputs() {
   # and workflow.ref (the path without externalParameters) as its last; ref
   # (the path without workflow) as the first key of externalParameters
   other_ref "a statement with the expected ref in seven decoys, the ref at the path the other branch" "refs/heads/feature" \
-    'def decoys: {ref: $r} + . + {decoy: {workflow: {ref: $r}}}; .predicate.buildDefinition.externalParameters |= {ref: $r} + .
-     | .predicate.buildDefinition |= {ref: $r} + . + {workflow: {ref: $r}} | .predicate |= decoys | decoys'
+    'def decoys: {ref: $e} + . + {decoy: {workflow: {ref: $e}}}; .predicate.buildDefinition.externalParameters |= {ref: $e} + .
+     | .predicate.buildDefinition |= {ref: $e} + . + {workflow: {ref: $e}} | .predicate |= decoys | decoys'
 }
 under_second_identity ref_inputs
 
@@ -1410,20 +1390,18 @@ under_second_identity ref_inputs
 # clauses wanted, those after it the names of the expectations it meets. A
 # met one's value may stand in the line: the builder identity holds three
 misses_several() {
-  local name=$1 held=$2 lines ended claims calls each other n; local -a clauses=() wrong=()
+  local name=$1 held=$2 lines ended claims each other n; local -a clauses=() wrong=()
   shift 2
   while [ $# -gt 0 ] && [ "$1" != -- ]; do clauses+=("$1"); shift; done
   shift
   fresh
   envelopes "$held" > "$SB/envelopes.jsonl"
   run verify "$SB/root" "$REF"
-  [ "$rc" -eq 1 ] && pass "$name: exit 1" \
-    || fail "$name: the exit code" "exit=$rc, wanted 1: the statement misses ${#clauses[@]} expectations" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
-  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
-    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  exit_is "$name" 1 "the statement misses ${#clauses[@]} expectations"
+  no_stdout "$name"
   lines=$(grep -c '' "$SB/stderr"); ended=$(wc -l < "$SB/stderr"); claims=$(occurs ", expected " <<<"$err")
   { [ "$lines" -eq 1 ] && [ "$ended" -eq 1 ]; } || wrong+=("lines on stderr: $lines, of them ended by a newline: $ended, wanted 1 and 1")
-  [[ "$err" == "::error::check-provenance: $REF: "*" (Req 2.28)" ]] || wrong+=("it is not begun '::error::check-provenance: ' and the reference and ended ' (Req 2.28)'")
+  in_frame
   for each in "${clauses[@]}"; do
     n=$(occurs "$each" <<<"$err"); [ "$n" -eq 1 ] || wrong+=("times this clause is in it: $n, wanted 1: $each")
   done
@@ -1436,7 +1414,7 @@ misses_several() {
       [[ "$err" != *"$each$other"* ]] || wrong+=("a clause is followed at once by another, wanted something between the two: $each" "and at once after it: $other")
     done
   done
-  [[ "$err" != *"3 attempts"* && "$err" != *"no provenance statement"* ]] || wrong+=("it says '3 attempts' or 'no provenance statement', wanted neither")
+  no_other_failure
   for each in "$@"; do
     [[ "$err" != *"$each is "* ]] || wrong+=("it holds '$each is ', of an expectation the statement meets, wanted nothing of it")
   done
@@ -1444,15 +1422,13 @@ misses_several() {
     && pass "$name: stderr is one line, the script's error line, which names the reference and holds one clause for each expectation missed and none for one the statement meets" \
     || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that holds each of the ${#clauses[@]} clauses once, holds ', expected ' ${#clauses[@]} times, lets no clause be followed at once by another, says neither '3 attempts' nor 'no provenance statement' and holds '<name> is ' of no expectation the statement meets" \
          "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted, in any order and with any words around them, the clauses:" "${clauses[@]}"
-  calls=$(grep -c '' "$SB/cosign.log")
-  [ "$calls" -eq 1 ] && pass "$name: cosign is called once and not asked again" \
-    || fail "$name: the cosign calls the stub logged: one, what cosign printed with exit 0 is judged once" "calls logged: $calls, wanted 1"
+  judged_once "$name"
 }
 several_inputs() {
   local met type="https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1" fork="${SOURCE%/*/*}/umbrella/${SOURCE##*/}" rescan="${WORKFLOW%/*}/rescan.yml"
   local b="builder identity is" t="build type is" s="source repository is" w="workflow path is" r="ref is"
   local eb=", expected \"$RELEASER\"" et=", expected \"$BUILD_TYPE\"" es=", expected \"$SOURCE\"" ew=", expected \"$WORKFLOW\"" er=", expected \"$GIT_REF\""
-  met=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")
+  met=$(all_five)
   # other values at the paths: all five, two that the script does not read one
   # after the other, and two more with one it meets between them
   misses_several "a statement that misses all five" "$(statement "$RE_ATTESTER" "$type" "$fork" "$rescan" "refs/heads/feature")" \
@@ -1491,24 +1467,23 @@ several_inputs
 #    cosign called once.
 # One input that passes: $1 names it, the arguments after it are the statements
 one_of_several() {
-  local name=$1 calls; shift
+  local name=$1; shift
   fresh
   envelopes "$@" > "$SB/envelopes.jsonl"
   run verify "$SB/root" "$REF"
-  [ "$rc" -eq 0 ] && pass "$name: exit 0" || fail "$name: the exit code" "exit=$rc, wanted 0: one of the $# statements meets all five" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  exit_is "$name" 0 "one of the $# statements meets all five"
   one_line "$SB/stdout" && [[ "$out" == "check-provenance: "* ]] && [[ "$out" == *"$REF"* ]] \
     && pass "$name: stdout is one line, begun 'check-provenance: ' and naming the reference in full" \
     || fail "$name: stdout: one line and no more, begun 'check-provenance: ' and naming the reference in full" "stdout:" "${out:-nothing}" "wanted: one line, ended by its newline, begun 'check-provenance: ' that carries $REF"
   [ ! -s "$SB/stderr" ] && pass "$name: nothing on stderr" \
     || fail "$name: stderr: nothing, a statement that misses an expectation is not told of when another meets all five" "stderr:" "$(cat "$SB/stderr")" "wanted: nothing"
-  calls=$(grep -c '' "$SB/cosign.log")
-  [ "$calls" -eq 1 ] && pass "$name: cosign is called once" || fail "$name: the cosign calls the stub logged: one" "calls logged: $calls, wanted 1"
+  cosign_calls "$name" 1 "cosign is called once" one
 }
 # One input that fails: $1 names it; then for each statement, in cosign's
 # order, the statement, the clauses wanted of it and --. A statement's part of
 # the line: from its "statement <i>: " to the next one's, or to the line's end
 none_of_several() {
-  local name=$1 calls i k rest part each; local -a held=() wanted=() wrong=(); shift
+  local name=$1 i k rest part each; local -a held=() wanted=() wrong=(); shift
   while [ $# -gt 0 ]; do
     held+=("$1"); shift; each=""
     while [ $# -gt 0 ] && [ "$1" != -- ]; do each+="$1"$'\n'; shift; done
@@ -1518,12 +1493,11 @@ none_of_several() {
   fresh
   envelopes "${held[@]}" > "$SB/envelopes.jsonl"
   run verify "$SB/root" "$REF"
-  [ "$rc" -eq 1 ] && pass "$name: exit 1" || fail "$name: the exit code" "exit=$rc, wanted 1: none of the $n statements meets all five" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
-  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
-    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  exit_is "$name" 1 "none of the $n statements meets all five"
+  no_stdout "$name"
   one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr")")
-  [[ "$err" == "::error::check-provenance: $REF: "*" (Req 2.28)" ]] || wrong+=("it is not begun '::error::check-provenance: ' and the reference and ended ' (Req 2.28)'")
-  [[ "$err" != *"3 attempts"* && "$err" != *"no provenance statement"* ]] || wrong+=("it says '3 attempts' or 'no provenance statement', wanted neither")
+  in_frame
+  no_other_failure
   [[ "$err" != *"statement $((n + 1)): "* ]] || wrong+=("it holds 'statement $((n + 1)): ', and cosign printed $n statements")
   for ((i = 1; i <= n; i++)); do
     k=$(occurs "statement $i: " <<<"$err"); [ "$k" -eq 1 ] || { wrong+=("times 'statement $i: ' is in it: $k, wanted 1; its part was not read"); continue; }
@@ -1542,14 +1516,12 @@ none_of_several() {
     || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that says neither '3 attempts' nor 'no provenance statement' and holds 'statement <i>: ' once for each of the $n statements, in rising order, each followed up to the next one by that statement's clauses, each once, and by ', expected ' once per clause" \
          "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted, the clauses of each statement in any order and with any words around them:" \
          "$(for ((i = 1; i <= n; i++)); do printf 'statement %s: %s\n' "$i" "$(printf '%s' "${wanted[i - 1]}" | paste -sd '|')"; done)"
-  calls=$(grep -c '' "$SB/cosign.log")
-  [ "$calls" -eq 1 ] && pass "$name: cosign is called once and not asked again" \
-    || fail "$name: the cosign calls the stub logged: one, what cosign printed with exit 0 is judged once" "calls logged: $calls, wanted 1"
+  judged_once "$name"
 }
 several_statements() {
   local met feature type="https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1"
   local eb=", expected \"$RELEASER\"" et=", expected \"$BUILD_TYPE\"" es=", expected \"$SOURCE\"" ew=", expected \"$WORKFLOW\"" er=", expected \"$GIT_REF\""
-  met=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")
+  met=$(all_five)
   feature=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "refs/heads/feature")
   one_of_several "two statements, the first with another ref, the second meets all five" "$feature" "$met"
   one_of_several "two statements, the first meets all five, the second's predicate is a string" "$met" "$(jq -c '.predicate = "a string"' <<<"$met")"
@@ -1582,12 +1554,12 @@ several_statements
 # ref: the ref's clause), the arguments after them are the lines of cosign's
 # stdout as they are laid down
 beside_no_json() {
-  local name=$1 want=$2 code=1 says calls clause="ref is \"refs/heads/feature\", expected \"$GIT_REF\""; local -a wrong=(); shift 2
+  local name=$1 want=$2 code=1 says clause="ref is \"refs/heads/feature\", expected \"$GIT_REF\""; local -a wrong=(); shift 2
   [ "$want" = passes ] && code=0
   fresh
   printf '%s\n' "$@" > "$SB/envelopes.jsonl"
   run verify "$SB/root" "$REF"
-  [ "$rc" -eq "$code" ] && pass "$name: exit $code" || fail "$name: the exit code" "exit=$rc, wanted $code" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  exit_is "$name" "$code"
   if [ "$want" = passes ]; then
     one_line "$SB/stdout" && [[ "$out" == "check-provenance: "* ]] && [[ "$out" == *"$REF"* ]] \
       && pass "$name: stdout is one line, begun 'check-provenance: ' and naming the reference in full" \
@@ -1595,10 +1567,9 @@ beside_no_json() {
     [ ! -s "$SB/stderr" ] && pass "$name: nothing on stderr" \
       || fail "$name: stderr: nothing, neither of the line that is no JSON nor of what jq says of it" "stderr:" "$(cat "$SB/stderr")" "wanted: nothing"
   else
-    [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
-      || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+    no_stdout "$name"
     one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr")")
-    [[ "$err" == "::error::check-provenance: $REF: "*" (Req 2.28)" ]] || wrong+=("it is not begun '::error::check-provenance: ' and the reference and ended ' (Req 2.28)'")
+    in_frame
     if [ "$want" = none ]; then
       says="says 'no provenance statement'"
       [[ "$err" == *"no provenance statement"* ]] || wrong+=("it does not say 'no provenance statement'")
@@ -1606,18 +1577,17 @@ beside_no_json() {
       says="holds the clause '$clause', holds ', expected ' once and says neither 'no provenance statement' nor '3 attempts'"
       [[ "$err" == *"$clause"* ]] || wrong+=("the clause is not in it")
       [ "$(occurs ", expected " <<<"$err")" -eq 1 ] || wrong+=("times ', expected ' is in it: $(occurs ", expected " <<<"$err"), wanted 1")
-      [[ "$err" != *"3 attempts"* && "$err" != *"no provenance statement"* ]] || wrong+=("it says '3 attempts' or 'no provenance statement', wanted neither")
+      no_other_failure
     fi
     [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which names the reference and $says" \
       || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that $says" \
            "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: $REF: <a reason that $says> (Req 2.28)"
   fi
-  calls=$(grep -c '' "$SB/cosign.log")
-  [ "$calls" -eq 1 ] && pass "$name: cosign is called once" || fail "$name: the cosign calls the stub logged: one" "calls logged: $calls, wanted 1"
+  cosign_calls "$name" 1 "cosign is called once" one
 }
 lines_no_json() {
   local words="cosign: this line is no JSON" met feature cut
-  met=$(envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")")
+  met=$(envelopes "$(all_five)")
   feature=$(envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "refs/heads/feature")")
   cut=${met:0:${#met}/2}
   beside_no_json "a line of words alone" none "$words"
@@ -1638,7 +1608,7 @@ lines_no_json
 #    name known today at six places. The five values and the paths to them
 #    are as they were. Wanted: exit 0; stdout the one passing line; nothing
 #    on stderr; cosign called once.
-all_else=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF" | jq -c '
+all_else=$(all_five | jq -c '
   .subject = [{name: "ghcr.io/other/gadgets", digest: .subject[0].digest},
               {name: "ghcr.io/other/gizmos", digest: {sha256: "7c5d3b1a0f8e6c4a2b9d7e3f1c0eae559371d8b6f4e2c9a0e6381e7d4c9a2f0b"}}]
   | .predicate.buildDefinition.resolvedDependencies = [{uri: "git+https://github.com/other/gadgets@refs/tags/v9", digest: {gitCommit: "fedcba9876543210fedcba9876543210fedcba98"}}]
@@ -1670,16 +1640,15 @@ one_of_several "a statement that meets all five and differs in all else" "$all_e
 # the arguments after them are the keys of which the line names one or more
 # (none: the line names the file alone)
 policy_gives_nothing() {
-  local name=$1 policy=$2 key named=no calls; local -a wrong=(); shift 2
+  local name=$1 policy=$2 key named=no; local -a wrong=(); shift 2
   fresh
   printf '%s' "${policy:+$policy$'\n'}" > "$SB/root/catalogue-policy.yaml"
-  envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+  envelopes "$(all_five)" > "$SB/envelopes.jsonl"
   run verify "$SB/root" "$REF"
-  [ "$rc" -eq 2 ] && pass "$name: exit 2" || fail "$name: the exit code" "exit=$rc, wanted 2" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
-  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
-    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  exit_is "$name" 2
+  no_stdout "$name"
   one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr")")
-  [[ "$err" == "::error::check-provenance: "* ]] || wrong+=("it is not begun '::error::check-provenance: '")
+  begun_error
   [[ "$err" == *"catalogue-policy.yaml"* ]] || wrong+=("it does not name the file catalogue-policy.yaml")
   [ $# -eq 0 ] && named=yes
   for key in "$@"; do [[ "$err" == *"$key"* ]] && named=yes; done
@@ -1688,16 +1657,7 @@ policy_gives_nothing() {
   [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which names catalogue-policy.yaml${1:+ and the key} and holds nothing of python's" \
     || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that names catalogue-policy.yaml${1:+ and the key by its dotted path} and holds neither 'Traceback' nor 'File \"'" \
          "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason that names catalogue-policy.yaml${1:+ and $(printf '%s' "$*" | sed 's/ / or /g')}>"
-  calls=$(grep -c '' "$SB/cosign.log")
-  [ "$calls" -eq 0 ] && pass "$name: cosign is never called" \
-    || fail "$name: the cosign calls the stub logged: none, the script cannot ask under a value the file does not give" "calls logged: $calls, wanted 0:" "$(cat "$SB/cosign.log")"
-}
-# the policy file as fresh writes it, with $1 for the issuer's line and $2 for
-# the line of the releaser's identity (either can be several lines, or empty:
-# the key is absent)
-policy_with() {
-  printf 'verification:\n%s  roles:\n    re-attester:\n      identity: %s\n      attests: [spdxjson, cyclonedx, vuln, openvex]\n    releaser:\n%s      attests: [spdxjson, cyclonedx, vuln, openvex]\n' \
-    "${1:+$1$'\n'}" "$RE_ATTESTER" "${2:+$2$'\n'}"
+  never_asked "$name" "the script cannot ask under a value the file does not give"
 }
 policy_faults() {
   local ki=verification.issuer kr=verification.roles.releaser.identity key pad good at line n
@@ -1754,7 +1714,7 @@ policy_faults
 # Where the root is no dir the line must not hold 'verification.' either: with
 # no policy file there to be read, no key of it is at fault
 refused_as_usage() {
-  local name=$1 held=$2 kind=$3 root each calls shows; local -a args=() wrong=(); shift 3
+  local name=$1 held=$2 kind=$3 root each shows; local -a args=() wrong=(); shift 3
   fresh; root="$SB/root"
   case "$kind" in
     no-policy) rm "$SB/root/catalogue-policy.yaml" ;;
@@ -1762,13 +1722,12 @@ refused_as_usage() {
     file)      root="$SB/root/a-file"; echo "a file, no directory" > "$root" ;;
   esac
   for each in "$@"; do [ "$each" = ROOT ] && each=$root; args+=("$each"); done
-  envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+  envelopes "$(all_five)" > "$SB/envelopes.jsonl"
   run ${args[@]+"${args[@]}"}
-  [ "$rc" -eq 2 ] && pass "$name: exit 2" || fail "$name: the exit code" "exit=$rc, wanted 2" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
-  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
-    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  exit_is "$name" 2
+  no_stdout "$name"
   one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
-  [[ "$err" == "::error::check-provenance: "* ]] || wrong+=("it is not begun '::error::check-provenance: '")
+  begun_error
   [ -z "$held" ] || [[ "$err" == *"$held"* ]] || wrong+=("it does not hold '$held'")
   [ "$kind" = dir ] || [[ "$err" != *"verification."* ]] || wrong+=("it holds 'verification.': it names a key of a file that is not there")
   for each in "unbound variable" "Traceback" "No such file"; do
@@ -1778,9 +1737,7 @@ refused_as_usage() {
   [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which ${shows}holds nothing of the shell's or python's" \
     || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that ${shows}holds neither 'unbound variable' nor 'Traceback' nor 'No such file'" \
          "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason${held:+ that holds $held}>"
-  calls=$(grep -c '' "$SB/cosign.log")
-  [ "$calls" -eq 0 ] && pass "$name: cosign is never called" \
-    || fail "$name: the cosign calls the stub logged: none, what is no usage is refused before cosign is asked" "calls logged: $calls, wanted 0:" "$(cat "$SB/cosign.log")"
+  never_asked "$name" "what is no usage is refused before cosign is asked"
 }
 # a reference ($2) that names no image by a sha256 digest; its line holds it
 no_reference() { refused_as_usage "the reference is $1" "$2" dir verify ROOT "$2"; }
@@ -1825,15 +1782,14 @@ usage_inputs
 #    wrong (at the last @, at /.github/), pass on the statement of their parts.
 # One identity without the form: $1 says what it is, $2 is the identity
 identity_without_form() {
-  local name="the releaser identity $1" RELEASER=$2 each calls; local -a wrong=()
+  local name="the releaser identity $1" RELEASER=$2 each; local -a wrong=()
   fresh
   envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
   run verify "$SB/root" "$REF"
-  [ "$rc" -eq 2 ] && pass "$name: exit 2" || fail "$name: the exit code" "exit=$rc, wanted 2" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
-  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
-    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  exit_is "$name" 2
+  no_stdout "$name"
   one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
-  [[ "$err" == "::error::check-provenance: "* ]] || wrong+=("it is not begun '::error::check-provenance: '")
+  begun_error
   for each in verification.roles.releaser.identity catalogue-policy.yaml "$RELEASER"; do
     [[ "$err" == *"$each"* ]] || wrong+=("it does not hold '$each'")
   done
@@ -1843,15 +1799,13 @@ identity_without_form() {
   [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which names the key, catalogue-policy.yaml and the identity as given" \
     || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that holds verification.roles.releaser.identity, catalogue-policy.yaml and the identity, and neither 'Traceback' nor 'unbound variable'" \
          "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason that names catalogue-policy.yaml and verification.roles.releaser.identity and holds $RELEASER>"
-  calls=$(grep -c '' "$SB/cosign.log")
-  [ "$calls" -eq 0 ] && pass "$name: cosign is never called" \
-    || fail "$name: the cosign calls the stub logged: none, an identity that gives no parts is refused before cosign is asked" "calls logged: $calls, wanted 0:" "$(cat "$SB/cosign.log")"
+  never_asked "$name" "an identity that gives no parts is refused before cosign is asked"
 }
 # One identity with the form: $1 names it, then its repository, workflow path
 # and ref as the rule above cuts them; its one statement carries these
 identity_with_form() {
   local name=$1 SOURCE=$2 WORKFLOW=$3 GIT_REF=$4; local RELEASER="$SOURCE/$WORKFLOW@$GIT_REF"
-  one_of_several "$name, $RELEASER" "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")"
+  one_of_several "$name, $RELEASER" "$(all_five)"
 }
 identity_forms() {
   local owner=${SOURCE%/*}; local host=${owner%/*}
@@ -1899,16 +1853,12 @@ declare -a NAMED=() HOLD=() LACK=()
 retry_sandbox() {
   local nth=0 file
   fresh; sleep_stand_in
-  envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+  envelopes "$(all_five)" > "$SB/envelopes.jsonl"
   [ "$1" -gt 0 ] && echo "$1" > "$SB/refusals"
   for file in first second third fourth fifth; do
     nth=$((nth + 1)); NAMED[$nth]="$SOURCE/.github/workflows/$file.yml@$GIT_REF"
     printf '%s\n' "no matching attestations: offline verification failed" " none of the expected identities matched what was in the certificate, got subjects [${NAMED[$nth]}] with issuer $ISSUER" > "$SB/refusal.$nth"
   done
-}
-exit_is() {
-  [ "$rc" -eq "$2" ] && pass "$1: exit $2" \
-    || fail "$1: the exit code" "exit=$rc, wanted $2" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
 }
 # the stand-in's log after a run: $2 calls, each as "sleep $3"
 pauses() {
@@ -1922,14 +1872,16 @@ pauses() {
 # begun "::warning::check-provenance: $REF: " without a prefix of cosign's,
 # and where $2 is 1 the error line after them; line k holds every text of
 # HOLD[k] and none of LACK[k] (a | between texts); cosign called $4 times,
-# each with case 1's argument set; sleep called $3 times as "sleep 0"
+# each with case 1's argument set; sleep called $3 times as "sleep 0". Of
+# the error line the ok line says what this call held it to carry, the texts
+# of its HOLD: after an attempt that succeeded it is the answer's line, with
+# a clause or with no statement, and not the third attempt's
 tried() {
-  local name=$1 warnings=$3 total=$3 k line each begun lines ended calls same=0; local -a wrong=() on=() texts=()
+  local name=$1 warnings=$3 total=$3 k line each begun lines ended calls same=0 held="" last=""; local -a wrong=() on=() texts=()
   [ "$2" -eq 1 ] && total=$((warnings + 1))
   exit_is "$name" "$2"
   if [ "$2" -eq 1 ]; then
-    [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
-      || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+    no_stdout "$name"
   else
     one_line "$SB/stdout" && [[ "$out" == "check-provenance: "* ]] && [[ "$out" == *"$REF"* ]] \
       && pass "$name: stdout is one line, begun 'check-provenance: ' and naming the reference in full" \
@@ -1946,7 +1898,13 @@ tried() {
     for each in "${texts[@]}"; do [[ "$line" != *"$each"* ]] || wrong+=("line $k carries '$each', which is another attempt's"); done
     [ "$k" -le "$warnings" ] && [[ "$line" == *"Error: "* || "$line" == *"error during command execution"* ]] && wrong+=("line $k holds one of cosign's prefixes 'Error: ' and 'error during command execution'")
   done
-  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is exactly $total lines: $warnings warnings, each carrying what cosign said in its attempt$([ "$total" -gt "$warnings" ] && echo ", then the error line of the third attempt")" \
+  # what the ok line says of the error line: the texts it was held to carry
+  if [ "$total" -gt "$warnings" ]; then
+    IFS='|' read -ra texts <<<"${HOLD[$total]:-}"
+    for each in "${texts[@]}"; do held+="${held:+ and }'$each'"; done
+    last=", then the error line${held:+, which carries $held}"
+  fi
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is exactly $total lines: $warnings warnings, each carrying what cosign said in its attempt$last" \
     || fail "$name: stderr: exactly $total lines, each ended by its newline: $warnings begun '::warning::check-provenance: $REF: ' that carry what cosign said in their attempt and no prefix of cosign's$([ "$total" -gt "$warnings" ] && echo ", then one begun '::error::check-provenance: $REF: ' that says '3 attempts' and carries the third attempt's words")" \
          "${wrong[@]}" "stderr:" "${err:-nothing}"
   calls=$(grep -c '' "$SB/cosign.log")
@@ -1960,13 +1918,11 @@ retry_sandbox 2; HOLD=("" "${NAMED[1]}" "${NAMED[2]}"); LACK=("" "${NAMED[2]}" "
 run verify "$SB/root" "$REF"; tried "cosign refusing twice, then accepting" 0 2 3
 retry_sandbox 1; HOLD=("" "${NAMED[1]}"); LACK=("" "${NAMED[2]}")
 run verify "$SB/root" "$REF"; tried "cosign refusing once, then accepting" 0 1 2
-# the first call ends as a Go program that panics does (case 2's trace, exit 2):
-# the one warning carries a word of the trace's first line and one of its last
+# the first call ends as a Go program that panics does (case 2's go_trace,
+# exit 2): the one warning carries a word of the trace's first line and one
+# of its last
 retry_sandbox 0; HOLD=("" "dereference|main.go:14"); LACK=()
-{
-  printf '%s\n' "panic: runtime error: invalid memory address or nil pointer dereference" "[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x46fb80]" "" "goroutine 1 [running]:"
-  printf '%s\n\t%s\n' "main.subject(0x0?)" "example.test/crash/main.go:9" "main.verify(0x475f00?)" "example.test/crash/main.go:12 +0x13" "main.main()" "example.test/crash/main.go:14 +0x15"
-} > "$SB/crash.1"
+go_trace > "$SB/crash.1"
 run verify "$SB/root" "$REF"; tried "cosign crashing once, then accepting" 0 1 2
 # five calls would refuse: two warnings, the error line, no pause after the third
 retry_sandbox 5; HOLD=("" "${NAMED[1]}" "${NAMED[2]}" "3 attempts|${NAMED[3]}"); LACK=("" "${NAMED[2]}" "${NAMED[1]}")
@@ -2053,18 +2009,17 @@ path_without() {
 # a fresh sandbox with the one envelope; the input's fault is laid down after
 cause_sandbox() {
   fresh
-  envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+  envelopes "$(all_five)" > "$SB/envelopes.jsonl"
 }
 # the second phrase of each cause; the first is the file's or the tool's name
 CAUSES=("cannot be opened" "cannot be read as YAML" "yaml module" "not found on PATH" "no directory for temporary files")
 # after an input's run: $1 names the input, $2 and $3 are its cause's phrases
 told_by_cause() {
-  local name=$1 each calls; local -a wrong=()
+  local name=$1 each; local -a wrong=()
   exit_is "$name" 2
-  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
-    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  no_stdout "$name"
   one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
-  [[ "$err" == "::error::check-provenance: "* ]] || wrong+=("it is not begun '::error::check-provenance: '")
+  begun_error
   for each in "$2" "$3"; do [[ "$err" == *"$each"* ]] || wrong+=("it does not hold '$each'"); done
   for each in "${CAUSES[@]}"; do
     [ "$each" = "$3" ] || [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', the phrase of another cause")
@@ -2078,9 +2033,7 @@ told_by_cause() {
   [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which holds '$2' and '$3', no phrase of another cause or failure and nothing of a tool's own words" \
     || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that holds '$2' and '$3', no phrase of another cause or failure and nothing of a tool's own words" \
          "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason that holds $2 and $3>"
-  calls=$(grep -c '' "$SB/cosign.log")
-  [ "$calls" -eq 0 ] && pass "$name: cosign is never called" \
-    || fail "$name: the cosign calls the stub logged: none, what cannot be made ends before cosign is asked" "calls logged: $calls, wanted 0:" "$(cat "$SB/cosign.log")"
+  never_asked "$name" "what cannot be made ends before cosign is asked"
 }
 cause_sandbox; echo "verification: [not closed" > "$SB/root/catalogue-policy.yaml"
 run verify "$SB/root" "$REF"; told_by_cause "the policy file is no YAML, a bracket not closed" catalogue-policy.yaml "cannot be read as YAML"
@@ -2119,8 +2072,8 @@ cause_sandbox; printf '%s\n' '#!/usr/bin/env bash' "echo \"mktemp: failed to cre
 run verify "$SB/root" "$REF"; told_by_cause "mktemp fails" mktemp "no directory for temporary files"
 
 # 15: a value the script cannot use is refused before cosign is asked (plan
-#    slice 2.5.15, FR-1 as amended 2026-11-17). Three values pass the tests so
-#    far and end somewhere else: an identity with an empty scheme is asked of
+#    slice 2.5.15, FR-1 as amended 2026-11-17). Three values pass the cases
+#    above and end elsewhere: an identity with an empty scheme is asked of
 #    cosign and refused there three times; a reference whose image name holds
 #    an @ reaches cosign as one it cannot read; a pause of 'soon' makes sleep
 #    fail, the attempts follow each other at once and nobody is told. Ten
@@ -2138,10 +2091,9 @@ pause_refused() {
   local name="the pause is $1" value=$2 each calls; local -a wrong=()
   retry_sandbox 0; PAUSE=$value run verify "$SB/root" "$REF"
   exit_is "$name" 2
-  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
-    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  no_stdout "$name"
   one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
-  [[ "$err" == "::error::check-provenance: "* ]] || wrong+=("it is not begun '::error::check-provenance: '")
+  begun_error
   for each in CHECK_PROVENANCE_RETRY_DELAY "$value"; do
     [[ "$err" == *"$each"* ]] || wrong+=("it does not hold '$each'")
   done

@@ -160,14 +160,15 @@ verify_provenance() { # reference
 mkdir "$SB/tuf"
 
 # 1: the real tools accept what the script writes. A stand-in image in the
-#    registry; beside the digest the statement names (the index) an attestation
-#    manifest with one cosign-shaped layer that carries the chain; store adds
-#    the provenance layer there with the real crane; crane reads both layers
-#    back; and with that manifest copied to the stand-in image's own .att tag
-#    cosign 2.6.5 verifies it as SLSA provenance v1 under the fixture
-#    certificate's identity and issuer. The stand-in image is not the
+#    registry; beside the digest the statement names (the index) an
+#    attestation manifest with one cosign-shaped layer that carries the chain;
+#    store adds the provenance layer there with the real crane; crane reads
+#    both layers back; and with that manifest copied to the stand-in image's
+#    own .att tag cosign 2.6.5 verifies it as SLSA provenance v1 under the
+#    fixture certificate's identity and issuer. The stand-in image is not the
 #    statement's subject (hence --check-claims=false), so the subject is
-#    asserted from the statement cosign accepted.
+#    asserted from the statement cosign accepted. Whether the read-back held
+#    is kept in $back: case 2 stands on the manifest read back here.
 REPO="$REGISTRY/mm-weber/slsa-spike"
 TAG=$(att_tag "$INDEX")
 image_layout "$SB/image" "provenance-real case 1"; att_layout "$SB/att"
@@ -183,7 +184,8 @@ manifest=$(crane manifest "$REPO:$TAG" 2>&1)
 count=$(jq '.layers | length' <<<"$manifest" 2>/dev/null)
 first=$(jq -r '.layers[0].digest' <<<"$manifest" 2>/dev/null)
 second=$(jq -r '.layers[1].annotations.predicateType' <<<"$manifest" 2>/dev/null)
-[ "$count" = "2" ] && [ "$first" = "$own" ] && [ "$second" = "https://slsa.dev/provenance/v1" ] \
+back=yes; [ "$count" = "2" ] && [ "$first" = "$own" ] && [ "$second" = "https://slsa.dev/provenance/v1" ] || back=no
+[ "$back" = yes ] \
   && pass "crane manifest reads two layers back from the .att tag: the suite's own layer unchanged, then the SLSA provenance v1 layer" \
   || fail "the manifest read back with crane manifest from $REPO:$TAG" "layers: ${count:-none}, wanted 2" \
        "first layer's digest '${first:-none}', wanted the suite's own '$own'" \
@@ -218,6 +220,10 @@ statements=$(jq -c '.payload | @base64d | fromjson | {predicateType, subject: [.
 #    in the image whose tag it sits under). If cosign accepts the control, the
 #    intermediate certificate reaches it from somewhere other than the chain
 #    the script wrote, and case 1 no longer shows what it is there to show.
+#    The control is made from the manifest case 1 read back, and is held
+#    against it: where that read-back had failed (case 1's second line), a
+#    failure here has the same cause, and its detail begins by saying so, so
+#    that the two lines are not read as two faults.
 image_layout "$SB/control-image" "provenance-real case 2, the control"
 staged=$({ crane push "$SB/control-image" "$REPO:control" && crane pull --format oci "$REPO:$TAG" "$SB/control"; } 2>&1) && staged=""
 IMAGE2=$(crane digest "$REPO:control" 2>/dev/null)
@@ -244,6 +250,8 @@ grep -q 'certificate signed by unknown authority' "$SB/control.err" && named="ye
 why=("the control read back from $REPO:$TAG2 is case 1's manifest with the chain off the provenance layer alone: ${exact:-no}, wanted true"
      "cosign's exit on $REPO@${IMAGE2:-none}: $rc, wanted non-zero"
      "cosign names the certificate authority ('certificate signed by unknown authority'): $named, wanted yes")
+[ "$back" = yes ] \
+  || why=("this case stands on the manifest case 1 read back from $REPO:$TAG, and that read-back had failed (case 1's second result line): the control is made from that manifest and held against it, so this line fails with that one, for the one cause, and says nothing of its own about the chain" "${why[@]}")
 if [ "$exact" != "true" ]; then
   why+=("the control is not the control it claims to be, so what cosign said of it says nothing about the chain"
         "its layers as read back, predicateType and chain, one line each:"
@@ -262,29 +270,30 @@ fi
   && pass "the control: cosign refuses the same manifest with the chain off the provenance layer alone, and names the certificate authority" \
   || fail "the control: the manifest of case 1 with the chain off the provenance layer alone, under a second stand-in image, asked of cosign as in case 1" "${why[@]}"
 
-# 3: what the real cosign prints passes the self-check (Req 2.28). The suite of
-#    scripts/check-provenance.sh knows cosign from a stand-in only: one JSON
-#    line per verified attestation on stdout, the statement base64 in .payload,
-#    a refusal as words on stderr and exit 1. Here the script meets cosign
-#    2.6.5 itself and the real statement, case 1's stand-in image. The policy
-#    root gives the fixture certificate's issuer and subject as the releaser's
-#    identity, so the five values the script cuts from it are the statement's
-#    own: the check passes, on one call that carries the exact identity. With
-#    the identity's ref changed, cosign refuses the certificate on each of the
-#    three attempts and the check fails with cosign's reason. The script finds
-#    a wrapper named cosign first on PATH, in its runs alone: it logs the
-#    arguments it was given, one line per call, and hands them to the real
-#    cosign with what only this offline, throwaway setting needs.
+# 3: what the real cosign prints passes the self-check (Req 2.28). The suite
+#    of scripts/check-provenance.sh knows cosign from a stand-in only: one
+#    JSON line per verified attestation on stdout, the statement base64 in
+#    .payload, a refusal as words on stderr and exit 1. Here the script meets
+#    cosign 2.6.5 itself and the real statement, case 1's stand-in image. The
+#    policy root gives the fixture certificate's issuer and subject as the
+#    releaser's identity, so the five values the script cuts from it are the
+#    statement's own: the check passes, on one call that carries the exact
+#    identity. With the identity's ref changed, cosign refuses the certificate
+#    on each of the three attempts and the check fails with cosign's reason.
+#    The script finds a wrapper named cosign first on PATH, in its runs alone:
+#    it logs the arguments it was given, one line per call, and hands them to
+#    the real cosign with what only this offline, throwaway setting needs.
 CHECK="$HERE/check-provenance.sh"
 ISSUER="https://token.actions.githubusercontent.com"
 SIGNER="https://github.com/mm-weber/dhc-pipeline/.github/workflows/slsa-spike.yml"
 REAL_COSIGN=$(command -v cosign) # the pinned one, found before the wrapper's directory is on PATH
 mkdir "$SB/wrap"
 # Added to the script's own arguments, none of them by the release's call:
-# --offline, TUF_ROOT at the empty directory and the three trust-root files, as
-# in verify_provenance (no network, no cached trust root); --check-claims=false
-# since the stand-in image is not the statement's subject;
-# --allow-insecure-registry since the throwaway registry speaks plain HTTP.
+# --offline, TUF_ROOT at the empty directory and the three trust-root files,
+# as in verify_provenance (no network, no cached trust root);
+# --check-claims=false since the stand-in image is not the statement's
+# subject; --allow-insecure-registry since the throwaway registry speaks plain
+# HTTP.
 cat > "$SB/wrap/cosign" <<WRAP
 #!/usr/bin/env bash
 { printf 'cosign'; [ \$# -gt 0 ] && printf ' %q' "\$@"; echo; } >> $(printf '%q' "$SB/wrap.log")
