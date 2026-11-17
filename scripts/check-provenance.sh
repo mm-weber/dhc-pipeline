@@ -20,6 +20,10 @@
 # one ::error:: line on stderr holding the usage form, and exit 2, before
 # anything is read or asked. A caller who meant another thing is told so, and
 # no check is run that he did not ask for by its name.
+# After the mode word come the root and the reference, the two and no more:
+# any other number of arguments is wrong usage the same way, one ::error::
+# line on stderr holding the usage form and the number given, and exit 2. A
+# caller's slip must read as that, not as the shell's "unbound variable".
 # The reference has to name the image by a sha256 digest: it ends in @sha256:
 # and 64 lower-case hex characters, after a name that is not empty and holds
 # no white space, one reference being one word: with two in the one argument
@@ -147,8 +151,12 @@ set -uo pipefail
 # thing, and is told the form instead of being given this check. So is a call
 # with no word at all: under set -u a bare $1 would end it in the shell's words
 [ "${1-}" = verify ] || { echo "::error::check-provenance: '${1-}' is no mode of this script, usage: check-provenance.sh verify <root> <image@sha256:digest> (Req 2.28)" >&2; exit 2; }
-# after the mode word: the root that holds catalogue-policy.yaml, and the
-# reference cosign is asked about
+# the two after the mode word, counted before either is read: under set -u a
+# missing one would end the run in the shell's words, and one too many would
+# be dropped unseen, the caller's slip checked as if it were none
+[ "$#" -eq 3 ] || { echo "::error::check-provenance: $(($# - 1)) argument(s) after verify where two belong, usage: check-provenance.sh verify <root> <image@sha256:digest> (Req 2.28)" >&2; exit 2; }
+# the root that holds catalogue-policy.yaml, and the reference cosign is
+# asked about
 ROOT="$2"
 REF="$3"
 # only a digest pins what the release pushed: a tag can be moved, and cosign
