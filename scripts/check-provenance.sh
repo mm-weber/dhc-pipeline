@@ -15,6 +15,10 @@
 # its attests list names cosign's own attestation types, the provenance not
 # among them. cosign gets exactly these arguments: no flag that weakens the
 # check rides along.
+# The script has the one mode, verify: any other first word is wrong usage,
+# one ::error:: line on stderr holding the usage form, and exit 2, before
+# anything is read or asked. A caller who meant another thing is told so, and
+# no check is run that he did not ask for by its name.
 # The reference has to name the image by a sha256 digest: it ends in @sha256:
 # and 64 lower-case hex characters, after a name that is not empty and holds
 # no white space, one reference being one word: with two in the one argument
@@ -138,6 +142,9 @@
 # every call, whatever it is, and of a jq that was killed the shell
 # writes no notice of its own, each call being made inside $( ).
 set -uo pipefail
+# the one mode there is; a word that is not it is a call that meant another
+# thing, and is told the form instead of being given this check
+[ "$1" = verify ] || { echo "::error::check-provenance: '$1' is no mode of this script, usage: check-provenance.sh verify <root> <image@sha256:digest> (Req 2.28)" >&2; exit 2; }
 # after the mode word: the root that holds catalogue-policy.yaml, and the
 # reference cosign is asked about
 ROOT="$2"
