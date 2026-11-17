@@ -1555,6 +1555,70 @@ several_statements() {
 }
 several_statements
 
+# 9b: a line that is no JSON hides no statement (plan slice 2.5.9b). cosign's
+#    stdout is one envelope per line today; should a later cosign, or a wrapper
+#    around it, ever write a line of words there, every line is still judged by
+#    itself. A line that is no JSON counts for nothing: it is no statement, and
+#    it takes nothing from the lines before it or after it. A self-check that
+#    stops reading at such a line fails a good release, and one that reads past
+#    it must still never pass without a statement. Two such lines: one of plain
+#    words, and the first half of a real envelope line, which begins like JSON
+#    and does not end. Five inputs under the first identity. Wanted where a
+#    statement meets all five: exit 0; stdout the one passing line; nothing on
+#    stderr, of what jq says of the line neither. Of the line alone: exit 1;
+#    nothing on stdout; stderr the one error line, saying "no provenance
+#    statement". Before a statement that misses the ref: the same, the line
+#    holding the ref's clause as a lone statement's does. cosign called once.
+# One input: $1 names it, $2 says what is wanted (passes, none: no statement,
+# ref: the ref's clause), the arguments after them are the lines of cosign's
+# stdout as they are laid down
+beside_no_json() {
+  local name=$1 want=$2 code=1 says calls clause="ref is \"refs/heads/feature\", expected \"$GIT_REF\""; local -a wrong=(); shift 2
+  [ "$want" = passes ] && code=0
+  fresh
+  printf '%s\n' "$@" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$REF"
+  [ "$rc" -eq "$code" ] && pass "$name: exit $code" || fail "$name: the exit code" "exit=$rc, wanted $code" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  if [ "$want" = passes ]; then
+    one_line "$SB/stdout" && [[ "$out" == "check-provenance: "* ]] && [[ "$out" == *"$REF"* ]] \
+      && pass "$name: stdout is one line, begun 'check-provenance: ' and naming the reference in full" \
+      || fail "$name: stdout: one line and no more, begun 'check-provenance: ' and naming the reference in full" "stdout:" "${out:-nothing}" "wanted: one line, ended by its newline, begun 'check-provenance: ' that carries $REF"
+    [ ! -s "$SB/stderr" ] && pass "$name: nothing on stderr" \
+      || fail "$name: stderr: nothing, neither of the line that is no JSON nor of what jq says of it" "stderr:" "$(cat "$SB/stderr")" "wanted: nothing"
+  else
+    [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
+      || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+    one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr")")
+    [[ "$err" == "::error::check-provenance: $REF: "*" (Req 2.28)" ]] || wrong+=("it is not begun '::error::check-provenance: ' and the reference and ended ' (Req 2.28)'")
+    if [ "$want" = none ]; then
+      says="says 'no provenance statement'"
+      [[ "$err" == *"no provenance statement"* ]] || wrong+=("it does not say 'no provenance statement'")
+    else
+      says="holds the clause '$clause', holds ', expected ' once and says neither 'no provenance statement' nor '3 attempts'"
+      [[ "$err" == *"$clause"* ]] || wrong+=("the clause is not in it")
+      [ "$(occurs ", expected " <<<"$err")" -eq 1 ] || wrong+=("times ', expected ' is in it: $(occurs ", expected " <<<"$err"), wanted 1")
+      [[ "$err" != *"3 attempts"* && "$err" != *"no provenance statement"* ]] || wrong+=("it says '3 attempts' or 'no provenance statement', wanted neither")
+    fi
+    [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which names the reference and $says" \
+      || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that $says" \
+           "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: $REF: <a reason that $says> (Req 2.28)"
+  fi
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq 1 ] && pass "$name: cosign is called once" || fail "$name: the cosign calls the stub logged: one" "calls logged: $calls, wanted 1"
+}
+lines_no_json() {
+  local words="cosign: this line is no JSON" met feature cut
+  met=$(envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")")
+  feature=$(envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "refs/heads/feature")")
+  cut=${met:0:${#met}/2}
+  beside_no_json "a line of words alone" none "$words"
+  beside_no_json "a line of words before a statement that meets all five" passes "$words" "$met"
+  beside_no_json "an envelope cut in its middle before a statement that meets all five" passes "$cut" "$met"
+  beside_no_json "a line of words after a statement that meets all five" passes "$met" "$words"
+  beside_no_json "a line of words before a statement that misses the ref" ref "$words" "$feature"
+}
+lines_no_json
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
