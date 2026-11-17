@@ -269,11 +269,12 @@ run() {
   rm -f "$SB/stdout" "$SB/stderr"
   was=$(holds)
   # the pause between attempts is $PAUSE seconds where a case sets it, 0
-  # otherwise; with the word unset the script is started without the variable
+  # otherwise; with the word unset the script is started without the variable,
+  # with the word empty with the variable set to the empty string;
   # with the tool a case names in $HIDE on none of the directories after the
   # stub's (see path_without, at case 14); with none named, the suite's PATH
   [ -z "${HIDE:-}" ] || dirs=$(path_without "$HIDE")
-  ( cd "$SB/cwd" && export CHECK_PROVENANCE_RETRY_DELAY="${PAUSE:-0}" && { [ "${PAUSE:-}" != unset ] || unset CHECK_PROVENANCE_RETRY_DELAY; } && PATH="$SB/bin:$dirs" TMPDIR="$SB/tmp" "$CHECK" "$@" > "$SB/stdout" 2> "$SB/stderr" ); rc=$?
+  ( cd "$SB/cwd" && export CHECK_PROVENANCE_RETRY_DELAY="${PAUSE:-0}" && { [ "${PAUSE:-}" != unset ] || unset CHECK_PROVENANCE_RETRY_DELAY; } && { [ "${PAUSE:-}" != empty ] || CHECK_PROVENANCE_RETRY_DELAY=""; } && PATH="$SB/bin:$dirs" TMPDIR="$SB/tmp" "$CHECK" "$@" > "$SB/stdout" 2> "$SB/stderr" ); rc=$?
   now=$(holds)
   RUNS=$((RUNS + 1))
   out=""; err=""
@@ -2116,6 +2117,60 @@ HIDE=cosign run verify "$SB/root" "$REF"; told_by_cause "cosign is not on PATH" 
 # a stand-in that fails in GNU mktemp's words
 cause_sandbox; printf '%s\n' '#!/usr/bin/env bash' "echo \"mktemp: failed to create directory via template '/tmp/tmp.XXXXXXXXXX': No such file or directory\" >&2" 'exit 1' > "$SB/bin/mktemp"; chmod +x "$SB/bin/mktemp"
 run verify "$SB/root" "$REF"; told_by_cause "mktemp fails" mktemp "no directory for temporary files"
+
+# 15: a value the script cannot use is refused before cosign is asked (plan
+#    slice 2.5.15, FR-1 as amended 2026-11-17). Three values pass the tests so
+#    far and end somewhere else: an identity with an empty scheme is asked of
+#    cosign and refused there three times; a reference whose image name holds
+#    an @ reaches cosign as one it cannot read; a pause of 'soon' makes sleep
+#    fail, the attempts follow each other at once and nobody is told. Ten
+#    inputs under the first identity. The identity is refused as in case 10c,
+#    the two references as in case 10b. The pause, CHECK_PROVENANCE_RETRY_DELAY,
+#    is 10 seconds where it is not set or set and empty; otherwise it has to be
+#    a whole number of seconds, digits alone. Six that are not, each with
+#    cosign accepting at once, so that no attempt fails and the refusal has to
+#    come at the start. Wanted: exit 2; nothing on stdout; stderr one line,
+#    begun '::error::check-provenance: ', that names the variable and holds
+#    the value and nothing of the shell's or sleep's own words; neither cosign
+#    nor sleep called. Set and empty, the pause stays 10 seconds.
+# One pause that cannot be used: $1 says what it is, $2 is the value
+pause_refused() {
+  local name="the pause is $1" value=$2 each calls; local -a wrong=()
+  retry_sandbox 0; PAUSE=$value run verify "$SB/root" "$REF"
+  exit_is "$name" 2
+  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
+    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
+  [[ "$err" == "::error::check-provenance: "* ]] || wrong+=("it is not begun '::error::check-provenance: '")
+  for each in CHECK_PROVENANCE_RETRY_DELAY "$value"; do
+    [[ "$err" == *"$each"* ]] || wrong+=("it does not hold '$each'")
+  done
+  for each in "invalid time interval" "unbound variable"; do
+    [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', sleep's or the shell's own words")
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which names CHECK_PROVENANCE_RETRY_DELAY and holds the value as given" \
+    || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that holds CHECK_PROVENANCE_RETRY_DELAY and '$value', and neither 'invalid time interval' nor 'unbound variable'" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason that names CHECK_PROVENANCE_RETRY_DELAY and holds '$value'>"
+  calls=$(cat "$SB/cosign.log" "$SB/sleep.log" | grep -c '')
+  [ "$calls" -eq 0 ] && pass "$name: cosign is never called and sleep is never called" \
+    || fail "$name: the calls of cosign and of sleep the stand-ins logged: none, a pause that cannot be used is refused at the start" "calls logged: $calls, wanted 0:" "$(cat "$SB/cosign.log" "$SB/sleep.log")"
+}
+unusable_values() {
+  local image=${REF%@*} hex=${REF##*:}
+  identity_without_form "has an empty scheme, it begins with ://" "://${RELEASER#*://}"
+  no_reference "an image name that itself holds @sha256: and a digest, then @sha256: and the digest" "$REF@sha256:$hex"
+  no_reference "an image name with an @ in it" "${image%/*}@${image##*/}@sha256:$hex"
+  pause_refused "soon" soon
+  pause_refused "1.5" 1.5
+  pause_refused "-1" -1
+  pause_refused "10s" 10s
+  pause_refused "a blank" " "
+  pause_refused "3 and 4, two numbers with a blank between them" "3 4"
+  # case 11's first input, the variable set to the empty string: still 10 seconds
+  retry_sandbox 2; PAUSE=empty run verify "$SB/root" "$REF"
+  exit_is "the pause is set and empty" 0; pauses "the pause is set and empty" 2 10
+}
+unusable_values
 
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
