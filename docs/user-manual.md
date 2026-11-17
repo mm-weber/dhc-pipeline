@@ -690,6 +690,21 @@ scripts/check-provenance.sh verify . "ghcr.io/mm-weber/dhc/<name>@sha256:<hex>"
 
 Once per digest that lost it: the index and each platform manifest.
 
+**A bump of `actions/attest-build-provenance` is merged by hand and
+watched.** Renovate offers it after three days and never merges it itself.
+A green pull request says nothing about the new version: the suites read a
+bundle recorded with v4.2.2, and the four steps run on main only. So:
+
+1. Read the action's release notes for four things: the bundle's media type,
+   the number of log entries, the signed entry timestamp, and the log it
+   writes to. `unpack-provenance.sh` refuses a bundle that differs in any of
+   them.
+2. Merge.
+3. Read the four steps of the next release.
+
+A release stopped by the new version is answered by reverting the bump,
+never by loosening a refusal.
+
 ### Handling Renovate PRs
 
 Every human step in this part is a row of the manual-controls register in

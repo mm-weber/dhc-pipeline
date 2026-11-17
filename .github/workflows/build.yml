@@ -1156,9 +1156,16 @@ jobs:
             > "${RUNNER_TEMP}/provenance-subjects.txt"
           cat "${RUNNER_TEMP}/provenance-subjects.txt"
 
-      # A bump of this action is merged by hand and watched: the suites read
-      # a bundle recorded with v4.2.2, and this step runs on main only, so a
-      # green pull request says nothing about what a new version emits.
+      # A bump of this action is merged by hand and watched (Renovate offers
+      # it after three days and never merges it itself): the suites read a
+      # bundle recorded with v4.2.2, and this step runs on main only, so a
+      # green pull request says nothing about what a new version emits. The
+      # rule: read the action's release notes for the bundle's media type,
+      # the number of log entries, the signed entry timestamp and the log it
+      # writes to; merge; read the next release's provenance steps. A release
+      # stopped by the new version is answered by reverting the bump, never
+      # by loosening a refusal (docs/user-manual.md, "A release stopped at
+      # the provenance steps").
       - name: attest provenance for the index and every platform manifest (Req 2.9, 2.27)
         id: provenance
         if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true') && steps.meta.outputs.provenance != 'off'
