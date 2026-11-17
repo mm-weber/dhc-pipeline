@@ -29,10 +29,12 @@
 # one, all of it.
 # With 0 cosign has printed on stdout the attestations it verified, one
 # envelope per line, the statement base64 in the envelope's payload. That
-# stdout is read for whether it holds a provenance statement: an envelope
-# whose payload is a string that decodes from base64 to a JSON object. Nothing
-# else is one: not a line that is no envelope, not a payload that is null,
-# that is not base64 or that decodes to anything but a JSON object. With no
+# stdout is read line by line for whether it holds a provenance statement: a
+# line that is an envelope whose payload is a string that decodes from base64
+# to a JSON object. Nothing else is one: not a line that is no envelope, not a
+# payload that is null, that is not base64 or that decodes to anything but a
+# JSON object. Every line is judged by itself: one that is no JSON counts for
+# nothing and hides no statement on the lines before it or after it. With no
 # statement the check has failed, though cosign ended with 0: a self-check
 # that passes when nothing was verified has checked nothing. One ::error::
 # line on stderr naming the reference, and exit 1; cosign is not asked again,
@@ -172,12 +174,15 @@ done
 # cosign has ended with 0: the statements in what it printed, each decoded
 # from its envelope's payload, one per line. What jq prints is the answer,
 # its exit code is not: over no input, and a blank line is none, jq -e ends
-# with 0 on jq 1.6 and with 4 on jq 1.7.1. A payload is decoded only when it
-# is a string (jq decodes null as it would the word null), and one that is
-# not base64, or decodes to no JSON, is no statement and no error, hence the
-# try; nor is JSON that is no object a statement. What jq says of a line
-# that is no JSON is not passed on
-statements=$(jq -c 'try (.payload | strings | @base64d | fromjson | objects) catch empty' "$TMP/stdout" 2>/dev/null)
+# with 0 on jq 1.6 and with 4 on jq 1.7.1. Every line is taken as text (-R)
+# and parsed inside the try, each by itself: read as a stream of JSON values,
+# jq would stop at the first line that is no JSON and never see the envelopes
+# after it. A payload is decoded only when it is a string (jq decodes null as
+# it would the word null), and a line that is no JSON, or a payload that is
+# not base64 or decodes to no JSON, is no statement and no error, hence the
+# try; nor is JSON that is no object a statement. What jq writes on stderr
+# is not passed on
+statements=$(jq -R -c 'try (fromjson | .payload | strings | @base64d | fromjson | objects) catch empty' "$TMP/stdout" 2>/dev/null)
 # nothing verified never passes, and cosign is not asked again: what it
 # printed with 0 is no failed attempt
 if [ -z "$statements" ]; then
