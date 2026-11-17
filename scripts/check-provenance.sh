@@ -70,6 +70,11 @@
 # value: without python3 the file would seem to lack a key, without jq what
 # cosign verified would seem to hold no statement, and without cosign three
 # attempts would seem to have failed.
+# A mktemp that fails gives no directory to keep cosign's answer in, and is
+# told by that cause: one ::error:: line on stderr naming mktemp and saying
+# that there is no directory for temporary files, and exit 2, before cosign
+# is asked. Gone on all the same, cosign's answer would be written nowhere,
+# and three attempts would seem to have failed.
 # The identity has to hold an @ with something after it besides: the workflow
 # path ends and the ref begins at its first @, and an identity without one,
 # or with nothing after it, gives no ref. Before that first @ it has to read
@@ -286,8 +291,10 @@ WORKFLOW=${WORKFLOW%%@*}
 # the build workflow's ref: all that follows that first @
 WORKFLOW_REF=${IDENTITY#*@}
 
-# where cosign's stdout is kept until it is read, gone on exit
-TMP=$(mktemp -d)
+# where cosign's stdout is kept until it is read, gone on exit. Without it
+# the check cannot be made: cosign's answer would have no place to go, and
+# the fault would read as cosign's. mktemp's own words are kept back
+TMP=$(mktemp -d 2>/dev/null) || { echo "::error::check-provenance: mktemp gave no directory for temporary files, the check cannot be made without one, the place to look is TMPDIR and the machine's directory for temporary files (Req 2.28)" >&2; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
 
 # cosign is asked up to three times, since what makes it fail can go away by
