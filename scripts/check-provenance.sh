@@ -63,12 +63,13 @@
 # that cause as well: one ::error:: line on stderr naming python3 and its
 # yaml module, and exit 2, before cosign is asked. The place to look is the
 # machine the check runs on, not the policy file.
-# A tool the check needs that is not on PATH, python3 or jq, is told by that
-# cause: one ::error:: line on stderr naming the tool and saying that it is
-# not found on PATH, and exit 2, before the file is read and before cosign is
-# asked. Asked for all the same, the shell would print no value: without
-# python3 the file would seem to lack a key, and without jq what cosign
-# verified would seem to hold no statement.
+# A tool the check needs that is not on PATH, python3, jq or cosign, is told
+# by that cause: one ::error:: line on stderr naming the tool and saying
+# that it is not found on PATH, and exit 2, before the file is read and
+# before cosign is asked. Asked for all the same, the shell would print no
+# value: without python3 the file would seem to lack a key, without jq what
+# cosign verified would seem to hold no statement, and without cosign three
+# attempts would seem to have failed.
 # The identity has to hold an @ with something after it besides: the workflow
 # path ends and the ref begins at its first @, and an identity without one,
 # or with nothing after it, gives no ref. Before that first @ it has to read
@@ -231,9 +232,10 @@ BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
 # file is handed to yaml as bytes: bytes that are no UTF-8 are then yaml's to
 # refuse as well, whatever the locale would have made of them. Before all
 # that the tools have to be there: a shell that does not find one prints no
-# value either, which would read as a key the file lacks (python3) or as
-# nothing verified (jq), and is the machine's fault and neither's
-for tool in python3 jq; do
+# value either, which would read as a key the file lacks (python3), as
+# nothing verified (jq) or as three failed attempts (cosign), and is the
+# machine's fault and none of theirs
+for tool in python3 jq cosign; do
   command -v "$tool" >/dev/null || { echo "::error::check-provenance: $tool is not found on PATH, the check cannot be made without it, $tool has to be installed where the check runs (Req 2.28)" >&2; exit 2; }
 done
 ISSUER=$(python3 -c 'import sys
