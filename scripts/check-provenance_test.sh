@@ -1643,6 +1643,86 @@ all_else=$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF" 
   | .predicate.runDetails.unknownToday = "under runDetails"')
 one_of_several "a statement that meets all five and differs in all else" "$all_else"
 
+# 10: a policy file that does not give the issuer or the releaser identity is
+#    refused (plan slice 2.5.10). cosign is asked under verification.issuer
+#    and verification.roles.releaser.identity of the root's policy file, and
+#    each has to be there as a string that is not empty. An empty one handed
+#    to cosign is a question about nobody, the word None as identity one about
+#    a signer of that name: a release must not go on with a self-check that
+#    asked the wrong question, and whoever broke the file must be told which
+#    key, not shown a python trace or a statement blamed for the file's fault.
+#    22 inputs under the first identity, each over a policy file with the one
+#    fault and all else as fresh writes it, and one envelope whose statement
+#    meets all five, so that a script that asks cosign anyway gets an answer
+#    that passes. Wanted: exit 2; nothing on stdout; stderr one line, begun
+#    '::error::check-provenance: ', naming the file and the key by its dotted
+#    path, with nothing of python's; cosign never called.
+# One input: $1 names it, $2 is the policy file's text (empty: an empty file),
+# the arguments after them are the keys of which the line names one or more
+# (none: the line names the file alone)
+policy_gives_nothing() {
+  local name=$1 policy=$2 key named=no calls; local -a wrong=(); shift 2
+  fresh
+  printf '%s' "${policy:+$policy$'\n'}" > "$SB/root/catalogue-policy.yaml"
+  envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$REF"
+  [ "$rc" -eq 2 ] && pass "$name: exit 2" || fail "$name: the exit code" "exit=$rc, wanted 2" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
+    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr")")
+  [[ "$err" == "::error::check-provenance: "* ]] || wrong+=("it is not begun '::error::check-provenance: '")
+  [[ "$err" == *"catalogue-policy.yaml"* ]] || wrong+=("it does not name the file catalogue-policy.yaml")
+  [ $# -eq 0 ] && named=yes
+  for key in "$@"; do [[ "$err" == *"$key"* ]] && named=yes; done
+  [ "$named" = yes ] || wrong+=("it names no key by its dotted path, wanted: $(printf '%s' "$*" | sed 's/ / or /g')")
+  [[ "$err" != *"Traceback"* && "$err" != *'File "'* ]] || wrong+=("it holds 'Traceback' or 'File \"', python's own words")
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which names catalogue-policy.yaml${1:+ and the key} and holds nothing of python's" \
+    || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that names catalogue-policy.yaml${1:+ and the key by its dotted path} and holds neither 'Traceback' nor 'File \"'" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason that names catalogue-policy.yaml${1:+ and $(printf '%s' "$*" | sed 's/ / or /g')}>"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq 0 ] && pass "$name: cosign is never called" \
+    || fail "$name: the cosign calls the stub logged: none, the script cannot ask under a value the file does not give" "calls logged: $calls, wanted 0:" "$(cat "$SB/cosign.log")"
+}
+# the policy file as fresh writes it, with $1 for the issuer's line and $2 for
+# the line of the releaser's identity (either can be several lines, or empty:
+# the key is absent)
+policy_with() {
+  printf 'verification:\n%s  roles:\n    re-attester:\n      identity: %s\n      attests: [spdxjson, cyclonedx, vuln, openvex]\n    releaser:\n%s      attests: [spdxjson, cyclonedx, vuln, openvex]\n' \
+    "${1:+$1$'\n'}" "$RE_ATTESTER" "${2:+$2$'\n'}"
+}
+policy_faults() {
+  local ki=verification.issuer kr=verification.roles.releaser.identity key pad good at line n
+  local i="  issuer: $ISSUER" r="      identity: $RELEASER"
+  local -a faults=("a mapping" "a list" "a number" "null, written ~" "null, written as nothing after the colon" "the empty string, written \"\"" "absent")
+  for key in "$ki" "$kr"; do
+    pad="  "; good=$ISSUER; [ "$key" = "$kr" ] && { pad="      "; good=$RELEASER; }
+    at="$pad${key##*.}:"
+    for n in 0 1 2 3 4 5 6; do
+      case $n in
+        0) line="$at"$'\n'"$pad  url: $good" ;;
+        1) line="$at"$'\n'"$pad  - $good" ;;
+        2) line="$at 7" ;;
+        3) line="$at ~" ;;
+        4) line="$at" ;;
+        5) line="$at \"\"" ;;
+        6) line="" ;;
+      esac
+      if [ "$key" = "$ki" ]; then policy_gives_nothing "$key is ${faults[n]}" "$(policy_with "$line" "$r")" "$key"
+      else policy_gives_nothing "$key is ${faults[n]}" "$(policy_with "$i" "$line")" "$key"; fi
+    done
+  done
+  policy_gives_nothing "verification is a string" "verification: a string" "$ki" "$kr"
+  policy_gives_nothing "verification.roles is a string, so no $kr" "verification:"$'\n'"$i"$'\n'"  roles: a string" "$kr"
+  policy_gives_nothing "verification.roles.releaser is a string, so no $kr" "$(policy_with "$i" "$r" | sed '/^    releaser:/,$d'; echo "    releaser: a string")" "$kr"
+  policy_gives_nothing "verification.roles.releaser is absent beside the re-attester's role, so no $kr" "$(policy_with "$i" "$r" | sed '/^    releaser:/,$d')" "$kr"
+  policy_gives_nothing "the policy file is empty" "" "$ki" "$kr"
+  policy_gives_nothing "the policy file is no YAML, a bracket not closed" "verification: [not closed"
+  policy_gives_nothing "the policy file's top is a list, no mapping" "- verification" "$ki" "$kr"
+  # the byte 0xFF, which no UTF-8 text holds, before the file as fresh writes it
+  policy_gives_nothing "the policy file is not UTF-8, a byte 0xFF at its beginning" $'\xff'"$(policy_with "$i" "$r")"
+}
+policy_faults
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
