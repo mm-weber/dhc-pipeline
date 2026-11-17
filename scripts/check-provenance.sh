@@ -47,8 +47,12 @@
 # file and the key, verification.issuer or
 # verification.roles.releaser.identity, and exit 2, before cosign is asked.
 # That holds as well where python cannot read the file down to the key (a
-# string where a mapping belongs, a file that is no YAML): it prints no value
-# then, and its own words on stderr are kept back, the line being all there is.
+# string where a mapping belongs): it prints no value then, and its own words
+# on stderr are kept back, the line being all there is.
+# A file that is no YAML gives no key at all, and is told by that cause, not
+# by a key: one ::error:: line on stderr naming the file and saying that it
+# cannot be read as YAML, and exit 2, before cosign is asked. Whoever repairs
+# the release is to look at the file's syntax, not for a key it seems to lack.
 # The identity has to hold an @ with something after it besides: the workflow
 # path ends and the ref begins at its first @, and an identity without one,
 # or with nothing after it, gives no ref. Before that first @ it has to read
@@ -201,8 +205,17 @@ BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
 # print as text, and cosign would be asked under an issuer nobody wrote.
 # What python writes on stderr is kept back: where the file cannot be read
 # down to the key, python ends on a trace and prints no value, and the line
-# below says what is missing
-ISSUER=$(python3 -c 'import sys,yaml; v=(yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("issuer"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml" 2>/dev/null)
+# below says what is missing. A file that yaml cannot parse is another cause
+# and has to be told from that: python ends with 3 there, a code of its own
+# (a trace ends with 1), so the shell reads the cause from the exit code and
+# never from the text, which is the file's value
+ISSUER=$(python3 -c 'import sys,yaml
+try: d=yaml.safe_load(open(sys.argv[1]))
+except yaml.YAMLError: sys.exit(3)
+v=(d or {}).get("verification",{}).get("issuer"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml" 2>/dev/null)
+# no YAML, no key: the file's syntax is at fault, and the line says so
+# instead of naming a key the file would seem to lack
+[ "$?" -ne 3 ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' cannot be read as YAML, its syntax is at fault and no key of it is read (Req 2.28)" >&2; exit 2; }
 # without an issuer there is no question to put to cosign: the file cannot
 # serve, and whoever broke it is told which key
 [ -n "$ISSUER" ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives no verification.issuer, which has to be a string that is not empty (Req 2.28)" >&2; exit 2; }
