@@ -1800,6 +1800,65 @@ usage_inputs() {
 }
 usage_inputs
 
+# 10c: an identity that cannot be cut into its parts is refused (plan slice
+#    2.5.10c). The releaser identity reads <scheme>://<host>/<owner>/<repo>/
+#    <workflow path>@<ref>, each of the six parts not empty: the source
+#    repository expected is the identity up to the repository, the workflow
+#    path what stands between the repository's slash and the first @, the ref
+#    all after that first @. An identity of another form gives no such parts:
+#    cut all the same it gives nonsense, cosign is asked, and the line blames
+#    the statement for the policy file's fault. Eight such identities, each
+#    with one envelope whose statement carries it as builder and the first
+#    identity's repository, path and ref. Wanted: exit 2; nothing on stdout;
+#    stderr one line, begun '::error::check-provenance: ', that holds the key,
+#    catalogue-policy.yaml and the identity as given; cosign never called.
+#    Two identities that have the form, where a cut that looks right goes
+#    wrong (at the last @, at /.github/), pass on the statement of their parts.
+# One identity without the form: $1 says what it is, $2 is the identity
+identity_without_form() {
+  local name="the releaser identity $1" RELEASER=$2 each calls; local -a wrong=()
+  fresh
+  envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$REF"
+  [ "$rc" -eq 2 ] && pass "$name: exit 2" || fail "$name: the exit code" "exit=$rc, wanted 2" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}"
+  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
+    || fail "$name: stdout: nothing, no line says the digest passed" "stdout:" "$(cat "$SB/stdout")" "wanted: nothing"
+  one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
+  [[ "$err" == "::error::check-provenance: "* ]] || wrong+=("it is not begun '::error::check-provenance: '")
+  for each in verification.roles.releaser.identity catalogue-policy.yaml "$RELEASER"; do
+    [[ "$err" == *"$each"* ]] || wrong+=("it does not hold '$each'")
+  done
+  for each in "Traceback" "unbound variable"; do
+    [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', python's or the shell's own words")
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which names the key, catalogue-policy.yaml and the identity as given" \
+    || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that holds verification.roles.releaser.identity, catalogue-policy.yaml and the identity, and neither 'Traceback' nor 'unbound variable'" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason that names catalogue-policy.yaml and verification.roles.releaser.identity and holds $RELEASER>"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq 0 ] && pass "$name: cosign is never called" \
+    || fail "$name: the cosign calls the stub logged: none, an identity that gives no parts is refused before cosign is asked" "calls logged: $calls, wanted 0:" "$(cat "$SB/cosign.log")"
+}
+# One identity with the form: $1 names it, then its repository, workflow path
+# and ref as the rule above cuts them; its one statement carries these
+identity_with_form() {
+  local name=$1 SOURCE=$2 WORKFLOW=$3 GIT_REF=$4; local RELEASER="$SOURCE/$WORKFLOW@$GIT_REF"
+  one_of_several "$name, $RELEASER" "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")"
+}
+identity_forms() {
+  local owner=${SOURCE%/*}; local host=${owner%/*}
+  identity_without_form "has no @ and no ref, it ends with the workflow path" "$SOURCE/$WORKFLOW"
+  identity_without_form "has nothing after the @, no ref" "$SOURCE/$WORKFLOW@"
+  identity_without_form "has nothing between the repository's slash and the @, no workflow path" "$SOURCE/@$GIT_REF"
+  identity_without_form "has no slash and no workflow path after the repository" "$SOURCE@$GIT_REF"
+  identity_without_form "has the owner alone before the @, no repository and no workflow path" "$owner@$GIT_REF"
+  identity_without_form "has an empty owner, two slashes after the host" "$host//${SOURCE##*/}/$WORKFLOW@$GIT_REF"
+  identity_without_form "has an empty repository, two slashes after the owner" "$owner//$WORKFLOW@$GIT_REF"
+  identity_without_form "has no scheme, it begins with the host" "${RELEASER#*://}"
+  identity_with_form "an identity whose ref holds an @" "$SOURCE" "$WORKFLOW" "refs/tags/@acme/widgets@1.2.3"
+  identity_with_form "an identity whose repository is named .github" "$owner/.github" "$WORKFLOW" "$GIT_REF"
+}
+identity_forms
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
