@@ -22,6 +22,9 @@
 # statement that fails the check: one ::error:: line on stderr naming the
 # file and the key, verification.issuer or
 # verification.roles.releaser.identity, and exit 2, before cosign is asked.
+# That holds as well where python cannot read the file down to the key (a
+# string where a mapping belongs, a file that is no YAML): it prints no value
+# then, and its own words on stderr are kept back, the line being all there is.
 # The answer is read in three places: cosign's exit code, its stderr when it
 # fails, its stdout when it ends with 0. Any code but 0 is a failed attempt,
 # a crash of cosign's as much as a refusal, and a failed attempt is tried
@@ -135,14 +138,17 @@ REF="$3"
 BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
 
 # only a string is the issuer: anything else the key holds, python would
-# print as text, and cosign would be asked under an issuer nobody wrote
-ISSUER=$(python3 -c 'import sys,yaml; v=(yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("issuer"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml")
+# print as text, and cosign would be asked under an issuer nobody wrote.
+# What python writes on stderr is kept back: where the file cannot be read
+# down to the key, python ends on a trace and prints no value, and the line
+# below says what is missing
+ISSUER=$(python3 -c 'import sys,yaml; v=(yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("issuer"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml" 2>/dev/null)
 # without an issuer there is no question to put to cosign: the file cannot
 # serve, and whoever broke it is told which key
 [ -n "$ISSUER" ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives no verification.issuer, which has to be a string that is not empty (Req 2.28)" >&2; exit 2; }
 # the role named releaser, whatever its place and whatever it attests; only a
 # string is its identity, as with the issuer
-IDENTITY=$(python3 -c 'import sys,yaml; v=(yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("roles",{}).get("releaser",{}).get("identity"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml")
+IDENTITY=$(python3 -c 'import sys,yaml; v=(yaml.safe_load(open(sys.argv[1])) or {}).get("verification",{}).get("roles",{}).get("releaser",{}).get("identity"); print(v if isinstance(v,str) else "")' "$ROOT/catalogue-policy.yaml" 2>/dev/null)
 # without an identity cosign would be asked about nobody: the file cannot
 # serve here either, and no other role's identity stands in
 [ -n "$IDENTITY" ] || { echo "::error::check-provenance: '$ROOT/catalogue-policy.yaml' gives no verification.roles.releaser.identity, which has to be a string that is not empty (Req 2.28)" >&2; exit 2; }
