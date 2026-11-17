@@ -511,8 +511,11 @@ left of the program is the follow-up list below, one decision each.
           a runner yet)
     - [x] 2.7 the action's pin read by the Renovate test; a bump merged
           by hand and watched (the owner's go 2026-11-17; the test at
-          206 passed; 2.8 waits for the owner's go)
-    - [ ] 2.8 the refactor commit
+          206 passed)
+    - [x] 2.8 the refactor (the owner's go 2026-11-17; two commits,
+          the scripts and then the suites; every suite's result lines
+          as before but for six pass texts; the suites judged the
+          same on 196 and 13 changed copies of the scripts)
     - [ ] the first pushed, the first scheduled and the first dispatched
           release read; Kyverno on the first released digest (one run of
           the spike workflow, the owner's go); the next rescan read
