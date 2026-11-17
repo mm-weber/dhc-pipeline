@@ -63,10 +63,12 @@
 # that cause as well: one ::error:: line on stderr naming python3 and its
 # yaml module, and exit 2, before cosign is asked. The place to look is the
 # machine the check runs on, not the policy file.
-# A python3 that is not on PATH reads no file either and is told by that
-# cause: one ::error:: line on stderr naming python3 and saying that it is
-# not found on PATH, and exit 2, before cosign is asked. Asked for all the
-# same, the shell would print no value, and the file would seem to lack a key.
+# A tool the check needs that is not on PATH, python3 or jq, is told by that
+# cause: one ::error:: line on stderr naming the tool and saying that it is
+# not found on PATH, and exit 2, before the file is read and before cosign is
+# asked. Asked for all the same, the shell would print no value: without
+# python3 the file would seem to lack a key, and without jq what cosign
+# verified would seem to hold no statement.
 # The identity has to hold an @ with something after it besides: the workflow
 # path ends and the ref begins at its first @, and an identity without one,
 # or with nothing after it, gives no ref. Before that first @ it has to read
@@ -228,9 +230,12 @@ BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
 # python ends with 5 there. The
 # file is handed to yaml as bytes: bytes that are no UTF-8 are then yaml's to
 # refuse as well, whatever the locale would have made of them. Before all
-# that python3 has to be there: a shell that does not find it prints no value
-# either, and that is the machine's fault and no key's
-command -v python3 >/dev/null || { echo "::error::check-provenance: python3 is not found on PATH, so '$ROOT/catalogue-policy.yaml' is not read, python3 has to be installed where the check runs (Req 2.28)" >&2; exit 2; }
+# that the tools have to be there: a shell that does not find one prints no
+# value either, which would read as a key the file lacks (python3) or as
+# nothing verified (jq), and is the machine's fault and neither's
+for tool in python3 jq; do
+  command -v "$tool" >/dev/null || { echo "::error::check-provenance: $tool is not found on PATH, the check cannot be made without it, $tool has to be installed where the check runs (Req 2.28)" >&2; exit 2; }
+done
 ISSUER=$(python3 -c 'import sys
 try: import yaml
 except ImportError: sys.exit(5)
