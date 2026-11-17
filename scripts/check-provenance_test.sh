@@ -1394,12 +1394,14 @@ under_second_identity ref_inputs
 #     "<name> is <found>, expected <expected>" for each expectation missed,
 #     each once, ", expected " as many times as there are clauses, and
 #     "<name> is " of no expectation the statement meets; cosign called once.
-#     The order of the clauses and the words around them are free.
+#     The order of the clauses and the words around them are free, but for
+#     this: no clause is followed at once by another, something stands
+#     between two of them, or the line cannot be read.
 # One input: $1 names it, $2 is the statement, the arguments up to -- are the
 # clauses wanted, those after it the names of the expectations it meets. A
 # met one's value may stand in the line: the builder identity holds three
 misses_several() {
-  local name=$1 held=$2 lines ended claims calls each n; local -a clauses=() wrong=()
+  local name=$1 held=$2 lines ended claims calls each other n; local -a clauses=() wrong=()
   shift 2
   while [ $# -gt 0 ] && [ "$1" != -- ]; do clauses+=("$1"); shift; done
   shift
@@ -1417,13 +1419,21 @@ misses_several() {
     n=$(occurs "$each" <<<"$err"); [ "$n" -eq 1 ] || wrong+=("times this clause is in it: $n, wanted 1: $each")
   done
   [ "$claims" -eq "${#clauses[@]}" ] || wrong+=("times ', expected ' is in it: $claims, wanted ${#clauses[@]}, one for each clause")
+  # whatever the order, each clause against each other one: what stands
+  # between two is free, that something stands there is not
+  for each in "${clauses[@]}"; do
+    for other in "${clauses[@]}"; do
+      [ "$each" != "$other" ] || continue
+      [[ "$err" != *"$each$other"* ]] || wrong+=("a clause is followed at once by another, wanted something between the two: $each" "and at once after it: $other")
+    done
+  done
   [[ "$err" != *"3 attempts"* && "$err" != *"no provenance statement"* ]] || wrong+=("it says '3 attempts' or 'no provenance statement', wanted neither")
   for each in "$@"; do
     [[ "$err" != *"$each is "* ]] || wrong+=("it holds '$each is ', of an expectation the statement meets, wanted nothing of it")
   done
   [ "${#wrong[@]}" -eq 0 ] \
     && pass "$name: stderr is one line, the script's error line, which names the reference and holds one clause for each expectation missed and none for one the statement meets" \
-    || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that holds each of the ${#clauses[@]} clauses once, holds ', expected ' ${#clauses[@]} times, says neither '3 attempts' nor 'no provenance statement' and holds '<name> is ' of no expectation the statement meets" \
+    || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ' and the reference, ended ' (Req 2.28)', that holds each of the ${#clauses[@]} clauses once, holds ', expected ' ${#clauses[@]} times, lets no clause be followed at once by another, says neither '3 attempts' nor 'no provenance statement' and holds '<name> is ' of no expectation the statement meets" \
          "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted, in any order and with any words around them, the clauses:" "${clauses[@]}"
   calls=$(grep -c '' "$SB/cosign.log")
   [ "$calls" -eq 1 ] && pass "$name: cosign is called once and not asked again" \
