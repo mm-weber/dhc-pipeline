@@ -65,11 +65,18 @@
 # fails, its stdout when it ends with 0. Any code but 0 is a failed attempt,
 # a crash of cosign's as much as a refusal, and a failed attempt is tried
 # again, up to three attempts: what makes cosign fail can go away by itself,
-# a registry that does not answer for a moment. After the third failure the
+# a registry that does not answer for a moment. Asking again at once would
+# mostly meet the same blip, so a failed attempt that another follows is
+# answered by a pause, sleep called with the seconds held in
+# CHECK_PROVENANCE_RETRY_DELAY, 10 where it is not set, and before the pause
+# by one ::warning:: line on stderr naming the reference, the attempt and
+# what cosign said in it: the line shows in the release's log that an attempt
+# was lost, and why. After the third failure there is neither, the
 # check has failed: one ::error:: line on stderr naming the reference, the
 # three attempts and what cosign said the last time, and exit 1 whatever code
-# cosign ended with. What cosign said is what it wrote on stderr in that
-# attempt, word by word on the one line: of a refusal, which cosign prints
+# cosign ended with. What cosign said, in a warning as in the error line, is
+# what it wrote on stderr in that attempt, word by word on the one line:
+# of a refusal, which cosign prints
 # twice (under "Error: " and then under "error during command execution: "),
 # the first copy without its prefix; of anything else, a Go panic's trace for
 # one, all of it.
@@ -233,16 +240,17 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 # cosign is asked up to three times, since what makes it fail can go away by
-# itself; any exit code but 0 is a failed attempt
+# itself; any exit code but 0 is a failed attempt. Between two attempts lies
+# a pause, since asking again at once mostly meets the same blip
 for attempt in 1 2 3; do
   # stdin is the caller's: the script is called once per digest, and a tool
   # that read stdin would eat what a caller's loop still has to read from it.
-  # What cosign writes ends here: its stderr is kept for the error line, its
+  # What cosign writes ends here: its stderr is kept for the script's own
+  # lines, its
   # stdout goes to a file that every attempt begins anew, so that what a
   # failed attempt printed is never read (2>&1 stands first, so the capture
   # takes stderr alone)
   said=$(cosign verify-attestation --type slsaprovenance1 --certificate-oidc-issuer "$ISSUER" --certificate-identity "$IDENTITY" "$REF" </dev/null 2>&1 >"$TMP/stdout") && break
-  [ "$attempt" -lt 3 ] && continue
   # cosign prints a refusal twice, under "Error: " and then under "error
   # during command execution: ": the message is the first copy without its
   # prefix, so the second is cut off. What cosign wrote without such lines, a
@@ -251,6 +259,13 @@ for attempt in 1 2 3; do
   # onto the one line word by word, so that no blank is doubled: a message's
   # lines after the first begin with a blank, and the last can end in one
   read -r -d '' -a words <<<"${said#Error: }"
+  # another attempt follows: the warning shows in the release's log that this
+  # one was lost, and why; then the pause, which reads no stdin either
+  if [ "$attempt" -lt 3 ]; then
+    echo "::warning::check-provenance: ${REF}: cosign failed on attempt ${attempt} of 3 and is asked again after ${CHECK_PROVENANCE_RETRY_DELAY:-10} seconds, it said:" "${words[@]}" >&2
+    sleep "${CHECK_PROVENANCE_RETRY_DELAY:-10}" </dev/null
+    continue
+  fi
   # 1 whatever code cosign ended with: the code says that the check failed,
   # not how cosign did
   echo "::error::check-provenance: ${REF}: cosign failed on each of 3 attempts, the last time with:" "${words[@]}" "(Req 2.28)" >&2
