@@ -1187,7 +1187,10 @@ jobs:
           scripts/unpack-provenance.sh store "$BUNDLES" "$IMAGE" "$DIGEST" "${manifests[@]}"
 
       # The release's self-check, before any tag: every digest a tag or a
-      # platform pull can resolve to is asked on its own.
+      # platform pull can resolve to is asked on its own, and every one of
+      # them is asked even after one has failed, so that one run names all
+      # that fail. The step ends with the worst exit code of the checks: 2
+      # where a check could not be made, 1 where a statement failed.
       - name: verify the provenance of each digest (Req 2.9, 2.28)
         if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || steps.psd.outputs.publish == 'true') && steps.meta.outputs.provenance != 'off'
         env:
@@ -1197,9 +1200,14 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t manifests < <(printf '%s\n' "$MANIFESTS")
+          rc=0
           for d in "$DIGEST" "${manifests[@]}"; do
-            scripts/check-provenance.sh verify . "${IMAGE}@${d}"
+            scripts/check-provenance.sh verify . "${IMAGE}@${d}" || {
+              s=$?
+              [ "$s" -le "$rc" ] || rc=$s
+            }
           done
+          exit "$rc"
 
       # Req 2.7/2.9: the tag is the promise, so it is applied only now, after the
       # scan, the signature and every attestation exist and the provenance,
