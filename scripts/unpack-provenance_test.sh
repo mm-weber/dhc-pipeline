@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tests for scripts/unpack-provenance.sh, both its modes. store (cases 1 to
-# 26): GitHub's provenance bundle (written by actions/attest-build-provenance)
+# 26 and case 29): GitHub's provenance bundle (written by
+# actions/attest-build-provenance)
 # is stored as one more layer of the attestation manifest cosign keeps beside
 # an image digest, at the tag sha256-<hex>.att (Req 2.27). Nothing is signed
 # here: the layer's blob is the envelope the transparency log recorded, byte
@@ -1195,6 +1196,70 @@ crane=$(cat "$SB/crane.log")
   || fail "subjects names a digest once (one line, at its first naming, exit 0) and refuses what is not a digest (exit 2, nothing on stdout, the usage on stderr), no crane call" \
        "calls not as wanted: $amiss of 6" "${calls[@]}" \
        "crane calls logged over the six calls, wanted none:" "${crane:-none}"
+
+# 29: between two attempts of a registry call lies a pause (plan slice
+#     2.4.30): a pull or a push that failed and is tried again (cases 24 and
+#     25) is tried again after a wait, because a registry asked again at once
+#     mostly meets the same blip, and then the three attempts are worth one.
+#     After each failure that is tried again sleep is called once, with the
+#     seconds UNPACK_PROVENANCE_RETRY_DELAY holds, and with 10 where the
+#     variable is not set; after the third failure no pause follows, the run
+#     ends with its refusal; a run in which no call fails never calls sleep.
+#     sleep is a stand-in of this case's own, put into the sandbox's bin
+#     after fresh: it writes the word sleep and its arguments to
+#     $SB/sleep.log, one line per call, and ends with 0, so no input waits.
+#     run fixes the variable to 0, so the script is run by this case's
+#     pause_run: run's PATH and its folding of stderr into the output, the
+#     variable set to the value the input names or taken out of the
+#     environment. Every input has a sandbox of its own, the attestation
+#     manifest laid down at the index's .att tag and the fixture's bundle as
+#     it is, so the digest lacks nothing; the stub's counts make the pulls
+#     and the pushes fail. The five inputs:
+#     a pull that fails once and then goes through, the variable 7: exit 0,
+#     one call, sleep 7;
+#     a push that fails once and then goes through, the variable 7: the same;
+#     a pull that fails twice and then goes through, the variable not set:
+#     exit 0, two calls, each sleep 10;
+#     a pull that fails three times, the variable 7: exit 1 (the refusal is
+#     case 14's and case 25's, its words are not asserted again), two calls,
+#     each sleep 7, none after the third failure;
+#     no call fails, the variable 7: exit 0, sleep never called.
+#     The log is compared as a whole file, byte for byte, against the lines
+#     wanted (cmp), never by a pattern or a count. One result line per input,
+#     named by the input and what is wanted; on a failure its detail shows
+#     the exit code, the sleep calls logged, the calls wanted and the output
+pause_run() { # the seconds for the variable ("" takes it out of the environment), then the script's arguments
+  local delay="$1"; shift
+  if [ -n "$delay" ]; then PATH="$SB/bin:$PATH" UNPACK_PROVENANCE_RETRY_DELAY="$delay" "$UNPACK" "$@" 2>&1
+  else PATH="$SB/bin:$PATH" env -u UNPACK_PROVENANCE_RETRY_DELAY "$UNPACK" "$@" 2>&1; fi
+}
+pause_input() { # what, the variable ("" not set), the pulls that fail, the pushes that fail, the exit code wanted, the sleep calls wanted in words, then one argument per sleep line wanted
+  local what="$1" delay="$2" pulls="$3" pushes="$4" code="$5" said="$6"; shift 6
+  fresh; TAG=$(att_tag "$INDEX"); lay_down "$TAG"
+  # sleep as a log: the word and its arguments, one line per call, no wait
+  cat > "$SB/bin/sleep" <<'STUB'
+#!/usr/bin/env bash
+SB="$(cd "$(dirname "$0")/.." && pwd)"
+{ printf 'sleep'; [ "$#" -eq 0 ] || printf ' %s' "$@"; echo; } >> "$SB/sleep.log"
+exit 0
+STUB
+  chmod +x "$SB/bin/sleep"; : > "$SB/sleep.log"
+  echo "$pulls" > "$SB/pull-failures"; echo "$pushes" > "$SB/push-failures"
+  # the lines wanted, as a file: none wanted is an empty file
+  : > "$SB/sleep.want"; [ "$#" -eq 0 ] || printf '%s\n' "$@" > "$SB/sleep.want"
+  out=$(pause_run "$delay" store "$DATA/bundle.jsonl" "$REPO" "$INDEX"); rc=$?
+  [ "$rc" -eq "$code" ] && cmp -s "$SB/sleep.log" "$SB/sleep.want" \
+    && pass "the pause between two attempts, $what: exit $code, $said" \
+    || fail "the pause between two attempts, $what: exit $code, $said" "exit=$rc, wanted $code" \
+         "sleep calls logged (through cat -A, \$ ends a line):" "$([ -s "$SB/sleep.log" ] && cat -A "$SB/sleep.log" || echo "none")" \
+         "sleep calls wanted:" "$([ -s "$SB/sleep.want" ] && cat -A "$SB/sleep.want" || echo "none")" \
+         "output:" "${out:-none}"
+}
+pause_input "a pull that fails once and then goes through, UNPACK_PROVENANCE_RETRY_DELAY=7" 7 1 0 0 "sleep called exactly once, as sleep 7" "sleep 7"
+pause_input "a push that fails once and then goes through, UNPACK_PROVENANCE_RETRY_DELAY=7" 7 0 1 0 "sleep called exactly once, as sleep 7" "sleep 7"
+pause_input "a pull that fails twice and then goes through, UNPACK_PROVENANCE_RETRY_DELAY not set" "" 2 0 0 "sleep called exactly twice, each time as sleep 10" "sleep 10" "sleep 10"
+pause_input "a pull that fails three times, UNPACK_PROVENANCE_RETRY_DELAY=7" 7 3 0 1 "sleep called exactly twice, each time as sleep 7, no pause after the third failure" "sleep 7" "sleep 7"
+pause_input "no call fails, UNPACK_PROVENANCE_RETRY_DELAY=7" 7 0 0 0 "sleep never called"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
