@@ -99,12 +99,19 @@
 # tried again is said with one ::warning:: line naming the digest, the tag
 # whose pull or push failed and the attempt that failed: a call that goes
 # through at the second or third attempt leaves a green run, and crane's own
-# words name a tag and a status and are no annotation.
+# words name a tag and a status and are no annotation. What crane says on
+# stderr passes to stderr as it is, at every attempt.
 #
-# After the third failure of its pull a digest is refused, like the others, as
-# one with no attestation manifest to pull: the layer is added to the manifest
-# cosign wrote and never begins a new one, so the release's other attestations
-# must exist first.
+# A pull the registry answers with its error code MANIFEST_UNKNOWN (the code
+# of the OCI distribution API for a manifest or a tag that is not there, on
+# the line crane prints; the code decides, not the words after it) is not
+# tried again, at whichever attempt the answer comes: the registry has
+# answered, and asking again brings the same answer. The digest is refused at
+# once, like the others, as one with no attestation manifest to pull, with no
+# warning line and no pause for that answer: the layer is added to the
+# manifest cosign wrote and never begins a new one, so the release's other
+# attestations must exist first. After the third failure of its pull for
+# another cause a digest is refused in the same words.
 #
 # The chain annotation (the Sigstore certificates that issued the bundle's
 # certificate; Kyverno reads the intermediate from there and nowhere else) is
@@ -177,12 +184,20 @@ refuse() {
 # attempts, UNPACK_PROVENANCE_RETRY_DELAY seconds apart (default 10). Every
 # failure that is tried again is said with a warning line naming the digest,
 # the call ($1, with its tag) and the attempt that failed; the last failure
-# is the refusal $2. What follows the two is crane's arguments
+# is the refusal $2. $3 is the registry's error code that is its answer and
+# no faltering ("" for none): a failure whose stderr holds it is the refusal
+# $2 at once, not tried again. What crane says on stderr is kept for that
+# reading and passes to stderr as it is. What follows the three is crane's
+# arguments
 registry() {
-  local what="$1" refusal="$2" attempt
-  shift 2
+  local what="$1" refusal="$2" answer="$3" attempt failed
+  shift 3
   for ((attempt = 1; attempt <= ATTEMPTS; attempt++)); do
-    crane "$@" && return
+    failed=0
+    crane "$@" 2> "$TMP/crane.stderr" || failed=1
+    cat "$TMP/crane.stderr" >&2
+    [ "$failed" -eq 1 ] || return 0
+    [ -z "$answer" ] || ! grep -Fq -- "$answer" "$TMP/crane.stderr" || refuse "$refusal"
     [ "$attempt" -lt "$ATTEMPTS" ] || refuse "$refusal"
     echo "::warning::unpack-provenance: ${REPO}@${DIGEST}: ${what} failed, attempt ${attempt} of ${ATTEMPTS}, it is tried again" >&2
     sleep "${UNPACK_PROVENANCE_RETRY_DELAY:-10}"
@@ -335,10 +350,11 @@ for DIGEST in "$@"; do
 
   # the layer is added to the attestation manifest cosign wrote for the digest
   # and never begins a new one: no manifest to pull, nothing is stored. The
-  # pull has its attempts; the last one's failure is the refusal
+  # pull has its attempts; the last one's failure is the refusal, and so is,
+  # at once, the registry's answer that the manifest is not there
   registry "the pull of ${REF}" \
     "no attestation manifest could be pulled from ${REF}, the release's other attestations must exist first" \
-    pull --format oci "$REF" "$DIR"
+    MANIFEST_UNKNOWN pull --format oci "$REF" "$DIR"
   # the chain is copied from a layer cosign wrote in that manifest: no layer
   # that carries one, nothing is stored
   old=$(jq -r '.manifests[0].digest' "$DIR/index.json")
@@ -403,6 +419,6 @@ for i in "${!DIGESTS[@]}"; do
   DIGEST="${DIGESTS[$i]}" REF="${REFS[$i]}"
   registry "the push to ${REF}" \
     "the push to ${REF} failed ${ATTEMPTS} times, the provenance is not stored beside the digest" \
-    push "${DIRS[$i]}" "$REF"
+    "" push "${DIRS[$i]}" "$REF"
   echo "unpack-provenance: ${REPO}@${DIGEST}: provenance stored as layer sha256:${LAYERS[$i]} of ${REF}"
 done
