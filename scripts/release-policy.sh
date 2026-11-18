@@ -3,31 +3,36 @@
 #
 # The one reader of catalogue-policy.yaml's `release` section (review
 # disposition D3, 2026-09-09; the triage-policy.sh shape for the switches
-# Req 2.13, 2.14, 2.17, 2.21 and 7.7 name):
+# Req 2.13, 2.14, 2.17, 2.21 and 7.7 name, and since then Req 6.61 and 2.30):
 #
 #   public           true|false   the public-release state (Req 2.21, 2.4)
 #   fail-closed      true|false   sign nothing on an uncovered finding (2.13)
-#   publish-policy   on-change|always   what a scheduled rebuild publishes (2.15, 2.17)
+#   publish-policy   on-change|always   what a scheduled rebuild publishes
+#                    (2.15, 2.17)
 #   schedule         the daily rebuild's cron, five fields (2.14)
 #   platforms        the admitted platforms, os/arch, one per line (7.7)
-#   page             true|false   the catalogue page is published to Pages (6.61)
+#   page             true|false   the catalogue page is published to Pages
+#                    (6.61)
+#   provenance       off|report|required   the SLSA provenance mode of a
+#                    release (2.30)
 #   check            every switch above, refusing the first hole; prints them
 #
 # Each switch is returned only when it is written exactly as the criteria
 # name it. build.yml used to read them with yq as raw strings and compare
 # them to 'true' and 'on-change', so `yes`, `True` or `on_change` silently
 # took the fail-open branch (every rebuild published, no release ever held).
-# The two booleans are checked against the file's own text, not a parsed
-# value: PyYAML reads `yes` as true and mikefarah's yq reads it as the string
-# "yes", and a switch two readers disagree on is not declared. A hole (a
-# missing key, a value outside the accepted set, a malformed platform or
-# cron) refuses with exit 2 naming the key, the value and what is accepted,
-# never a default.
+# The booleans and the provenance mode are checked against the file's own
+# text, not a parsed value: PyYAML reads `yes` as true and mikefarah's yq
+# reads it as the string "yes" (a bare `off` likewise: a boolean to the one,
+# a string to the other), and a switch two readers disagree on is not
+# declared. A hole (a missing key, a value outside the accepted set, a
+# malformed platform or cron) refuses with exit 2 naming the key, the value
+# and what is accepted, never a default.
 set -euo pipefail
 
 err() { printf '::error::release-policy: %s\n' "$1" >&2; }
 if [ "$#" -ne 2 ]; then
-  err "usage: release-policy.sh <root> <public|fail-closed|publish-policy|schedule|platforms|page|check>"
+  err "usage: release-policy.sh <root> <public|fail-closed|publish-policy|schedule|platforms|page|provenance|check>"
   exit 2
 fi
 ROOT="${1%/}"; QUERY="$2"
@@ -86,6 +91,14 @@ def platforms():
         out.append(p)
     return out
 
+def provenance():
+    if "provenance" not in rel:
+        refuse("provenance is missing; write off, report or required (Req 2.30)")
+    tok = raw_token("provenance")
+    if tok not in ("off", "report", "required"):
+        refuse(f"provenance is '{tok}'; write exactly off, report or required, unquoted (a bare off or on is a boolean to PyYAML and a string to mikefarah's yq, so the value is taken as written; Req 2.30)")
+    return tok
+
 if query == "public":
     print(boolean("public"))
 elif query == "fail-closed":
@@ -98,9 +111,11 @@ elif query == "platforms":
     print("\n".join(platforms()))
 elif query == "page":
     print(boolean("page"))
+elif query == "provenance":
+    print(provenance())
 elif query == "check":
-    pub, fc, pp, sch, pl, pg = boolean("public"), boolean("fail_closed"), publish_policy(), schedule(), platforms(), boolean("page")
-    print(f"release-policy: public={pub} fail_closed={fc} publish_policy={pp} page={pg} schedule=\"{sch}\" {len(pl)} platform(s): {', '.join(pl)}")
+    pub, fc, pp, sch, pl, pg, prov = boolean("public"), boolean("fail_closed"), publish_policy(), schedule(), platforms(), boolean("page"), provenance()
+    print(f"release-policy: public={pub} fail_closed={fc} publish_policy={pp} page={pg} provenance={prov} schedule=\"{sch}\" {len(pl)} platform(s): {', '.join(pl)}")
 else:
-    refuse(f"unknown query '{query}'; one of public, fail-closed, publish-policy, schedule, platforms, page, check")
+    refuse(f"unknown query '{query}'; one of public, fail-closed, publish-policy, schedule, platforms, page, provenance, check")
 PY

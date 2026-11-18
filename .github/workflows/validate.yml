@@ -265,6 +265,27 @@ jobs:
         run: scripts/render-chart_test.sh
       - name: exactly one OpenVEX attestation per digest (Req 6.44, 6.45)
         run: scripts/check-attestation-count_test.sh
+      - name: provenance unpack unit tests (Req 2.27; stub crane)
+        run: scripts/unpack-provenance_test.sh
+      - name: provenance self-check unit tests (Req 2.9, 2.28; stub cosign)
+        run: scripts/check-provenance_test.sh
+
+      # The two provenance scripts once more, against the tools themselves:
+      # the pinned crane and cosign, a throwaway registry on 127.0.0.1 and
+      # Sigstore's public trust root from fixture files, so that what the
+      # stubs above accept is also what the real tools accept. Installed the
+      # way the release job installs them; the suite refuses any other
+      # version. Last of the suites, so that the two tools are on PATH for no
+      # suite that stubs them.
+      - name: install the pinned crane and cosign for the real-tool suite (Req 7.5)
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/provenance-bin"
+          scripts/install-tool.sh crane "${RUNNER_TEMP}/provenance-bin"
+          scripts/install-tool.sh cosign "${RUNNER_TEMP}/provenance-bin"
+          echo "${RUNNER_TEMP}/provenance-bin" >> "$GITHUB_PATH"
+      - name: provenance scripts against the real crane and cosign (Req 2.27, 2.28)
+        run: scripts/provenance-real_test.sh
 
       # Every script has a suite and every suite is enumerated above, as a
       # live step: a suite that exists but never runs in CI passes locally

@@ -1,0 +1,418 @@
+#!/usr/bin/env bash
+# Tests of the provenance scripts against the real tools: the pinned crane
+# and the pinned cosign, a throwaway registry on 127.0.0.1 (Req 2.27).
+#
+# Why this suite exists beside scripts/unpack-provenance_test.sh: there crane
+# is a stub and no verifier reads what the script writes, so every case there
+# holds the script to what the suite's author believes the tools want. What
+# the stubs accept must also be what the real tools accept. A defect the
+# stand-ins share with the script shows only here: the wrong logIndex, a
+# certificate PEM cosign cannot parse, a log entry annotation whose signed
+# entry timestamp does not verify, a layer that is not the envelope the
+# transparency log recorded.
+#
+# Run it with the two pinned tools first on PATH (scripts/install-tool.sh
+# installs them, and holds the two versions this suite asks for):
+#
+#     scripts/install-tool.sh crane && scripts/install-tool.sh cosign
+#     bash scripts/provenance-real_test.sh
+#
+# With another crane or cosign on PATH, or with one of them missing, the suite
+# refuses to run: one line on stderr, exit 2, nothing started. A verdict from
+# another version is no verdict on the pinned one.
+#
+# No network beyond 127.0.0.1: the registry is `crane registry serve` in
+# memory on a free port, the image and the attestation manifest are laid down
+# by hand, the bundle and the chain are the real ones of the measuring run of
+# 2026-11-13 (scripts/testdata/provenance), and cosign verifies offline with
+# the public Sigstore trust root handed over as files
+# (scripts/testdata/provenance/roots: Fulcio's two root certificates, the key
+# of the first Rekor log, the key of the certificate transparency log that
+# logged the fixture's certificate; taken from the public trusted_root.json)
+# and with TUF_ROOT at an empty directory, so that a trust root cached on the
+# machine cannot help a run.
+#
+# The Fulcio file holds the roots only, not the intermediate certificate that
+# issued the fixture's certificate: cosign therefore takes the intermediate
+# from the layer's dev.sigstore.cosign/chain annotation. That is wanted: a
+# verifier configured with the roots alone must be able to build the path
+# from what the script wrote, and the stub suite can only check that the
+# annotation is there. Case 2 holds it with a control: the same layer without
+# its chain is refused. With the intermediate back in the file, case 2 fails.
+set -uo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+UNPACK="$HERE/unpack-provenance.sh"
+DATA="$HERE/testdata/provenance"
+ROOTS="$DATA/roots"
+FAILURES=0
+pass() { echo "ok   $1"; }
+fail() { echo "FAIL $1"; shift; [ $# -gt 0 ] && printf '%s\n' "$@" | sed 's/^/    /'; FAILURES=$((FAILURES+1)); }
+
+# The version gate, before anything else: the pins live in install-tool.sh and
+# nowhere else, and what is on PATH must be exactly those two versions.
+want_crane=$(sed -n 's/^CRANE_VERSION="\([^"]*\)"$/\1/p' "$HERE/install-tool.sh")
+want_cosign=$(sed -n 's/^COSIGN_VERSION="\([^"]*\)"$/\1/p' "$HERE/install-tool.sh")
+have_crane=$(crane version 2>/dev/null | head -n 1) || have_crane=""
+have_cosign=$(cosign version 2>/dev/null | sed -n 's/^GitVersion:[[:space:]]*v//p') || have_cosign=""
+if [ -z "$want_crane" ] || [ -z "$want_cosign" ] || [ "$have_crane" != "$want_crane" ] || [ "$have_cosign" != "$want_cosign" ]; then
+  echo "provenance-real_test: crane ${want_crane:-(no pin read)} and cosign ${want_cosign:-(no pin read)} are needed on PATH, the versions scripts/install-tool.sh pins and installs; found crane ${have_crane:-none} and cosign ${have_cosign:-none}. Nothing was started, no case was run." >&2
+  exit 2
+fi
+
+# the index digest the fixture's statement names
+INDEX="sha256:c47ac86f0e7100538371e5836d2608bbb9abec15c5589d5bbc34bc9cad3619b2"
+att_tag() { printf 'sha256-%s.att' "${1#sha256:}"; } # cosign's attestation tag for a digest
+
+put_blob() { # layout: stdin becomes a blob named by its sha256; prints "<hex> <size>"
+  local dir="$1/blobs/sha256" tmp hex
+  mkdir -p "$dir"; tmp=$(mktemp "$dir/tmp.XXXXXX"); cat > "$tmp"
+  hex=$(sha256sum < "$tmp" | cut -d' ' -f1); mv "$tmp" "$dir/$hex"
+  printf '%s %s\n' "$hex" "$(wc -c < "$dir/$hex")"
+}
+
+close_layout() { # layout config-hex config-size layers: the manifest, index.json and oci-layout in the shape crane 0.22.1 reads
+  local dir="$1" mhex msize
+  read -r mhex msize < <(jq -nc --arg config "sha256:$2" --argjson csize "$3" --argjson layers "$4" \
+    '{schemaVersion:2,mediaType:"application/vnd.oci.image.manifest.v1+json",
+      config:{mediaType:"application/vnd.oci.image.config.v1+json",size:$csize,digest:$config},
+      layers:$layers}' | put_blob "$dir")
+  jq -nc --arg manifest "sha256:$mhex" --argjson msize "$msize" \
+    '{schemaVersion:2,mediaType:"application/vnd.oci.image.index.v1+json",
+      manifests:[{mediaType:"application/vnd.oci.image.manifest.v1+json",size:$msize,digest:$manifest}]}' > "$dir/index.json"
+  printf '{"imageLayoutVersion": "1.0.0"}' > "$dir/oci-layout"
+}
+
+image_layout() { # layout name: a stand-in image built with no network, a config that carries the name and no layer
+  local dir="$1" chex csize
+  mkdir -p "$dir"
+  read -r chex csize < <(jq -nc --arg name "$2" \
+    '{architecture:"amd64",os:"linux",rootfs:{type:"layers",diff_ids:[]},config:{Labels:{"stand-in":$name}}}' | put_blob "$dir")
+  close_layout "$dir" "$chex" "$csize" '[]'
+}
+
+att_layout() { # layout: the attestation manifest cosign keeps beside a digest, one cosign-shaped layer that carries the chain
+  local dir="$1" type="https://spdx.dev/Document" payload lhex lsize chex csize layers
+  mkdir -p "$dir"
+  # a small DSSE envelope that nobody signed: the layer cosign wrote stands
+  # here only as the layer that was already there and that carries the chain
+  payload=$(printf '{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"%s","subject":[],"predicate":{}}' "$type" | base64 -w0)
+  read -r lhex lsize < <(printf '{"payload":"%s","payloadType":"application/vnd.in-toto+json","signatures":[{"sig":""}]}' "$payload" | put_blob "$dir")
+  layers=$(jq -nc --rawfile chain "$DATA/chain.pem" --arg type "$type" --arg layer "sha256:$lhex" --argjson lsize "$lsize" \
+    '[{mediaType:"application/vnd.dsse.envelope.v1+json",size:$lsize,digest:$layer,
+       annotations:{predicateType:$type,"dev.cosignproject.cosign/signature":"","dev.sigstore.cosign/chain":$chain}}]')
+  # the config: the layers' digests in order, one history entry per layer
+  read -r chex csize < <(jq -nc --argjson layers "$layers" \
+    '{architecture:"",created:"0001-01-01T00:00:00Z",history:[$layers[] | {created:"0001-01-01T00:00:00Z"}],os:"",rootfs:{type:"layers",diff_ids:[$layers[].digest]},config:{}}' | put_blob "$dir")
+  close_layout "$dir" "$chex" "$csize" "$layers"
+}
+
+short() { jq -c 'walk(if type == "string" and length > 120 then "\(.[0:32])... (\(length) characters)" else . end)' 2>/dev/null; } # JSON for a detail line
+
+# The setup every case shares: a sandbox, and the registry, the real
+# `crane registry serve` in memory on 127.0.0.1 on a port the kernel chooses
+# (--address 127.0.0.1:0; crane 0.22.1 says the port on stderr, "serving on
+# port N"). ONE trap stops the registry and removes the sandbox, on every way
+# out of the suite: the end of the run, an early exit, and a signal, which is
+# turned into an exit so that it leaves through the same trap (bash 5.2 ended
+# by a signal sent to its whole process group does not always run an EXIT trap
+# by itself, measured with HUP and TERM).
+SB=$(mktemp -d)
+REGISTRY_PID=""
+cleanup() {
+  if [ -n "$REGISTRY_PID" ]; then kill "$REGISTRY_PID" 2>/dev/null; wait "$REGISTRY_PID" 2>/dev/null; fi
+  rm -rf "$SB"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+crane registry serve --address 127.0.0.1:0 > "$SB/registry.log" 2>&1 &
+REGISTRY_PID=$!
+# waited for until it answers, ten seconds at most
+REGISTRY=""
+for _ in $(seq 1 100); do
+  port=$(sed -n 's/.*serving on port \([0-9][0-9]*\).*/\1/p' "$SB/registry.log" | head -n 1)
+  if [ -n "$port" ] && crane catalog "127.0.0.1:$port" > /dev/null 2>&1; then REGISTRY="127.0.0.1:$port"; break; fi
+  sleep 0.1
+done
+if [ -z "$REGISTRY" ]; then
+  fail "the throwaway registry (crane registry serve --address 127.0.0.1:0) answers within ten seconds" \
+    "no answer; what it said:" "$(cat "$SB/registry.log")"
+  echo "$FAILURES failure(s)"; exit 1
+fi
+
+# cosign 2.6.5 on the old attestation layout, keyless and offline: the
+# certificate against Fulcio's roots, its certificate transparency timestamp,
+# the log entry's signed entry timestamp, the envelope's signature and the
+# signer's identity, all from the three files and the layer's annotations.
+# fulcio.pem holds the two roots only, so the intermediate certificate between
+# a root and the signing certificate is the one in the layer's
+# dev.sigstore.cosign/chain annotation: the chain the script wrote there is
+# what the path is built from. Case 2 holds that with a control: the same
+# layer without its chain is refused.
+# --check-claims=false: the image asked about need not be the statement's
+# subject. The accepted envelopes go to stdout, one per line.
+verify_provenance() { # reference
+  TUF_ROOT="$SB/tuf" SIGSTORE_ROOT_FILE="$ROOTS/fulcio.pem" SIGSTORE_REKOR_PUBLIC_KEY="$ROOTS/rekor0.pem" \
+    SIGSTORE_CT_LOG_PUBLIC_KEY_FILE="$ROOTS/ctfe1.pem" \
+    cosign verify-attestation --allow-insecure-registry --offline --check-claims=false --type slsaprovenance1 \
+      --certificate-identity-regexp '^https://github.com/mm-weber/dhc-pipeline/' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com "$1"
+}
+mkdir "$SB/tuf"
+
+# 1: the real tools accept what the script writes. A stand-in image in the
+#    registry; beside the digest the statement names (the index) an
+#    attestation manifest with one cosign-shaped layer that carries the chain;
+#    store adds the provenance layer there with the real crane; crane reads
+#    both layers back; and with that manifest copied to the stand-in image's
+#    own .att tag cosign 2.6.5 verifies it as SLSA provenance v1 under the
+#    fixture certificate's identity and issuer. The stand-in image is not the
+#    statement's subject (hence --check-claims=false), so the subject is
+#    asserted from the statement cosign accepted. Whether the read-back held
+#    is kept in $back: case 2 stands on the manifest read back here.
+REPO="$REGISTRY/mm-weber/slsa-spike"
+TAG=$(att_tag "$INDEX")
+image_layout "$SB/image" "provenance-real case 1"; att_layout "$SB/att"
+laid=$({ crane push "$SB/image" "$REPO:stand-in" && crane push "$SB/att" "$REPO:$TAG"; } 2>&1) && laid=""
+IMAGE=$(crane digest "$REPO:stand-in" 2>/dev/null)
+own=$(jq -r '.manifests[0].digest' "$SB/att/index.json"); own=$(jq -r '.layers[0].digest' "$SB/att/blobs/sha256/${own#sha256:}")
+out=$(UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" store "$DATA/bundle.jsonl" "$REPO" "$INDEX" 2>&1); rc=$?
+[ "$rc" -eq 0 ] \
+  && pass "store against the registry, with the real crane, exits 0" \
+  || fail "store against the registry, with the real crane" "exit=$rc, wanted 0" "its output:" "${out:-none}" \
+       "the stand-in image's digest: ${IMAGE:-none, it was not pushed}" "what a failed push of the suite's own two layouts said:" "${laid:-nothing, both went through}"
+manifest=$(crane manifest "$REPO:$TAG" 2>&1)
+count=$(jq '.layers | length' <<<"$manifest" 2>/dev/null)
+first=$(jq -r '.layers[0].digest' <<<"$manifest" 2>/dev/null)
+second=$(jq -r '.layers[1].annotations.predicateType' <<<"$manifest" 2>/dev/null)
+back=yes; [ "$count" = "2" ] && [ "$first" = "$own" ] && [ "$second" = "https://slsa.dev/provenance/v1" ] || back=no
+[ "$back" = yes ] \
+  && pass "crane manifest reads two layers back from the .att tag: the suite's own layer unchanged, then the SLSA provenance v1 layer" \
+  || fail "the manifest read back with crane manifest from $REPO:$TAG" "layers: ${count:-none}, wanted 2" \
+       "first layer's digest '${first:-none}', wanted the suite's own '$own'" \
+       "second layer's predicateType '${second:-none}', wanted 'https://slsa.dev/provenance/v1'" \
+       "the manifest read back:" "$(short <<<"$manifest" || echo "$manifest")"
+copied=$(crane copy "$REPO:$TAG" "$REPO:$(att_tag "${IMAGE:-sha256:none}")" 2>&1) && copied=""
+accepted=$(verify_provenance "$REPO@$IMAGE" 2> "$SB/cosign.err"); rc=$?
+[ "$rc" -eq 0 ] \
+  && pass "cosign verify-attestation --type slsaprovenance1 --offline, the trust root from files, exits 0 on the stand-in image" \
+  || fail "cosign verify-attestation --type slsaprovenance1 --offline on $REPO@${IMAGE:-none}" "exit=$rc, wanted 0" \
+       "the end of what cosign said:" "$(tail -n 8 "$SB/cosign.err" | cut -c1-400)" "what a failed crane copy to the stand-in image's .att tag said:" "${copied:-nothing, the copy went through}"
+hex="${INDEX#sha256:}"
+statements=$(jq -c '.payload | @base64d | fromjson | {predicateType, subject: [.subject[]? | .digest.sha256]}' <<<"$accepted" 2>/dev/null)
+[ -n "$accepted" ] && jq -e -s --arg hex "$hex" \
+  'length == 1 and (.[0].payload | @base64d | fromjson
+     | .predicateType == "https://slsa.dev/provenance/v1" and any(.subject[]?; .digest.sha256 == $hex))' <<<"$accepted" > /dev/null 2>&1 \
+  && pass "the one envelope cosign accepted is the provenance statement: predicateType SLSA provenance v1, the index digest among its subjects" \
+  || fail "the envelope cosign accepted, decoded" "accepted, as predicateType and subject digests, one line each:" "${statements:-none}" \
+       "wanted exactly one, of predicateType 'https://slsa.dev/provenance/v1', its subjects holding '$hex'"
+
+# 2: the control on case 1: the real cosign refuses the provenance layer
+#    without its chain. Case 1's manifest is pulled back with the real crane,
+#    the dev.sigstore.cosign/chain annotation is taken off the provenance
+#    layer alone (the suite's own layer keeps its chain; every other
+#    annotation, both layer blobs and the config stay as they are), and that
+#    copy is pushed to the .att tag of a second stand-in image. The same
+#    repository: cosign finds the manifest by the image's digest in the tag,
+#    and the blobs are already there. cosign 2.6.5, asked as in case 1, must
+#    exit non-zero and name the certificate authority. Case 1's third line
+#    shows the unchanged manifest accepted under a stand-in image's tag, so
+#    the control differs from an accepted manifest in the one annotation (and
+#    in the image whose tag it sits under). If cosign accepts the control, the
+#    intermediate certificate reaches it from somewhere other than the chain
+#    the script wrote, and case 1 no longer shows what it is there to show.
+#    The control is made from the manifest case 1 read back, and is held
+#    against it: where that read-back had failed (case 1's second line), a
+#    failure here has the same cause, and its detail begins by saying so, so
+#    that the two lines are not read as two faults.
+image_layout "$SB/control-image" "provenance-real case 2, the control"
+staged=$({ crane push "$SB/control-image" "$REPO:control" && crane pull --format oci "$REPO:$TAG" "$SB/control"; } 2>&1) && staged=""
+IMAGE2=$(crane digest "$REPO:control" 2>/dev/null)
+TAG2=$(att_tag "${IMAGE2:-sha256:none}")
+pulled=$(jq -r '.manifests[0].digest' "$SB/control/index.json" 2>/dev/null)
+read -r mhex msize < <(jq -c 'del(.layers[] | select(.annotations.predicateType == "https://slsa.dev/provenance/v1") | .annotations."dev.sigstore.cosign/chain")' \
+  "$SB/control/blobs/sha256/${pulled#sha256:}" 2>/dev/null | put_blob "$SB/control")
+jq -c --arg digest "sha256:$mhex" --argjson size "${msize:-0}" '.manifests[0].digest = $digest | .manifests[0].size = $size' \
+  "$SB/control/index.json" > "$SB/control/index.json.new" 2>/dev/null && mv "$SB/control/index.json.new" "$SB/control/index.json"
+[ -n "$staged" ] || { staged=$(crane push "$SB/control" "$REPO:$TAG2" 2>&1) && staged=""; }
+# the control is read back from the registry and held to what it claims to be:
+# two layers, the suite's own first and with its chain, the provenance layer
+# second and without one, and with case 1's chain put back there it is case
+# 1's manifest again
+control=$(crane manifest "$REPO:$TAG2" 2>&1)
+exact=$(jq --argjson whole "$manifest" --arg own "$own" \
+  '(.layers | length) == 2
+   and .layers[0].digest == $own and (.layers[0].annotations | has("dev.sigstore.cosign/chain"))
+   and .layers[1].annotations.predicateType == "https://slsa.dev/provenance/v1"
+   and (.layers[1].annotations | has("dev.sigstore.cosign/chain") | not)
+   and (.layers[1].annotations."dev.sigstore.cosign/chain" = $whole.layers[1].annotations."dev.sigstore.cosign/chain") == $whole' <<<"$control" 2>/dev/null)
+verify_provenance "$REPO@$IMAGE2" > /dev/null 2> "$SB/control.err"; rc=$?
+grep -q 'certificate signed by unknown authority' "$SB/control.err" && named="yes" || named="no"
+why=("the control read back from $REPO:$TAG2 is case 1's manifest with the chain off the provenance layer alone: ${exact:-no}, wanted true"
+     "cosign's exit on $REPO@${IMAGE2:-none}: $rc, wanted non-zero"
+     "cosign names the certificate authority ('certificate signed by unknown authority'): $named, wanted yes")
+[ "$back" = yes ] \
+  || why=("this case stands on the manifest case 1 read back from $REPO:$TAG, and that read-back had failed (case 1's second result line): the control is made from that manifest and held against it, so this line fails with that one, for the one cause, and says nothing of its own about the chain" "${why[@]}")
+if [ "$exact" != "true" ]; then
+  why+=("the control is not the control it claims to be, so what cosign said of it says nothing about the chain"
+        "its layers as read back, predicateType and chain, one line each:"
+        "$(jq -r '.layers[] | "  \(.annotations.predicateType): \(.annotations."dev.sigstore.cosign/chain" | if . == null then "no chain" else "a chain of \(length) characters" end)"' <<<"$control" 2>/dev/null || echo "  none, no manifest was read back")"
+        "the control as read back, then case 1's manifest:" "$(short <<<"$control" || echo "$control")" "$(short <<<"$manifest" || echo "$manifest")"
+        "what a failed push or pull of the control's two layouts said:" "${staged:-nothing, all went through}")
+elif [ "$rc" -eq 0 ]; then
+  why+=("cosign ACCEPTED the provenance layer without its chain. What that means:"
+        "the chain the script writes on the provenance layer is no longer read."
+        "The intermediate certificate reaches cosign from somewhere else, most likely $ROOTS/fulcio.pem holds it again: it holds $(grep -c 'BEGIN CERTIFICATE' "$ROOTS/fulcio.pem") certificates, Fulcio's two roots alone are 2."
+        "With that, case 1 no longer shows that a verifier configured with the roots alone can build the path from what the script wrote.")
+else
+  why+=("cosign refused the control, but not for the certificate authority; the end of what it said:" "$(tail -n 8 "$SB/control.err" | cut -c1-400)")
+fi
+[ "$exact" = "true" ] && [ "$rc" -ne 0 ] && [ "$named" = "yes" ] \
+  && pass "the control: cosign refuses the same manifest with the chain off the provenance layer alone, and names the certificate authority" \
+  || fail "the control: the manifest of case 1 with the chain off the provenance layer alone, under a second stand-in image, asked of cosign as in case 1" "${why[@]}"
+
+# 3: what the real cosign prints passes the self-check (Req 2.28). The suite
+#    of scripts/check-provenance.sh knows cosign from a stand-in only: one
+#    JSON line per verified attestation on stdout, the statement base64 in
+#    .payload, a refusal as words on stderr and exit 1. Here the script meets
+#    cosign 2.6.5 itself and the real statement, case 1's stand-in image. The
+#    policy root gives the fixture certificate's issuer and subject as the
+#    releaser's identity, so the five values the script cuts from it are the
+#    statement's own: the check passes, on one call that carries the exact
+#    identity. With the identity's ref changed, cosign refuses the certificate
+#    on each of the three attempts and the check fails with cosign's reason.
+#    The script finds a wrapper named cosign first on PATH, in its runs alone:
+#    it logs the arguments it was given, one line per call, and hands them to
+#    the real cosign with what only this offline, throwaway setting needs.
+CHECK="$HERE/check-provenance.sh"
+ISSUER="https://token.actions.githubusercontent.com"
+SIGNER="https://github.com/mm-weber/dhc-pipeline/.github/workflows/slsa-spike.yml"
+REAL_COSIGN=$(command -v cosign) # the pinned one, found before the wrapper's directory is on PATH
+mkdir "$SB/wrap"
+# Added to the script's own arguments, none of them by the release's call:
+# --offline, TUF_ROOT at the empty directory and the three trust-root files,
+# as in verify_provenance (no network, no cached trust root);
+# --check-claims=false since the stand-in image is not the statement's
+# subject; --allow-insecure-registry since the throwaway registry speaks plain
+# HTTP.
+cat > "$SB/wrap/cosign" <<WRAP
+#!/usr/bin/env bash
+{ printf 'cosign'; [ \$# -gt 0 ] && printf ' %q' "\$@"; echo; } >> $(printf '%q' "$SB/wrap.log")
+TUF_ROOT=$(printf '%q' "$SB/tuf") SIGSTORE_ROOT_FILE=$(printf '%q' "$ROOTS/fulcio.pem") \\
+  SIGSTORE_REKOR_PUBLIC_KEY=$(printf '%q' "$ROOTS/rekor0.pem") SIGSTORE_CT_LOG_PUBLIC_KEY_FILE=$(printf '%q' "$ROOTS/ctfe1.pem") \\
+  exec $(printf '%q' "$REAL_COSIGN") "\$@" --offline --check-claims=false --allow-insecure-registry
+WRAP
+chmod +x "$SB/wrap/cosign"
+policy() { # root ref: a policy root whose releaser is the fixture's workflow at that ref, beside a second role
+  mkdir "$1"
+  printf 'verification:\n  issuer: %s\n  roles:\n    releaser:\n      identity: %s\n      attests: [spdxjson, cyclonedx]\n    re-attester:\n      identity: %s\n      attests: [vuln, openvex]\n' \
+    "$ISSUER" "$SIGNER@$2" "https://github.com/mm-weber/dhc-pipeline/.github/workflows/rescan.yml@refs/heads/main" > "$1/catalogue-policy.yaml"
+}
+self_check() { # root: one run of the self-check over the wrapper, stdout and stderr apart; sets rc and calls
+  : > "$SB/wrap.log"
+  CHECK_PROVENANCE_RETRY_DELAY=0 PATH="$SB/wrap:$PATH" "$CHECK" verify "$1" "$REPO@$IMAGE" > "$SB/check.out" 2> "$SB/check.err"; rc=$?
+  calls=$(grep -c '' "$SB/wrap.log")
+}
+arguments() { # stdin, one logged call: its arguments one per line, a flag together with its value, sorted
+  local w i=1; read -ra w
+  while [ "$i" -lt "${#w[@]}" ]; do
+    if [[ ${w[i]} == --* && ${w[i+1]-} != --* && -n ${w[i+1]-} ]]; then echo "${w[i]} ${w[i+1]}"; i=$((i+2)); else echo "${w[i]}"; i=$((i+1)); fi
+  done | LC_ALL=C sort
+}
+said() { echo "stdout:" "$(cut -c1-400 "$SB/check.out")" "stderr:" "$(cut -c1-400 "$SB/check.err")"; } # what the run printed, for a detail
+name="the self-check over the real cosign passes the stand-in image"
+policy "$SB/policy" refs/pull/401/merge
+self_check "$SB/policy"
+[ "$rc" -eq 0 ] && pass "$name: exit 0" || fail "$name: exit code" "exit=$rc, wanted 0" "$(said)"
+[ "$(grep -c '' "$SB/check.out")" -eq 1 ] && grep -q '^check-provenance: ' "$SB/check.out" && grep -qF -- "$REPO@$IMAGE" "$SB/check.out" \
+  && pass "$name: stdout is one line, begun 'check-provenance: ' and naming the reference" \
+  || fail "$name: stdout" "wanted one line, begun 'check-provenance: ' and holding '$REPO@$IMAGE'; it is:" "$(cut -c1-400 "$SB/check.out")"
+[ ! -s "$SB/check.err" ] && pass "$name: stderr is empty" || fail "$name: stderr" "wanted nothing; it is:" "$(cut -c1-400 "$SB/check.err")"
+wanted=$(printf 'cosign verify-attestation --type slsaprovenance1 --certificate-oidc-issuer %q --certificate-identity %q %q\n' \
+  "$ISSUER" "$SIGNER@refs/pull/401/merge" "$REPO@$IMAGE" | arguments)
+[ "$calls" -eq 1 ] && [ "$(arguments < "$SB/wrap.log")" = "$wanted" ] \
+  && pass "$name: cosign was called once, with verify-attestation, the type, the policy file's issuer, its exact identity and the reference, and no argument more" \
+  || fail "$name: the call" "calls: $calls, wanted 1" "the arguments logged, as a set:" "$(head -n 1 "$SB/wrap.log" | arguments)" "wanted, as a set:" "$wanted"
+name="with the identity's ref changed to refs/heads/main the self-check fails"
+reason="none of the expected identities matched what was in the certificate"
+policy "$SB/policy-main" refs/heads/main
+self_check "$SB/policy-main"
+[ "$rc" -eq 1 ] && pass "$name: exit 1" || fail "$name: exit code" "exit=$rc, wanted 1" "$(said)"
+[ ! -s "$SB/check.out" ] && pass "$name: nothing on stdout" || fail "$name: stdout" "wanted nothing; it is:" "$(cut -c1-400 "$SB/check.out")"
+mapfile -t lines < "$SB/check.err"
+[ "${#lines[@]}" -eq 3 ] && [[ ${lines[0]} == "::warning::check-provenance: "* && ${lines[1]} == "::warning::check-provenance: "* ]] \
+  && [[ ${lines[2]} == "::error::check-provenance: "*"3 attempts"* && ${lines[2]} == *"$reason"* ]] \
+  && pass "$name: stderr is two warnings and then the error line, which says 3 attempts and carries cosign's reason" \
+  || fail "$name: stderr" "lines: ${#lines[@]}, wanted 3: two begun '::warning::check-provenance: ', then one begun '::error::check-provenance: ' holding '3 attempts' and '$reason'; it is:" "$(cut -c1-400 "$SB/check.err")"
+[ "$calls" -eq 3 ] && pass "$name: cosign was called three times" || fail "$name: the calls" "calls: $calls, wanted 3; logged:" "$(cut -c1-400 "$SB/wrap.log")"
+
+# 4: what the pinned crane says of a tag that is not there, and the question
+#    before the push with the real crane digest (plan slice 2.9.10). The stub
+#    suite holds both with a stand-in crane (scripts/unpack-provenance_test.sh,
+#    cases 33 and 35): there the line with MANIFEST_UNKNOWN is one the suite's
+#    author wrote, and the answer to crane digest is the stand-in's. Here the
+#    registry and crane 0.22.1 say them.
+#    (a) The amd64 manifest the fixture's statement names beside the index
+#        has nothing at its .att tag in the suite's registry: no case lays
+#        anything down there. The repository itself is there since case 1, so
+#        the registry's answer is about the manifest and not about the name.
+#        store for that digest must be refused at the first answer: exit 1;
+#        on stderr a line of crane's own (none of the script's :: lines) that
+#        holds the registry's code MANIFEST_UNKNOWN, the code the script
+#        reads; no ::warning:: line, which would mean that the answer was not
+#        recognised and the pull was tried again; exactly one ::error:: line,
+#        naming the digest and the tag and holding the words no attestation
+#        manifest. The pause is 0, so a wrong path does not wait. Every
+#        detail shows the whole stderr: the words the real crane uses are on
+#        record with a failure.
+#    (b) Case 1 as it stands already passes through the real crane digest:
+#        the script asks the tag right before every push, so case 1's store
+#        went through only because crane digest answered the digest of the
+#        manifest crane pull had written into the layout. That is held from
+#        outside here. After case 1's store, crane digest of the index's .att
+#        tag answers a digest of the form sha256:<64 hex> that is not the
+#        digest of the manifest the suite laid down before the store: the tag
+#        was rewritten by the push. A second store over it then ends with
+#        exit 0 and without a ::warning:: line (the question was answered
+#        with the manifest just pulled, at the first asking), and leaves two
+#        layers of which exactly one is of the provenance type: the pull went
+#        into a fresh directory, the stale layer was taken out. Where case
+#        1's store had failed, this line fails with it.
+AMD64="sha256:ac78223352dc43ec63a57e63b45de5420722ada4f7db77f1305ab472a86d0d4e" # the statement's second subject
+ATAG=$(att_tag "$AMD64")
+name="store for a digest with nothing at its .att tag, the real crane and registry"
+UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" store "$DATA/bundle.jsonl" "$REPO" "$AMD64" > "$SB/absent.out" 2> "$SB/absent.err"; rc=$?
+whole=("the whole stderr:" "$(grep '' "$SB/absent.err" || echo "nothing")")
+[ "$rc" -eq 1 ] \
+  && pass "$name: exit 1" \
+  || fail "$name: exit code" "exit=$rc, wanted 1" "stdout:" "$(grep '' "$SB/absent.out" || echo "nothing")" "${whole[@]}"
+answers=$(grep -v '^::' "$SB/absent.err" | grep -cF 'MANIFEST_UNKNOWN')
+[ "$answers" -ge 1 ] \
+  && pass "$name: stderr holds crane's own line with the registry's code MANIFEST_UNKNOWN" \
+  || fail "$name: crane's line" "lines of stderr that are not the script's and hold 'MANIFEST_UNKNOWN': $answers, wanted at least 1" "${whole[@]}"
+warned=$(grep -c '^::warning::' "$SB/absent.err")
+errors=$(grep -c '^::error::' "$SB/absent.err")
+reasoned=$(grep '^::error::' "$SB/absent.err" | grep -F -- "$REPO@$AMD64" | grep -F -- "$REPO:$ATAG" | grep -cF 'no attestation manifest')
+[ "$warned" -eq 0 ] && [ "$errors" -eq 1 ] && [ "$reasoned" -eq 1 ] \
+  && pass "$name: refused at the first answer, no ::warning:: line and exactly one ::error:: line, which names the digest and the tag and says no attestation manifest" \
+  || fail "$name: the refusal" "::warning:: lines: $warned, wanted 0 (a warning means the pull was tried again)" "::error:: lines: $errors, wanted 1" \
+       "::error:: lines holding '$REPO@$AMD64', '$REPO:$ATAG' and 'no attestation manifest': $reasoned, wanted 1" "${whole[@]}"
+laid_manifest=$(jq -r '.manifests[0].digest' "$SB/att/index.json" 2>/dev/null)
+now=$(crane digest "$REPO:$TAG" 2>&1)
+again=$(UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" store "$DATA/bundle.jsonl" "$REPO" "$INDEX" 2>&1); rc=$?
+after=$(crane manifest "$REPO:$TAG" 2>&1)
+layers=$(jq '.layers | length' <<<"$after" 2>/dev/null)
+typed=$(jq '[.layers[] | select(.annotations.predicateType == "https://slsa.dev/provenance/v1")] | length' <<<"$after" 2>/dev/null)
+rewarned=$(grep -c '^::warning::' <<<"$again")
+[[ "$laid_manifest" =~ ^sha256:[0-9a-f]{64}$ && "$now" =~ ^sha256:[0-9a-f]{64}$ && "$now" != "$laid_manifest" ]] \
+  && [ "$rc" -eq 0 ] && [ "$rewarned" -eq 0 ] && [ "$layers" = "2" ] && [ "$typed" = "1" ] \
+  && pass "the question before the push, the real crane digest: after case 1's store the tag answers a digest that is not the laid-down manifest's, and a second store over it exits 0 with no warning and leaves exactly one provenance layer" \
+  || fail "the question before the push with the real crane digest, a second store over case 1's" \
+       "crane digest $REPO:$TAG after case 1's store: '$now', wanted sha256: and 64 hex digits" \
+       "the manifest the suite laid down there before that store: '${laid_manifest:-none}', wanted another digest than the tag's" \
+       "the second store: exit=$rc, wanted 0; ::warning:: lines: $rewarned, wanted 0" \
+       "layers at the tag after it: ${layers:-none}, wanted 2; of the provenance type: ${typed:-none}, wanted 1" \
+       "the second store's output:" "${again:-none}" "the manifest read back:" "$(short <<<"$after" || echo "$after")"
+
+echo
+if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
+echo "all provenance-real tests passed"
