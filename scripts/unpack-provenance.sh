@@ -46,7 +46,17 @@
 # order in the file deciding nothing.
 #
 # A refusal of content is one ::error:: line naming the digest and the reason,
-# and exit 1. Refused before anything is pulled or pushed for it, in this
+# and exit 1. The first refusal is of the bundles file as a whole, before
+# anything is pulled for any digest, on a line naming the first digest given:
+# a bundles file that cannot be read in full. That is a file that is not JSON
+# or holds none, and a file with an entry that is no bundle with an envelope
+# whose payload is base64 of a JSON statement with its list of subjects, even
+# where another entry is the bundle that names the digest: a file the script
+# cannot read in full is not one it picks from, and the words of the refusal
+# are the script's, never jq's. The attestation store's answer with no
+# attestation in it is read in full and names no digest.
+#
+# Refused then, before anything is pulled or pushed for it, in this
 # order, is a digest no statement in the bundles file names; one that no
 # statement of SLSA provenance v1 names, with the predicate type found on the
 # error line (of several statements of other types that of the latest log
@@ -207,6 +217,21 @@ shift 3
 # every digest is one
 [ -f "$BUNDLES" ] || usage
 check_digests "$@"
+
+# the bundles file is read in full or not at all, before anything is pulled:
+# it is JSON, at least one value, and every entry of it (the file's lines or,
+# in the attestation store's answer, what is under .attestations[].bundle) is
+# a bundle whose envelope's payload is base64 of a statement with its list of
+# subjects. The file is read as one input (-s) and an entry that fails is
+# caught as false, so the verdict hangs on no exit code jq gives over several
+# inputs (jq 1.6 takes it from the last input alone); jq's own words are kept
+# off stderr, the refusal names the first digest given
+DIGEST="$1"
+jq -es 'length > 0
+        and all(.[] | if type == "object" and has("attestations") then .attestations[].bundle else . end;
+                try (.dsseEnvelope.payload | @base64d | fromjson | .subject | type == "array") catch false)' \
+  "$BUNDLES" > /dev/null 2>&1 \
+  || refuse "the bundles file cannot be read: it is not JSON, or holds an entry that is no bundle with an envelope whose statement can be read"
 
 # the working directories, one per digest, all gone on exit
 TMP=$(mktemp -d)
