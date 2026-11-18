@@ -111,7 +111,10 @@
 # warning line and no pause for that answer: the layer is added to the
 # manifest cosign wrote and never begins a new one, so the release's other
 # attestations must exist first. After the third failure of its pull for
-# another cause a digest is refused in the same words.
+# another cause a digest is refused in other words, those of a push that
+# failed: the pull of the tag failed three times and the provenance is not
+# stored beside the digest. Whether a manifest is there was never answered,
+# so the line does not say that there is none.
 #
 # The chain annotation (the Sigstore certificates that issued the bundle's
 # certificate; Kyverno reads the intermediate from there and nowhere else) is
@@ -186,18 +189,18 @@ refuse() {
 # the call ($1, with its tag) and the attempt that failed; the last failure
 # is the refusal $2. $3 is the registry's error code that is its answer and
 # no faltering ("" for none): a failure whose stderr holds it is the refusal
-# $2 at once, not tried again. What crane says on stderr is kept for that
-# reading and passes to stderr as it is. What follows the three is crane's
+# $4 at once, not tried again. What crane says on stderr is kept for that
+# reading and passes to stderr as it is. What follows the four is crane's
 # arguments
 registry() {
-  local what="$1" refusal="$2" answer="$3" attempt failed
-  shift 3
+  local what="$1" refusal="$2" answer="$3" answered="$4" attempt failed
+  shift 4
   for ((attempt = 1; attempt <= ATTEMPTS; attempt++)); do
     failed=0
     crane "$@" 2> "$TMP/crane.stderr" || failed=1
     cat "$TMP/crane.stderr" >&2
     [ "$failed" -eq 1 ] || return 0
-    [ -z "$answer" ] || ! grep -Fq -- "$answer" "$TMP/crane.stderr" || refuse "$refusal"
+    [ -z "$answer" ] || ! grep -Fq -- "$answer" "$TMP/crane.stderr" || refuse "$answered"
     [ "$attempt" -lt "$ATTEMPTS" ] || refuse "$refusal"
     echo "::warning::unpack-provenance: ${REPO}@${DIGEST}: ${what} failed, attempt ${attempt} of ${ATTEMPTS}, it is tried again" >&2
     sleep "${UNPACK_PROVENANCE_RETRY_DELAY:-10}"
@@ -350,11 +353,14 @@ for DIGEST in "$@"; do
 
   # the layer is added to the attestation manifest cosign wrote for the digest
   # and never begins a new one: no manifest to pull, nothing is stored. The
-  # pull has its attempts; the last one's failure is the refusal, and so is,
-  # at once, the registry's answer that the manifest is not there
+  # pull has its attempts; the last one's failure is a refusal that says so,
+  # and the registry's answer that the manifest is not there is, at once, the
+  # refusal that says that
   registry "the pull of ${REF}" \
+    "the pull of ${REF} failed ${ATTEMPTS} times, the provenance is not stored beside the digest" \
+    MANIFEST_UNKNOWN \
     "no attestation manifest could be pulled from ${REF}, the release's other attestations must exist first" \
-    MANIFEST_UNKNOWN pull --format oci "$REF" "$DIR"
+    pull --format oci "$REF" "$DIR"
   # the chain is copied from a layer cosign wrote in that manifest: no layer
   # that carries one, nothing is stored
   old=$(jq -r '.manifests[0].digest' "$DIR/index.json")
@@ -419,6 +425,6 @@ for i in "${!DIGESTS[@]}"; do
   DIGEST="${DIGESTS[$i]}" REF="${REFS[$i]}"
   registry "the push to ${REF}" \
     "the push to ${REF} failed ${ATTEMPTS} times, the provenance is not stored beside the digest" \
-    "" push "${DIRS[$i]}" "$REF"
+    "" "" push "${DIRS[$i]}" "$REF"
   echo "unpack-provenance: ${REPO}@${DIGEST}: provenance stored as layer sha256:${LAYERS[$i]} of ${REF}"
 done
