@@ -1363,6 +1363,116 @@ chosen_input "the attestation store's answer for the amd64 manifest, the other s
 chosen_input "bundle lines with two provenance statements: the other, the newer, the older; the newer wanted" "$INDEX" "$want_newer" lines "$stmt_other" "$stmt_newer" "$stmt_older"
 chosen_input "bundle lines with two provenance statements: the older, the newer, the other; the newer wanted" "$INDEX" "$want_newer" lines "$stmt_older" "$stmt_newer" "$stmt_other"
 
+# 31: a bundles file that cannot be read is refused by name (plan slice
+#     2.9.2; spec FR-1, the clause of 2026-11-18 on a bundles file that
+#     cannot be read as JSON or holds an entry that is no Sigstore bundle
+#     with a signed envelope whose statement can be read). store reads its
+#     bundles file with jq. A file jq cannot read as what it must be ends the
+#     run as a refusal of content like the others, in the script's own words
+#     and not in those of the tool that failed on it, and before anything is
+#     asked of the registry. An entry that cannot be read refuses the run
+#     even when another entry of the file is the valid provenance bundle that
+#     names the digest: a file the script cannot read in full is not one it
+#     picks from. A bundle that can be read but lacks its certificate, its
+#     integrated time, its log index or its log's id is the next slice's
+#     (2.9.3) and no input here.
+#     Every input is run for two digests, the index and the amd64 manifest
+#     (the fixture's statement names both), in a sandbox of its own with the
+#     attestation manifest laid down at both .att tags, so that a run that
+#     gets as far as the registry shows in the stub's call log. The first
+#     digest given is the index, in two inputs the amd64 manifest. stderr is
+#     kept apart (case 27's run_apart). The inputs:
+#     (a) no JSON at all: plain text; an empty file;
+#     (b) the fixture's bundle line and one line that is no JSON, before it
+#         and after it;
+#     (c) an entry that is no bundle: the attestation store's answer with one
+#         entry whose bundle is null, before the fixture's bundle and after
+#         it; a line that is an object without dsseEnvelope, before the
+#         fixture's bundle line and after it; a line that is JSON but no
+#         object, after the fixture's bundle line: a number, a string, an
+#         array (the array holds the fixture's bundle);
+#     (d) an envelope whose payload is no statement, the entry built from the
+#         fixture's bundle and standing after its line: a payload that is not
+#         base64; base64 of text that is no JSON; a statement without
+#         subject, after the fixture's bundle line and before it.
+#     Wanted of each input: exit 1; nothing on stdout; on stderr exactly one
+#     line, begun ::error::unpack-provenance: <repository>@<the first digest
+#     given>: , ended (Req 2.27), holding the words "bundles file" and not
+#     the reason of case 8 (no statement in the bundles file names the
+#     digest: the file was not read, so nothing is known of what it names),
+#     and none of jq's own words (jq: , parse error, Cannot index, Cannot
+#     iterate, cannot be parsed, is not valid base64); crane never called,
+#     neither pull nor push, for either digest. One result line per input; on
+#     a failure its detail shows what was found against what was wanted
+unreadable=$(mktemp -d "$TOP/unreadable.XXXXXX") \
+  || { echo "FAIL the directory for the bundles files that cannot be read could not be made under '$TOP': the suite ends here"; exit 1; }
+entry_valid=$(jq -c . "$DATA/bundle.jsonl")
+entry_no_envelope=$(jq -c 'del(.dsseEnvelope)' "$DATA/bundle.jsonl")
+entry_not_base64=$(jq -c '.dsseEnvelope.payload = "%%% this is not base64 %%%"' "$DATA/bundle.jsonl")
+entry_no_json=$(jq -c '.dsseEnvelope.payload = ("this is no statement" | @base64)' "$DATA/bundle.jsonl")
+entry_no_subject=$(jq -c '.dsseEnvelope.payload |= (@base64d | fromjson | del(.subject) | tojson | @base64)' "$DATA/bundle.jsonl")
+# what the inputs rest on, asked once: the entry without an envelope is an
+# object that has none and keeps its verification material; the payload that
+# is no JSON is base64 of the text; the statement without subject is the
+# fixture's statement, of the provenance type, with every other key
+rest=$(jq -rn --argjson valid "$entry_valid" --argjson envelope "$entry_no_envelope" --argjson text "$entry_no_json" --argjson subject "$entry_no_subject" \
+  '($valid.dsseEnvelope.payload | @base64d | fromjson) as $s | ($subject.dsseEnvelope.payload | @base64d | fromjson) as $t
+   | "\($envelope | type) \($envelope | has("dsseEnvelope")) \($envelope | has("verificationMaterial")) \($text.dsseEnvelope.payload | @base64d) \($t | has("subject")) \($t == ($s | del(.subject))) \($t.predicateType)"' 2>&1)
+rest_want="object false true this is no statement false true $slsa"
+[ "$rest" = "$rest_want" ] \
+  && pass "the inputs of the bundles file that cannot be read: the entry without an envelope is an object with its verification material, the payload that is no JSON is base64 of plain text, the statement without subject is the fixture's provenance statement less its subject" \
+  || fail "the inputs of the bundles file that cannot be read" "found:  '$rest'" "wanted: '$rest_want'"
+printf 'this is no JSON\n' > "$unreadable/text"
+: > "$unreadable/empty"
+printf '%s\n' 'this line is no JSON' "$entry_valid" > "$unreadable/line-before"
+printf '%s\n' "$entry_valid" 'this line is no JSON' > "$unreadable/line-after"
+jq -n --argjson valid "$entry_valid" '{attestations: [{bundle: null}, {bundle: $valid}]}' > "$unreadable/null-before"
+jq -n --argjson valid "$entry_valid" '{attestations: [{bundle: $valid}, {bundle: null}]}' > "$unreadable/null-after"
+printf '%s\n' "$entry_no_envelope" "$entry_valid" > "$unreadable/envelope-before"
+printf '%s\n' "$entry_valid" "$entry_no_envelope" > "$unreadable/envelope-after"
+printf '%s\n' "$entry_valid" '42' > "$unreadable/number"
+printf '%s\n' "$entry_valid" '"a bundle"' > "$unreadable/string"
+printf '%s\n' "$entry_valid" "[$entry_valid]" > "$unreadable/array"
+printf '%s\n' "$entry_valid" "$entry_not_base64" > "$unreadable/not-base64"
+printf '%s\n' "$entry_valid" "$entry_no_json" > "$unreadable/no-json"
+printf '%s\n' "$entry_valid" "$entry_no_subject" > "$unreadable/subject-after"
+printf '%s\n' "$entry_no_subject" "$entry_valid" > "$unreadable/subject-before"
+short_lines() { cut -c1-300; } # stdin lines for a detail line, each cut to 300 characters
+unreadable_input() { # what, the bundles file, the first digest given, the second
+  local what="$1" bundles="$2" first="$3" second="$4" count line named=no words=none
+  fresh; lay_down "$(att_tag "$first")"; lay_down "$(att_tag "$second")"
+  out=$(run_apart store "$bundles" "$REPO" "$first" "$second"); rc=$?
+  count=$(grep -c '' "$SB/stderr"); line=$(cat "$SB/stderr")
+  [[ "$line" == "::error::unpack-provenance: ${REPO}@${first}: "*"bundles file"*" (Req 2.27)" ]] \
+    && [[ "$line" != *"no statement in the bundles file names the digest"* ]] && named=yes
+  grep -Eq 'jq: |parse error|Cannot index|Cannot iterate|cannot be parsed|is not valid base64' "$SB/stderr" && words=some
+  [ "$rc" -eq 1 ] && [ -z "$out" ] && [ "$count" -eq 1 ] && [ "$named" = yes ] && [ "$words" = none ] && [ ! -s "$SB/crane.log" ] \
+    && pass "a bundles file that cannot be read, $what: exit 1, nothing on stdout, one ::error:: line on stderr naming the first digest given and the bundles file, none of jq's words, crane never called" \
+    || fail "a bundles file that cannot be read, $what: exit 1, nothing on stdout, one ::error:: line on stderr naming the first digest given and the bundles file, none of jq's words, crane never called" \
+         "exit=$rc, wanted 1" "lines on stderr: $count, wanted 1" \
+         "the one line begins '::error::unpack-provenance: ${REPO}@${first}: ', ends ' (Req 2.27)', holds 'bundles file' and is not case 8's reason: $named, wanted yes" \
+         "jq's own words on stderr: $words, wanted none" \
+         "stderr:" "$([ -s "$SB/stderr" ] && short_lines < "$SB/stderr" || echo "none")" \
+         "stdout, wanted none:" "$([ -n "$out" ] && short_lines <<<"$out" || echo "none")" \
+         "crane calls, wanted crane never:" "$([ -s "$SB/crane.log" ] && cat "$SB/crane.log" || echo "crane never")"
+}
+unreadable_input "(a) plain text, no JSON at all" "$unreadable/text" "$INDEX" "$AMD64"
+unreadable_input "(a) plain text, no JSON at all, the amd64 manifest given first" "$unreadable/text" "$AMD64" "$INDEX"
+unreadable_input "(a) an empty file" "$unreadable/empty" "$INDEX" "$AMD64"
+unreadable_input "(b) a line that is no JSON, then the valid bundle line" "$unreadable/line-before" "$INDEX" "$AMD64"
+unreadable_input "(b) the valid bundle line, then a line that is no JSON" "$unreadable/line-after" "$INDEX" "$AMD64"
+unreadable_input "(c) the attestation store's answer, an entry whose bundle is null, then the valid bundle" "$unreadable/null-before" "$INDEX" "$AMD64"
+unreadable_input "(c) the attestation store's answer, the valid bundle, then an entry whose bundle is null, the amd64 manifest given first" "$unreadable/null-after" "$AMD64" "$INDEX"
+unreadable_input "(c) an object without dsseEnvelope, then the valid bundle line" "$unreadable/envelope-before" "$INDEX" "$AMD64"
+unreadable_input "(c) the valid bundle line, then an object without dsseEnvelope" "$unreadable/envelope-after" "$INDEX" "$AMD64"
+unreadable_input "(c) the valid bundle line, then a line that is a number" "$unreadable/number" "$INDEX" "$AMD64"
+unreadable_input "(c) the valid bundle line, then a line that is a string" "$unreadable/string" "$INDEX" "$AMD64"
+unreadable_input "(c) the valid bundle line, then a line that is an array holding the valid bundle" "$unreadable/array" "$INDEX" "$AMD64"
+unreadable_input "(d) the valid bundle line, then an envelope whose payload is not base64" "$unreadable/not-base64" "$INDEX" "$AMD64"
+unreadable_input "(d) the valid bundle line, then an envelope whose payload is base64 of text that is no JSON" "$unreadable/no-json" "$INDEX" "$AMD64"
+unreadable_input "(d) the valid bundle line, then an envelope whose statement has no subject" "$unreadable/subject-after" "$INDEX" "$AMD64"
+unreadable_input "(d) an envelope whose statement has no subject, then the valid bundle line" "$unreadable/subject-before" "$INDEX" "$AMD64"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
