@@ -471,19 +471,69 @@ left of the program is the follow-up list below, one decision each.
           and a platform manifest (`subject-checksums`), unpacked beside
           both, verified on both by cosign 2.6.5, Kyverno 1.19.2 and
           `gh attestation verify`; its bundle becomes the suites' fixture
-    - [ ] 2.2 the mode in `release-policy.sh` (six slices, and the
-          policy file by hand)
-    - [ ] 2.3 `attestations: write`, both sides, held by the existing lint
-    - [ ] 2.4 `scripts/unpack-provenance.sh`, modes `store` and
-          `subjects` (twenty-eight slices: retries, the attestation
-          store's answer, the last one against the real crane and cosign)
-    - [ ] 2.5 `scripts/check-provenance.sh verify` (thirteen slices:
-          retries, the last one against the real cosign)
-    - [ ] 2.6 the release steps in `build.yml`, the three suites in
-          `validate.yml`, the way out written into the manual
-    - [ ] 2.7 the action's pin read by the Renovate test; a bump merged
-          by hand and watched
-    - [ ] 2.8 the refactor commit
+    - [x] 2.2 the mode in `release-policy.sh` (six slices, and the
+          policy file by hand): done 2026-11-14 on branch
+          `provenance-step`, one failing test before each change; the
+          suite at 38 passed; `catalogue-policy.yaml` declares
+          `release.provenance: report`
+    - [x] 2.3 `attestations: write`, both sides, held by the existing lint:
+          done 2026-11-14; with the line in `catalogue-policy.yaml` alone
+          `lint-workflow-policy.sh .` refuses the release job by name,
+          with the line in `build.yml` too it passes
+    - [x] 2.4 `scripts/unpack-provenance.sh`, modes `store` and
+          `subjects` (thirty slices, 2.4.24b added for the pull's
+          attempts and 2.4.29 on 2026-11-15 at the owner's call:
+          retries, the attestation store's answer, the last two
+          against the real crane and cosign): done 2026-11-14 on
+          branch `provenance-step`, one failing test or one guard
+          before each change; the stub suite at 45 passed; the
+          real-tool suite `scripts/provenance-real_test.sh` at 5 passed
+          (crane 0.22.1 stores the layer on a registry on 127.0.0.1,
+          cosign 2.6.5 accepts it offline as SLSA provenance v1, the
+          Fulcio file holding the roots only so that the chain the
+          script wrote is what the path is built from, and a control
+          in which cosign refuses the same layer without its chain);
+          cleanup
+          candidates recorded as plan item 2.8.2
+    - [x] 2.5 `scripts/check-provenance.sh verify` (the owner's go
+          2026-11-15; built by 2026-11-17: slices 2.5.1 to 2.5.13 and
+          eight added ones, then at the owner's call on the step's
+          report, the track's spec amended first (FR-1):
+          - [x] 2.5.14 what cannot serve is told by its cause
+          - [x] 2.5.15 a value the script cannot use is refused
+          the self-check's suite at 903 passed under jq 1.6 and jq
+          1.7.1, the real-tool suite at 13 against cosign 2.6.5; 2.6
+          waits for the owner's go)
+    - [x] 2.6 the release steps in `build.yml`, the three suites in
+          `validate.yml`, the way out written into the manual (the
+          owner's go 2026-11-17; four steps before the tags, the
+          subjects file in a step of its own; nothing of it has run on
+          a runner yet)
+    - [x] 2.7 the action's pin read by the Renovate test; a bump merged
+          by hand and watched (the owner's go 2026-11-17; the test at
+          206 passed)
+    - [x] 2.8 the refactor (the owner's go 2026-11-17; two commits,
+          the scripts and then the suites; every suite's result lines
+          as before but for six pass texts; the suites judged the
+          same on 196 and 13 changed copies of the scripts; on
+          2026-11-18 at the owner's call: shellcheck clean on the
+          three scripts, the pause between the unpack's attempts held
+          by a guard, slice 2.4.30, the unpack suite at 50)
+    - [x] validate's chain rehearsed locally at 4ed1d63: 47 suites
+          and 18 lint steps green, the Renovate test 206 ok
+    - [x] 2.9 the findings of the code review of the pull request (a
+          subagent, read-only; the owner's call 2026-11-18, the
+          track's FR-1 amended first, five clauses): the provenance
+          statement chosen among provenance statements; a bundles
+          file or a bundle that cannot be read refused by name; a
+          manifest that is not there refused at the first answer and
+          three failed pulls said as failed pulls; a manifest
+          rewritten since the pull prepared again, three times at
+          most; the self-check asking every digest; the manual's
+          sentence on what the unpack refuses set right. The unpack
+          suite at 112 passed (jq 1.6 and 1.7.1), the real-tool suite
+          at 17; 47 suites and 18 lint steps green at b8f3cea
+    - [ ] the pull request, opened 2026-11-18; the owner merges
     - [ ] the first pushed, the first scheduled and the first dispatched
           release read; Kyverno on the first released digest (one run of
           the spike workflow, the owner's go); the next rescan read
