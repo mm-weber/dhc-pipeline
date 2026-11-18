@@ -1261,6 +1261,108 @@ pause_input "a pull that fails twice and then goes through, UNPACK_PROVENANCE_RE
 pause_input "a pull that fails three times, UNPACK_PROVENANCE_RETRY_DELAY=7" 7 3 0 1 "sleep called exactly twice, each time as sleep 7, no pause after the third failure" "sleep 7" "sleep 7"
 pause_input "no call fails, UNPACK_PROVENANCE_RETRY_DELAY=7" 7 0 0 0 "sleep never called"
 
+# 30: the provenance statement is chosen among provenance statements (plan
+#     slice 2.9.1; spec FR-1, the clause of 2026-11-18 on more than one
+#     statement naming a digest): GitHub's attestation store keeps every
+#     statement made about a digest, an SBOM attested there as well as the
+#     provenance, and the bundles file may then hold several statements that
+#     name one digest and are not all provenance. Of those only the
+#     statements of the predicate type https://slsa.dev/provenance/v1 are
+#     candidates, and among the candidates the one whose log entry is the
+#     latest is stored (integrated time, then log index, case 21). A
+#     statement of another predicate type that names the same digest decides
+#     nothing, however late its log entry is and wherever it stands in the
+#     file: it neither hides the provenance statement nor becomes a layer,
+#     and no layer cosign wrote gives way to it. Cases 8 and 9 hold what
+#     stays: no statement naming the digest, and none of the provenance type
+#     naming it, are refused.
+#     The other statement is built here from the fixture's bundle with jq:
+#     the same two subjects (the index and the amd64 manifest), the predicate
+#     type https://spdx.dev/Document, and a log entry later than every entry
+#     of the fixtures: an hour after the newer entry of store-two.json by its
+#     integrated time and a thousand above it by its log index. It is no
+#     consistent signed bundle (its envelope no longer matches its signature
+#     or the hash its entry records) and need not be: it is never stored.
+#     Six inputs, each in a sandbox of its own, the attestation manifest laid
+#     down at the digest's .att tag with its one SBOM layer:
+#     as bundle lines, for the index: the fixture's statement, then the
+#     other; and the other first;
+#     as the attestation store's answer ({"attestations":[{"bundle":...}]},
+#     one JSON object over many lines), for the amd64 manifest: the same two
+#     orders;
+#     as bundle lines, for the index, with the two provenance statements of
+#     store-two.json: the other, the newer, the older; and the older, the
+#     newer, the other. Here the newer provenance statement is wanted, so a
+#     choice that leaves the other type out and then takes the first or the
+#     last candidate of the file stores the older one in one of the two.
+#     stderr is kept apart (case 27's run_apart). Wanted of each input: exit
+#     0; no ::error:: line on stderr or stdout; the manifest pushed has one
+#     layer more than was laid down, the layers laid down are still its
+#     first ones, unchanged, and exactly one layer is of the provenance type:
+#     its digest is the envelope hash the wanted statement's log entry
+#     records (for the fixture's statement what case 1 asserts), and its blob
+#     lies in the pushed layout under that sha256. One result line per input;
+#     on a failure its detail shows what was found against what was wanted
+other_type="https://spdx.dev/Document"
+late_time=$(jq -r '[.attestations[].bundle.verificationMaterial.tlogEntries[0].integratedTime | tonumber] | max + 3600 | tostring' "$DATA/store-two.json")
+late_index=$(jq -r '[.attestations[].bundle.verificationMaterial.tlogEntries[0].logIndex | tonumber] | max + 1000 | tostring' "$DATA/store-two.json")
+# the statements as bundle lines: the fixture's, the other built from it, and
+# the two of store-two.json (the older of them is the fixture's statement)
+stmt_fixture=$(jq -c . "$DATA/bundle.jsonl")
+stmt_other=$(jq -c --arg type "$other_type" --arg time "$late_time" --arg index "$late_index" \
+  '.dsseEnvelope.payload |= (@base64d | fromjson | .predicateType = $type | tojson | @base64)
+   | .verificationMaterial.tlogEntries[0].integratedTime = $time | .verificationMaterial.tlogEntries[0].logIndex = $index' "$DATA/bundle.jsonl")
+stmt_newer=$(jq -c '[.attestations[].bundle] | max_by(.verificationMaterial.tlogEntries[0].integratedTime | tonumber)' "$DATA/store-two.json")
+stmt_older=$(jq -c '[.attestations[].bundle] | min_by(.verificationMaterial.tlogEntries[0].integratedTime | tonumber)' "$DATA/store-two.json")
+envelope_logged() { jq -r '.verificationMaterial.tlogEntries[0].canonicalizedBody | @base64d | fromjson | .spec.envelopeHash.value'; } # stdin a bundle: the envelope hash its log entry records
+want_fixture="sha256:$(logged_hash)"
+want_newer="sha256:$(envelope_logged <<<"$stmt_newer")"
+# what the inputs rest on, asked once: the other statement is of the other
+# type, names both digests and carries the latest log entry; the two
+# provenance statements of store-two.json are two, and the older is the
+# fixture's
+built=$(jq -r --arg index "${INDEX#sha256:}" --arg amd64 "${AMD64#sha256:}" \
+  '(.dsseEnvelope.payload | @base64d | fromjson) as $s | .verificationMaterial.tlogEntries[0] as $e
+   | "\($s.predicateType) \([$s.subject[].digest.sha256] | (index($index) != null) and (index($amd64) != null)) \($e.integratedTime) \($e.logIndex)"' <<<"$stmt_other" 2>&1)
+built_want="$other_type true $late_time $late_index"
+older_is="sha256:$(envelope_logged <<<"$stmt_older")"
+[ "$built" = "$built_want" ] && [ "$want_newer" != "$want_fixture" ] && [ "$older_is" = "$want_fixture" ] \
+  && pass "the inputs of the choice among provenance statements: the other statement is of the type $other_type, names the index and the amd64 manifest and carries the latest log entry (integrated time $late_time, log index $late_index); store-two.json holds two provenance statements, the older the fixture's" \
+  || fail "the inputs of the choice among provenance statements" "the other statement (type, names both digests, integrated time, log index): '$built'" "wanted:                                                                    '$built_want'" \
+       "the newer provenance statement's envelope: $want_newer, wanted another than the fixture's" "the older provenance statement's envelope: $older_is" "the fixture's envelope, wanted the older:  $want_fixture"
+chosen_input() { # what, the digest, the envelope wanted as the one provenance layer (sha256:<hex>), lines or answer (the file's shape), then the bundles in the file's order
+  local what="$1" digest="$2" want="$3" shape="$4" laid before pushed manifest after kept got hex sum errors; shift 4
+  fresh; TAG=$(att_tag "$digest"); lay_down "$TAG"
+  laid=$(manifest_of "$SB/registry/$TAG" | jq -c '.layers'); before=$(jq 'length' <<<"$laid")
+  if [ "$shape" = answer ]; then printf '%s\n' "$@" | jq -s '{attestations: [.[] | {bundle: .}]}' > "$SB/bundles"
+  else printf '%s\n' "$@" > "$SB/bundles"; fi
+  out=$(run_apart store "$SB/bundles" "$REPO" "$digest"); rc=$?
+  errors=$(printf '%s\n' "$out" | cat - "$SB/stderr" | grep '::error::')
+  # a tag nothing was pushed to is said so, never read
+  pushed="$SB/pushed/$TAG"; manifest=""; [ -f "$pushed/index.json" ] && manifest=$(manifest_of "$pushed")
+  after=$(jq '.layers | length' <<<"$manifest" 2>/dev/null)
+  kept=$(jq -r --argjson laid "$laid" 'if .layers[0:($laid | length)] == $laid then "yes" else "no" end' <<<"$manifest" 2>/dev/null)
+  got=$(jq -c --arg type "$slsa" '[.layers[] | select(.annotations.predicateType == $type) | .digest]' <<<"$manifest" 2>/dev/null)
+  hex=${want#sha256:}; sum="no such blob"; [ -f "$pushed/blobs/sha256/$hex" ] && sum=$(sha256sum < "$pushed/blobs/sha256/$hex" | cut -d' ' -f1)
+  [ "$rc" -eq 0 ] && [ -z "$errors" ] && [ "$after" = "$((before + 1))" ] && [ "$kept" = yes ] && [ "$got" = "[\"$want\"]" ] && [ "$sum" = "$hex" ] \
+    && pass "a statement of another predicate type decides nothing, $what: exit 0, no ::error:: line, one layer more, the layers laid down kept, one provenance layer, the envelope of the provenance statement wanted" \
+    || fail "a statement of another predicate type decides nothing, $what: exit 0, no ::error:: line, one provenance layer, the envelope of the provenance statement wanted" \
+         "exit=$rc, wanted 0" "::error:: lines on stderr or stdout, wanted none:" "${errors:-none}" \
+         "layers pushed: ${after:-none, nothing was pushed to the tag}, wanted $((before + 1))" \
+         "the layers laid down are the first layers pushed, unchanged: ${kept:-nothing was pushed to the tag}, wanted yes" \
+         "provenance layers pushed: ${got:-none}, wanted [\"$want\"]" \
+         "sha256 of the wanted envelope's blob in the pushed layout: '$sum', wanted its name, '$hex'" \
+         "layers pushed:" "$([ -n "$manifest" ] && layers_words <<<"$manifest" || echo "none")" \
+         "crane calls:" "$([ -s "$SB/crane.log" ] && cat "$SB/crane.log" || echo "crane never")" \
+         "stdout:" "${out:-none}" "stderr:" "$([ -s "$SB/stderr" ] && cat "$SB/stderr" || echo "none")"
+}
+chosen_input "bundle lines, the provenance statement and then the other" "$INDEX" "$want_fixture" lines "$stmt_fixture" "$stmt_other"
+chosen_input "bundle lines, the other statement and then the provenance statement" "$INDEX" "$want_fixture" lines "$stmt_other" "$stmt_fixture"
+chosen_input "the attestation store's answer for the amd64 manifest, the provenance statement and then the other" "$AMD64" "$want_fixture" answer "$stmt_fixture" "$stmt_other"
+chosen_input "the attestation store's answer for the amd64 manifest, the other statement and then the provenance statement" "$AMD64" "$want_fixture" answer "$stmt_other" "$stmt_fixture"
+chosen_input "bundle lines with two provenance statements: the other, the newer, the older; the newer wanted" "$INDEX" "$want_newer" lines "$stmt_other" "$stmt_newer" "$stmt_older"
+chosen_input "bundle lines with two provenance statements: the older, the newer, the other; the newer wanted" "$INDEX" "$want_newer" lines "$stmt_older" "$stmt_newer" "$stmt_other"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
