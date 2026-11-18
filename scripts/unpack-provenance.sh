@@ -92,15 +92,16 @@
 # the signature annotation present and empty.
 #
 # The manifest is pulled as an OCI layout with crane, gets the layer appended
-# and is pushed back to the same tag. Each of the two registry calls, the pull
-# and the push, is tried again when it fails, up to three attempts,
-# UNPACK_PROVENANCE_RETRY_DELAY seconds apart (default 10; the tests set 0): a
-# registry that falters once is no missing manifest. Every failure that is
-# tried again is said with one ::warning:: line naming the digest, the tag
-# whose pull or push failed and the attempt that failed: a call that goes
-# through at the second or third attempt leaves a green run, and crane's own
-# words name a tag and a status and are no annotation. What crane says on
-# stderr passes to stderr as it is, at every attempt.
+# and is pushed back to the same tag. Each of the registry calls, the pull,
+# the question before the push (below) and the push, is tried again when it
+# fails, up to three attempts, UNPACK_PROVENANCE_RETRY_DELAY seconds apart
+# (default 10; the tests set 0): a registry that falters once is no missing
+# manifest. Every failure that is tried again is said with one ::warning::
+# line naming the digest, the tag whose pull, question or push failed and the
+# attempt that failed: a call that goes through at the second or third attempt
+# leaves a green run, and crane's own words name a tag and a status and are no
+# annotation. What crane says on stderr passes to stderr as it is, at every
+# attempt.
 #
 # A pull the registry answers with its error code MANIFEST_UNKNOWN (the code
 # of the OCI distribution API for a manifest or a tag that is not there, on
@@ -145,14 +146,39 @@
 # the digests before it included: a release carries its provenance beside
 # every digest or beside none.
 #
-# Then the pushes, in the order the digests were given, each one that is
-# through said with one line on stdout. After the third failure of a push the
-# run ends with one ::error:: line naming the digest and the three attempts,
-# and exit 1: nothing more is pushed, and the digests pushed before it keep
-# their layer, which a re-run replaces.
+# Then the pushes, in the order the digests were given. Another writer (the
+# rescan's cosign attest --replace, a second release run) can write a tag
+# between its pull and its push, and the push would put back a manifest built
+# from the old one, the other writer's layer gone. So immediately before the
+# push of each digest, and not for all digests ahead of the first push, the
+# registry is asked which manifest the tag points at now (crane digest), and
+# the answer is compared with the digest of the manifest that was pulled.
+# Equal, the push goes ahead. Not equal, the layout prepared is not pushed:
+# one ::warning:: line says that the manifest at the tag has changed since it
+# was read, and the digest is prepared again from the manifest now there, in
+# a working directory of its own, every refusal above applying as at the
+# first time and with no pause before it (the other writer is done, a pause
+# only widens the window); then the tag is asked again. A question that fails
+# is treated like a pull that fails: its attempts, the warning lines and the
+# pause, after the third failure a refusal that says the question failed, and
+# at the answer MANIFEST_UNKNOWN (the tag has vanished) the refusal at once
+# of a digest with no attestation manifest. A manifest that has changed at
+# each of three questions in a row ends the run with a refusal naming the
+# digest. What the question cannot see is a writer between the question and
+# the push itself: the registry has no conditional write, the window is made
+# small and is not closed.
+#
+# Each push that is through is said with one line on stdout, the question and
+# the push of a digest done before the next digest's. A refusal at a question
+# or at a repeated preparation, and the third failure of a push, come when
+# digests before it may be pushed: after the third failure of a push the run
+# ends with one ::error:: line naming the digest and the three attempts, and
+# exit 1: nothing more is pushed, and the digests pushed before it keep their
+# layer, which a re-run replaces.
 set -euo pipefail
 
-# the attempts a pull or a push gets
+# the attempts a pull, a question or a push gets, and the questions in a row
+# that may find the manifest changed
 ATTEMPTS=3
 # the one predicate type stored here: SLSA provenance v1
 PROVENANCE="https://slsa.dev/provenance/v1"
@@ -262,11 +288,14 @@ jq -es 'length > 0
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-# every digest is prepared and checked here, nothing is pushed yet: what the
-# pushes below need per digest, in the order the digests were given
-DIGESTS=() REFS=() DIRS=() LAYERS=()
-for DIGEST in "$@"; do
-  first_naming "$DIGEST" || continue
+# the preparation of the digest DIGEST, nothing is pushed: every refusal is
+# passed, the attestation manifest is pulled and its layout rewritten with
+# the provenance layer. It leaves what the push needs: REF, the tag; DIR, the
+# layout; old, the digest of the manifest as it was pulled; layer, the
+# provenance layer's sha256. Called again for a digest whose manifest has
+# changed since, it begins anew, in a working directory of its own: a pull
+# into a directory that holds a layout would add to that layout's index
+prepare() {
   REF="${REPO}:sha256-${DIGEST#sha256:}.att"
   # a working directory of its own per digest: no layout sees another's blobs
   DIR=$(mktemp -d "$TMP/XXXXXX")
@@ -413,8 +442,15 @@ for DIGEST in "$@"; do
   jq -c --arg digest "sha256:$manifest" --argjson size "$msize" \
     '.manifests[0].digest = $digest | .manifests[0].size = $size' "$DIR/index.json" > "$DIR/index.json.tmp"
   mv "$DIR/index.json.tmp" "$DIR/index.json"
+}
 
-  DIGESTS+=("$DIGEST"); REFS+=("$REF"); DIRS+=("$DIR"); LAYERS+=("$layer")
+# every digest is prepared and checked here, nothing is pushed yet: what the
+# pushes below need per digest, in the order the digests were given
+DIGESTS=() REFS=() DIRS=() OLDS=() LAYERS=()
+for DIGEST in "$@"; do
+  first_naming "$DIGEST" || continue
+  prepare
+  DIGESTS+=("$DIGEST"); REFS+=("$REF"); DIRS+=("$DIR"); OLDS+=("$old"); LAYERS+=("$layer")
 done
 
 # no digest was refused: the prepared layouts are pushed, each to its own tag,
@@ -422,9 +458,29 @@ done
 # its attempts; the last one's failure ends the run with the error line of a
 # refusal, naming the digest whose push it was
 for i in "${!DIGESTS[@]}"; do
-  DIGEST="${DIGESTS[$i]}" REF="${REFS[$i]}"
+  DIGEST="${DIGESTS[$i]}" REF="${REFS[$i]}" DIR="${DIRS[$i]}" old="${OLDS[$i]}" layer="${LAYERS[$i]}"
+  # right before the push the tag is asked which manifest it points at now:
+  # another writer may have written it since the pull, and the layout
+  # prepared from the manifest as it was would take that writer's layers
+  # away. The question has a pull's attempts and a pull's refusals; its
+  # answer goes to a file, the refusals end the run from here and not from a
+  # subshell. A manifest that is no longer the one pulled: the digest is
+  # prepared again from the one now there, with no pause, and the tag is
+  # asked again; changed at every one of ATTEMPTS questions, it is refused
+  for ((asked = 1; ; asked++)); do
+    registry "the question for the manifest at ${REF}" \
+      "the question for the manifest at ${REF} failed ${ATTEMPTS} times, the provenance is not stored beside the digest" \
+      MANIFEST_UNKNOWN \
+      "no attestation manifest is at ${REF} any more, the release's other attestations must exist first" \
+      digest "$REF" > "$TMP/now"
+    [ "$(cat "$TMP/now")" != "$old" ] || break
+    [ "$asked" -lt "$ATTEMPTS" ] \
+      || refuse "the attestation manifest at ${REF} has changed at each of ${ATTEMPTS} questions in a row, the provenance is not stored beside the digest"
+    echo "::warning::unpack-provenance: ${REPO}@${DIGEST}: the attestation manifest at ${REF} has changed since it was read, the digest is prepared again from the manifest now there" >&2
+    prepare
+  done
   registry "the push to ${REF}" \
     "the push to ${REF} failed ${ATTEMPTS} times, the provenance is not stored beside the digest" \
-    "" "" push "${DIRS[$i]}" "$REF"
-  echo "unpack-provenance: ${REPO}@${DIGEST}: provenance stored as layer sha256:${LAYERS[$i]} of ${REF}"
+    "" "" push "$DIR" "$REF"
+  echo "unpack-provenance: ${REPO}@${DIGEST}: provenance stored as layer sha256:${layer} of ${REF}"
 done
