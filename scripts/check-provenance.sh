@@ -452,6 +452,7 @@ for attempt in 1 2 3; do
   # one was lost, and why; then the pause, which reads no stdin either
   if [ "$attempt" -lt 3 ]; then
     echo "::warning::check-provenance: ${REF}: cosign failed on attempt ${attempt} of 3 and is asked again after ${PAUSE} seconds, it said:" "${words[@]}" >&2
+    # shellcheck disable=SC2217  # every program gets no stdin, sleep too
     sleep "$PAUSE" </dev/null
     continue
   fi

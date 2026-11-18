@@ -169,12 +169,16 @@ registry() {
 case "${1:-}" in
   # after it the bundles file, the repository and the digests, at least one;
   # the rest of the script is this mode's
-  store) [ "$#" -ge 4 ] && [ -n "$3" ] || usage ;;
+  store)
+    [ "$#" -ge 4 ] || usage
+    [ -n "$3" ] || usage
+    ;;
   # after it the repository and the digests, at least one: a line per digest
   # in the order given, a digest named again left out, the digest without its
   # sha256:, one space, the repository; nothing is read and nothing is pulled
   subjects)
-    [ "$#" -ge 3 ] && [ -n "$2" ] || usage
+    [ "$#" -ge 3 ] || usage
+    [ -n "$2" ] || usage
     REPO="$2"
     shift 2
     # checked before the first line is written: every digest is one
