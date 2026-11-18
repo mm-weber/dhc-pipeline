@@ -51,7 +51,20 @@ fresh() {
   # while it is above 0 a pull fails the way crane does when the registry
   # answers 503 (a line on stderr, exit 1), writes nothing to the target
   # directory and counts it down by one; with no such file a pull fails only
-  # where no layout is laid down for the tag
+  # where no layout is laid down for the tag. digest prints the digest of the
+  # manifest at the tag as crane does (.manifests[0].digest of the layout laid
+  # down for it, sha256:<hex>, on stdout), fails like a pull where no layout is
+  # laid down (the MANIFEST_UNKNOWN line on stderr, exit 1), and fails with 503
+  # for a case that writes a number to $SB/digest-failures, counted down like
+  # the two others. Another writer between a pull and what follows it: a case
+  # that puts a layout at $SB/rewrite/<tag> has it moved over the layout at
+  # $SB/registry/<tag> right after a pull of that tag is served, once (the
+  # pull got the manifest as it was, the tag holds the other writer's from
+  # then on); a case that makes a file $SB/remove/<tag> has the tag's layout
+  # removed right after a pull of it is served, once (the tag has vanished).
+  # A pull into a directory that already holds a layout does what crane does
+  # there: the manifest pulled is appended to the index.json that is there,
+  # after the entries it has, its blobs put beside the others
   cat > "$SB/bin/crane" <<'STUB'
 #!/usr/bin/env bash
 SB="$(cd "$(dirname "$0")/.." && pwd)"
@@ -67,7 +80,28 @@ case "$1" in
     if [ ! -d "$SB/registry/$tag" ]; then
       echo "Error: GET https://${ref%%/*}/v2/.../manifests/$tag: MANIFEST_UNKNOWN: manifest unknown" >&2; exit 1
     fi
-    mkdir -p "$dir" && cp -R "$SB/registry/$tag/." "$dir/" ;;
+    mkdir -p "$dir" || exit 1
+    if [ -f "$dir/index.json" ]; then
+      jq -c --slurpfile pulled "$SB/registry/$tag/index.json" '.manifests += $pulled[0].manifests' "$dir/index.json" > "$dir/index.json.pulled" \
+        && mv "$dir/index.json.pulled" "$dir/index.json" && cp -R "$SB/registry/$tag/blobs/." "$dir/blobs/" || exit 1
+    else
+      cp -R "$SB/registry/$tag/." "$dir/" || exit 1
+    fi
+    # the other writer, after the pull is served: the tag rewritten, or gone
+    if [ -d "$SB/rewrite/$tag" ]; then rm -rf "$SB/registry/$tag"; mv "$SB/rewrite/$tag" "$SB/registry/$tag"; fi
+    if [ -e "$SB/remove/$tag" ]; then rm -rf "$SB/registry/$tag" "$SB/remove/$tag"; fi
+    exit 0 ;;
+  digest) # crane digest <ref>
+    ref="${*: -1}"; tag="${ref##*:}"
+    left=0; [ -f "$SB/digest-failures" ] && left=$(cat "$SB/digest-failures")
+    if [ "$left" -gt 0 ]; then
+      echo "$((left - 1))" > "$SB/digest-failures"
+      echo "Error: HEAD https://${ref%%/*}/v2/.../manifests/$tag: unexpected status code 503 Service Unavailable" >&2; exit 1
+    fi
+    if [ ! -d "$SB/registry/$tag" ]; then
+      echo "Error: GET https://${ref%%/*}/v2/.../manifests/$tag: MANIFEST_UNKNOWN: manifest unknown" >&2; exit 1
+    fi
+    jq -r '.manifests[0].digest' "$SB/registry/$tag/index.json" ;;
   push) # crane push <dir> <ref>
     dir="${*: -2:1}"; ref="${*: -1}"; tag="${ref##*:}"
     left=0; [ -f "$SB/push-failures" ] && left=$(cat "$SB/push-failures")
@@ -1867,6 +1901,268 @@ STUB
 busy_input "(a) three 503s, nothing at the tag" "$INDEX" "" count "$INDEX"
 busy_input "(b) three 503s, the manifest laid down at the tag" "$INDEX" "$INDEX" count "$INDEX"
 busy_input "(c) two digests with their manifests laid down, every pull for the amd64 manifest answered 503" "$AMD64" "$INDEX $AMD64" tag "$INDEX" "$AMD64"
+
+# 35: a manifest rewritten since the pull is not overwritten (plan slice
+#     2.9.6; spec FR-1, the clause of 2026-11-18 on a second writer). store
+#     pulls the attestation manifest of a digest, rewrites it in a working
+#     directory with the provenance layer appended and pushes the result back
+#     to the same tag. Another writer (the rescan's cosign attest --replace, a
+#     second release run) can write that tag between the pull and the push:
+#     the push then puts back a manifest built from the old one and the other
+#     writer's layer is gone. The registry has no conditional write, so the
+#     script closes what it can: immediately before the push of each digest it
+#     asks the registry for the digest the tag points at now, with
+#     crane digest <repository>:sha256-<hex>.att and nothing else on that
+#     line, and compares the answer with the digest of the manifest it
+#     pulled. Equal: the push goes ahead. Not equal: the prepared layout is
+#     not pushed; one ::warning::unpack-provenance: <repository>@<digest>: ...
+#     line says that the attestation manifest at the tag has changed since it
+#     was read and that it is prepared again; the digest is prepared again
+#     from the manifest now at the tag (pulled anew, the provenance layer
+#     appended to that manifest, a stale provenance layer in it taken out as
+#     always), the tag is asked again, and when the answer is the manifest
+#     just pulled, that layout is pushed. No pause lies before a repeated
+#     preparation: the other writer is done, a pause only widens the window.
+#     A question that fails is treated like a pull that fails: tried again up
+#     to three attempts, a warning line and the pause after each failure that
+#     is tried again, and the answer MANIFEST_UNKNOWN (the tag has vanished)
+#     refuses the digest at once in case 33's words. What happens when the
+#     manifest has changed again at every attempt is the next slice's (2.9.7)
+#     and no input here reaches it: the other writer writes once.
+#     The stub stands in for the other writer (see fresh): a layout put at
+#     rewrite/<tag> is moved over the tag's layout right after a pull of that
+#     tag is served, a file remove/<tag> has the tag's layout removed at that
+#     moment, and digest-failures counts the questions answered 503. The
+#     other writer's layout is lay_down's, with the SBOM layer the first
+#     layout has and a CycloneDX layer after it, so its manifest is another
+#     one. Every input has a sandbox of its own, the fixture's bundle as it
+#     is (it names both digests), the one SBOM layer laid down at the tag of
+#     every digest given, sleep as case 29's stand-in and the variable 7
+#     (case 33's absent_run: stdout is the output, stderr is kept apart).
+#     The order of the crane calls is held as a whole, each call reduced to
+#     its subcommand and the digest whose tag it names:
+#     (a) one digest, nothing else writes: pull, digest, push;
+#     (b) one digest, rewritten once between the pull and the question:
+#         pull, digest, pull, digest, push;
+#     (c) two digests, the index and the amd64 manifest, of which only the
+#         second is rewritten: pull index, pull amd64, digest index, push
+#         index, digest amd64, pull amd64, digest amd64, push amd64. This
+#         order and no other, because every digest is prepared before the
+#         first push (cases 19 and 20, all or nothing), the question stands
+#         immediately before the push it guards (asked for both digests ahead
+#         of the first push, the second answer would be older than it need
+#         be), and a digest whose manifest did not change is pushed from its
+#         first preparation: one pull of the index's tag, no more;
+#     (d) as (b), the other writer's manifest holding a provenance layer of
+#         an earlier run between its two layers: that layer is taken out,
+#         exactly one provenance layer is pushed;
+#     (e) the first question answered 503, the second answered: pull, digest,
+#         digest, push, one warning line that names the first attempt, one
+#         pause;
+#     (f) the tag gone after the pull, the question answered
+#         MANIFEST_UNKNOWN: pull, digest, and the digest is refused at once;
+#     (g) the question answered 503 three times: pull, digest, digest,
+#         digest, two warning lines, two pauses, and the digest is refused.
+#     Wanted of each input: the exit code (0, and 1 in (f) and (g)); the
+#     crane calls in the order named and every digest call the line
+#     crane digest <repository>:<tag> and nothing else; stdout the usual line
+#     of every digest stored, in the order given, and nothing else; the sleep
+#     log byte for byte one line sleep 7 per 503 that is tried again (cmp),
+#     so none for a repeated preparation; on stderr one line of crane's per
+#     failed question, one ::warning::unpack-provenance: line per 503 that is
+#     tried again (begun with the repository and the digest, holding the tag,
+#     naming its attempt by case 24's patterns), for a rewritten digest
+#     exactly one ::warning::unpack-provenance: line begun with the
+#     repository and that digest which speaks of the manifest, says that it
+#     changed (chang, rewritten, no longer or differ, any case) and that it
+#     is prepared again (again or anew, any case), no other warning line, and
+#     no ::error:: line where the run ends 0. A digest refused has exactly
+#     one ::error:: line, the last line of stderr, begun
+#     ::error::unpack-provenance: <repository>@<digest>: and ended
+#     (Req 2.27), holding the tag; in (f) it holds the words no attestation
+#     manifest and says that the attestations must exist first (case 33's
+#     patterns); in (g) what is left of it without that frame and the tag
+#     says that something failed (fail, any case) and holds the three
+#     attempts as a word of its own (3 or three), as case 34 asks of a pull,
+#     and the line does not say no attestation manifest; nothing is pushed
+#     for it. At the tag of every digest stored the manifest pushed holds,
+#     before its last layer, the layers of the manifest that was at the tag
+#     when it was last pulled, descriptor for descriptor and in their order
+#     (the other writer's where it wrote, without a provenance layer of an
+#     earlier run; the layers laid down elsewhere), its last layer is the
+#     envelope the log recorded, exactly one layer is of the provenance type,
+#     and the config pushed lists these layers: rootfs.diff_ids their digests
+#     in order, history one entry per layer. One result line per input; on a
+#     failure its detail shows what was found against what was wanted
+rewritten_name() { case "$1" in "$INDEX") echo index ;; "$AMD64") echo amd64 ;; *) echo "$1" ;; esac; } # a digest's short name for the order of the calls
+rewritten_input() { # what, the digest whose manifest is rewritten right after its pull ("" none), the predicate types of the other writer's layers (one word), the digest whose tag is gone right after its pull ("" none), the questions answered 503 before one is answered, then the digests given
+  local what="$1" rewritten="$2" types="$3" vanished="$4" fails="$5" digest tag name n line which rest sub ref
+  local code=0 busywant warns denied="" provenance moved=yes calls odd only=() stdoutwant
+  local lines cranes craneswant busy answers answerswant=0 warned warnedwant named=0 changed=0 changedwant=0 errors errorswant=0 last framed="not asked" reason="not asked"
+  local pushed manifest want got lastlayer typed listed layersd entries stored=0 storedwant=0 tags=() ok=1
+  shift 5
+  fresh; mkdir -p "$SB/rewrite" "$SB/remove"
+  # sleep as a log, as in case 29: the word and its arguments, no wait
+  cat > "$SB/bin/sleep" <<'STUB'
+#!/usr/bin/env bash
+SB="$(cd "$(dirname "$0")/.." && pwd)"
+{ printf 'sleep'; [ "$#" -eq 0 ] || printf ' %s' "$@"; echo; } >> "$SB/sleep.log"
+exit 0
+STUB
+  chmod +x "$SB/bin/sleep"; : > "$SB/sleep.log"
+  provenance="sha256:$(logged_hash)"
+  # the questions that are answered 503, three at most, and the warnings and
+  # pauses for those of them that are tried again
+  busywant="$fails"; [ "$fails" -lt 3 ] || busywant=3
+  warns="$fails"; [ "$fails" -lt 3 ] || warns=2
+  : > "$SB/sleep.want"; for ((n = 0; n < warns; n++)); do echo "sleep 7" >> "$SB/sleep.want"; done
+  # laid down per digest: the one SBOM layer at its tag; for the digest that
+  # is rewritten the other writer's layout first, put aside for the stub. The
+  # layers wanted before the provenance layer are kept per digest as a file:
+  # those of the manifest that is at the tag when it is last pulled
+  for digest in "$@"; do
+    tag=$(att_tag "$digest"); name=$(rewritten_name "$digest")
+    if [ "$digest" = "$rewritten" ]; then
+      # shellcheck disable=SC2086 # the types are words on purpose
+      lay_down "$tag" $types; mv "$SB/registry/$tag" "$SB/rewrite/$tag"
+      manifest_of "$SB/rewrite/$tag" | jq -S --arg type "$slsa" '[.layers[] | select(.annotations.predicateType != $type)]' > "$SB/layers.want.$name"
+    fi
+    lay_down "$tag"
+    [ "$digest" = "$rewritten" ] || manifest_of "$SB/registry/$tag" | jq -S '.layers' > "$SB/layers.want.$name"
+    [ "$digest" != "$vanished" ] || : > "$SB/remove/$tag"
+    only+=(-e "crane digest $REPO:$tag")
+  done
+  echo "$fails" > "$SB/digest-failures"
+  # the calls wanted, in their order: every pull first, then per digest its
+  # question (the 503s come to the first digest asked) and its push, and for
+  # the digest rewritten a second pull and a second question between the two.
+  # A digest refused ends the list, and stdout holds the digests before it
+  : > "$SB/calls.want"; : > "$SB/stdout.want"
+  for digest in "$@"; do echo "pull $(rewritten_name "$digest")" >> "$SB/calls.want"; done
+  n=0
+  for digest in "$@"; do
+    tag=$(att_tag "$digest"); name=$(rewritten_name "$digest")
+    if [ "$n" -eq 0 ]; then
+      for ((n = 0; n < busywant; n++)); do echo "digest $name" >> "$SB/calls.want"; done
+      n=1
+      [ "$fails" -lt 3 ] || { denied="$digest"; break; }
+    fi
+    echo "digest $name" >> "$SB/calls.want"
+    [ "$digest" != "$vanished" ] || { denied="$digest"; answerswant=1; break; }
+    [ "$digest" != "$rewritten" ] || { printf 'pull %s\ndigest %s\n' "$name" "$name" >> "$SB/calls.want"; changedwant=1; }
+    echo "push $name" >> "$SB/calls.want"
+    echo "unpack-provenance: ${REPO}@${digest}: provenance stored as layer $provenance of ${REPO}:${tag}" >> "$SB/stdout.want"
+    storedwant=$((storedwant + 1))
+  done
+  [ -z "$denied" ] || { code=1; errorswant=1; }
+  stdoutwant=$(cat "$SB/stdout.want")
+  warnedwant=$((warns + changedwant)); craneswant=$((busywant + answerswant))
+
+  out=$(absent_run store "$DATA/bundle.jsonl" "$REPO" "$@"); rc=$?
+
+  # the other writer has written: the stub moved its layout to the tag
+  [ -z "$rewritten" ] || [ ! -e "$SB/rewrite/$(att_tag "$rewritten")" ] || moved=no
+  [ -z "$vanished" ] || [ ! -e "$SB/remove/$(att_tag "$vanished")" ] || moved=no
+  # the calls as logged, each reduced to its subcommand and the digest whose
+  # tag it names; the digest calls also as whole lines
+  calls=$(while read -r _ sub rest; do
+    ref=$(tr ' ' '\n' <<<"$rest" | grep -F -- "$REPO:" | head -n 1); name="${ref#"$REPO:"}"
+    for digest in "$@"; do [ "$name" != "$(att_tag "$digest")" ] || name=$(rewritten_name "$digest"); done
+    echo "$sub ${name:-no reference}"
+  done < "$SB/crane.log")
+  odd=$(grep '^crane digest' "$SB/crane.log" | grep -vxF "${only[@]}")
+  lines=$(grep -c '' "$SB/stderr"); cranes=$(grep -c '^Error: ' "$SB/stderr")
+  busy=$(grep -c '^Error: .*503' "$SB/stderr"); answers=$(grep -c '^Error: .*MANIFEST_UNKNOWN' "$SB/stderr")
+  warned=$(grep -c '^::warning::' "$SB/stderr"); errors=$(grep -c '^::error::' "$SB/stderr")
+  last=$(tail -n 1 "$SB/stderr")
+  # the warning lines of the questions answered 503, the first lines begun
+  # ::warning:: in their order: the first digest given, its tag, the attempt
+  for ((n = 1; n <= warns; n++)); do
+    line=$(grep '^::warning::' "$SB/stderr" | sed -n "${n}p"); which="$first"; [ "$n" -eq 2 ] && which="$second"
+    [[ "$line" == "::warning::unpack-provenance: ${REPO}@$1: "* ]] \
+      && grep -Fq -- "$(att_tag "$1")" <<<"$line" && grep -Eiq -- "$which" <<<"$line" && named=$((named + 1))
+  done
+  # the warning line of a manifest that has changed: the digest rewritten,
+  # the manifest, that it changed, that it is prepared again
+  [ -z "$rewritten" ] || changed=$(grep -F -- "::warning::unpack-provenance: ${REPO}@${rewritten}: " "$SB/stderr" \
+    | grep -i -- 'manifest' | grep -Ei -- 'chang|rewritten|no longer|differ' | grep -Eic -- 'again|anew')
+  # the error line of a digest refused: framed, the tag, and the reason
+  if [ -n "$denied" ]; then
+    tag=$(att_tag "$denied"); framed=no; reason=no
+    [[ "$last" == "::error::unpack-provenance: ${REPO}@${denied}: "*" (Req 2.27)" ]] && grep -Fq -- "$tag" <<<"$last" && framed=yes
+    if [ "$denied" = "$vanished" ]; then
+      grep -Fiq -- "no attestation manifest" <<<"$last" && grep -Eiq -- 'attestations.*(first|exist)' <<<"$last" && reason=yes
+    else
+      rest="${last#"::error::unpack-provenance: ${REPO}@${denied}: "}"; rest="${rest%" (Req 2.27)"}"; rest="${rest//"$tag"/}"
+      [ "$framed" = yes ] && grep -Fiq -- "fail" <<<"$rest" && grep -Eiq -- '(^|[^[:alnum:]])(3|three)([^[:alnum:]]|$)' <<<"$rest" \
+        && ! grep -Fiq -- "no attestation manifest" <<<"$last" && reason=yes
+    fi
+  fi
+  # what was pushed, per digest: a digest refused, and every digest after it,
+  # has nothing at its tag; a digest stored has the layers wanted, then the
+  # one provenance layer, and a config that lists them
+  n=0
+  for digest in "$@"; do
+    tag=$(att_tag "$digest"); name=$(rewritten_name "$digest"); pushed="$SB/pushed/$tag"
+    [ "$digest" != "$denied" ] || n=1
+    if [ "$n" -eq 1 ]; then
+      [ ! -e "$pushed" ] || { ok=0; tags+=("$name: something was pushed to $tag, wanted nothing: the digest is refused or stands after the one refused"); }
+      continue
+    fi
+    manifest=""; [ -f "$pushed/index.json" ] && manifest=$(manifest_of "$pushed")
+    want=$(cat "$SB/layers.want.$name")
+    got=$(jq -S '.layers[:-1]' <<<"$manifest" 2>/dev/null)
+    lastlayer=$(jq -r '.layers[-1].digest' <<<"$manifest" 2>/dev/null)
+    typed=$(jq -c --arg type "$slsa" '[.layers[] | select(.annotations.predicateType == $type) | .digest]' <<<"$manifest" 2>/dev/null)
+    layersd=$(jq -c '[.layers[].digest]' <<<"$manifest" 2>/dev/null)
+    listed=$(config_of "$pushed" | jq -c '.rootfs.diff_ids' 2>/dev/null)
+    entries=$(config_of "$pushed" | jq '.history | length' 2>/dev/null)
+    if [ -n "$manifest" ] && [ -n "$got" ] && [ "$got" = "$want" ] && [ "$lastlayer" = "$provenance" ] && [ "$typed" = "[\"$provenance\"]" ] \
+      && [ -n "$listed" ] && [ "$listed" = "$layersd" ] && [ "$entries" = "$(jq 'length' <<<"$layersd")" ]; then
+      stored=$((stored + 1)); continue
+    fi
+    tags+=("$name, pushed to $tag, not as wanted:" \
+           "  layers before the last:" "$([ -n "$manifest" ] && jq -c '.layers[:-1][] | "    \(.annotations.predicateType) \(.digest)"' -r <<<"$manifest" || echo "    nothing was pushed to the tag")" \
+           "  wanted, descriptor for descriptor:" "$(jq -r '.[] | "    \(.annotations.predicateType) \(.digest)"' <<<"$want")" \
+           "  last layer: ${lastlayer:-none}, wanted $provenance; layers of the provenance type: ${typed:-none}, wanted [\"$provenance\"]" \
+           "  rootfs.diff_ids of the config pushed: ${listed:-no config to read}" "  the manifest's layers' digests:       ${layersd:-none}" \
+           "  history entries: ${entries:-none}, wanted one per layer")
+  done
+  [ "$moved" = yes ] && [ "$rc" -eq "$code" ] && [ "$calls" = "$(cat "$SB/calls.want")" ] && [ -z "$odd" ] && [ "$out" = "$stdoutwant" ] \
+    && cmp -s "$SB/sleep.log" "$SB/sleep.want" && [ "$cranes" -eq "$craneswant" ] && [ "$busy" -eq "$busywant" ] && [ "$answers" -eq "$answerswant" ] \
+    && [ "$warned" -eq "$warnedwant" ] && [ "$named" -eq "$warns" ] && [ "$changed" -eq "$changedwant" ] \
+    && [ "$errors" -eq "$errorswant" ] && [ "$framed" != no ] && [ "$reason" != no ] \
+    && [ "$lines" -eq "$((craneswant + warnedwant + errorswant))" ] && [ "$stored" -eq "$storedwant" ] || ok=0
+  [ "$ok" -eq 1 ] \
+    && pass "a manifest rewritten since the pull is not overwritten, $what: exit $code, the crane calls in their order ($(tr '\n' ',' < "$SB/calls.want" | sed 's/,$//; s/,/, /g')), $warnedwant ::warning:: line(s), $warns pause(s), $errorswant ::error:: line(s), $storedwant digest(s) stored, each with the layers of the manifest last pulled and one provenance layer, the last" \
+    || fail "a manifest rewritten since the pull is not overwritten, $what: exit $code, the crane calls in their order, $warnedwant ::warning:: line(s), $warns pause(s), $errorswant ::error:: line(s), $storedwant digest(s) stored with the layers of the manifest last pulled and one provenance layer" \
+         "exit=$rc, wanted $code" \
+         "crane calls, each as its subcommand and the digest whose tag it names:" "$([ -n "$calls" ] && sed 's/^/  /' <<<"$calls" || echo "  crane never called")" \
+         "wanted, in this order:" "$(sed 's/^/  /' "$SB/calls.want")" \
+         "crane digest calls that are not the line 'crane digest $REPO:<the tag of a digest given>', wanted none:" "${odd:-none}" \
+         "the calls as logged:" "$([ -s "$SB/crane.log" ] && short_lines < "$SB/crane.log" || echo "crane never called")" \
+         "stdout:" "$([ -n "$out" ] && short_lines <<<"$out" || echo "nothing")" "wanted:" "${stdoutwant:-nothing}" \
+         "sleep calls logged (through cat -A, \$ ends a line):" "$([ -s "$SB/sleep.log" ] && cat -A "$SB/sleep.log" || echo "none")" \
+         "sleep calls wanted (one per 503 that is tried again, none for a repeated preparation):" "$([ -s "$SB/sleep.want" ] && cat -A "$SB/sleep.want" || echo "none")" \
+         "::warning:: lines on stderr: $warned, wanted $warnedwant" \
+         "of them for a question that failed, begun '::warning::unpack-provenance: ${REPO}@$1: ', holding the tag and naming the attempt (case 24's patterns), in their place: $named, wanted $warns" \
+         "lines begun '::warning::unpack-provenance: ${REPO}@${rewritten:-<no digest is rewritten>}: ' that speak of the manifest, say that it changed ('chang', 'rewritten', 'no longer' or 'differ', any case) and that it is prepared again ('again' or 'anew', any case): $changed, wanted $changedwant" \
+         "::error:: lines on stderr: $errors, wanted $errorswant; the last line of stderr begins '::error::unpack-provenance: ${REPO}@${denied:-<no digest is refused>}: ', ends ' (Req 2.27)' and holds the tag: $framed, wanted $([ -n "$denied" ] && echo yes || echo "not asked")" \
+         "its reason ($([ "$denied" = "$vanished" ] && echo "'no attestation manifest' and 'attestations.*(first|exist)', any case" || echo "without the frame and the tag 'fail' and '3' or 'three' as a word of its own, any case, and not 'no attestation manifest'")): $reason, wanted $([ -n "$denied" ] && echo yes || echo "not asked")" \
+         "crane's lines on stderr (begun 'Error: '): $cranes, wanted $craneswant; of them with 503: $busy, wanted $busywant; with MANIFEST_UNKNOWN: $answers, wanted $answerswant" \
+         "lines on stderr in all: $lines, wanted $((craneswant + warnedwant + errorswant)) (crane's, the warnings, the error line)" \
+         "the other writer wrote (the stub moved the layout at rewrite/, or removed the tag): $moved, wanted yes" \
+         "digests stored as wanted: $stored, wanted $storedwant" "${tags[@]}" \
+         "stderr:" "$([ -s "$SB/stderr" ] && short_lines < "$SB/stderr" || echo "none")"
+}
+cyclonedx="https://cyclonedx.org/bom"
+rewritten_input "(a) one digest, nothing else writes" "" "" "" 0 "$INDEX"
+rewritten_input "(b) one digest, rewritten once between the pull and the question" "$INDEX" "https://spdx.dev/Document $cyclonedx" "" 0 "$INDEX"
+rewritten_input "(c) two digests, only the second rewritten" "$AMD64" "https://spdx.dev/Document $cyclonedx" "" 0 "$INDEX" "$AMD64"
+rewritten_input "(d) the manifest rewritten holds a provenance layer of an earlier run" "$INDEX" "https://spdx.dev/Document $slsa $cyclonedx" "" 0 "$INDEX"
+rewritten_input "(e) the question answered 503 once, then answered" "" "" "" 1 "$INDEX"
+rewritten_input "(f) the tag gone after the pull, the question answered MANIFEST_UNKNOWN" "" "" "$INDEX" 0 "$INDEX"
+rewritten_input "(g) the question answered 503 three times" "" "" "" 3 "$INDEX"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
