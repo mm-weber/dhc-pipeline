@@ -1596,6 +1596,136 @@ lacking_input "(e) no certificate, two digests given, the index first: the index
 lacking_input "(e) no certificate, two digests given, the amd64 manifest first: the amd64 manifest is named" "certificate" "$lacking/certificate-chain" "$AMD64" "$AMD64" "$INDEX"
 lacking_input "(e) no certificate in the bundle chosen for the amd64 manifest, the index in order before it: the amd64 manifest is named, nothing is pushed for the index" "certificate" "$lacking/newer-then-certificate-chain" "$AMD64" "$INDEX" "$AMD64"
 
+# 33: a manifest that is not there is refused at the first answer (plan slice
+#     2.9.4; spec FR-1, the clause of 2026-11-18 on the registry answering
+#     that no attestation manifest exists beside a digest). A pull that fails
+#     is tried again (cases 25 and 29) because a registry that falters may
+#     answer the next time. A registry that answers that the manifest is not
+#     there has answered: its error code MANIFEST_UNKNOWN (the code of the OCI
+#     distribution API for a manifest or a tag that is not there) is on the
+#     line crane prints on stderr, and asking again brings the same answer two
+#     attempts and two pauses later. So a failed pull whose stderr holds that
+#     code ends the digest at once: no further pull of that tag, no
+#     ::warning:: line for that failure, no pause after it, the refusal of
+#     case 14 (no attestation manifest at the tag, the release's other
+#     attestations must exist first). The code decides, not the words the
+#     registry puts after it, which differ from registry to registry. A pull
+#     that fails for another cause (the stub's 503) keeps its attempts, its
+#     warnings and its pauses, and a pull answered MANIFEST_UNKNOWN after one
+#     or two such failures is refused at that answer, with the warnings said
+#     and the pauses made so far. What crane said passes to stderr as before,
+#     every failed pull's line, the registry's answer above the error line.
+#     Every input has a sandbox of its own, the fixture's bundle as it is (it
+#     names both digests) and nothing laid down at the .att tag of the digest
+#     refused; the stub's count of pulls that fail holds the 503s that come
+#     first. sleep is case 29's stand-in, a log of its calls, and the variable
+#     is 7, so a pause shows as the line sleep 7. stdout is the output, stderr
+#     is kept apart in the sandbox. The inputs:
+#     (a) nothing at the tag, the first answer is MANIFEST_UNKNOWN: one pull,
+#         no warning, no pause;
+#     (b) the same with the words another registry puts after the code
+#         (MANIFEST_UNKNOWN: Failed to fetch <tag>): the same;
+#     (c) two digests, the manifest laid down for the index and nothing for
+#         the amd64 manifest: one pull for each tag, the amd64 manifest is
+#         the digest refused, no warning, no pause, nothing pushed for the
+#         index either;
+#     (d) one 503, then MANIFEST_UNKNOWN: two pulls, one warning (the first
+#         attempt), one pause;
+#     (e) two 503s, then MANIFEST_UNKNOWN: three pulls, two warnings, two
+#         pauses, the refusal that of the manifest that is not there;
+#     (f) three 503s and nothing at the tag, the other cause alone: three
+#         pulls, two warnings, two pauses as today, no MANIFEST_UNKNOWN
+#         anywhere; of its error line only the frame and the digest are
+#         asked here.
+#     Wanted of each input: exit 1; nothing on stdout; crane pull called for
+#     the tag of the digest refused as often as named and crane push never,
+#     for any digest; the sleep log byte for byte the lines named (cmp); on
+#     stderr one line of crane's per failed pull (begun Error:, the 503s
+#     first, then, except in (f), the one that holds MANIFEST_UNKNOWN), one
+#     ::warning::unpack-provenance: line per 503 that is tried again, carrying
+#     the digest, speaking of the pull and naming its attempt (case 24's
+#     patterns), exactly one ::error:: line, the last line of stderr and so
+#     below the registry's answer, and no other line; the error line begins
+#     ::error::unpack-provenance: <repository>@<the digest refused>: , ends
+#     (Req 2.27) and, except in (f), holds the tag and the words no
+#     attestation manifest and says that the attestations must exist first
+#     (case 14's pattern for that part). One result line per input; on a
+#     failure its detail shows what was found against what was wanted
+absent_run() { PATH="$SB/bin:$PATH" UNPACK_PROVENANCE_RETRY_DELAY=7 "$UNPACK" "$@" 2> "$SB/stderr"; } # run's PATH, the pause 7 seconds, stdout the output, stderr to a file in the sandbox
+absent_input() { # what, the 503s that come first, the words after the code ("" the stub's own), the digest refused, the digests with a manifest laid down (one word, "" none), then the digests given
+  local what="$1" fails="$2" words="$3" refused="$4" laid="$5" digest tag tries warns unknown=yes n line which
+  local pulls allpulls allwant pushes lines cranes busy busywant answers warned named=0 errors last framed=no reason=no above=no ok=1
+  shift 5
+  fresh; tag=$(att_tag "$refused")
+  for digest in $laid; do lay_down "$(att_tag "$digest")"; done
+  # sleep as a log, as in case 29: the word and its arguments, no wait
+  cat > "$SB/bin/sleep" <<'STUB'
+#!/usr/bin/env bash
+SB="$(cd "$(dirname "$0")/.." && pwd)"
+{ printf 'sleep'; [ "$#" -eq 0 ] || printf ' %s' "$@"; echo; } >> "$SB/sleep.log"
+exit 0
+STUB
+  chmod +x "$SB/bin/sleep"; : > "$SB/sleep.log"
+  # the words another registry puts after the code, in the stub's one line
+  [ -z "$words" ] || sed -i "s|MANIFEST_UNKNOWN: manifest unknown|MANIFEST_UNKNOWN: $words|" "$SB/bin/crane"
+  echo "$fails" > "$SB/pull-failures"
+  # what is wanted: a pull per 503 and one for the registry's answer, three at
+  # most; a warning and a pause per failure that is tried again
+  tries=$((fails + 1)); busywant="$fails"; [ "$tries" -le 3 ] || { tries=3; busywant=3; unknown=no; }
+  warns=$((tries - 1)); allwant=$((tries + $(wc -w <<<"$laid")))
+  : > "$SB/sleep.want"; for ((n = 0; n < warns; n++)); do echo "sleep 7" >> "$SB/sleep.want"; done
+  out=$(absent_run store "$DATA/bundle.jsonl" "$REPO" "$@"); rc=$?
+  pulls=$(grep -c "^crane pull .*:$tag " "$SB/crane.log"); allpulls=$(grep -c '^crane pull' "$SB/crane.log")
+  pushes=$(grep -c '^crane push' "$SB/crane.log")
+  lines=$(grep -c '' "$SB/stderr"); cranes=$(grep -c '^Error: ' "$SB/stderr")
+  busy=$(grep -c '^Error: .*503' "$SB/stderr"); answers=$(grep -c '^Error: .*MANIFEST_UNKNOWN' "$SB/stderr")
+  warned=$(grep -c '^::warning::' "$SB/stderr"); errors=$(grep -c '^::error::' "$SB/stderr")
+  last=$(tail -n 1 "$SB/stderr")
+  # the warning lines in their order, counted as case 24's named_attempts
+  # counts them: the unpack's own, the digest, the pull, the attempt
+  for ((n = 1; n <= warns; n++)); do
+    line=$(grep '^::warning::' "$SB/stderr" | sed -n "${n}p"); which="$first"; [ "$n" -eq 2 ] && which="$second"
+    [[ "$line" == "::warning::unpack-provenance: ${REPO}@${refused}: "* ]] \
+      && grep -iq -- "pull" <<<"$line" && grep -Eiq -- "$which" <<<"$line" && named=$((named + 1))
+  done
+  [[ "$last" == "::error::unpack-provenance: ${REPO}@${refused}: "*" (Req 2.27)" ]] && framed=yes
+  # the reason and the registry's answer above it; three 503s have neither
+  if [ "$unknown" = yes ]; then
+    grep -Fq -- "$tag" <<<"$last" && grep -Fiq -- "no attestation manifest" <<<"$last" \
+      && grep -Eiq -- 'attestations.*(first|exist)' <<<"$last" && reason=yes
+    [ "$answers" -eq 1 ] && [ "$busy" -eq "$busywant" ] && [ "$cranes" -eq "$tries" ] \
+      && [ "$(grep '^Error: ' "$SB/stderr" | tail -n 1 | grep -c 'MANIFEST_UNKNOWN')" -eq 1 ] \
+      && { [ -z "$words" ] || grep -Fq -- "MANIFEST_UNKNOWN: $words" "$SB/stderr"; } && above=yes
+  else
+    reason="not asked"
+    [ "$answers" -eq 0 ] && [ "$busy" -eq "$busywant" ] && [ "$cranes" -eq "$tries" ] && above=yes
+  fi
+  [ "$rc" -eq 1 ] && [ -z "$out" ] && [ "$pulls" -eq "$tries" ] && [ "$allpulls" -eq "$allwant" ] && [ "$pushes" -eq 0 ] \
+    && cmp -s "$SB/sleep.log" "$SB/sleep.want" && [ "$warned" -eq "$warns" ] && [ "$named" -eq "$warns" ] \
+    && [ "$errors" -eq 1 ] && [ "$framed" = yes ] && [ "$reason" != no ] && [ "$above" = yes ] \
+    && [ "$lines" -eq "$((tries + warns + 1))" ] || ok=0
+  [ "$ok" -eq 1 ] \
+    && pass "a manifest that is not there, $what: exit 1, nothing on stdout, $tries crane pull(s) of the tag and no crane push, $warns ::warning:: line(s), $warns pause(s), crane's line of every failed pull on stderr, one ::error::unpack-provenance: line with the digest as the last line" \
+    || fail "a manifest that is not there, $what: exit 1, nothing on stdout, $tries crane pull(s) of the tag and no crane push, $warns ::warning:: line(s), $warns pause(s), crane's line of every failed pull on stderr, one ::error:: line as the last line" \
+         "exit=$rc, wanted 1" \
+         "crane pull calls for the tag $tag: $pulls, wanted $tries; crane pull calls in all: $allpulls, wanted $allwant; crane push calls: $pushes, wanted 0:" "$([ -s "$SB/crane.log" ] && cat "$SB/crane.log" || echo "crane never called")" \
+         "sleep calls logged (through cat -A, \$ ends a line):" "$([ -s "$SB/sleep.log" ] && cat -A "$SB/sleep.log" || echo "none")" \
+         "sleep calls wanted:" "$([ -s "$SB/sleep.want" ] && cat -A "$SB/sleep.want" || echo "none")" \
+         "::warning:: lines on stderr: $warned, wanted $warns, each begun '::warning::unpack-provenance: ${REPO}@${refused}: ', speaking of the pull and naming its attempt (case 24's patterns); lines that do, in their place: $named, wanted $warns" \
+         "::error:: lines on stderr: $errors, wanted 1; the last line of stderr begins '::error::unpack-provenance: ${REPO}@${refused}: ' and ends ' (Req 2.27)': $framed, wanted yes" \
+         "that line holds the tag '$tag', the words 'no attestation manifest' (any case) and matches 'attestations.*(first|exist)' (any case): $reason, wanted $([ "$unknown" = yes ] && echo yes || echo "not asked")" \
+         "crane's lines on stderr (begun 'Error: '): $cranes, wanted $tries; of them with 503: $busy, wanted $busywant; with MANIFEST_UNKNOWN: $answers, wanted $([ "$unknown" = yes ] && echo "1, the last of crane's lines${words:+, holding 'MANIFEST_UNKNOWN: $words'}" || echo 0); as wanted: $above, wanted yes" \
+         "lines on stderr in all: $lines, wanted $((tries + warns + 1)) (crane's, the warnings, the error line)" \
+         "stderr:" "$([ -s "$SB/stderr" ] && short_lines < "$SB/stderr" || echo "none")" \
+         "stdout, wanted none:" "$([ -n "$out" ] && short_lines <<<"$out" || echo "none")"
+}
+absent_input "(a) nothing at the tag, the first answer is MANIFEST_UNKNOWN" 0 "" "$INDEX" "" "$INDEX"
+absent_input "(b) the first answer is MANIFEST_UNKNOWN in another registry's words" 0 "Failed to fetch $(att_tag "$INDEX")" "$INDEX" "" "$INDEX"
+absent_input "(c) two digests, the manifest there for the index and not for the amd64 manifest" 0 "" "$AMD64" "$INDEX" "$INDEX" "$AMD64"
+absent_input "(d) one 503, then MANIFEST_UNKNOWN" 1 "" "$INDEX" "" "$INDEX"
+absent_input "(e) two 503s, then MANIFEST_UNKNOWN" 2 "" "$INDEX" "" "$INDEX"
+absent_input "(f) three 503s, the other cause alone" 3 "" "$INDEX" "" "$INDEX"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
