@@ -1473,6 +1473,129 @@ unreadable_input "(d) the valid bundle line, then an envelope whose payload is b
 unreadable_input "(d) the valid bundle line, then an envelope whose statement has no subject" "$unreadable/subject-after" "$INDEX" "$AMD64"
 unreadable_input "(d) an envelope whose statement has no subject, then the valid bundle line" "$unreadable/subject-before" "$INDEX" "$AMD64"
 
+# 32: a bundle that lacks a part the layer needs is refused by name (plan
+#     slice 2.9.3; spec FR-1, the clause of 2026-11-18 on the bundle chosen
+#     for a digest that lacks its signing certificate, or whose log entry
+#     lacks its integrated time, its log index or its log's id, or holds one
+#     of the first two as something other than a whole number). The bundle
+#     chosen for a digest has passed the refusals of cases 9, 13, 10 and 20:
+#     it is of the provenance type, holds exactly one log entry, that entry
+#     has its signed entry timestamp and is of the kind dsse. The layer's
+#     annotations then need four more parts of it: the signing certificate
+#     (.verificationMaterial.certificate.rawBytes, base64 of DER) and, of the
+#     log entry, its integrated time (.integratedTime), its own log index
+#     (.logIndex) and the log's id (.logId.keyId, base64). A bundle without
+#     one of them is refused like the others, in the script's own words and
+#     not in those of jq, openssl, base64 or bash, and before anything is
+#     pulled for that digest. A bundle with no log entry at all keeps the
+#     refusal of case 13 and is no input here.
+#     Every input is the fixture's bundle with one part changed by jq, alone
+#     in the bundles file, run in a sandbox of its own with the attestation
+#     manifest laid down at the .att tag of every digest given, so that a run
+#     that gets as far as the registry shows in the stub's call log. stderr
+#     is kept apart (case 27's run_apart). The inputs:
+#     (a) the certificate: verificationMaterial.certificate removed and a
+#         x509CertificateChain in its place (the older bundle form); rawBytes
+#         null; rawBytes that is not base64; rawBytes that is base64 of bytes
+#         that are no certificate;
+#     (b) the integrated time: removed; null; a text that is no number
+#         ("soon"); a number with a fraction ("1794604098.5");
+#     (c) the log index: removed; a text that is no number ("many");
+#     (d) the log's id: logId removed; keyId null; keyId that is not base64;
+#     (e) the order of things, the bundle without its certificate of (a):
+#         two digests given, the index first and then the amd64 manifest
+#         first (the statement names both), the line names the first given;
+#         and the two digests with a bundles file whose first line is the
+#         newer provenance statement of store-two.json, complete and naming
+#         the index alone: the index is in order, the amd64 manifest is the
+#         digest refused, and nothing is pushed for the index either.
+#     Wanted of each input: exit 1; nothing on stdout; on stderr exactly one
+#     line, begun ::error::unpack-provenance: <repository>@<the digest
+#     refused>: , ended (Req 2.27), holding the part that is missing in
+#     words (certificate, integrated time, log index or log id, in any case)
+#     and none of the other three; no word of a tool on stderr (jq, openssl,
+#     base64: , bash's line numbers, Could not, invalid input and their
+#     like); crane never called for push, for any digest, and never called
+#     at all with the .att tag of the digest refused. One result line per
+#     input; on a failure its detail shows what was found against what was
+#     wanted
+lacking=$(mktemp -d "$TOP/lacking.XXXXXX") \
+  || { echo "FAIL the directory for the bundles that lack a part could not be made under '$TOP': the suite ends here"; exit 1; }
+jq -c '.verificationMaterial |= (del(.certificate) + {x509CertificateChain: {certificates: [{rawBytes: .certificate.rawBytes}]}})' "$DATA/bundle.jsonl" > "$lacking/certificate-chain"
+jq -c '.verificationMaterial.certificate.rawBytes = null' "$DATA/bundle.jsonl" > "$lacking/certificate-null"
+jq -c '.verificationMaterial.certificate.rawBytes = "%%% this is not base64 %%%"' "$DATA/bundle.jsonl" > "$lacking/certificate-not-base64"
+jq -c '.verificationMaterial.certificate.rawBytes = ("these bytes are no certificate" | @base64)' "$DATA/bundle.jsonl" > "$lacking/certificate-other-bytes"
+jq -c 'del(.verificationMaterial.tlogEntries[0].integratedTime)' "$DATA/bundle.jsonl" > "$lacking/time-removed"
+jq -c '.verificationMaterial.tlogEntries[0].integratedTime = null' "$DATA/bundle.jsonl" > "$lacking/time-null"
+jq -c '.verificationMaterial.tlogEntries[0].integratedTime = "soon"' "$DATA/bundle.jsonl" > "$lacking/time-text"
+jq -c '.verificationMaterial.tlogEntries[0].integratedTime = "1794604098.5"' "$DATA/bundle.jsonl" > "$lacking/time-fraction"
+jq -c 'del(.verificationMaterial.tlogEntries[0].logIndex)' "$DATA/bundle.jsonl" > "$lacking/index-removed"
+jq -c '.verificationMaterial.tlogEntries[0].logIndex = "many"' "$DATA/bundle.jsonl" > "$lacking/index-text"
+jq -c 'del(.verificationMaterial.tlogEntries[0].logId)' "$DATA/bundle.jsonl" > "$lacking/id-removed"
+jq -c '.verificationMaterial.tlogEntries[0].logId.keyId = null' "$DATA/bundle.jsonl" > "$lacking/id-null"
+jq -c '.verificationMaterial.tlogEntries[0].logId.keyId = "%%% this is not base64 %%%"' "$DATA/bundle.jsonl" > "$lacking/id-not-base64"
+cat <(printf '%s\n' "$stmt_newer") "$lacking/certificate-chain" > "$lacking/newer-then-certificate-chain"
+# what the inputs rest on, asked once: each of the thirteen is one line, a
+# bundle that differs from the fixture's in the one part named and in nothing
+# else (the envelope, the entry's signed entry timestamp, body and kind and
+# the three other parts are the fixture's); the bundle with the chain in the
+# certificate's place has no certificate and carries the chain, the
+# certificate's bytes in it; the newer statement of the last input is another
+# than the fixture's
+lacking_rest=$(for f in certificate-chain certificate-null certificate-not-base64 certificate-other-bytes time-removed time-null time-text time-fraction index-removed index-text id-removed id-null id-not-base64; do
+  jq -rs --slurpfile valid "$DATA/bundle.jsonl" --arg f "$f" \
+    '[["verificationMaterial", "certificate"], ["verificationMaterial", "tlogEntries", 0, "integratedTime"], ["verificationMaterial", "tlogEntries", 0, "logIndex"], ["verificationMaterial", "tlogEntries", 0, "logId"]] as $parts
+     | {certificate: 0, time: 1, index: 2, id: 3}[$f | split("-")[0]] as $n
+     | if length == 1 and (.[0] | delpaths([$parts[$n], ["verificationMaterial", "x509CertificateChain"]])) == ($valid[0] | delpaths([$parts[$n]]))
+          and (.[0] | getpath($parts[$n])) != ($valid[0] | getpath($parts[$n]))
+       then "\($f) yes" else "\($f) no" end' "$lacking/$f" 2>&1
+done | tr '\n' ' ')
+lacking_rest="$lacking_rest$(jq -rs --slurpfile valid "$DATA/bundle.jsonl" '.[0].verificationMaterial | "chain \(has("certificate") | not) \(.x509CertificateChain.certificates | length) \(.x509CertificateChain.certificates[0].rawBytes == $valid[0].verificationMaterial.certificate.rawBytes)"' "$lacking/certificate-chain" 2>&1) newer $([ "$want_newer" != "$want_fixture" ] && echo other || echo same)"
+lacking_want="certificate-chain yes certificate-null yes certificate-not-base64 yes certificate-other-bytes yes time-removed yes time-null yes time-text yes time-fraction yes index-removed yes index-text yes id-removed yes id-null yes id-not-base64 yes chain true 1 true newer other"
+[ "$lacking_rest" = "$lacking_want" ] \
+  && pass "the inputs of the bundle that lacks a part: thirteen bundles, each the fixture's with the one part named changed and nothing else; the bundle with a certificate chain has no certificate; the newer statement of store-two.json is another than the fixture's" \
+  || fail "the inputs of the bundle that lacks a part" "found:  '$lacking_rest'" "wanted: '$lacking_want'"
+lacking_input() { # what, the part wanted on the line (certificate, integrated time, log index or log id), the bundles file, the digest refused, then the digests given
+  local what="$1" part="$2" bundles="$3" refused="$4" digest count line named=no other others="" words=none calls
+  shift 4
+  fresh; for digest in "$@"; do lay_down "$(att_tag "$digest")"; done
+  out=$(run_apart store "$bundles" "$REPO" "$@"); rc=$?
+  count=$(grep -c '' "$SB/stderr"); line=$(cat "$SB/stderr")
+  [[ "$line" == "::error::unpack-provenance: ${REPO}@${refused}: "*" (Req 2.27)" ]] && grep -Fiq -- "$part" <<<"$line" && named=yes
+  for other in "certificate" "integrated time" "log index" "log id"; do
+    [ "$other" = "$part" ] || ! grep -Fiq -- "$other" "$SB/stderr" || others="$others '$other'"
+  done
+  grep -Eq '(^|[^[:alnum:]])jq([^[:alnum:]]|$)|parse error|Cannot |cannot be parsed|openssl|Could not|[Uu]nable to load|base64: |invalid input|unbound variable|line [0-9]+: |error:[0-9A-Fa-f]{6,}' "$SB/stderr" && words=some
+  calls=$(grep -E "^crane push|$(att_tag "$refused")" "$SB/crane.log")
+  [ "$rc" -eq 1 ] && [ -z "$out" ] && [ "$count" -eq 1 ] && [ "$named" = yes ] && [ -z "$others" ] && [ "$words" = none ] && [ -z "$calls" ] \
+    && pass "a bundle that lacks a part, $what: exit 1, nothing on stdout, one ::error:: line on stderr naming the digest and the $part and none of the other parts, no word of a tool, no crane push, no crane call for the digest refused" \
+    || fail "a bundle that lacks a part, $what: exit 1, nothing on stdout, one ::error:: line on stderr naming the digest and the $part and none of the other parts, no word of a tool, no crane push, no crane call for the digest refused" \
+         "exit=$rc, wanted 1" "lines on stderr: $count, wanted 1" \
+         "the one line begins '::error::unpack-provenance: ${REPO}@${refused}: ', ends ' (Req 2.27)' and holds '$part' (any case): $named, wanted yes" \
+         "the other parts named on stderr:${others:- none}, wanted none" \
+         "a tool's own words on stderr: $words, wanted none" \
+         "stderr:" "$([ -s "$SB/stderr" ] && short_lines < "$SB/stderr" || echo "none")" \
+         "stdout, wanted none:" "$([ -n "$out" ] && short_lines <<<"$out" || echo "none")" \
+         "crane push calls and crane calls with the tag of the digest refused, wanted none:" "${calls:-none}" \
+         "crane calls:" "$([ -s "$SB/crane.log" ] && cat "$SB/crane.log" || echo "crane never")"
+}
+lacking_input "(a) no certificate, a certificate chain in its place" "certificate" "$lacking/certificate-chain" "$INDEX" "$INDEX"
+lacking_input "(a) the certificate's rawBytes null" "certificate" "$lacking/certificate-null" "$INDEX" "$INDEX"
+lacking_input "(a) the certificate's rawBytes not base64" "certificate" "$lacking/certificate-not-base64" "$INDEX" "$INDEX"
+lacking_input "(a) the certificate's rawBytes base64 of bytes that are no certificate" "certificate" "$lacking/certificate-other-bytes" "$INDEX" "$INDEX"
+lacking_input "(b) the integrated time removed" "integrated time" "$lacking/time-removed" "$INDEX" "$INDEX"
+lacking_input "(b) the integrated time null" "integrated time" "$lacking/time-null" "$INDEX" "$INDEX"
+lacking_input "(b) the integrated time a text that is no number" "integrated time" "$lacking/time-text" "$INDEX" "$INDEX"
+lacking_input "(b) the integrated time a number with a fraction" "integrated time" "$lacking/time-fraction" "$INDEX" "$INDEX"
+lacking_input "(c) the log index removed" "log index" "$lacking/index-removed" "$INDEX" "$INDEX"
+lacking_input "(c) the log index a text that is no number" "log index" "$lacking/index-text" "$INDEX" "$INDEX"
+lacking_input "(d) the log's id removed (logId)" "log id" "$lacking/id-removed" "$INDEX" "$INDEX"
+lacking_input "(d) the log's id null (keyId)" "log id" "$lacking/id-null" "$INDEX" "$INDEX"
+lacking_input "(d) the log's id not base64 (keyId)" "log id" "$lacking/id-not-base64" "$INDEX" "$INDEX"
+lacking_input "(e) no certificate, two digests given, the index first: the index is named" "certificate" "$lacking/certificate-chain" "$INDEX" "$INDEX" "$AMD64"
+lacking_input "(e) no certificate, two digests given, the amd64 manifest first: the amd64 manifest is named" "certificate" "$lacking/certificate-chain" "$AMD64" "$AMD64" "$INDEX"
+lacking_input "(e) no certificate in the bundle chosen for the amd64 manifest, the index in order before it: the amd64 manifest is named, nothing is pushed for the index" "certificate" "$lacking/newer-then-certificate-chain" "$AMD64" "$INDEX" "$AMD64"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all unpack-provenance tests passed"
