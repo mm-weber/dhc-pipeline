@@ -43,7 +43,9 @@
 # its log entry is. Among the provenance statements (a release run twice
 # leaves two) the one whose log entry is the later is taken: by the entry's
 # integrated time, then by its log index, both compared as numbers, their
-# order in the file deciding nothing.
+# order in the file deciding nothing. An integrated time or a log index that
+# is missing or is no whole number written in digits counts as 0 there, the
+# earliest: its statement is refused below if it is the one taken.
 #
 # A refusal of content is one ::error:: line naming the digest and the reason,
 # and exit 1. The first refusal is of the bundles file as a whole, before
@@ -70,6 +72,11 @@
 # on the error line: the kind is read from the entry's body, which the log
 # signed (the bundle's kindVersion only repeats it), and only an entry of the
 # kind dsse records the envelope hash that ties the layer to the log; one
+# whose bundle lacks a part the layer's annotations need, with the part named
+# on the error line and never in the words of the tool that would fail on it,
+# asked in this order: the signing certificate (base64 of DER that openssl
+# reads as a certificate), the log entry's integrated time, its own log index
+# (each a whole number written in digits) and the log's id (base64); one
 # whose envelope carries more or fewer than one signature (the layer holds
 # exactly one, the one the log entry recorded); and then one whose envelope's
 # sha256 is not the envelope hash the log entry records: that hash is the one
@@ -250,15 +257,17 @@ for DIGEST in "$@"; do
   # the bundle whose statement names the digest; of several a provenance
   # statement before one of any other type (false sorts before true), and
   # then the one whose log entry is the later, by its integrated time, then
-  # by its log index, as numbers (a bundle with no log entry counts as 0
-  # here, it is refused below). The bundles are the file's lines or, in the
-  # attestation store's answer, what is under .attestations[].bundle
+  # by its log index, as numbers (a bundle with no log entry, and a time or
+  # an index that is no whole number in digits, counts as 0 here, it is
+  # refused below). The bundles are the file's lines or, in the attestation
+  # store's answer, what is under .attestations[].bundle
   bundle=$(jq -c --arg hex "${DIGEST#sha256:}" \
     '(if type == "object" and has("attestations") then .attestations[].bundle else . end)
      | select(.dsseEnvelope.payload | @base64d | fromjson | any(.subject[]; .digest.sha256 == $hex))' "$BUNDLES" \
     | jq -sc --arg provenance "$PROVENANCE" \
-      'max_by([(.dsseEnvelope.payload | @base64d | fromjson | .predicateType == $provenance)]
-              + (.verificationMaterial.tlogEntries[0] | [(.integratedTime // "0" | tonumber), (.logIndex // "0" | tonumber)])) // empty')
+      'def whole: tostring | if test("^[0-9]+$") then tonumber else 0 end;
+       max_by([(.dsseEnvelope.payload | @base64d | fromjson | .predicateType == $provenance)]
+              + (.verificationMaterial.tlogEntries[0] | [(.integratedTime | whole), (.logIndex | whole)])) // empty')
   [ -n "$bundle" ] || refuse "no statement in the bundles file names the digest"
   predicate=$(jq -r '.dsseEnvelope.payload | @base64d | fromjson | .predicateType' <<<"$bundle")
   # SLSA provenance v1 and nothing else is stored here: the statement taken
@@ -290,9 +299,20 @@ for DIGEST in "$@"; do
   # cosign's annotations: the certificate as PEM, the log entry as JSON text.
   # logIndex is the entry's own, the one the signed entry timestamp covers
   # (inclusionProof.logIndex is a different number); logID is the key id in
-  # hex
-  certificate=$(jq -r '.verificationMaterial.certificate.rawBytes' <<<"$bundle" | base64 -d | openssl x509 -inform DER)
-  logid=$(jq -r '.verificationMaterial.tlogEntries[0].logId.keyId' <<<"$bundle" | base64 -d | od -An -vtx1 | tr -d ' \n')
+  # hex. A bundle that lacks one of the four parts read here is refused with
+  # the part named: what base64 and openssl say of it is kept off stderr
+  certificate=$(jq -r '.verificationMaterial.certificate.rawBytes // ""' <<<"$bundle" | base64 -d 2> /dev/null | openssl x509 -inform DER 2> /dev/null) \
+    || refuse "the bundle carries no signing certificate that can be read (verificationMaterial.certificate.rawBytes, base64 of DER)"
+  at=$(jq -r '.verificationMaterial.tlogEntries[0].integratedTime // ""' <<<"$bundle")
+  [[ "$at" =~ ^[0-9]+$ ]] \
+    || refuse "the log entry carries no integrated time that is a whole number written in digits (integratedTime)"
+  logindex=$(jq -r '.verificationMaterial.tlogEntries[0].logIndex // ""' <<<"$bundle")
+  [[ "$logindex" =~ ^[0-9]+$ ]] \
+    || refuse "the log entry carries no log index that is a whole number written in digits (logIndex)"
+  logid=$(jq -r '.verificationMaterial.tlogEntries[0].logId.keyId // ""' <<<"$bundle" | base64 -d 2> /dev/null | od -An -vtx1 | tr -d ' \n') \
+    || logid=""
+  [ -n "$logid" ] \
+    || refuse "the log entry carries no log id that can be read (logId.keyId, base64)"
   entry=$(jq -c --arg logid "$logid" '.verificationMaterial.tlogEntries[0]
     | {SignedEntryTimestamp: .inclusionPromise.signedEntryTimestamp,
        Payload: {body: .canonicalizedBody, integratedTime: (.integratedTime | tonumber),
@@ -329,7 +349,6 @@ for DIGEST in "$@"; do
   # integrated time (the certificate lives ten minutes); what openssl says of
   # a failure passes to stderr as it is
   jq -rj 'first(.layers[].annotations."dev.sigstore.cosign/chain" | strings)' "$BLOBS/${old#sha256:}" > "$DIR.chain"
-  at=$(jq -r '.verificationMaterial.tlogEntries[0].integratedTime' <<<"$bundle")
   openssl verify -attime "$at" -no-CApath -no-CAstore -CAfile "$DIR.chain" <<<"$certificate" > /dev/null \
     || refuse "the chain of the attestation manifest ${REF} (the annotation dev.sigstore.cosign/chain) did not issue the provenance certificate, openssl verify fails at the log entry's integrated time ${at}"
   mv "$DIR.envelope" "$BLOBS/$layer"
