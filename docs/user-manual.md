@@ -664,9 +664,33 @@ policy and the rescan ask afterwards, not in what a release must carry. Only
 | Step that failed | The line says | Usual cause |
 |------------------|---------------|-------------|
 | Attest | the action's own error | GitHub's attestation service or Sigstore is down; or the repository has no artifact attestations (a private repository on a plan without them) |
-| Store | `unpack-provenance: <image>@<digest>: ...` | the registry refused the pull or the push three times; or the bundle holds no log entry, which is the action having signed with GitHub's own Sigstore instance because the event did not say the repository is public |
+| Store | `unpack-provenance: <image>@<digest>: ...` | see the table below |
 | Verify, exit 1 | `check-provenance: ...: cosign failed on each of 3 attempts`, or `... is not one the catalogue's verification policy would admit: <field> is <found>, expected <expected>` | Sigstore or the registry unreachable; or a statement whose builder identity, build type, source repository, workflow path or ref is not the build workflow's on main |
 | Verify, exit 2 | `check-provenance: ...` naming a tool, the policy file, a key of it or a variable | the check could not be made at all: nothing was judged, and the line names what could not serve |
+
+The verify step asks every digest before it ends, the index and each
+platform manifest, so one run names all that fail.
+
+What the store step's line says after the digest, and what it means:
+
+| The line says | Meaning |
+|---------------|---------|
+| `the bundles file cannot be read` | the file the action left is not JSON, or one of its entries is no bundle with a statement; nothing was pulled |
+| `no statement in the bundles file names the digest`, or `is of predicate type ...` | the action signed for other digests, or the file holds no SLSA provenance for this one |
+| `carries 0 log entries` | the action signed with GitHub's own Sigstore instance, which it picks when the event does not say the repository is public |
+| `no signing certificate`, `no integrated time`, `no log index`, `no log id` | the bundle lacks a part the layer needs; a new version of the action, most likely |
+| `no attestation manifest could be pulled`, `no attestation manifest is at ... any more` | the registry says there is no attestation manifest beside the digest (`MANIFEST_UNKNOWN`): "sign and attest" did not write one. Not tried again |
+| `the pull of ... failed 3 times`, `the push to ... failed 3 times`, `the question for the manifest at ... failed 3 times` | the registry did not serve; crane's own lines stand above |
+| `has changed at each of 3 questions in a row` | another writer (the rescan, a second release run) kept rewriting the attestation manifest; run again when it is done |
+
+A `::warning::` line saying that the attestation manifest has changed since
+it was read is no failure: right before each push the store step asks the
+registry whether the manifest is still the one it read, and prepares its
+layer again on the new one when it is not, so that the other writer's
+attestation is kept. The registry has no write that is conditional on what
+is there, so a writer in the instant between that question and the push is
+not seen; the rescan re-attests its own layers daily, and a provenance layer
+lost that way is restored as described below.
 
 **When the cause passes** (an outage, a registry blip): do nothing, or
 dispatch `build` for the image.
@@ -697,8 +721,13 @@ bundle recorded with v4.2.2, and the four steps run on main only. So:
 
 1. Read the action's release notes for four things: the bundle's media type,
    the number of log entries, the signed entry timestamp, and the log it
-   writes to. `unpack-provenance.sh` refuses a bundle that differs in any of
-   them.
+   writes to. `unpack-provenance.sh` refuses, by name, a bundle with more or
+   fewer than one log entry, a log entry without a signed entry timestamp
+   or of another kind than `dsse`, and an envelope that does not hash to
+   what the log entry records. It does not look at the bundle's media type
+   or at which log the entry is from: a change there shows one step later,
+   when `check-provenance.sh verify` has cosign check the stored layer
+   against the public log, and stops the release there.
 2. Merge.
 3. Read the four steps of the next release.
 
