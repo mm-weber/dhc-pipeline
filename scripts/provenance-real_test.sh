@@ -345,6 +345,74 @@ mapfile -t lines < "$SB/check.err"
   || fail "$name: stderr" "lines: ${#lines[@]}, wanted 3: two begun '::warning::check-provenance: ', then one begun '::error::check-provenance: ' holding '3 attempts' and '$reason'; it is:" "$(cut -c1-400 "$SB/check.err")"
 [ "$calls" -eq 3 ] && pass "$name: cosign was called three times" || fail "$name: the calls" "calls: $calls, wanted 3; logged:" "$(cut -c1-400 "$SB/wrap.log")"
 
+# 4: what the pinned crane says of a tag that is not there, and the question
+#    before the push with the real crane digest (plan slice 2.9.10). The stub
+#    suite holds both with a stand-in crane (scripts/unpack-provenance_test.sh,
+#    cases 33 and 35): there the line with MANIFEST_UNKNOWN is one the suite's
+#    author wrote, and the answer to crane digest is the stand-in's. Here the
+#    registry and crane 0.22.1 say them.
+#    (a) The amd64 manifest the fixture's statement names beside the index
+#        has nothing at its .att tag in the suite's registry: no case lays
+#        anything down there. The repository itself is there since case 1, so
+#        the registry's answer is about the manifest and not about the name.
+#        store for that digest must be refused at the first answer: exit 1;
+#        on stderr a line of crane's own (none of the script's :: lines) that
+#        holds the registry's code MANIFEST_UNKNOWN, the code the script
+#        reads; no ::warning:: line, which would mean that the answer was not
+#        recognised and the pull was tried again; exactly one ::error:: line,
+#        naming the digest and the tag and holding the words no attestation
+#        manifest. The pause is 0, so a wrong path does not wait. Every
+#        detail shows the whole stderr: the words the real crane uses are on
+#        record with a failure.
+#    (b) Case 1 as it stands already passes through the real crane digest:
+#        the script asks the tag right before every push, so case 1's store
+#        went through only because crane digest answered the digest of the
+#        manifest crane pull had written into the layout. That is held from
+#        outside here. After case 1's store, crane digest of the index's .att
+#        tag answers a digest of the form sha256:<64 hex> that is not the
+#        digest of the manifest the suite laid down before the store: the tag
+#        was rewritten by the push. A second store over it then ends with
+#        exit 0 and without a ::warning:: line (the question was answered
+#        with the manifest just pulled, at the first asking), and leaves two
+#        layers of which exactly one is of the provenance type: the pull went
+#        into a fresh directory, the stale layer was taken out. Where case
+#        1's store had failed, this line fails with it.
+AMD64="sha256:ac78223352dc43ec63a57e63b45de5420722ada4f7db77f1305ab472a86d0d4e" # the statement's second subject
+ATAG=$(att_tag "$AMD64")
+name="store for a digest with nothing at its .att tag, the real crane and registry"
+UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" store "$DATA/bundle.jsonl" "$REPO" "$AMD64" > "$SB/absent.out" 2> "$SB/absent.err"; rc=$?
+whole=("the whole stderr:" "$(grep '' "$SB/absent.err" || echo "nothing")")
+[ "$rc" -eq 1 ] \
+  && pass "$name: exit 1" \
+  || fail "$name: exit code" "exit=$rc, wanted 1" "stdout:" "$(grep '' "$SB/absent.out" || echo "nothing")" "${whole[@]}"
+answers=$(grep -v '^::' "$SB/absent.err" | grep -cF 'MANIFEST_UNKNOWN')
+[ "$answers" -ge 1 ] \
+  && pass "$name: stderr holds crane's own line with the registry's code MANIFEST_UNKNOWN" \
+  || fail "$name: crane's line" "lines of stderr that are not the script's and hold 'MANIFEST_UNKNOWN': $answers, wanted at least 1" "${whole[@]}"
+warned=$(grep -c '^::warning::' "$SB/absent.err")
+errors=$(grep -c '^::error::' "$SB/absent.err")
+reasoned=$(grep '^::error::' "$SB/absent.err" | grep -F -- "$REPO@$AMD64" | grep -F -- "$REPO:$ATAG" | grep -cF 'no attestation manifest')
+[ "$warned" -eq 0 ] && [ "$errors" -eq 1 ] && [ "$reasoned" -eq 1 ] \
+  && pass "$name: refused at the first answer, no ::warning:: line and exactly one ::error:: line, which names the digest and the tag and says no attestation manifest" \
+  || fail "$name: the refusal" "::warning:: lines: $warned, wanted 0 (a warning means the pull was tried again)" "::error:: lines: $errors, wanted 1" \
+       "::error:: lines holding '$REPO@$AMD64', '$REPO:$ATAG' and 'no attestation manifest': $reasoned, wanted 1" "${whole[@]}"
+laid_manifest=$(jq -r '.manifests[0].digest' "$SB/att/index.json" 2>/dev/null)
+now=$(crane digest "$REPO:$TAG" 2>&1)
+again=$(UNPACK_PROVENANCE_RETRY_DELAY=0 "$UNPACK" store "$DATA/bundle.jsonl" "$REPO" "$INDEX" 2>&1); rc=$?
+after=$(crane manifest "$REPO:$TAG" 2>&1)
+layers=$(jq '.layers | length' <<<"$after" 2>/dev/null)
+typed=$(jq '[.layers[] | select(.annotations.predicateType == "https://slsa.dev/provenance/v1")] | length' <<<"$after" 2>/dev/null)
+rewarned=$(grep -c '^::warning::' <<<"$again")
+[[ "$laid_manifest" =~ ^sha256:[0-9a-f]{64}$ && "$now" =~ ^sha256:[0-9a-f]{64}$ && "$now" != "$laid_manifest" ]] \
+  && [ "$rc" -eq 0 ] && [ "$rewarned" -eq 0 ] && [ "$layers" = "2" ] && [ "$typed" = "1" ] \
+  && pass "the question before the push, the real crane digest: after case 1's store the tag answers a digest that is not the laid-down manifest's, and a second store over it exits 0 with no warning and leaves exactly one provenance layer" \
+  || fail "the question before the push with the real crane digest, a second store over case 1's" \
+       "crane digest $REPO:$TAG after case 1's store: '$now', wanted sha256: and 64 hex digits" \
+       "the manifest the suite laid down there before that store: '${laid_manifest:-none}', wanted another digest than the tag's" \
+       "the second store: exit=$rc, wanted 0; ::warning:: lines: $rewarned, wanted 0" \
+       "layers at the tag after it: ${layers:-none}, wanted 2; of the provenance type: ${typed:-none}, wanted 1" \
+       "the second store's output:" "${again:-none}" "the manifest read back:" "$(short <<<"$after" || echo "$after")"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "all provenance-real tests passed"
