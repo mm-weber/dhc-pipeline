@@ -515,7 +515,13 @@ left of the program is the follow-up list below, one decision each.
     - [x] 2.8 the refactor (the owner's go 2026-11-17; two commits,
           the scripts and then the suites; every suite's result lines
           as before but for six pass texts; the suites judged the
-          same on 196 and 13 changed copies of the scripts)
+          same on 196 and 13 changed copies of the scripts; on
+          2026-11-18 at the owner's call: shellcheck clean on the
+          three scripts, the pause between the unpack's attempts held
+          by a guard, slice 2.4.30, the unpack suite at 50)
+    - [x] validate's chain rehearsed locally at 4ed1d63: 47 suites
+          and 18 lint steps green, the Renovate test 206 ok
+    - [ ] the pull request, opened 2026-11-18; the owner merges
     - [ ] the first pushed, the first scheduled and the first dispatched
           release read; Kyverno on the first released digest (one run of
           the spike workflow, the owner's go); the next rescan read
