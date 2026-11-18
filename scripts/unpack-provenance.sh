@@ -35,19 +35,25 @@
 # <bundles> is the file the action leaves at its bundle-path: one Sigstore
 # bundle per line, or the answer of GitHub's attestation store, read like that
 # file: one JSON object, the bundles under .attestations[].bundle. The bundle
-# whose statement names the digest is taken, and of several that name it (a
-# release run twice leaves two) the one whose log entry is the later: by the
-# entry's integrated time, then by its log index, both compared as numbers,
-# their order in the file deciding nothing.
+# whose statement names the digest is taken. Of several that name it, the
+# statements of SLSA provenance v1, the one predicate type stored here, come
+# before those of every other type: a statement of another type (the
+# attestation store keeps an SBOM attested there beside the provenance)
+# decides nothing while a provenance statement names the digest, however late
+# its log entry is. Among the provenance statements (a release run twice
+# leaves two) the one whose log entry is the later is taken: by the entry's
+# integrated time, then by its log index, both compared as numbers, their
+# order in the file deciding nothing.
 #
 # A refusal of content is one ::error:: line naming the digest and the reason,
 # and exit 1. Refused before anything is pulled or pushed for it, in this
-# order, is a digest no statement in the bundles file names; one whose
-# statement is not SLSA provenance v1, the one predicate type stored here; one
-# whose bundle holds more or fewer than one log entry (the layer's bundle
-# annotation carries exactly one; for none the error line adds the likely
-# cause, the action having signed with GitHub's own Sigstore instance, which
-# keeps no transparency log); one whose log entry carries no signed entry
+# order, is a digest no statement in the bundles file names; one that no
+# statement of SLSA provenance v1 names, with the predicate type found on the
+# error line (of several statements of other types that of the latest log
+# entry); one whose bundle holds more or fewer than one log entry (the layer's
+# bundle annotation carries exactly one; for none the error line adds the
+# likely cause, the action having signed with GitHub's own Sigstore instance,
+# which keeps no transparency log); one whose log entry carries no signed entry
 # timestamp: cosign verifies the entry in this layout by that timestamp, and
 # the layout has no place for the inclusion proof the newer log issues in its
 # stead; one whose log entry is of another kind than dsse, with the kind found
@@ -121,6 +127,8 @@ set -euo pipefail
 
 # the attempts a pull or a push gets
 ATTEMPTS=3
+# the one predicate type stored here: SLSA provenance v1
+PROVENANCE="https://slsa.dev/provenance/v1"
 
 # wrong usage: the usage lines, one per mode, and exit 2
 usage() {
@@ -214,20 +222,24 @@ for DIGEST in "$@"; do
   DIR=$(mktemp -d "$TMP/XXXXXX")
   BLOBS="$DIR/blobs/sha256"
 
-  # the bundle whose statement names the digest; of several the one whose log
-  # entry is the later, by its integrated time, then by its log index, as
-  # numbers (a bundle with no log entry counts as 0 here, it is refused
-  # below). The bundles are the file's lines or, in the attestation store's
-  # answer, what is under .attestations[].bundle
+  # the bundle whose statement names the digest; of several a provenance
+  # statement before one of any other type (false sorts before true), and
+  # then the one whose log entry is the later, by its integrated time, then
+  # by its log index, as numbers (a bundle with no log entry counts as 0
+  # here, it is refused below). The bundles are the file's lines or, in the
+  # attestation store's answer, what is under .attestations[].bundle
   bundle=$(jq -c --arg hex "${DIGEST#sha256:}" \
     '(if type == "object" and has("attestations") then .attestations[].bundle else . end)
      | select(.dsseEnvelope.payload | @base64d | fromjson | any(.subject[]; .digest.sha256 == $hex))' "$BUNDLES" \
-    | jq -sc 'max_by(.verificationMaterial.tlogEntries[0] | [(.integratedTime // "0" | tonumber), (.logIndex // "0" | tonumber)]) // empty')
+    | jq -sc --arg provenance "$PROVENANCE" \
+      'max_by([(.dsseEnvelope.payload | @base64d | fromjson | .predicateType == $provenance)]
+              + (.verificationMaterial.tlogEntries[0] | [(.integratedTime // "0" | tonumber), (.logIndex // "0" | tonumber)])) // empty')
   [ -n "$bundle" ] || refuse "no statement in the bundles file names the digest"
   predicate=$(jq -r '.dsseEnvelope.payload | @base64d | fromjson | .predicateType' <<<"$bundle")
-  # SLSA provenance v1 and nothing else is stored here
-  [ "$predicate" = "https://slsa.dev/provenance/v1" ] \
-    || refuse "the statement naming the digest is of predicate type ${predicate}, not https://slsa.dev/provenance/v1"
+  # SLSA provenance v1 and nothing else is stored here: the statement taken
+  # is of another type only where no provenance statement names the digest
+  [ "$predicate" = "$PROVENANCE" ] \
+    || refuse "the statement naming the digest is of predicate type ${predicate}, not ${PROVENANCE}"
   # exactly one log entry in the bundle, the one the bundle annotation
   # carries; none is what the action leaves when it signs with GitHub's own
   # Sigstore instance, and only then is that cause named
