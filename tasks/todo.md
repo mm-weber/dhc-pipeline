@@ -521,6 +521,18 @@ left of the program is the follow-up list below, one decision each.
           by a guard, slice 2.4.30, the unpack suite at 50)
     - [x] validate's chain rehearsed locally at 4ed1d63: 47 suites
           and 18 lint steps green, the Renovate test 206 ok
+    - [x] 2.9 the findings of the code review of the pull request (a
+          subagent, read-only; the owner's call 2026-11-18, the
+          track's FR-1 amended first, five clauses): the provenance
+          statement chosen among provenance statements; a bundles
+          file or a bundle that cannot be read refused by name; a
+          manifest that is not there refused at the first answer and
+          three failed pulls said as failed pulls; a manifest
+          rewritten since the pull prepared again, three times at
+          most; the self-check asking every digest; the manual's
+          sentence on what the unpack refuses set right. The unpack
+          suite at 112 passed (jq 1.6 and 1.7.1), the real-tool suite
+          at 17; 47 suites and 18 lint steps green at b8f3cea
     - [ ] the pull request, opened 2026-11-18; the owner merges
     - [ ] the first pushed, the first scheduled and the first dispatched
           release read; Kyverno on the first released digest (one run of
