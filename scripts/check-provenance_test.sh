@@ -2147,12 +2147,13 @@ unusable_values
 #    in case 1 (so no call carries two references, and none a flag more).
 #    Then one reference alone, the second of the three: one line, exit 0, one
 #    call.
-# One input: $1 names it, the references follow in the order they are given
+# One input: $1 names it, the references follow in the order they are given.
+# The mode word is report unless the caller names another in MODE (case 19)
 all_covered() {
   local name=$1 each want got calls nth=0; local -a wrong=()
   shift
   fresh; envelopes "$(all_five)" > "$SB/envelopes.jsonl"
-  run report "$SB/root" "$@"
+  run "${MODE:-report}" "$SB/root" "$@"
   exit_is "$name" 0 "every reference was asked, and each of them is covered"
   # byte for byte: a word after each text keeps the newlines at its end, which
   # $( ) would drop, so a last line without its newline differs, and so does
@@ -2456,6 +2457,30 @@ report_refusals() {
   report_asks_nothing "report, the pause is soon" "as verify" pause ROOT "$first" "$second" "$third"
 }
 report_refusals
+
+# 19: require over references that are all covered ends as report does (plan
+#    slice 3.2.1, FR-3 as amended 2026-11-19). The mode require takes the root
+#    and then one or more references, as report does, and asks of each, in the
+#    order given, the question verify asks of one; it differs from report only
+#    where a reference is not covered, which a later slice holds. The inputs
+#    are case 16's, through case 16's helper under the mode word require: the
+#    three references that differ in name and digest, in their order, each
+#    answered with one envelope whose statement meets all five, and then the
+#    second of them alone. Wanted, as of report over the same answers: exit 0,
+#    no reference being uncovered; stdout exactly one line per reference,
+#    'covered', ONE tab and the reference, in the order given, each ended by
+#    its newline, and not a byte more (not the line verify prints either);
+#    nothing on stderr; cosign called once per reference in the order given,
+#    each call with the arguments verify hands it for that reference and not
+#    one more.
+required_covered() {
+  local first="registry.example.test/tools/sprocket@sha256:7c1e9a3b5d2f4a6c8e0b1d3f5a7c9e2b4d6f8a0c1e3b5d7f9a2c4e6b8d0f1a3c"
+  local second="ghcr.io/acme/anvil@sha256:e4a1c8f2b6d09e3a7c5b1f8d2e6a4c0b9f7d3e1a5c8b2f6d0e4a9c7b3f1d5e8a"
+  local third="ghcr.io/acme/gadgets-server@sha256:0d9b7f5e3c1a8e6c4b2f0d9a7e5c3b1f8d6a4e2c0b9f7d5a3e1c8b6f4d2a0e9c"
+  MODE=require all_covered "require over three covered references" "$first" "$second" "$third"
+  MODE=require all_covered "require over one covered reference" "$second"
+}
+required_covered
 
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
