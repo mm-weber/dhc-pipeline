@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # check-provenance.sh verify <root> <image@sha256:digest>
 # check-provenance.sh report <root> <image@sha256:digest>...
+# check-provenance.sh require <root> <image@sha256:digest>...
 #
 # Puts to cosign the question the release's self-check begins with: does the
 # digest carry a SLSA provenance statement signed by the build workflow? The
@@ -25,10 +26,10 @@
 # and why it is told so; each comes before anything told after it is read or
 # asked.
 #
-# The script has two modes, verify and report: any other first word, or none,
-# is wrong usage, the line holding the usage form, and exit 2, before anything
-# is read or asked. A caller who meant another thing is told so, and no check
-# is run that he did not ask for by its name.
+# The script has three modes, verify, report and require: any other first
+# word, or none, is wrong usage, the line holding the usage form, and exit 2,
+# before anything is read or asked. A caller who meant another thing is told
+# so, and no check is run that he did not ask for by its name.
 #
 # verify asks about one reference, and all that follows tells its run. report
 # takes the root and then the references, and asks of each, in the order
@@ -50,6 +51,12 @@
 # asked about any reference, the good ones that stand before a bad one among
 # them. The line is the one verify writes under the same fault, but for the
 # count of the arguments, told next.
+#
+# require takes the root and then the references as report does, and asks of
+# each, in the order given, the same question. Over references that all pass
+# it does what report does over them: one line covered, one tab and the
+# reference for each on stdout, in the order given and nothing else, nothing
+# on stderr but the ::warning:: lines of failed attempts, and exit 0.
 #
 # After the mode word verify come the root and the reference, the two and no
 # more: any other number of arguments is wrong usage the same way, the line
@@ -248,25 +255,27 @@ refuse() {
   echo "::error::check-provenance:" "$@" "(Req 2.28)" >&2
   exit "$code"
 }
-# the two modes there are; a word that is neither is a call that meant another
-# thing, and is told the form instead of being given this check. So is a call
-# with no word at all: under set -u a bare $1 would end it in the shell's
-# words
-[ "${1-}" = verify ] || [ "${1-}" = report ] \
+# the three modes there are; a word that is none of them is a call that meant
+# another thing, and is told the form instead of being given this check. So is
+# a call with no word at all: under set -u a bare $1 would end it in the
+# shell's words
+[ "${1-}" = verify ] || [ "${1-}" = report ] || [ "${1-}" = require ] \
   || refuse 2 "'${1-}' is no mode of this script, usage: check-provenance.sh verify <root> <image@sha256:digest>"
 # the two after the mode word, counted before either is read: under set -u a
 # missing one would end the run in the shell's words, and one too many would
 # be dropped unseen, the caller's slip checked as if it were none. report
 # takes its references after the root, however many, but one at the least: a
-# report about nothing is a caller's slip too, and is told report's form
+# report about nothing is a caller's slip too, and is told report's form.
+# verify's count is verify's alone: require takes its references as report
+# does
 [ "$1" != report ] || [ "$#" -ge 3 ] \
   || refuse 2 "$(($# - 1)) argument(s) after report where the root and one or more references belong, usage: check-provenance.sh report <root> <image@sha256:digest>..."
-[ "$1" = report ] || [ "$#" -eq 3 ] \
+[ "$1" != verify ] || [ "$#" -eq 3 ] \
   || refuse 2 "$(($# - 1)) argument(s) after verify where two belong, usage: check-provenance.sh verify <root> <image@sha256:digest>"
 # the root that holds catalogue-policy.yaml; the references cosign is asked
-# about stand after it, verify's one and report's several, and REF names each
-# in turn, here to be tested and under report in the loop at the end to be
-# asked
+# about stand after it, verify's one and the several of report and require,
+# and REF names each in turn, here to be tested and under those two in the
+# loop at the end to be asked
 ROOT="$2"
 # only a digest pins what the release pushed: a tag can be moved, and cosign
 # would verify whatever it points at. The hex digits are written out, a range
@@ -467,7 +476,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 # the question itself, put about the one reference in REF: cosign asked, what
 # it printed read for a statement, the statements judged against the five.
-# Both modes ask it through here and in no other way. It comes back with one
+# Every mode asks it through here and in no other way. It comes back with one
 # line on stdout, that of a reference that passed; every other end is refuse's
 ask() {
   # cosign is asked up to three times, since what makes it fail can go away by
@@ -559,8 +568,9 @@ ask() {
 # reference that failed the last line of that is the error line, which is
 # told on stdout as the reason, without its ::error::, and never on stderr;
 # the lines before it, and all of them for one that passed, are the warnings
-# of failed attempts and go on to stderr as they are
-if [ "$1" = report ]; then
+# of failed attempts and go on to stderr as they are. require goes through
+# the same loop
+if [ "$1" != verify ]; then
   for REF in "${@:3}"; do
     if told=$(ask 2>&1 >/dev/null); then
       [ -z "$told" ] || printf '%s\n' "$told" >&2
