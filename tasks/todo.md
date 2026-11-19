@@ -533,10 +533,15 @@ left of the program is the follow-up list below, one decision each.
           sentence on what the unpack refuses set right. The unpack
           suite at 112 passed (jq 1.6 and 1.7.1), the real-tool suite
           at 17; 47 suites and 18 lint steps green at b8f3cea
-    - [ ] the pull request, opened 2026-11-18; the owner merges
-    - [ ] the first pushed, the first scheduled and the first dispatched
-          release read; Kyverno on the first released digest (one run of
-          the spike workflow, the owner's go); the next rescan read
+    - [x] the pull request, opened 2026-11-18; merged by the owner the
+          same day (#414, `cca7bd6`)
+    - [x] the first pushed and the first dispatched release read (build
+          runs 44353893731 and 44406052456); Kyverno on the first released
+          digest (spike run 44411812054, the owner's go); the next rescan
+          read (run 44500579834, dispatched); the plan's verification
+          list has each read
+    - [ ] the first scheduled release read: it waits for the first day
+          a scheduled rebuild differs from the released digest
   - [ ] Candidate, the owner's idea of 2026-11-13, not started: reshape
         the pipeline into local composite actions where a group of steps
         is one unit (the provenance trio a first candidate). Its own
