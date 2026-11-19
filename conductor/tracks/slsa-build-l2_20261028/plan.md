@@ -325,7 +325,11 @@ The review (a subagent running the code-review skill on the pull request, read-o
   - [ ] **3.2.2 An uncovered reference fails the run after all were asked**: the same stdout as `report` for the same answers, on stderr one `::error::` line per uncovered reference (the line `verify` writes), every reference asked, exit 1
   - [ ] **3.2.3 A requirement that cannot be checked asks nothing**: the inputs of 3.1.3 under `require`: exit 2, nothing on stdout, cosign never asked
 - [ ] **3.3 Wiring**: the rescan runs what the declared mode asks: with `report`, report mode over the supported set, the status data and issue gaining the coverage line; with `off`, one line stating that provenance is off, nothing verified (2.30)
-  - Sliced when 3.2 is built: the status tool (`triage/rescan/cmd/rescan-status`, Go, its tests first) gains the coverage as an input and writes the line into the status data and the issue; `rescan.yml` by hand, under the lints
+  - Sliced 2026-11-19. The status tool (`triage/rescan`, Go) reads what the check printed and writes the coverage into the status data and the issue; its tests first, agents apart. `rescan.yml` by hand, under the lints
+  - [ ] **3.3.1 The loader**: `inputs.LoadProvenance(mode, file)` reads the check's lines into `rescan.ProvenanceStatus` (mode, covered, total, the uncovered references in file order); the mode `off` reads no file; no mode gives nothing; another mode word, a missing or empty file and a line of another form are errors naming the file and the line
+  - [ ] **3.3.2 The line in the issue and the data**: with a coverage of mode `report` or `required` the issue's summary gains one line, covered n of m, each uncovered reference named; the data carries it through the fenced block and back; without a coverage no line
+  - [ ] **3.3.3 The off line**: with the mode `off` the line states that provenance is off and nothing was verified (Req 2.30)
+  - [ ] **3.3.4 The wiring**: `rescan-status` takes `--provenance-mode` and `--provenance`; `rescan.yml` reads the mode through `release-policy.sh`, runs `report` or `require` over every supported digest and each platform manifest under it, or neither with `off`, and hands the result to the status tool; the summary names the count
 
 ### Verification
 
