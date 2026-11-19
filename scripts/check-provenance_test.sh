@@ -2264,9 +2264,14 @@ tells() {
 # One input: $1 names it; then for each reference, in the order report is
 # given them, a way (covered, or one of not_covered's four) and the reference.
 # A reference jq gives no answer about stands after covered ones only: the
-# number of its jq call is counted from theirs, $per_reference each
+# number of its jq call is counted from theirs, $per_reference each.
+# The mode word is report unless the caller names another in MODE (case 20).
+# Under another word, require, two things are wanted otherwise: exit 1, and on
+# stderr, after the warnings of each uncovered reference, the ::error:: line
+# verify ends on for it, so for each such reference all that verify wrote on
+# stderr when asked about it alone, the references in the order given
 some_uncovered() {
-  local name=$1 i k kind each line rest errors lines ended warned want got calls total nth=0 call=1 asked_jq=0 with_jq=no want_out="" want_err=""
+  local name=$1 mode=${MODE:-report} i k kind each line rest errors lines ended warned want got calls total nth=0 call=1 asked_jq=0 with_jq=no want_out="" want_err=""
   local -a kinds=() given=() takes=() wrong=()
   shift
   while [ $# -gt 0 ]; do kinds+=("$1"); given+=("$2"); shift 2; done
@@ -2290,6 +2295,7 @@ some_uncovered() {
       return
     fi
     want_out+="uncovered"$'\t'"$each"$'\t'"${line#::error::}"$'\n'; want_err+=$rest
+    [ "$mode" = report ] || want_err+=$line$'\n'
   done
   # report over all of them, the answers laid down call by call
   report_sandbox "$with_jq"
@@ -2299,17 +2305,28 @@ some_uncovered() {
     call=$((call + takes[i])); asked_jq=$((asked_jq + per_reference))
   done
   total=$((call - 1))
-  run report "$SB/root" "${given[@]}"
-  exit_is "$name" 0 "every reference was asked, and a reference that is not covered does not fail report (Req 2.29)"
+  run "$mode" "$SB/root" "${given[@]}"
+  if [ "$mode" = report ]; then
+    exit_is "$name" 0 "every reference was asked, and a reference that is not covered does not fail report (Req 2.29)"
+  else
+    exit_is "$name" 1 "one or more references are not covered, which fails $mode, whatever their number and wherever they stand among the others"
+  fi
   got=$(cat "$SB/stdout" 2>/dev/null; echo end)
   [ "$got" = "${want_out}end" ] && pass "$name: stdout is exactly one line per reference in the order given, 'covered', a tab and the reference, or 'uncovered', a tab, the reference, a tab and verify's error line for it without '::error::'" \
     || fail "$name: stdout: exactly one line per reference in the order given, 'covered', one tab and the reference, or 'uncovered', one tab, the reference, one tab and the line verify ends on for that reference without its leading '::error::', each ended by a newline, and nothing else" \
          "stdout (as cat -A shows it: a tab reads ^I, a line's end \$):" "$(cat -A "$SB/stdout" 2>/dev/null | grep '' || echo nothing)" \
          "wanted, the same way:" "$(printf '%s' "$want_out" | cat -A)"
   errors=$(grep -c '^::error::' "$SB/stderr"); got=$(cat "$SB/stderr" 2>/dev/null; echo end)
+  if [ "$mode" != report ]; then
+    [ "$got" = "${want_err}end" ] && pass "$name: stderr is, for each uncovered reference in the order given, exactly what verify writes of it: the warnings of its failed attempts and then its one '::error::' line, and nothing else" \
+      || fail "$name: stderr: for each uncovered reference, in the order given, the ::warning:: lines verify writes of its failed attempts that another follows and then the one ::error:: line verify ends on for it, byte for byte and once, the lines of one reference together, each ended by a newline, and nothing else" \
+           "lines on stderr begun '::error::': $errors, wanted $(printf '%s' "$want_err" | grep -c '^::error::'), one per uncovered reference" \
+           "stderr (as cat -A shows it: a line's end reads \$):" "$(cat -A "$SB/stderr" 2>/dev/null | grep '' || echo nothing)" "wanted, the same way:" "$(printf '%s' "$want_err" | cat -A)"
+  else
   [ "$got" = "${want_err}end" ] && pass "$name: stderr holds no line begun '::error::', and is $([ -n "$want_err" ] && echo "exactly the two warnings verify writes of each refused reference's first two attempts" || echo "empty")" \
     || fail "$name: stderr: no line begun '::error::', and $([ -n "$want_err" ] && echo "exactly the ::warning:: lines verify writes of the failed attempts that another follows, in the order of the references" || echo "nothing at all")" \
          "lines on stderr begun '::error::': $errors, wanted 0" "stderr:" "${err:-nothing}" "wanted:" "$(printf '%s' "$want_err" | grep '' || echo nothing)"
+  fi
   calls=$(grep -c '' "$SB/cosign.log")
   [ "$calls" -eq "$total" ] || wrong+=("calls logged: $calls, wanted $total")
   for i in "${!given[@]}"; do
@@ -2481,6 +2498,52 @@ required_covered() {
   MODE=require all_covered "require over one covered reference" "$second"
 }
 required_covered
+
+# 20: under require an uncovered reference fails the run, after every
+#    reference was asked (plan slice 3.2.2, FR-3 as amended 2026-11-19).
+#    require is the mode for where a missing provenance has to stop the
+#    release: it tells of each reference what report tells, and of one that is
+#    not covered also what verify tells, and ends with 1. The inputs are case
+#    17's, through case 17's helper under the mode word require: the four ways
+#    a reference is not covered (refused by cosign at all three attempts, a
+#    statement built from another ref, no statement, no answer from jq), each
+#    between two covered references; then the uncovered one first, then last,
+#    then two of four. One input more, which case 17 has no use for: three of
+#    four uncovered, the first of them with no warning of its own (another
+#    ref) and after it two refused ones next to each other, so that warnings
+#    stand after an error line and two references' warnings would stand
+#    together if the error lines were kept for the end.
+#    Wanted of each input: exit 1; stdout byte for byte what report prints
+#    under the same answers, one line per reference in the order given,
+#    'covered' or 'uncovered' as in case 17; every reference asked, also those
+#    after an uncovered one, the same cosign calls as under report; stderr,
+#    for each uncovered reference in the order given, byte for byte what
+#    verify writes on stderr when asked about that reference alone under the
+#    same answers (the two ::warning:: lines of a refused reference's first
+#    two attempts, then the one ::error:: line verify ends on, once), the
+#    lines of one reference together, and nothing else: no line for a covered
+#    reference, nothing of cosign's or jq's own.
+required_uncovered() {
+  local first="registry.example.test/tools/sprocket@sha256:e951d951d900000bf3f37bf37bf37ba2adc7bf32d951d444fa2a2a2a22adf518"
+  local second="ghcr.io/acme/anvil@sha256:244444f97bf371d9518837bf37bf32a2a2a251d951d95188888837ba25000000"
+  local third="ghcr.io/acme/gadgets-server@sha256:6f51d4444444ccccc72a2a2a2a2a2a2adccccc7bf32060000bf3888888800000"
+  local fourth="ghcr.io/acme/bellows@sha256:d6e6951d951d9518ec2a251d90000000bf3200000bf37ba2a2a2a2a2a2a2a251"
+  local per_reference
+  # the jq calls of a run about one covered reference, counted as in case 17
+  fresh; jq_stand_in; envelopes "$(all_five)" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$first"; per_reference=$(grep -c '' "$SB/jq.log")
+  [ "$rc" -eq 0 ] && [ "$per_reference" -ge 2 ] \
+    || fail "require with an uncovered reference: the jq calls of a run about one covered reference are counted" "exit=$rc, wanted 0; jq calls the stand-in logged: $per_reference, wanted 2 or more" "stderr:" "${err:-nothing}"
+  MODE=require some_uncovered "require, the second of three references refused by cosign at all three attempts" covered "$first" refused "$second" covered "$third"
+  MODE=require some_uncovered "require, the second of three references with a statement built from another ref" covered "$first" "another ref" "$second" covered "$third"
+  MODE=require some_uncovered "require, the second of three references with no statement verified" covered "$first" "no statement" "$second" covered "$third"
+  MODE=require some_uncovered "require, the second of three references with jq giving no answer about its statement" covered "$first" "no answer from jq" "$second" covered "$third"
+  MODE=require some_uncovered "require, the first of three references refused by cosign at all three attempts" refused "$third" covered "$first" covered "$second"
+  MODE=require some_uncovered "require, the last of three references with a statement built from another ref" covered "$second" covered "$third" "another ref" "$first"
+  MODE=require some_uncovered "require, the second and the third of four references uncovered" covered "$fourth" refused "$first" "another ref" "$third" covered "$second"
+  MODE=require some_uncovered "require, three of four references uncovered, two refused ones after one with a statement built from another ref" "another ref" "$second" refused "$fourth" refused "$first" covered "$third"
+}
+required_uncovered
 
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
