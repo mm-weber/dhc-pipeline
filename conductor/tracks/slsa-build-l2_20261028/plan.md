@@ -315,8 +315,17 @@ The review (a subagent running the code-review skill on the pull request, read-o
 ### Tasks
 
 - [ ] **3.1 `check-provenance.sh` report mode**: on phase 2's `verify` (one digest against the declared identity and expectations), one line per supported digest, exit 0 on absent (Req 2.29), a failed verify already tried again by `verify` itself (phase 2, slice 2.5.11); suite first, one test per slice
+  - Sliced 2026-11-19, before the first test (FR-3's clauses of that day). The form: `check-provenance.sh report <root> <image@sha256:digest>...`, one or more references. stdout holds one line per reference, in the order given, tab-separated: `covered`, the reference; or `uncovered`, the reference, and what `verify` would have written about it, its error line without the leading `::error::`. The warnings of a failed attempt go to stderr as `verify` writes them. One test per slice, in `scripts/check-provenance_test.sh`, agents apart
+  - [ ] **3.1.1 Every reference covered**: three references, each with a statement that meets the five: three `covered` lines in the order given, nothing else on stdout, nothing on stderr, exit 0; cosign asked once per reference, with `verify`'s arguments
+  - [ ] **3.1.2 An uncovered reference neither fails nor stops the report**: among covered ones, a reference cosign refuses three times, one whose statement misses an expectation, one for which cosign verified nothing and one whose statement jq does not answer for: each an `uncovered` line holding the reference and what `verify` says of it, the references after it asked all the same, no `::error::` line on stderr, exit 0
+  - [ ] **3.1.3 A report that cannot be made asks nothing**: no reference at all, a reference among good ones that names no image by a sha256 digest (first, in the middle, last), a root without the policy file, a policy file that gives no issuer, a tool missing, a pause that is no number: exit 2, nothing on stdout, the one error line `verify` would write, cosign never asked
 - [ ] **3.2 Require mode**: absent or mismatched fails by name (for the successor); suite cases
+  - Sliced 2026-11-19: `check-provenance.sh require <root> <image@sha256:digest>...`
+  - [ ] **3.2.1 Every reference covered**: the lines of `report`, exit 0, nothing on stderr
+  - [ ] **3.2.2 An uncovered reference fails the run after all were asked**: the same stdout as `report` for the same answers, on stderr one `::error::` line per uncovered reference (the line `verify` writes), every reference asked, exit 1
+  - [ ] **3.2.3 A requirement that cannot be checked asks nothing**: the inputs of 3.1.3 under `require`: exit 2, nothing on stdout, cosign never asked
 - [ ] **3.3 Wiring**: the rescan runs what the declared mode asks: with `report`, report mode over the supported set, the status data and issue gaining the coverage line; with `off`, one line stating that provenance is off, nothing verified (2.30)
+  - Sliced when 3.2 is built: the status tool (`triage/rescan/cmd/rescan-status`, Go, its tests first) gains the coverage as an input and writes the line into the status data and the issue; `rescan.yml` by hand, under the lints
 
 ### Verification
 

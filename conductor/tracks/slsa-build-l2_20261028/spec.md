@@ -78,9 +78,21 @@ THE Repository SHALL declare the provenance expectations and the predicate type 
 
 WHILE the policy file's provenance mode is report THE Scan Pipeline SHALL report once per day, for every supported digest, whether it carries an admissible provenance attestation, and SHALL not fail the run on an absent one.
 
+The five clauses below sharpen that sentence before its first test (added 2026-11-19, the owner's go for phase 3; what "every supported digest" takes in and what ends the check are the session's reading, put to the owner with the step's report).
+
+WHEN the coverage check is asked about one or more references THE Scan Pipeline SHALL ask each of them, in the order given, the question the release's self-check asks of one digest (FR-1: signed under the declared issuer and the build workflow's identity, and the five expectations met), and SHALL print for each reference one line that names it and says whether it is covered, and for one that is not covered what the self-check would have said of it.
+
+IF a reference carries no admissible provenance attestation, or the question about it stays unanswered after the self-check's attempts, THEN THE Scan Pipeline SHALL report that reference as not covered, SHALL write no error line for it, SHALL go on to the next reference and SHALL not fail the run for it.
+
+IF the coverage check cannot be made, because its call, a reference it is given, the policy file, a value it reads from the policy file or from the environment, or a tool it needs cannot serve, THEN THE Scan Pipeline SHALL ask no verifier about any reference, SHALL print no state for any reference and SHALL fail the run naming what could not serve, each cause told as the self-check tells it: a check that was never made is not a day without coverage.
+
+WHERE the policy file's provenance mode is required THE Scan Pipeline SHALL ask every reference the same way, SHALL print the same lines, SHALL write one error line for each reference that is not covered, and SHALL fail the run if there is one, after the last reference was asked (the successor's position; built here, used there).
+
+WHILE the policy file's provenance mode is report or required THE Scan Pipeline SHALL give that check every supported digest and each platform manifest under it, the references a release attests (FR-1), and SHALL state in the status data and in the status issue how many of them are covered, of how many, naming each that is not.
+
 **Acceptance criteria:**
 
-- [ ] `check-provenance.sh` suite green (report and require modes)
+- [ ] `check-provenance.sh` suite green (report and require modes): one line per reference in the order given, an uncovered reference reported with exit 0 and no error line, a check that cannot be made ending with exit 2 before any reference is asked, `require` ending with exit 1 and one error line per uncovered reference after all were asked (sharpened 2026-11-19; plan 3.1, 3.2)
 - [ ] A scheduled rescan whose status data and issue carry the coverage line, the uncovered digests named
 
 ### FR-4: Consumer instructions and the smoke test (Req 2.25, 9.13)
