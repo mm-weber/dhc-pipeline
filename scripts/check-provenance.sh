@@ -35,12 +35,19 @@
 # given, the question verify asks of one: the same cosign call with the same
 # arguments, the same reading of what cosign printed, the same five
 # expectations. Of a reference that passes it prints one line on stdout,
-# covered, one tab and the reference, in place of the line verify prints; with
-# every reference passed these lines are all its stdout, its stderr is empty
-# and it ends with 0. As the script stands the two tests of verify's arguments
-# told next are not made under report, and whatever ends verify with 1 or 2
-# ends report the same way, with the same line, at the reference it happens
-# at.
+# covered, one tab and the reference, in place of the line verify prints. A
+# reference that fails the check, in any of the ways that end verify with 1,
+# neither fails report nor stops it (Req 2.29: an absent attestation never
+# fails the run): of such a one it prints uncovered, one tab, the reference,
+# one tab and the reason, which is the line verify ends on for that reference
+# without its leading ::error::, and the references after it are asked as
+# well. These lines are all its stdout, one per reference in the order given;
+# its stderr holds the ::warning:: lines of failed attempts as verify writes
+# them, each reference's when its question is answered, and no ::error:: line
+# for a reference that is not covered; with every reference asked it ends
+# with 0. As the script stands the two tests of verify's arguments told next
+# are not made under report, and whatever ends verify with 2 ends report the
+# same way, with the same line.
 #
 # After the mode word verify come the root and the reference, the two and no
 # more: any other number of arguments is wrong usage the same way, the line
@@ -529,11 +536,25 @@ ask() {
 
 # report: each reference asked in the order given, the same question each
 # time, and of one that passed the one line covered, a tab and the reference.
-# The line the question itself prints of it is verify's and is dropped here
+# The line the question itself prints of it is verify's and is dropped here.
+# The question is put inside $( ): a refuse in there ends that shell alone,
+# with the directory for temporary files left standing (the EXIT trap is this
+# shell's), so a reference that is not covered does not end the run, and what
+# the question wrote on stderr is held back until it is answered. Of a
+# reference that failed the last line of that is the error line, which is
+# told on stdout as the reason, without its ::error::, and never on stderr;
+# the lines before it, and all of them for one that passed, are the warnings
+# of failed attempts and go on to stderr as they are
 if [ "$1" = report ]; then
   for REF in "${@:3}"; do
-    ask >/dev/null
-    printf 'covered\t%s\n' "$REF"
+    if told=$(ask 2>&1 >/dev/null); then
+      [ -z "$told" ] || printf '%s\n' "$told" >&2
+      printf 'covered\t%s\n' "$REF"
+    else
+      reason=${told##*$'\n'}
+      printf '%s' "${told%"$reason"}" >&2
+      printf 'uncovered\t%s\t%s\n' "$REF" "${reason#::error::}"
+    fi
   done
   exit 0
 fi
