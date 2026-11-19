@@ -2605,6 +2605,70 @@ require_refusals() {
 }
 require_refusals
 
+# 22: a word that is no mode is told all three forms (plan slice 3.2.4, FR-3 as
+#    amended 2026-11-19). The script has three modes, and a caller whose first
+#    word is none of them has to read in the one line which words there are
+#    and what stands after each: told verify's form alone, as while verify was
+#    the one mode, whoever mistyped report or require would learn nothing of
+#    the mode he meant. Six inputs, each over a fresh sandbox and one envelope
+#    whose statement meets all five, so that a script that asks cosign anyway
+#    gets an answer that passes: the mode words reprot, check, REPORT and
+#    Require (a mode's name in other letters is no mode: the words are told
+#    apart to the letter) and the empty string as mode word, each followed by
+#    the root and one reference, and no argument at all. Wanted of each: exit
+#    2; nothing on stdout; stderr exactly one line, begun
+#    '::error::check-provenance: ', that holds ALL THREE usage forms, each
+#    written out, 'verify <root> <image@sha256:digest>' (as it stands, no
+#    three dots behind it: verify takes one reference),
+#    'report <root> <image@sha256:digest>...' and
+#    'require <root> <image@sha256:digest>...', and, where a word was given
+#    that is not empty, that word as given, a word of its own (check is also
+#    in the script's name, which does not count); nothing of the shell's or
+#    python's own words; cosign never called.
+# One input: $1 names it, $2 is the word its line holds (empty: none is asked
+# of it), the arguments after them go to the script as they are, the word
+# ROOT standing for the root
+no_mode() {
+  local name=$1 word=$2 each rest alone form='<root> <image@sha256:digest>'; local -a args=() wrong=(); shift 2
+  fresh
+  for each in "$@"; do [ "$each" = ROOT ] && each="$SB/root"; args+=("$each"); done
+  envelopes "$(all_five)" > "$SB/envelopes.jsonl"
+  run ${args[@]+"${args[@]}"}
+  exit_is "$name" 2 "a word that is no mode is wrong usage"
+  no_stdout "$name"
+  one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
+  begun_error
+  # verify's form counts where no three dots stand behind it: with them it
+  # would be the form of a mode over several references
+  rest=${err//"verify $form..."/}
+  [[ "$rest" == *"verify $form"* ]] || wrong+=("it does not hold verify's form, 'verify $form' with no three dots behind it")
+  for each in report require; do
+    [[ "$err" == *"$each $form..."* ]] || wrong+=("it does not hold $each's form, '$each $form...'")
+  done
+  if [ -n "$word" ]; then
+    # the word by itself: neither a letter, a digit nor a hyphen before it or
+    # behind it, so that check is not found in check-provenance
+    alone="(^|[^[:alnum:]-])${word}([^[:alnum:]-]|\$)"
+    [[ "$err" =~ $alone ]] || wrong+=("it does not hold the word as given, '$word', as a word of its own")
+  fi
+  for each in "unbound variable" "command not found" "Traceback" "No such file"; do
+    [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', the shell's or python's own words")
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which holds ${word:+the word '$word' and }all three usage forms, verify's, report's and require's, and nothing of the shell's or python's" \
+    || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that holds ${word:+the word '$word' and }all three usage forms and neither 'unbound variable' nor 'command not found' nor 'Traceback' nor 'No such file'" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason that holds ${word:+'$word', }'verify $form', 'report $form...' and 'require $form...'>"
+  never_asked "$name" "a word that is no mode is refused before cosign is asked"
+}
+no_modes() {
+  no_mode "the mode word is reprot, report mistyped" reprot reprot ROOT "$REF"
+  no_mode "the mode word is check" check check ROOT "$REF"
+  no_mode "the mode word is REPORT, report in capitals" REPORT REPORT ROOT "$REF"
+  no_mode "the mode word is Require, require begun with a capital" Require Require ROOT "$REF"
+  no_mode "the mode word is the empty string, the root and the reference after it" "" "" ROOT "$REF"
+  no_mode "no argument at all, told the three forms" ""
+}
+no_modes
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
