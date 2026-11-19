@@ -56,7 +56,16 @@
 # each, in the order given, the same question. Over references that all pass
 # it does what report does over them: one line covered, one tab and the
 # reference for each on stdout, in the order given and nothing else, nothing
-# on stderr but the ::warning:: lines of failed attempts, and exit 0.
+# on stderr but the ::warning:: lines of failed attempts, and exit 0. A
+# reference that fails the check fails require, but does not stop it: require
+# is the mode for where a missing provenance has to stop the release. Of such
+# a one it prints on stdout the line uncovered that report prints, and writes
+# on stderr what verify writes of that reference, the ::warning:: lines of its
+# failed attempts and behind them the one ::error:: line verify ends on, once,
+# when that reference's question is answered and not at the run's end, so
+# that the lines of one reference stand together and the references in the
+# order given. The references after it are asked as well, and with the last
+# one asked it ends with 1, however many were not covered.
 #
 # After the mode word verify come the root and the reference, the two and no
 # more: any other number of arguments is wrong usage the same way, the line
@@ -569,18 +578,27 @@ ask() {
 # told on stdout as the reason, without its ::error::, and never on stderr;
 # the lines before it, and all of them for one that passed, are the warnings
 # of failed attempts and go on to stderr as they are. require goes through
-# the same loop
+# the same loop and differs in two things: the error line of a reference that
+# failed goes on to stderr as well, behind that reference's warnings, as
+# verify writes it, and one such reference or more makes the exit code 1,
+# which is decided after the last reference was asked
 if [ "$1" != verify ]; then
+  code=0
   for REF in "${@:3}"; do
     if told=$(ask 2>&1 >/dev/null); then
       [ -z "$told" ] || printf '%s\n' "$told" >&2
       printf 'covered\t%s\n' "$REF"
     else
       reason=${told##*$'\n'}
-      printf '%s' "${told%"$reason"}" >&2
+      if [ "$1" = require ]; then
+        printf '%s\n' "$told" >&2
+        code=1
+      else
+        printf '%s' "${told%"$reason"}" >&2
+      fi
       printf 'uncovered\t%s\t%s\n' "$REF" "${reason#::error::}"
     fi
   done
-  exit 0
+  exit "$code"
 fi
 ask
