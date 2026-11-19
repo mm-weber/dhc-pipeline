@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # check-provenance.sh verify <root> <image@sha256:digest>
+# check-provenance.sh report <root> <image@sha256:digest>...
 #
 # Puts to cosign the question the release's self-check begins with: does the
 # digest carry a SLSA provenance statement signed by the build workflow? The
@@ -24,15 +25,27 @@
 # and why it is told so; each comes before anything told after it is read or
 # asked.
 #
-# The script has the one mode, verify: any other first word, or none, is wrong
-# usage, the line holding the usage form, and exit 2, before anything is read
-# or asked. A caller who meant another thing is told so, and no check is run
-# that he did not ask for by its name.
+# The script has two modes, verify and report: any other first word, or none,
+# is wrong usage, the line holding the usage form, and exit 2, before anything
+# is read or asked. A caller who meant another thing is told so, and no check
+# is run that he did not ask for by its name.
 #
-# After the mode word come the root and the reference, the two and no more:
-# any other number of arguments is wrong usage the same way, the line holding
-# the usage form and the number given, and exit 2. A caller's slip must read
-# as that, not as the shell's "unbound variable".
+# verify asks about one reference, and all that follows tells its run. report
+# takes the root and then the references, and asks of each, in the order
+# given, the question verify asks of one: the same cosign call with the same
+# arguments, the same reading of what cosign printed, the same five
+# expectations. Of a reference that passes it prints one line on stdout,
+# covered, one tab and the reference, in place of the line verify prints; with
+# every reference passed these lines are all its stdout, its stderr is empty
+# and it ends with 0. As the script stands the two tests of verify's arguments
+# told next are not made under report, and whatever ends verify with 1 or 2
+# ends report the same way, with the same line, at the reference it happens
+# at.
+#
+# After the mode word verify come the root and the reference, the two and no
+# more: any other number of arguments is wrong usage the same way, the line
+# holding the usage form and the number given, and exit 2. A caller's slip
+# must read as that, not as the shell's "unbound variable".
 #
 # The reference has to name the image by a sha256 digest: it ends in @sha256:
 # and 64 lower-case hex characters, after a name that is not empty and holds
@@ -221,19 +234,20 @@ refuse() {
   echo "::error::check-provenance:" "$@" "(Req 2.28)" >&2
   exit "$code"
 }
-# the one mode there is; a word that is not it is a call that meant another
+# the two modes there are; a word that is neither is a call that meant another
 # thing, and is told the form instead of being given this check. So is a call
 # with no word at all: under set -u a bare $1 would end it in the shell's
 # words
-[ "${1-}" = verify ] \
+[ "${1-}" = verify ] || [ "${1-}" = report ] \
   || refuse 2 "'${1-}' is no mode of this script, usage: check-provenance.sh verify <root> <image@sha256:digest>"
 # the two after the mode word, counted before either is read: under set -u a
 # missing one would end the run in the shell's words, and one too many would
-# be dropped unseen, the caller's slip checked as if it were none
-[ "$#" -eq 3 ] \
+# be dropped unseen, the caller's slip checked as if it were none. report
+# takes its references after the root, however many
+[ "$1" = report ] || [ "$#" -eq 3 ] \
   || refuse 2 "$(($# - 1)) argument(s) after verify where two belong, usage: check-provenance.sh verify <root> <image@sha256:digest>"
 # the root that holds catalogue-policy.yaml, and the reference cosign is asked
-# about
+# about; under report the loop at the end names each of its references in turn
 ROOT="$2"
 REF="$3"
 # only a digest pins what the release pushed: a tag can be moved, and cosign
@@ -241,8 +255,8 @@ REF="$3"
 # like a-f taking in capitals under some locales. No white space in the name:
 # a second reference behind a blank is no part of one image's name. No @ in it
 # either: an image's name holds none, the digest begins at the one @, and
-# cosign cannot read a reference with two
-[[ "$REF" =~ ^[^[:space:]@]+@sha256:[0123456789abcdef]{64}$ ]] \
+# cosign cannot read a reference with two. verify's one reference is tested
+[ "$1" = report ] || [[ "$REF" =~ ^[^[:space:]@]+@sha256:[0123456789abcdef]{64}$ ]] \
   || refuse 2 "'$REF' does not name an image by a sha256 digest, which reads <image>@sha256: and 64 lower-case hex characters"
 # the pause between two attempts, 10 seconds unless the caller sets another.
 # Seconds in digits alone, the digits written out as above: sleep fails on
@@ -429,78 +443,98 @@ TMP=$(mktemp -d 2>/dev/null) \
   || refuse 2 "mktemp gave no directory for temporary files, the check cannot be made without one, the place to look is TMPDIR and the machine's directory for temporary files"
 trap 'rm -rf "$TMP"' EXIT
 
-# cosign is asked up to three times, since what makes it fail can go away by
-# itself; any exit code but 0 is a failed attempt. Between two attempts lies a
-# pause, since asking again at once mostly meets the same blip
-for attempt in 1 2 3; do
-  # stdin is the caller's: the script is called once per digest, and a tool
-  # that read stdin would eat what a caller's loop still has to read from it.
-  # What cosign writes ends here: its stderr is kept for the script's own
-  # lines, its stdout goes to a file that every attempt begins anew, so that
-  # what a failed attempt printed is never read (2>&1 stands first, so the
-  # capture takes stderr alone)
-  said=$(cosign verify-attestation --type slsaprovenance1 --certificate-oidc-issuer "$ISSUER" --certificate-identity "$IDENTITY" "$REF" </dev/null 2>&1 >"$TMP/stdout") && break
-  # cosign prints a refusal twice, under "Error: " and then under "error
-  # during command execution: ": the message is the first copy without its
-  # prefix, so the second is cut off. What cosign wrote without such lines, a
-  # Go panic's trace for one, is the message as a whole
-  said=${said%%$'\n'"error during command execution: "*}
-  # onto the one line word by word, so that no blank is doubled: a message's
-  # lines after the first begin with a blank, and the last can end in one
-  read -r -d '' -a words <<<"${said#Error: }"
-  # another attempt follows: the warning shows in the release's log that this
-  # one was lost, and why; then the pause, which reads no stdin either
-  if [ "$attempt" -lt 3 ]; then
-    echo "::warning::check-provenance: ${REF}: cosign failed on attempt ${attempt} of 3 and is asked again after ${PAUSE} seconds, it said:" "${words[@]}" >&2
-    # shellcheck disable=SC2217  # every program gets no stdin, sleep too
-    sleep "$PAUSE" </dev/null
-    continue
+# the question itself, put about the one reference in REF: cosign asked, what
+# it printed read for a statement, the statements judged against the five.
+# Both modes ask it through here and in no other way. It comes back with one
+# line on stdout, that of a reference that passed; every other end is refuse's
+ask() {
+  # cosign is asked up to three times, since what makes it fail can go away by
+  # itself; any exit code but 0 is a failed attempt. Between two attempts lies
+  # a pause, since asking again at once mostly meets the same blip
+  for attempt in 1 2 3; do
+    # stdin is the caller's: the script is called once per digest, and a tool
+    # that read stdin would eat what a caller's loop still has to read from
+    # it. What cosign writes ends here: its stderr is kept for the script's
+    # own lines, its stdout goes to a file that every attempt begins anew, so
+    # that what a failed attempt printed is never read (2>&1 stands first, so
+    # the capture takes stderr alone)
+    said=$(cosign verify-attestation --type slsaprovenance1 --certificate-oidc-issuer "$ISSUER" --certificate-identity "$IDENTITY" "$REF" </dev/null 2>&1 >"$TMP/stdout") && break
+    # cosign prints a refusal twice, under "Error: " and then under "error
+    # during command execution: ": the message is the first copy without its
+    # prefix, so the second is cut off. What cosign wrote without such lines,
+    # a Go panic's trace for one, is the message as a whole
+    said=${said%%$'\n'"error during command execution: "*}
+    # onto the one line word by word, so that no blank is doubled: a message's
+    # lines after the first begin with a blank, and the last can end in one
+    read -r -d '' -a words <<<"${said#Error: }"
+    # another attempt follows: the warning shows in the release's log that
+    # this one was lost, and why; then the pause, which reads no stdin either
+    if [ "$attempt" -lt 3 ]; then
+      echo "::warning::check-provenance: ${REF}: cosign failed on attempt ${attempt} of 3 and is asked again after ${PAUSE} seconds, it said:" "${words[@]}" >&2
+      # shellcheck disable=SC2217  # every program gets no stdin, sleep too
+      sleep "$PAUSE" </dev/null
+      continue
+    fi
+    # 1 whatever code cosign ended with: the code says that the check failed,
+    # not how cosign did
+    refuse 1 "${REF}: cosign failed on each of 3 attempts, the last time with:" \
+      "${words[@]}"
+  done
+  # cosign has ended with 0: the statements in what it printed, each decoded
+  # from its envelope's payload, one per line. What jq prints is the answer,
+  # its exit code is not: over no input, and a blank line is none, jq -e ends
+  # with 0 on jq 1.6 and with 4 on jq 1.7.1. Every line is taken as text (-R)
+  # and parsed inside the try, each by itself: read as a stream of JSON
+  # values, jq would stop at the first line that is no JSON and never see the
+  # envelopes after it. A payload is decoded only when it is a string (jq
+  # decodes null as it would the word null), and a line that is no JSON, or a
+  # payload that is not base64 or decodes to no JSON, is no statement and no
+  # error, hence the try; nor is JSON that is no object a statement. What jq
+  # writes on stderr is not passed on
+  statements=$(jq -R -c 'try (fromjson | .payload | strings | @base64d | fromjson | objects) catch empty' "$TMP/stdout" 2>/dev/null)
+  # nothing verified never passes, and cosign is not asked again: what it
+  # printed with 0 is no failed attempt
+  [ -n "$statements" ] \
+    || refuse 1 "${REF}: cosign ended with exit code 0 and what it printed holds no provenance statement"
+  # the statements are judged one by one, each by itself: the policy's rule
+  # admits on any statement that meets the conditions, wherever it stands
+  # among the others, and the self-check is neither stricter nor laxer than
+  # the rule. They are read on a file descriptor of the loop's own: a jq
+  # started inside inherits the loop's stdin, and one that read it would eat
+  # the statements still to come. Each is counted, its number being its name
+  # in the error line
+  count=0
+  misses=""
+  while IFS= read -r statement <&3; do
+    count=$((count + 1))
+    judge_statement "$statement"
+    # a statement that misses nothing is the admitted one: the others are not
+    # read, and nothing is said of those read before it
+    [ -n "$missed" ] || break
+    # what this one misses is kept under its number: should none meet all
+    # five, the line has to say of each statement what is wrong with it
+    misses="${misses:+$misses; }statement ${count}: ${missed}"
+  done 3<<<"$statements"
+  # no statement met all five, the last one read neither, and the check has
+  # failed; cosign is not asked again. One line: of a lone statement the
+  # clause of each expectation it missed, of several the same for each under
+  # its number
+  if [ -n "$missed" ]; then
+    [ "$count" -eq 1 ] \
+      || refuse 1 "${REF}: none of the ${count} provenance statements cosign verified is one the catalogue's verification policy would admit: ${misses}"
+    refuse 1 "${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: ${missed}"
   fi
-  # 1 whatever code cosign ended with: the code says that the check failed,
-  # not how cosign did
-  refuse 1 "${REF}: cosign failed on each of 3 attempts, the last time with:" \
-    "${words[@]}"
-done
-# cosign has ended with 0: the statements in what it printed, each decoded
-# from its envelope's payload, one per line. What jq prints is the answer, its
-# exit code is not: over no input, and a blank line is none, jq -e ends with 0
-# on jq 1.6 and with 4 on jq 1.7.1. Every line is taken as text (-R) and
-# parsed inside the try, each by itself: read as a stream of JSON values, jq
-# would stop at the first line that is no JSON and never see the envelopes
-# after it. A payload is decoded only when it is a string (jq decodes null as
-# it would the word null), and a line that is no JSON, or a payload that is
-# not base64 or decodes to no JSON, is no statement and no error, hence the
-# try; nor is JSON that is no object a statement. What jq writes on stderr is
-# not passed on
-statements=$(jq -R -c 'try (fromjson | .payload | strings | @base64d | fromjson | objects) catch empty' "$TMP/stdout" 2>/dev/null)
-# nothing verified never passes, and cosign is not asked again: what it
-# printed with 0 is no failed attempt
-[ -n "$statements" ] \
-  || refuse 1 "${REF}: cosign ended with exit code 0 and what it printed holds no provenance statement"
-# the statements are judged one by one, each by itself: the policy's rule
-# admits on any statement that meets the conditions, wherever it stands among
-# the others, and the self-check is neither stricter nor laxer than the rule.
-# They are read on a file descriptor of the loop's own: a jq started inside
-# inherits the loop's stdin, and one that read it would eat the statements
-# still to come. Each is counted, its number being its name in the error line
-count=0
-misses=""
-while IFS= read -r statement <&3; do
-  count=$((count + 1))
-  judge_statement "$statement"
-  # a statement that misses nothing is the admitted one: the others are not
-  # read, and nothing is said of those read before it
-  [ -n "$missed" ] || break
-  # what this one misses is kept under its number: should none meet all five,
-  # the line has to say of each statement what is wrong with it
-  misses="${misses:+$misses; }statement ${count}: ${missed}"
-done 3<<<"$statements"
-# no statement met all five, the last one read neither, and the check has
-# failed; cosign is not asked again. One line: of a lone statement the clause
-# of each expectation it missed, of several the same for each under its number
-if [ -n "$missed" ]; then
-  [ "$count" -eq 1 ] \
-    || refuse 1 "${REF}: none of the ${count} provenance statements cosign verified is one the catalogue's verification policy would admit: ${misses}"
-  refuse 1 "${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: ${missed}"
+  echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement whose builder identity is that identity, whose build type is ${BUILD_TYPE}, whose source repository is ${SOURCE}, whose workflow path is ${WORKFLOW} and whose ref is ${WORKFLOW_REF}, what else the statement says is not read"
+}
+
+# report: each reference asked in the order given, the same question each
+# time, and of one that passed the one line covered, a tab and the reference.
+# The line the question itself prints of it is verify's and is dropped here
+if [ "$1" = report ]; then
+  for REF in "${@:3}"; do
+    ask >/dev/null
+    printf 'covered\t%s\n' "$REF"
+  done
+  exit 0
 fi
-echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement whose builder identity is that identity, whose build type is ${BUILD_TYPE}, whose source repository is ${SOURCE}, whose workflow path is ${WORKFLOW} and whose ref is ${WORKFLOW_REF}, what else the statement says is not read"
+ask
