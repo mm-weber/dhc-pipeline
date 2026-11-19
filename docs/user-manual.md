@@ -849,6 +849,33 @@ opening paragraph quotes it verbatim from there, so the statement and the
 status cannot disagree. A Pages dashboard, if one is ever wanted, is
 presentation over that JSON and nothing else.
 
+### Provenance coverage in the status
+
+Unless `release.provenance` is `off`, every rescan asks each supported
+digest and each platform manifest under it what a release's self-check asks:
+does it carry a SLSA provenance attestation the verification policy would
+admit (task 18.4; Req 2.29)? The status issue's summary list and the data
+carry the answer as one line, for instance:
+
+    - provenance: 21 of 21 supported digests and platform manifests carry an admissible SLSA provenance attestation (mode report, Req 2.29)
+
+A reference that is not covered is named behind it (`; not covered:`), and
+the rescan's log holds the reason beside it, in the words the self-check
+uses. What each mode does with that:
+
+| `release.provenance` | The rescan | A reference that is not covered |
+|---|---|---|
+| `report` | asks every reference (`check-provenance.sh report`) | is named in the status; the run stays green |
+| `required` | asks every reference (`check-provenance.sh require`) | is named in the status and fails the step, after the last reference was asked |
+| `off` | asks nothing | the status says that provenance is off and nothing was verified (Req 2.30) |
+
+A check that could not be made at all (the policy file, a tool missing on
+the runner) fails the step by name in both asking modes, and that day's
+status is published without the line: a check that was never made is not a
+day without coverage. A digest released before the provenance steps existed
+stays uncovered until its definition is released again; provenance cannot be
+attested after the fact.
+
 ### The catalogue page
 
 The picture of the catalogue (Req 6.61, 6.62; design Decision 12):
@@ -1428,7 +1455,7 @@ documentation — each states what it enforces and why it exists.
 | `lint-rescan-steps.sh` | `[workflow]` | Every rescan step after the scan runs regardless of earlier failures (review D1) |
 | `release-policy.sh` | `<root> <query>` | The one reader of the policy's `release` section, the page switch included; a misspelt switch is a refusal (Req 2.13, 2.14, 2.17, 6.61, 7.7) |
 | `unpack-provenance.sh` | `store <bundles> <repository> <digest>…` / `subjects <repository> <digest>…` | Names the provenance subjects for the action, and stores GitHub's signed provenance statement as one more layer of cosign's attestation manifest beside each digest; signs nothing (Req 2.27) |
-| `check-provenance.sh` | `verify <root> <image@sha256:digest>` | The release's self-check: cosign under the declared issuer and build identity, then the statement's builder identity, build type, source repository, workflow path and ref; exit 1 for a statement that fails, exit 2 when the check could not be made (Req 2.9, 2.28) |
+| `check-provenance.sh` | `verify <root> <image@sha256:digest>`; `report <root> <image@sha256:digest>...`; `require <root> <image@sha256:digest>...` | `verify` is the release's self-check: cosign under the declared issuer and build identity, then the statement's builder identity, build type, source repository, workflow path and ref; exit 1 for a statement that fails, exit 2 when the check could not be made (Req 2.9, 2.28). `report` and `require` ask the same of several references for the rescan and print one line each, `covered` or `uncovered` with the reason: `report` ends with 0 whatever the answers, `require` with 1 after the last reference when one is not covered; both end with 2, before any reference is asked, when the check cannot be made (Req 2.29) |
 | `render-verification.sh` | `[--check] [root]` | Renders the two Kyverno policies and the consumer recipe from the policy file; `--check` fails on drift (Req 7.8, 7.9) |
 | `render-tracking.sh` | `[--check] [root]` | Renders the active set into Renovate's ignore block; `--check` fails on drift (Req 1.14) |
 | `check-authenticity.sh` | `<root> <out.jsonl>` | Daily re-verification of every active definition's authenticity signal and the compat clocks (Req 3.10, 4.9) |
