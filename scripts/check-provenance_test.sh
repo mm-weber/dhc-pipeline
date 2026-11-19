@@ -2124,6 +2124,64 @@ unusable_values() {
 }
 unusable_values
 
+# 16: report over references that are all covered says so of each (plan slice
+#    3.1.1, FR-3 as amended 2026-11-19, Req 2.29). The mode report takes the
+#    root and then one or more references, and asks of each, in the order
+#    given, the question verify asks of one. Three references that differ in
+#    their image names and in their digests, none of them the suite's, given
+#    in an order that is neither that of their names nor that of their digests
+#    sorted either way; cosign answers each call with one envelope whose
+#    statement meets all five. Wanted: exit 0; stdout exactly one line per
+#    reference, 'covered', ONE tab and the reference, in the order given, each
+#    line ended by its newline, and not a byte more: no heading, no count, and
+#    not the line verify prints of a digest that passed; nothing on stderr,
+#    cosign's own report is not passed on under report either; cosign called
+#    three times, once per reference in the order given, each call with the
+#    arguments verify hands it for that reference, compared as a whole set as
+#    in case 1 (so no call carries two references, and none a flag more).
+#    Then one reference alone, the second of the three: one line, exit 0, one
+#    call.
+# One input: $1 names it, the references follow in the order they are given
+all_covered() {
+  local name=$1 each want got calls nth=0; local -a wrong=()
+  shift
+  fresh; envelopes "$(all_five)" > "$SB/envelopes.jsonl"
+  run report "$SB/root" "$@"
+  exit_is "$name" 0 "every reference was asked, and each of them is covered"
+  # byte for byte: a word after each text keeps the newlines at its end, which
+  # $( ) would drop, so a last line without its newline differs, and so does
+  # an empty line more
+  want=$(printf 'covered\t%s\n' "$@"; echo end); got=$(cat "$SB/stdout" 2>/dev/null; echo end)
+  [ "$got" = "$want" ] && pass "$name: stdout is exactly one line per reference, 'covered', a tab and the reference, in the order given" \
+    || fail "$name: stdout: exactly one line per reference, 'covered', one tab and the reference, in the order given, each ended by a newline, and nothing else" \
+         "stdout (as cat -A shows it: a tab reads ^I, a line's end \$):" "$(cat -A "$SB/stdout" 2>/dev/null | grep '' || echo nothing)" \
+         "wanted, the same way:" "$(printf 'covered\t%s\n' "$@" | cat -A)"
+  [ ! -s "$SB/stderr" ] && pass "$name: nothing on stderr" \
+    || fail "$name: stderr: nothing, every reference is covered and cosign's own report is not passed on" "stderr:" "$(cat "$SB/stderr")" "wanted: nothing"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq "$#" ] && pass "$name: cosign is called $# time(s), once per reference" \
+    || fail "$name: the cosign calls the stub logged: $#, one per reference" "calls logged: $calls, wanted $#:" "$([ -s "$SB/cosign.log" ] && cat "$SB/cosign.log" || echo "cosign was never called")"
+  for each in "$@"; do
+    nth=$((nth + 1))
+    want=$(echo verify-attestation; printf '%s\n' "--type slsaprovenance1" "--certificate-oidc-issuer $ISSUER" "--certificate-identity $RELEASER" "$each" | LC_ALL=C sort)
+    got=$(sed -n "${nth}p" "$SB/cosign.log" | asked)
+    [ "$got" = "$want" ] || wrong+=("call $nth, as the stub logged it: $(sed -n "${nth}p" "$SB/cosign.log" | grep '' || echo "there is no such call")" \
+      "  what it asked (the first argument, then the others sorted, a flag on one line with its value):" "${got:-nothing}" \
+      "  wanted, the same way, the call verify makes for reference $nth:" "$want")
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: each call, in the order the references were given, is the call verify makes for that reference, and not one argument more" \
+    || fail "$name: the cosign calls in their order: the first about the first reference and so on, each verify-attestation with --type slsaprovenance1, the policy file's issuer, the releaser's identity and that one reference, nothing else" \
+         "${wrong[@]}"
+}
+covered_references() {
+  local first="registry.example.test/tools/sprocket@sha256:7c1e9a3b5d2f4a6c8e0b1d3f5a7c9e2b4d6f8a0c1e3b5d7f9a2c4e6b8d0f1a3c"
+  local second="ghcr.io/acme/anvil@sha256:e4a1c8f2b6d09e3a7c5b1f8d2e6a4c0b9f7d3e1a5c8b2f6d0e4a9c7b3f1d5e8a"
+  local third="ghcr.io/acme/gadgets-server@sha256:0d9b7f5e3c1a8e6c4b2f0d9a7e5c3b1f8d6a4e2c0b9f7d5a3e1c8b6f4d2a0e9c"
+  all_covered "report over three covered references" "$first" "$second" "$third"
+  all_covered "report over one covered reference" "$second"
+}
+covered_references
+
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
 # goes above this call
