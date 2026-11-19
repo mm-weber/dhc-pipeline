@@ -508,3 +508,87 @@ func TestRenderStatusIssue_PublishesTheSupportStatement(t *testing.T) {
 		t.Errorf("the statement round-trips through the data: got %+v", back.Support)
 	}
 }
+
+// The provenance coverage in the status issue (task 18.4, plan 3.3.2; Req
+// 2.29): one line in the summary list, directly after the medians, naming
+// what is not covered; the data carries the same numbers back.
+func TestRenderStatusIssue_PublishesTheProvenanceCoverage(t *testing.T) {
+	const (
+		valkeyArm  = "ghcr.io/acme/dhc/valkey@sha256:505b98c4b31828bb25b20d2ca56047b127e6bfc480857fecd65f3089fb8ac714"
+		grafanaArm = "ghcr.io/acme/dhc/grafana@sha256:837727cbdb7058ee72e8a67c78cd2110677746127cc4da969abc2733ec514569"
+	)
+	provenanceLines := func(body string) (lines []string, before, after string) {
+		all := strings.Split(body, "\n")
+		for i, l := range all {
+			if strings.HasPrefix(l, "- provenance:") {
+				lines = append(lines, l)
+				if i > 0 {
+					before = all[i-1]
+				}
+				if i+1 < len(all) {
+					after = all[i+1]
+				}
+			}
+		}
+		return lines, before, after
+	}
+
+	base := StatusData{SchemaVersion: 1, GeneratedAt: "2026-11-19T06:17:00Z"}
+	if lines, _, _ := provenanceLines(RenderStatusIssue(base)); len(lines) != 0 {
+		t.Fatalf("without a coverage nothing is claimed: %q", lines)
+	}
+
+	// The second uncovered reference is built by shortDigest's rule (the
+	// prefix and twelve hex digits); the first is written out.
+	grafanaShort := grafanaArm[:strings.Index(grafanaArm, "@")+1] + shortDigest(grafanaArm[strings.Index(grafanaArm, "@")+1:])
+	if grafanaShort != "ghcr.io/acme/dhc/grafana@sha256:837727cbdb70" {
+		t.Fatalf("the test's own shortening: %q", grafanaShort)
+	}
+
+	cases := []struct {
+		name       string
+		provenance ProvenanceStatus
+		want       string
+	}{
+		{"report, all covered", ProvenanceStatus{Mode: "report", Covered: 21, Total: 21, Uncovered: []string{}},
+			"- provenance: 21 of 21 supported digests and platform manifests carry an admissible SLSA provenance attestation (mode report, Req 2.29)"},
+		{"report, two not covered", ProvenanceStatus{Mode: "report", Covered: 19, Total: 21, Uncovered: []string{valkeyArm, grafanaArm}},
+			"- provenance: 19 of 21 supported digests and platform manifests carry an admissible SLSA provenance attestation (mode report, Req 2.29); not covered: `ghcr.io/acme/dhc/valkey@sha256:505b98c4b318`, `" + grafanaShort + "`"},
+		{"required, all covered", ProvenanceStatus{Mode: "required", Covered: 21, Total: 21, Uncovered: []string{}},
+			"- provenance: 21 of 21 supported digests and platform manifests carry an admissible SLSA provenance attestation (mode required, Req 2.29)"},
+		{"required, one not covered", ProvenanceStatus{Mode: "required", Covered: 20, Total: 21, Uncovered: []string{grafanaArm}},
+			"- provenance: 20 of 21 supported digests and platform manifests carry an admissible SLSA provenance attestation (mode required, Req 2.29); not covered: `ghcr.io/acme/dhc/grafana@sha256:837727cbdb70`"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := base
+			p := tc.provenance
+			s.Provenance = &p
+			body := RenderStatusIssue(s)
+			lines, before, after := provenanceLines(body)
+			if len(lines) != 1 {
+				t.Fatalf("one provenance line in the summary list, got %d %q in:\n%s", len(lines), lines, body)
+			}
+			if lines[0] != tc.want {
+				t.Errorf("the coverage line:\n got %q\nwant %q", lines[0], tc.want)
+			}
+			if !strings.HasPrefix(before, "- median days to decision") {
+				t.Errorf("the line stands directly after the medians, got before it: %q", before)
+			}
+			if !strings.HasPrefix(after, "- revocations:") {
+				t.Errorf("the line stands directly before the revocations, got after it: %q", after)
+			}
+			raw, ok := ExtractFencedJSON(body)
+			if !ok {
+				t.Fatalf("no fenced json block in:\n%s", body)
+			}
+			back, err := ParseStatus(raw)
+			if err != nil {
+				t.Fatalf("fenced block does not parse: %v", err)
+			}
+			if back.Provenance == nil || !reflect.DeepEqual(*back.Provenance, p) {
+				t.Errorf("the coverage round-trips through the data: want %+v, got %+v", p, back.Provenance)
+			}
+		})
+	}
+}

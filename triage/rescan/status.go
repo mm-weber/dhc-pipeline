@@ -149,6 +149,9 @@ type StatusData struct {
 	// superseded (referenced, scanned and attested, outside the supported
 	// set): the support statement's other half, as a number (task 15.8).
 	SupersededTags int `json:"superseded_tags"`
+	// Provenance is the provenance coverage the day's check measured (Req
+	// 2.29, 2.30), as the status tool loaded it; nil when it was given none.
+	Provenance *ProvenanceStatus `json:"provenance,omitempty"`
 }
 
 // SupportStatement names the supported set and what a superseded digest
