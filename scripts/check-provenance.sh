@@ -65,7 +65,11 @@
 # when that reference's question is answered and not at the run's end, so
 # that the lines of one reference stand together and the references in the
 # order given. The references after it are asked as well, and with the last
-# one asked it ends with 1, however many were not covered.
+# one asked it ends with 1, however many were not covered. A require that
+# cannot be made asks nothing, as with report: whatever ends verify with 2
+# ends require with 2 as well, with nothing on stdout and before cosign is
+# asked about any reference, the line the one verify writes under the same
+# fault, but for the count of the arguments, told next.
 #
 # After the mode word verify come the root and the reference, the two and no
 # more: any other number of arguments is wrong usage the same way, the line
@@ -73,7 +77,10 @@
 # must read as that, not as the shell's "unbound variable". After report come
 # the root and one or more references: the root alone, or nothing, is wrong
 # usage the same way, the line holding report's usage form and the number
-# given, and exit 2.
+# given, and exit 2. After require they come as after report, and the root
+# alone, or nothing, is told the same way under require's name: the line holds
+# require's usage form and the number given, and exit 2, where require over no
+# reference would else end with 0 as if every digest were covered.
 #
 # The reference has to name the image by a sha256 digest: it ends in @sha256:
 # and 64 lower-case hex characters, after a name that is not empty and holds
@@ -87,6 +94,7 @@
 # given, and exit 2. report's references are tested so as well, all of them in
 # the order given and before any is asked: the first that names no image by a
 # digest ends the run with that line, which holds it and none of the others.
+# So are require's.
 #
 # The pause between two attempts, CHECK_PROVENANCE_RETRY_DELAY, is 10 seconds
 # where the variable is not set or is empty; otherwise it has to be a whole
@@ -276,9 +284,11 @@ refuse() {
 # takes its references after the root, however many, but one at the least: a
 # report about nothing is a caller's slip too, and is told report's form.
 # verify's count is verify's alone: require takes its references as report
-# does
-[ "$1" != report ] || [ "$#" -ge 3 ] \
-  || refuse 2 "$(($# - 1)) argument(s) after report where the root and one or more references belong, usage: check-provenance.sh report <root> <image@sha256:digest>..."
+# does, one at the least as well, and is told its own form, the line naming
+# the mode that was called: require over nothing would end with 0, the code
+# of a release whose every digest is covered
+[ "$1" = verify ] || [ "$#" -ge 3 ] \
+  || refuse 2 "$(($# - 1)) argument(s) after $1 where the root and one or more references belong, usage: check-provenance.sh $1 <root> <image@sha256:digest>..."
 [ "$1" != verify ] || [ "$#" -eq 3 ] \
   || refuse 2 "$(($# - 1)) argument(s) after verify where two belong, usage: check-provenance.sh verify <root> <image@sha256:digest>"
 # the root that holds catalogue-policy.yaml; the references cosign is asked

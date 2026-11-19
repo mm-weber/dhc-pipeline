@@ -323,7 +323,7 @@ The review (a subagent running the code-review skill on the pull request, read-o
   - Sliced 2026-11-19: `check-provenance.sh require <root> <image@sha256:digest>...`
   - [x] **3.2.1 Every reference covered**: the lines of `report`, exit 0, nothing on stderr
   - [x] **3.2.2 An uncovered reference fails the run after all were asked**: the same stdout as `report` for the same answers, on stderr one `::error::` line per uncovered reference (the line `verify` writes), every reference asked, exit 1
-  - [ ] **3.2.3 A requirement that cannot be checked asks nothing**: the inputs of 3.1.3 under `require`: exit 2, nothing on stdout, cosign never asked
+  - [x] **3.2.3 A requirement that cannot be checked asks nothing**: the inputs of 3.1.3 under `require`: exit 2, nothing on stdout, cosign never asked
 - [ ] **3.3 Wiring**: the rescan runs what the declared mode asks: with `report`, report mode over the supported set, the status data and issue gaining the coverage line; with `off`, one line stating that provenance is off, nothing verified (2.30)
   - Sliced 2026-11-19. The status tool (`triage/rescan`, Go) reads what the check printed and writes the coverage into the status data and the issue; its tests first, agents apart. `rescan.yml` by hand, under the lints
   - [x] **3.3.1 The loader**: `inputs.LoadProvenance(mode, file)` reads the check's lines into `rescan.ProvenanceStatus` (mode, covered, total, the uncovered references in file order); the mode `off` reads no file; no mode gives nothing; another mode word, a missing or empty file and a line of another form are errors naming the file and the line
