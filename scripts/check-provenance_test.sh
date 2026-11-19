@@ -114,6 +114,12 @@ EOF
   # per verified attestation, on stderr its report, exit 0.
   # A refusing call prints on its stdout, before it ends, the case's file
   # $SB/refused.stdout.<n> where the case laid one down for that n-th call.
+  # For a run over several references (report, case 17), whose calls are not
+  # all answered alike, two files more name one call each: the n-th call
+  # refuses, whatever the countdown says and leaving it alone, where the case
+  # laid down $SB/refuses.<n> (its message is $SB/refusal.<n> as ever), and an
+  # accepting n-th call prints $SB/envelopes.jsonl.<n> in the place of
+  # $SB/envelopes.jsonl where the case laid that down, be it empty.
   # Whatever it answers, every call first notes where its stdout and its
   # stderr go, a line for each: what readlink says of its own descriptors 1
   # and 2 under /proc, a file by its path, a pipe as pipe:[...]. The note is
@@ -128,13 +134,13 @@ readlink "/proc/$$/fd/1" "/proc/$$/fd/2" >> "$SB/cosign.wrote-to" 2>/dev/null
 nth=$(grep -c '' "$SB/cosign.log")
 if [ -f "$SB/crash.$nth" ]; then cat "$SB/crash.$nth" >&2; exit 2; fi
 left=0; [ -f "$SB/refusals" ] && left=$(cat "$SB/refusals")
-if [ "$left" -gt 0 ]; then
-  echo "$((left - 1))" > "$SB/refusals"
+if [ "$left" -gt 0 ] || [ -f "$SB/refuses.$nth" ]; then
+  [ "$left" -gt 0 ] && echo "$((left - 1))" > "$SB/refusals"
   [ -f "$SB/refused.stdout.$nth" ] && cat "$SB/refused.stdout.$nth"
   { printf 'Error: '; cat "$SB/refusal.$nth"; printf 'error during command execution: '; cat "$SB/refusal.$nth"; } >&2
   exit 1
 fi
-cat "$SB/envelopes.jsonl"
+if [ -f "$SB/envelopes.jsonl.$nth" ]; then cat "$SB/envelopes.jsonl.$nth"; else cat "$SB/envelopes.jsonl"; fi
 cat "$SB/accepting.stderr" >&2
 exit 0
 STUB
@@ -2181,6 +2187,162 @@ covered_references() {
   all_covered "report over one covered reference" "$second"
 }
 covered_references
+
+# 17: an uncovered reference neither fails nor stops report (plan slice 3.1.2,
+#    FR-3 as amended 2026-11-19, Req 2.29: an absent attestation never fails
+#    the run). report asks every reference it is given, covered or not, and
+#    says of one that is not covered what verify would say of it: on stdout
+#    the line 'uncovered', ONE tab, the reference, ONE tab and the reason,
+#    which is byte for byte the one ::error:: line verify ends on for that
+#    reference, without its leading '::error::' (so it begins
+#    'check-provenance: ' and ends '(Req 2.28)'). Four ways a reference is not
+#    covered: cosign refuses it at all three attempts (twice the registry does
+#    not answer, the third time 'no matching attestations: ', nothing beside
+#    the digest); cosign verifies for it a statement built from another ref;
+#    cosign ends with 0 for it and prints nothing; jq gives no answer when
+#    asked for the first value of its statement (case 4b's stand-in, the one
+#    call alone). Seven inputs over references that differ in name and digest:
+#    each of the four ways with the uncovered reference between two covered
+#    ones; then it stands first, then last, then two of four are uncovered and
+#    stand next to each other. Every other reference is answered with a
+#    statement that meets all five.
+#    Wanted of each input: exit 0; stdout exactly one line per reference in
+#    the order given, 'covered', a tab and the reference, or the uncovered
+#    line above, and not a byte more; stderr without any line begun
+#    '::error::': for a refused reference exactly the two ::warning:: lines
+#    verify writes of its first two attempts, for the other three ways nothing;
+#    every reference asked, also those after the uncovered one: three cosign
+#    calls for a refused reference and one for each other, each the call
+#    verify makes for that reference.
+#    The wanted reason and warnings are not written out here: before report is
+#    run, verify is asked about each uncovered reference by itself, in a
+#    sandbox of its own under the same answers, and what it wrote is held to
+#    what the cases above hold of verify's lines (exit 1, nothing on stdout,
+#    one error line in its frame that tells the way, two warnings before it
+#    for a refusal and none otherwise). That run is heard only when it fails:
+#    the input cannot be judged then, and one FAIL line says so.
+# a fresh sandbox for one run: the stand-in for sleep as in case 11, the one
+# for jq where $1 is yes, and one envelope whose statement meets all five,
+# what every cosign call answers that the input does not name
+report_sandbox() {
+  fresh; sleep_stand_in
+  [ "$1" = yes ] && jq_stand_in
+  envelopes "$(all_five)" > "$SB/envelopes.jsonl"
+}
+# The answers that leave one reference uncovered in the way $1, laid down for
+# the reference whose first cosign call is the run's $2-th and before whose
+# first jq call the run has made $3 jq calls; covered lays down nothing. A
+# refused reference takes three cosign calls, any other takes one
+not_covered() {
+  local i
+  case "$1" in
+    refused)
+      for i in 0 1 2; do : > "$SB/refuses.$(($2 + i))"; done
+      unanswered 1 > "$SB/refusal.$2"; unanswered 2 > "$SB/refusal.$(($2 + 1))"
+      echo "no matching attestations: " > "$SB/refusal.$(($2 + 2))" ;;
+    "another ref") envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" refs/heads/feature)" > "$SB/envelopes.jsonl.$2" ;;
+    "no statement") : > "$SB/envelopes.jsonl.$2" ;;
+    # the second jq call about the reference: the first reads the statements
+    # (unanswered, it is the line of no statement), the second a value
+    "no answer from jq") echo "$(($3 + 2))" > "$SB/jq.no-answer-at" ;;
+  esac
+}
+# whether verify's error line $2 tells the way $1, in the words the cases
+# above hold: case 2's and case 11's for a refusal, with the third attempt's
+# message and neither of the first two; case 8's clause; case 3's words; and
+# for a jq without an answer, whose words are free (case 4b), none of the
+# other three and no clause
+tells() {
+  case "$1" in
+    refused) [[ "$2" == *"3 attempts"*"no matching attestations:"* && "$2" != *"connection refused"* ]] ;;
+    "another ref") [[ "$2" == *"ref is \"refs/heads/feature\", expected \"$GIT_REF\""* ]] ;;
+    "no statement") [[ "$2" == *"no provenance statement"* ]] ;;
+    "no answer from jq") [[ "$2" != *"3 attempts"* && "$2" != *"no provenance statement"* && "$2" != *", expected "* ]] ;;
+  esac
+}
+# One input: $1 names it; then for each reference, in the order report is
+# given them, a way (covered, or one of not_covered's four) and the reference.
+# A reference jq gives no answer about stands after covered ones only: the
+# number of its jq call is counted from theirs, $per_reference each
+some_uncovered() {
+  local name=$1 i k kind each line rest errors lines ended warned want got calls total nth=0 call=1 asked_jq=0 with_jq=no want_out="" want_err=""
+  local -a kinds=() given=() takes=() wrong=()
+  shift
+  while [ $# -gt 0 ]; do kinds+=("$1"); given+=("$2"); shift 2; done
+  for kind in "${kinds[@]}"; do [ "$kind" = "no answer from jq" ] && with_jq=yes; done
+  # what verify writes of each uncovered reference, asked about it alone
+  for i in "${!given[@]}"; do
+    kind=${kinds[i]}; each=${given[i]}
+    if [ "$kind" = covered ]; then want_out+="covered"$'\t'"$each"$'\n'; continue; fi
+    report_sandbox "$with_jq"; not_covered "$kind" 1 0
+    run verify "$SB/root" "$each"
+    warned=0; [ "$kind" = refused ] && warned=2
+    errors=$(grep -c '^::error::' "$SB/stderr"); lines=$(grep -c '' "$SB/stderr"); ended=$(wc -l < "$SB/stderr"); line=$(tail -n 1 "$SB/stderr")
+    # a word after the text keeps the newline at its end, which $( ) would drop
+    rest=$(grep -v '^::error::' "$SB/stderr"; echo end); rest=${rest%end}
+    if [ "$rc" -ne 1 ] || [ -s "$SB/stdout" ] || [ "$errors" -ne 1 ] || [ "$lines" -ne $((warned + 1)) ] || [ "$ended" -ne "$lines" ] \
+      || [ "$(grep -c "^::warning::check-provenance: $each: " "$SB/stderr")" -ne "$warned" ] \
+      || [[ "$line" != "::error::check-provenance: $each: "*" (Req 2.28)" ]] || ! tells "$kind" "$line"; then
+      fail "$name: verify asked about reference $((i + 1)) alone, under the same answers ($kind), ends as the cases above hold it to; without that the input is not judged" \
+           "exit=$rc; lines on stderr: $lines, of them ended by a newline: $ended, begun '::error::': $errors" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}" \
+           "wanted: exit 1; nothing on stdout; stderr $warned line(s) begun '::warning::check-provenance: $each: ' and then one line '::error::check-provenance: $each: <a reason that tells the way: $kind> (Req 2.28)', each ended by its newline"
+      return
+    fi
+    want_out+="uncovered"$'\t'"$each"$'\t'"${line#::error::}"$'\n'; want_err+=$rest
+  done
+  # report over all of them, the answers laid down call by call
+  report_sandbox "$with_jq"
+  for i in "${!given[@]}"; do
+    not_covered "${kinds[i]}" "$call" "$asked_jq"
+    takes[i]=1; [ "${kinds[i]}" = refused ] && takes[i]=3
+    call=$((call + takes[i])); asked_jq=$((asked_jq + per_reference))
+  done
+  total=$((call - 1))
+  run report "$SB/root" "${given[@]}"
+  exit_is "$name" 0 "every reference was asked, and a reference that is not covered does not fail report (Req 2.29)"
+  got=$(cat "$SB/stdout" 2>/dev/null; echo end)
+  [ "$got" = "${want_out}end" ] && pass "$name: stdout is exactly one line per reference in the order given, 'covered', a tab and the reference, or 'uncovered', a tab, the reference, a tab and verify's error line for it without '::error::'" \
+    || fail "$name: stdout: exactly one line per reference in the order given, 'covered', one tab and the reference, or 'uncovered', one tab, the reference, one tab and the line verify ends on for that reference without its leading '::error::', each ended by a newline, and nothing else" \
+         "stdout (as cat -A shows it: a tab reads ^I, a line's end \$):" "$(cat -A "$SB/stdout" 2>/dev/null | grep '' || echo nothing)" \
+         "wanted, the same way:" "$(printf '%s' "$want_out" | cat -A)"
+  errors=$(grep -c '^::error::' "$SB/stderr"); got=$(cat "$SB/stderr" 2>/dev/null; echo end)
+  [ "$got" = "${want_err}end" ] && pass "$name: stderr holds no line begun '::error::', and is $([ -n "$want_err" ] && echo "exactly the two warnings verify writes of each refused reference's first two attempts" || echo "empty")" \
+    || fail "$name: stderr: no line begun '::error::', and $([ -n "$want_err" ] && echo "exactly the ::warning:: lines verify writes of the failed attempts that another follows, in the order of the references" || echo "nothing at all")" \
+         "lines on stderr begun '::error::': $errors, wanted 0" "stderr:" "${err:-nothing}" "wanted:" "$(printf '%s' "$want_err" | grep '' || echo nothing)"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq "$total" ] || wrong+=("calls logged: $calls, wanted $total")
+  for i in "${!given[@]}"; do
+    want=$(echo verify-attestation; printf '%s\n' "--type slsaprovenance1" "--certificate-oidc-issuer $ISSUER" "--certificate-identity $RELEASER" "${given[i]}" | LC_ALL=C sort)
+    for ((k = 0; k < takes[i]; k++)); do
+      nth=$((nth + 1)); got=$(sed -n "${nth}p" "$SB/cosign.log" | asked)
+      [ "$got" = "$want" ] || wrong+=("call $nth, wanted about reference $((i + 1)) (${kinds[i]}), as the stub logged it: $(sed -n "${nth}p" "$SB/cosign.log" | grep '' || echo "there is no such call")")
+    done
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: cosign is called $total times, three for a refused reference and one for each other, also for those after the uncovered one, each the call verify makes for its reference" \
+    || fail "$name: the cosign calls the stub logged: $total, three for a refused reference and one for each other, the references after an uncovered one asked as well, each call verify-attestation with --type slsaprovenance1, the policy file's issuer, the releaser's identity and its one reference" \
+         "${wrong[@]}" "the log:" "$([ -s "$SB/cosign.log" ] && cat "$SB/cosign.log" || echo "cosign was never called")"
+}
+uncovered_references() {
+  local first="registry.example.test/tools/sprocket@sha256:e951d951d900000bf3f37bf37bf37ba2adc7bf32d951d444fa2a2a2a22adf518"
+  local second="ghcr.io/acme/anvil@sha256:244444f97bf371d9518837bf37bf32a2a2a251d951d95188888837ba25000000"
+  local third="ghcr.io/acme/gadgets-server@sha256:6f51d4444444ccccc72a2a2a2a2a2a2adccccc7bf32060000bf3888888800000"
+  local fourth="ghcr.io/acme/bellows@sha256:d6e6951d951d9518ec2a251d90000000bf3200000bf37ba2a2a2a2a2a2a2a251"
+  local per_reference
+  # the jq calls of a run about one covered reference, counted as in case 4b:
+  # as many pass before the first jq call about the reference after it
+  fresh; jq_stand_in; envelopes "$(all_five)" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$first"; per_reference=$(grep -c '' "$SB/jq.log")
+  [ "$rc" -eq 0 ] && [ "$per_reference" -ge 2 ] \
+    || fail "report with an uncovered reference: the jq calls of a run about one covered reference are counted" "exit=$rc, wanted 0; jq calls the stand-in logged: $per_reference, wanted 2 or more" "stderr:" "${err:-nothing}"
+  some_uncovered "report, the second of three references refused by cosign at all three attempts" covered "$first" refused "$second" covered "$third"
+  some_uncovered "report, the second of three references with a statement built from another ref" covered "$first" "another ref" "$second" covered "$third"
+  some_uncovered "report, the second of three references with no statement verified" covered "$first" "no statement" "$second" covered "$third"
+  some_uncovered "report, the second of three references with jq giving no answer about its statement" covered "$first" "no answer from jq" "$second" covered "$third"
+  some_uncovered "report, the first of three references refused by cosign at all three attempts" refused "$third" covered "$first" covered "$second"
+  some_uncovered "report, the last of three references with a statement built from another ref" covered "$second" covered "$third" "another ref" "$first"
+  some_uncovered "report, the second and the third of four references uncovered" covered "$fourth" refused "$first" "another ref" "$third" covered "$second"
+}
+uncovered_references
 
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
