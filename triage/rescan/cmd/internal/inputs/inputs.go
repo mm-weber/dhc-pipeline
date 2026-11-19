@@ -177,6 +177,51 @@ func LoadAdmission(path string) (map[string]bool, error) {
 	return out, nil
 }
 
+// LoadProvenance reads what scripts/check-provenance.sh printed on stdout
+// under the provenance mode given, the policy file's release.provenance
+// (Req 2.29): one line per reference, "covered<TAB>reference" or
+// "uncovered<TAB>reference<TAB>what the check said". With the mode off
+// nothing was checked, so nothing is read and the result says so (Req 2.30);
+// with no mode given there is no result at all. A line that is not one of the
+// two forms, or a file without lines, is an error and not a smaller coverage:
+// a number counted past a line nobody understood would be a claim invented.
+func LoadProvenance(mode, file string) (*rescan.ProvenanceStatus, error) {
+	switch mode {
+	case "":
+		return nil, nil
+	case "off":
+		return &rescan.ProvenanceStatus{Mode: mode, Uncovered: []string{}}, nil
+	case "report", "required":
+	default:
+		return nil, fmt.Errorf("provenance mode %q is none of off, report, required", mode)
+	}
+	if file == "" {
+		return nil, fmt.Errorf("provenance mode %s: no file with the check's output given", mode)
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", file, err)
+	}
+	text := strings.TrimSuffix(string(data), "\n")
+	if text == "" {
+		return nil, fmt.Errorf("%s: no lines: a coverage of nothing is no report", file)
+	}
+	out := &rescan.ProvenanceStatus{Mode: mode, Uncovered: []string{}}
+	for i, line := range strings.Split(text, "\n") {
+		cols := strings.Split(line, "\t")
+		switch {
+		case len(cols) == 2 && cols[0] == "covered" && cols[1] != "":
+			out.Covered++
+		case len(cols) == 3 && cols[0] == "uncovered" && cols[1] != "" && cols[2] != "":
+			out.Uncovered = append(out.Uncovered, cols[1])
+		default:
+			return nil, fmt.Errorf("%s:%d: expected covered, reference or uncovered, reference, what the check said, tab-separated; got %q", file, i+1, line)
+		}
+		out.Total++
+	}
+	return out, nil
+}
+
 // LoadExpiries reads scripts/lint-accepted-risk.sh's report as the rescan's
 // expiries step keeps it: every workflow-command line about an exception file
 // that says an entry "expires in" (lapsing within the warning window) or "is

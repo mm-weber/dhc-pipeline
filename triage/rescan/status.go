@@ -149,6 +149,9 @@ type StatusData struct {
 	// superseded (referenced, scanned and attested, outside the supported
 	// set): the support statement's other half, as a number (task 15.8).
 	SupersededTags int `json:"superseded_tags"`
+	// Provenance is the provenance coverage the day's check measured (Req
+	// 2.29, 2.30), as the status tool loaded it; nil when it was given none.
+	Provenance *ProvenanceStatus `json:"provenance,omitempty"`
 }
 
 // SupportStatement names the supported set and what a superseded digest
@@ -156,6 +159,16 @@ type StatusData struct {
 type SupportStatement struct {
 	SupportedSet string `json:"supported_set"`
 	Superseded   string `json:"superseded"`
+}
+
+// ProvenanceStatus is the coverage the rescan's provenance check measured
+// over the supported digests and their platform manifests (Req 2.29), or,
+// with the mode off, the statement that nothing was verified (Req 2.30).
+type ProvenanceStatus struct {
+	Mode      string   `json:"mode"` // off | report | required, the policy file's release.provenance
+	Covered   int      `json:"covered"`
+	Total     int      `json:"total"`
+	Uncovered []string `json:"uncovered"` // the references not covered, in the order the check printed them
 }
 
 // Definition is one definition directory as the catalogue page draws it
@@ -631,6 +644,26 @@ func RenderStatusIssue(s StatusData) string {
 	}
 	fmt.Fprintf(&b, "- findings: %d; undecided: %d (over ceiling: %d%s); decided: %d; fixed: %d\n", ag.Findings, ag.Undecided, ag.OverCeiling, oldest, ag.Decided, ag.Fixed)
 	fmt.Fprintf(&b, "- median days to decision: %s; median days to fix: %s\n", num(ag.MedianDaysToDecision), num(ag.MedianDaysToFix))
+	// The coverage is published where the check measured one (Req 2.29):
+	// the count, and each reference not covered by name.
+	if p := s.Provenance; p != nil && (p.Mode == "report" || p.Mode == "required") {
+		fmt.Fprintf(&b, "- provenance: %d of %d supported digests and platform manifests carry an admissible SLSA provenance attestation (mode %s, Req 2.29)", p.Covered, p.Total, p.Mode)
+		for i, ref := range p.Uncovered {
+			sep := ", "
+			if i == 0 {
+				sep = "; not covered: "
+			}
+			name, digest, _ := strings.Cut(ref, "@")
+			b.WriteString(sep + "`" + name + "@" + shortDigest(digest) + "`")
+		}
+		b.WriteString("\n")
+	}
+	// With the mode off nothing was verified, and the line says exactly that
+	// (Req 2.30): no count and no list, whatever numbers the data carries. A
+	// mode that is none of the three writes no line at all.
+	if p := s.Provenance; p != nil && p.Mode == "off" {
+		b.WriteString("- provenance: off, releases attest no SLSA provenance and none was verified (mode off, Req 2.30)\n")
+	}
 	if len(s.Revocations) == 0 {
 		b.WriteString("- revocations: none\n\n")
 	} else {

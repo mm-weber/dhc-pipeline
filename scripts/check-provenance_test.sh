@@ -114,6 +114,12 @@ EOF
   # per verified attestation, on stderr its report, exit 0.
   # A refusing call prints on its stdout, before it ends, the case's file
   # $SB/refused.stdout.<n> where the case laid one down for that n-th call.
+  # For a run over several references (report, case 17), whose calls are not
+  # all answered alike, two files more name one call each: the n-th call
+  # refuses, whatever the countdown says and leaving it alone, where the case
+  # laid down $SB/refuses.<n> (its message is $SB/refusal.<n> as ever), and an
+  # accepting n-th call prints $SB/envelopes.jsonl.<n> in the place of
+  # $SB/envelopes.jsonl where the case laid that down, be it empty.
   # Whatever it answers, every call first notes where its stdout and its
   # stderr go, a line for each: what readlink says of its own descriptors 1
   # and 2 under /proc, a file by its path, a pipe as pipe:[...]. The note is
@@ -128,13 +134,13 @@ readlink "/proc/$$/fd/1" "/proc/$$/fd/2" >> "$SB/cosign.wrote-to" 2>/dev/null
 nth=$(grep -c '' "$SB/cosign.log")
 if [ -f "$SB/crash.$nth" ]; then cat "$SB/crash.$nth" >&2; exit 2; fi
 left=0; [ -f "$SB/refusals" ] && left=$(cat "$SB/refusals")
-if [ "$left" -gt 0 ]; then
-  echo "$((left - 1))" > "$SB/refusals"
+if [ "$left" -gt 0 ] || [ -f "$SB/refuses.$nth" ]; then
+  [ "$left" -gt 0 ] && echo "$((left - 1))" > "$SB/refusals"
   [ -f "$SB/refused.stdout.$nth" ] && cat "$SB/refused.stdout.$nth"
   { printf 'Error: '; cat "$SB/refusal.$nth"; printf 'error during command execution: '; cat "$SB/refusal.$nth"; } >&2
   exit 1
 fi
-cat "$SB/envelopes.jsonl"
+if [ -f "$SB/envelopes.jsonl.$nth" ]; then cat "$SB/envelopes.jsonl.$nth"; else cat "$SB/envelopes.jsonl"; fi
 cat "$SB/accepting.stderr" >&2
 exit 0
 STUB
@@ -2123,6 +2129,545 @@ unusable_values() {
   exit_is "the pause is set and empty" 0; pauses "the pause is set and empty" 2 10
 }
 unusable_values
+
+# 16: report over references that are all covered says so of each (plan slice
+#    3.1.1, FR-3 as amended 2026-11-19, Req 2.29). The mode report takes the
+#    root and then one or more references, and asks of each, in the order
+#    given, the question verify asks of one. Three references that differ in
+#    their image names and in their digests, none of them the suite's, given
+#    in an order that is neither that of their names nor that of their digests
+#    sorted either way; cosign answers each call with one envelope whose
+#    statement meets all five. Wanted: exit 0; stdout exactly one line per
+#    reference, 'covered', ONE tab and the reference, in the order given, each
+#    line ended by its newline, and not a byte more: no heading, no count, and
+#    not the line verify prints of a digest that passed; nothing on stderr,
+#    cosign's own report is not passed on under report either; cosign called
+#    three times, once per reference in the order given, each call with the
+#    arguments verify hands it for that reference, compared as a whole set as
+#    in case 1 (so no call carries two references, and none a flag more).
+#    Then one reference alone, the second of the three: one line, exit 0, one
+#    call.
+# One input: $1 names it, the references follow in the order they are given.
+# The mode word is report unless the caller names another in MODE (case 19)
+all_covered() {
+  local name=$1 each want got calls nth=0; local -a wrong=()
+  shift
+  fresh; envelopes "$(all_five)" > "$SB/envelopes.jsonl"
+  run "${MODE:-report}" "$SB/root" "$@"
+  exit_is "$name" 0 "every reference was asked, and each of them is covered"
+  # byte for byte: a word after each text keeps the newlines at its end, which
+  # $( ) would drop, so a last line without its newline differs, and so does
+  # an empty line more
+  want=$(printf 'covered\t%s\n' "$@"; echo end); got=$(cat "$SB/stdout" 2>/dev/null; echo end)
+  [ "$got" = "$want" ] && pass "$name: stdout is exactly one line per reference, 'covered', a tab and the reference, in the order given" \
+    || fail "$name: stdout: exactly one line per reference, 'covered', one tab and the reference, in the order given, each ended by a newline, and nothing else" \
+         "stdout (as cat -A shows it: a tab reads ^I, a line's end \$):" "$(cat -A "$SB/stdout" 2>/dev/null | grep '' || echo nothing)" \
+         "wanted, the same way:" "$(printf 'covered\t%s\n' "$@" | cat -A)"
+  [ ! -s "$SB/stderr" ] && pass "$name: nothing on stderr" \
+    || fail "$name: stderr: nothing, every reference is covered and cosign's own report is not passed on" "stderr:" "$(cat "$SB/stderr")" "wanted: nothing"
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq "$#" ] && pass "$name: cosign is called $# time(s), once per reference" \
+    || fail "$name: the cosign calls the stub logged: $#, one per reference" "calls logged: $calls, wanted $#:" "$([ -s "$SB/cosign.log" ] && cat "$SB/cosign.log" || echo "cosign was never called")"
+  for each in "$@"; do
+    nth=$((nth + 1))
+    want=$(echo verify-attestation; printf '%s\n' "--type slsaprovenance1" "--certificate-oidc-issuer $ISSUER" "--certificate-identity $RELEASER" "$each" | LC_ALL=C sort)
+    got=$(sed -n "${nth}p" "$SB/cosign.log" | asked)
+    [ "$got" = "$want" ] || wrong+=("call $nth, as the stub logged it: $(sed -n "${nth}p" "$SB/cosign.log" | grep '' || echo "there is no such call")" \
+      "  what it asked (the first argument, then the others sorted, a flag on one line with its value):" "${got:-nothing}" \
+      "  wanted, the same way, the call verify makes for reference $nth:" "$want")
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: each call, in the order the references were given, is the call verify makes for that reference, and not one argument more" \
+    || fail "$name: the cosign calls in their order: the first about the first reference and so on, each verify-attestation with --type slsaprovenance1, the policy file's issuer, the releaser's identity and that one reference, nothing else" \
+         "${wrong[@]}"
+}
+covered_references() {
+  local first="registry.example.test/tools/sprocket@sha256:7c1e9a3b5d2f4a6c8e0b1d3f5a7c9e2b4d6f8a0c1e3b5d7f9a2c4e6b8d0f1a3c"
+  local second="ghcr.io/acme/anvil@sha256:e4a1c8f2b6d09e3a7c5b1f8d2e6a4c0b9f7d3e1a5c8b2f6d0e4a9c7b3f1d5e8a"
+  local third="ghcr.io/acme/gadgets-server@sha256:0d9b7f5e3c1a8e6c4b2f0d9a7e5c3b1f8d6a4e2c0b9f7d5a3e1c8b6f4d2a0e9c"
+  all_covered "report over three covered references" "$first" "$second" "$third"
+  all_covered "report over one covered reference" "$second"
+}
+covered_references
+
+# 17: an uncovered reference neither fails nor stops report (plan slice 3.1.2,
+#    FR-3 as amended 2026-11-19, Req 2.29: an absent attestation never fails
+#    the run). report asks every reference it is given, covered or not, and
+#    says of one that is not covered what verify would say of it: on stdout
+#    the line 'uncovered', ONE tab, the reference, ONE tab and the reason,
+#    which is byte for byte the one ::error:: line verify ends on for that
+#    reference, without its leading '::error::' (so it begins
+#    'check-provenance: ' and ends '(Req 2.28)'). Four ways a reference is not
+#    covered: cosign refuses it at all three attempts (twice the registry does
+#    not answer, the third time 'no matching attestations: ', nothing beside
+#    the digest); cosign verifies for it a statement built from another ref;
+#    cosign ends with 0 for it and prints nothing; jq gives no answer when
+#    asked for the first value of its statement (case 4b's stand-in, the one
+#    call alone). Seven inputs over references that differ in name and digest:
+#    each of the four ways with the uncovered reference between two covered
+#    ones; then it stands first, then last, then two of four are uncovered and
+#    stand next to each other. Every other reference is answered with a
+#    statement that meets all five.
+#    Wanted of each input: exit 0; stdout exactly one line per reference in
+#    the order given, 'covered', a tab and the reference, or the uncovered
+#    line above, and not a byte more; stderr without any line begun
+#    '::error::': for a refused reference exactly the two ::warning:: lines
+#    verify writes of its first two attempts, for the other three ways nothing;
+#    every reference asked, also those after the uncovered one: three cosign
+#    calls for a refused reference and one for each other, each the call
+#    verify makes for that reference.
+#    The wanted reason and warnings are not written out here: before report is
+#    run, verify is asked about each uncovered reference by itself, in a
+#    sandbox of its own under the same answers, and what it wrote is held to
+#    what the cases above hold of verify's lines (exit 1, nothing on stdout,
+#    one error line in its frame that tells the way, two warnings before it
+#    for a refusal and none otherwise). That run is heard only when it fails:
+#    the input cannot be judged then, and one FAIL line says so.
+# a fresh sandbox for one run: the stand-in for sleep as in case 11, the one
+# for jq where $1 is yes, and one envelope whose statement meets all five,
+# what every cosign call answers that the input does not name
+report_sandbox() {
+  fresh; sleep_stand_in
+  [ "$1" = yes ] && jq_stand_in
+  envelopes "$(all_five)" > "$SB/envelopes.jsonl"
+}
+# The answers that leave one reference uncovered in the way $1, laid down for
+# the reference whose first cosign call is the run's $2-th and before whose
+# first jq call the run has made $3 jq calls; covered lays down nothing. A
+# refused reference takes three cosign calls, any other takes one
+not_covered() {
+  local i
+  case "$1" in
+    refused)
+      for i in 0 1 2; do : > "$SB/refuses.$(($2 + i))"; done
+      unanswered 1 > "$SB/refusal.$2"; unanswered 2 > "$SB/refusal.$(($2 + 1))"
+      echo "no matching attestations: " > "$SB/refusal.$(($2 + 2))" ;;
+    "another ref") envelopes "$(statement "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" refs/heads/feature)" > "$SB/envelopes.jsonl.$2" ;;
+    "no statement") : > "$SB/envelopes.jsonl.$2" ;;
+    # the second jq call about the reference: the first reads the statements
+    # (unanswered, it is the line of no statement), the second a value
+    "no answer from jq") echo "$(($3 + 2))" > "$SB/jq.no-answer-at" ;;
+  esac
+}
+# whether verify's error line $2 tells the way $1, in the words the cases
+# above hold: case 2's and case 11's for a refusal, with the third attempt's
+# message and neither of the first two; case 8's clause; case 3's words; and
+# for a jq without an answer, whose words are free (case 4b), none of the
+# other three and no clause
+tells() {
+  case "$1" in
+    refused) [[ "$2" == *"3 attempts"*"no matching attestations:"* && "$2" != *"connection refused"* ]] ;;
+    "another ref") [[ "$2" == *"ref is \"refs/heads/feature\", expected \"$GIT_REF\""* ]] ;;
+    "no statement") [[ "$2" == *"no provenance statement"* ]] ;;
+    "no answer from jq") [[ "$2" != *"3 attempts"* && "$2" != *"no provenance statement"* && "$2" != *", expected "* ]] ;;
+  esac
+}
+# One input: $1 names it; then for each reference, in the order report is
+# given them, a way (covered, or one of not_covered's four) and the reference.
+# A reference jq gives no answer about stands after covered ones only: the
+# number of its jq call is counted from theirs, $per_reference each.
+# The mode word is report unless the caller names another in MODE (case 20).
+# Under another word, require, two things are wanted otherwise: exit 1, and on
+# stderr, after the warnings of each uncovered reference, the ::error:: line
+# verify ends on for it, so for each such reference all that verify wrote on
+# stderr when asked about it alone, the references in the order given
+some_uncovered() {
+  local name=$1 mode=${MODE:-report} i k kind each line rest errors lines ended warned want got calls total nth=0 call=1 asked_jq=0 with_jq=no want_out="" want_err=""
+  local -a kinds=() given=() takes=() wrong=()
+  shift
+  while [ $# -gt 0 ]; do kinds+=("$1"); given+=("$2"); shift 2; done
+  for kind in "${kinds[@]}"; do [ "$kind" = "no answer from jq" ] && with_jq=yes; done
+  # what verify writes of each uncovered reference, asked about it alone
+  for i in "${!given[@]}"; do
+    kind=${kinds[i]}; each=${given[i]}
+    if [ "$kind" = covered ]; then want_out+="covered"$'\t'"$each"$'\n'; continue; fi
+    report_sandbox "$with_jq"; not_covered "$kind" 1 0
+    run verify "$SB/root" "$each"
+    warned=0; [ "$kind" = refused ] && warned=2
+    errors=$(grep -c '^::error::' "$SB/stderr"); lines=$(grep -c '' "$SB/stderr"); ended=$(wc -l < "$SB/stderr"); line=$(tail -n 1 "$SB/stderr")
+    # a word after the text keeps the newline at its end, which $( ) would drop
+    rest=$(grep -v '^::error::' "$SB/stderr"; echo end); rest=${rest%end}
+    if [ "$rc" -ne 1 ] || [ -s "$SB/stdout" ] || [ "$errors" -ne 1 ] || [ "$lines" -ne $((warned + 1)) ] || [ "$ended" -ne "$lines" ] \
+      || [ "$(grep -c "^::warning::check-provenance: $each: " "$SB/stderr")" -ne "$warned" ] \
+      || [[ "$line" != "::error::check-provenance: $each: "*" (Req 2.28)" ]] || ! tells "$kind" "$line"; then
+      fail "$name: verify asked about reference $((i + 1)) alone, under the same answers ($kind), ends as the cases above hold it to; without that the input is not judged" \
+           "exit=$rc; lines on stderr: $lines, of them ended by a newline: $ended, begun '::error::': $errors" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}" \
+           "wanted: exit 1; nothing on stdout; stderr $warned line(s) begun '::warning::check-provenance: $each: ' and then one line '::error::check-provenance: $each: <a reason that tells the way: $kind> (Req 2.28)', each ended by its newline"
+      return
+    fi
+    want_out+="uncovered"$'\t'"$each"$'\t'"${line#::error::}"$'\n'; want_err+=$rest
+    [ "$mode" = report ] || want_err+=$line$'\n'
+  done
+  # report over all of them, the answers laid down call by call
+  report_sandbox "$with_jq"
+  for i in "${!given[@]}"; do
+    not_covered "${kinds[i]}" "$call" "$asked_jq"
+    takes[i]=1; [ "${kinds[i]}" = refused ] && takes[i]=3
+    call=$((call + takes[i])); asked_jq=$((asked_jq + per_reference))
+  done
+  total=$((call - 1))
+  run "$mode" "$SB/root" "${given[@]}"
+  if [ "$mode" = report ]; then
+    exit_is "$name" 0 "every reference was asked, and a reference that is not covered does not fail report (Req 2.29)"
+  else
+    exit_is "$name" 1 "one or more references are not covered, which fails $mode, whatever their number and wherever they stand among the others"
+  fi
+  got=$(cat "$SB/stdout" 2>/dev/null; echo end)
+  [ "$got" = "${want_out}end" ] && pass "$name: stdout is exactly one line per reference in the order given, 'covered', a tab and the reference, or 'uncovered', a tab, the reference, a tab and verify's error line for it without '::error::'" \
+    || fail "$name: stdout: exactly one line per reference in the order given, 'covered', one tab and the reference, or 'uncovered', one tab, the reference, one tab and the line verify ends on for that reference without its leading '::error::', each ended by a newline, and nothing else" \
+         "stdout (as cat -A shows it: a tab reads ^I, a line's end \$):" "$(cat -A "$SB/stdout" 2>/dev/null | grep '' || echo nothing)" \
+         "wanted, the same way:" "$(printf '%s' "$want_out" | cat -A)"
+  errors=$(grep -c '^::error::' "$SB/stderr"); got=$(cat "$SB/stderr" 2>/dev/null; echo end)
+  if [ "$mode" != report ]; then
+    [ "$got" = "${want_err}end" ] && pass "$name: stderr is, for each uncovered reference in the order given, exactly what verify writes of it: the warnings of its failed attempts and then its one '::error::' line, and nothing else" \
+      || fail "$name: stderr: for each uncovered reference, in the order given, the ::warning:: lines verify writes of its failed attempts that another follows and then the one ::error:: line verify ends on for it, byte for byte and once, the lines of one reference together, each ended by a newline, and nothing else" \
+           "lines on stderr begun '::error::': $errors, wanted $(printf '%s' "$want_err" | grep -c '^::error::'), one per uncovered reference" \
+           "stderr (as cat -A shows it: a line's end reads \$):" "$(cat -A "$SB/stderr" 2>/dev/null | grep '' || echo nothing)" "wanted, the same way:" "$(printf '%s' "$want_err" | cat -A)"
+  else
+  [ "$got" = "${want_err}end" ] && pass "$name: stderr holds no line begun '::error::', and is $([ -n "$want_err" ] && echo "exactly the two warnings verify writes of each refused reference's first two attempts" || echo "empty")" \
+    || fail "$name: stderr: no line begun '::error::', and $([ -n "$want_err" ] && echo "exactly the ::warning:: lines verify writes of the failed attempts that another follows, in the order of the references" || echo "nothing at all")" \
+         "lines on stderr begun '::error::': $errors, wanted 0" "stderr:" "${err:-nothing}" "wanted:" "$(printf '%s' "$want_err" | grep '' || echo nothing)"
+  fi
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq "$total" ] || wrong+=("calls logged: $calls, wanted $total")
+  for i in "${!given[@]}"; do
+    want=$(echo verify-attestation; printf '%s\n' "--type slsaprovenance1" "--certificate-oidc-issuer $ISSUER" "--certificate-identity $RELEASER" "${given[i]}" | LC_ALL=C sort)
+    for ((k = 0; k < takes[i]; k++)); do
+      nth=$((nth + 1)); got=$(sed -n "${nth}p" "$SB/cosign.log" | asked)
+      [ "$got" = "$want" ] || wrong+=("call $nth, wanted about reference $((i + 1)) (${kinds[i]}), as the stub logged it: $(sed -n "${nth}p" "$SB/cosign.log" | grep '' || echo "there is no such call")")
+    done
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: cosign is called $total times, three for a refused reference and one for each other, also for those after the uncovered one, each the call verify makes for its reference" \
+    || fail "$name: the cosign calls the stub logged: $total, three for a refused reference and one for each other, the references after an uncovered one asked as well, each call verify-attestation with --type slsaprovenance1, the policy file's issuer, the releaser's identity and its one reference" \
+         "${wrong[@]}" "the log:" "$([ -s "$SB/cosign.log" ] && cat "$SB/cosign.log" || echo "cosign was never called")"
+}
+uncovered_references() {
+  local first="registry.example.test/tools/sprocket@sha256:e951d951d900000bf3f37bf37bf37ba2adc7bf32d951d444fa2a2a2a22adf518"
+  local second="ghcr.io/acme/anvil@sha256:244444f97bf371d9518837bf37bf32a2a2a251d951d95188888837ba25000000"
+  local third="ghcr.io/acme/gadgets-server@sha256:6f51d4444444ccccc72a2a2a2a2a2a2adccccc7bf32060000bf3888888800000"
+  local fourth="ghcr.io/acme/bellows@sha256:d6e6951d951d9518ec2a251d90000000bf3200000bf37ba2a2a2a2a2a2a2a251"
+  local per_reference
+  # the jq calls of a run about one covered reference, counted as in case 4b:
+  # as many pass before the first jq call about the reference after it
+  fresh; jq_stand_in; envelopes "$(all_five)" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$first"; per_reference=$(grep -c '' "$SB/jq.log")
+  [ "$rc" -eq 0 ] && [ "$per_reference" -ge 2 ] \
+    || fail "report with an uncovered reference: the jq calls of a run about one covered reference are counted" "exit=$rc, wanted 0; jq calls the stand-in logged: $per_reference, wanted 2 or more" "stderr:" "${err:-nothing}"
+  some_uncovered "report, the second of three references refused by cosign at all three attempts" covered "$first" refused "$second" covered "$third"
+  some_uncovered "report, the second of three references with a statement built from another ref" covered "$first" "another ref" "$second" covered "$third"
+  some_uncovered "report, the second of three references with no statement verified" covered "$first" "no statement" "$second" covered "$third"
+  some_uncovered "report, the second of three references with jq giving no answer about its statement" covered "$first" "no answer from jq" "$second" covered "$third"
+  some_uncovered "report, the first of three references refused by cosign at all three attempts" refused "$third" covered "$first" covered "$second"
+  some_uncovered "report, the last of three references with a statement built from another ref" covered "$second" covered "$third" "another ref" "$first"
+  some_uncovered "report, the second and the third of four references uncovered" covered "$fourth" refused "$first" "another ref" "$third" covered "$second"
+}
+uncovered_references
+
+# 18: a report that cannot be made asks nothing (plan slice 3.1.3, FR-3 as
+#    amended 2026-11-19). Everything verify ends with exit 2 on ends report
+#    the same way, before cosign is asked about ANY reference: a report over
+#    half the references, or one that asked under a fault, would read as a
+#    finding about the images where it is the call, the policy file or the
+#    machine that is at fault. 16 inputs, each over a fresh sandbox in which
+#    every cosign call would be answered with a statement that meets all five,
+#    so that a script that asks anyway gets an answer that passes:
+#    no reference at all after the root, and report alone, which is wrong
+#    usage; among three references one that names no image by a sha256 digest
+#    (by tag, a digest of 63 hex characters, the empty string), standing
+#    first, in the middle and last, the other two being good ones; a root
+#    without catalogue-policy.yaml, a policy file that gives no issuer and one
+#    that gives no releaser identity; cosign missing from PATH, as in case 14;
+#    a pause that is no whole number, as in case 15.
+#    Wanted of each: exit 2; NOTHING on stdout, also no 'covered' line for
+#    the good references that stand before a bad one; stderr exactly one
+#    line, begun '::error::check-provenance: ', with nothing of the shell's
+#    or python's own words; cosign never called. For a bad reference the line
+#    holds that reference as given and neither of the two good ones, which are
+#    not at fault; for no reference it holds the usage form that names report.
+#    For the policy, tool and pause inputs the line is byte for byte the one
+#    verify writes under the same fault: verify is asked first, in the same
+#    sandbox (its line holds the sandbox's paths), about the suite's
+#    reference, and what it wrote is held to what the cases above hold of it.
+#    That run is heard only when it fails: the input cannot be judged then,
+#    and one FAIL line says so.
+# One input: $1 names it; $2 is what its line holds, or the words 'as verify'
+# for the line verify writes under the same fault; $3 is the fault laid down
+# in the sandbox (none, no-policy, no-issuer, no-identity, no-cosign, pause);
+# the arguments after them go to the script after the word report as they
+# are, the word ROOT standing for the root. Where $2 is a reference, every
+# other argument after the root is a good reference, which the line must not
+# hold.
+# The mode word is report unless the caller names another in MODE (case 21);
+# under another the line of an input that is not 'as verify' must not hold
+# the word report standing by itself, a blank before it and one after it, be
+# it in the sentence or in a usage form: report was not the mode called
+report_asks_nothing() {
+  local name=$1 held=$2 fault=$3 mode=${MODE:-report} each want="" told="" hide="" pause="" other=""; local -a args=() wrong=(); shift 3
+  fresh; envelopes "$(all_five)" > "$SB/envelopes.jsonl"
+  case "$fault" in
+    no-policy)   rm "$SB/root/catalogue-policy.yaml"; told="catalogue-policy.yaml" ;;
+    no-issuer)   policy_with "" "      identity: $RELEASER" > "$SB/root/catalogue-policy.yaml"; told="verification.issuer" ;;
+    no-identity) policy_with "  issuer: $ISSUER" "" > "$SB/root/catalogue-policy.yaml"; told="verification.roles.releaser.identity" ;;
+    # the stub is no cosign on PATH either: it is taken out of the sandbox
+    no-cosign)   rm "$SB/bin/cosign"; hide=cosign; told="cosign is not found on PATH" ;;
+    pause)       pause=soon; told="CHECK_PROVENANCE_RETRY_DELAY" ;;
+  esac
+  if [ "$held" = "as verify" ]; then
+    HIDE=$hide PAUSE=$pause run verify "$SB/root" "$REF"
+    if [ "$rc" -ne 2 ] || [ -s "$SB/stdout" ] || ! one_line "$SB/stderr" || [[ "$err" != "::error::check-provenance: "*"$told"* ]] || [ -s "$SB/cosign.log" ]; then
+      fail "$name: verify under the same fault ends as the cases above hold it to; without that the input is not judged" \
+           "exit=$rc; lines on stderr: $(grep -c '' "$SB/stderr"); cosign calls logged: $(grep -c '' "$SB/cosign.log")" "stdout:" "${out:-nothing}" "stderr:" "${err:-nothing}" \
+           "wanted: exit 2; nothing on stdout; stderr one line '::error::check-provenance: <a reason that holds $told>'; cosign never called"
+      return
+    fi
+    want=$err
+  fi
+  for each in "$@"; do [ "$each" = ROOT ] && each="$SB/root"; args+=("$each"); done
+  HIDE=$hide PAUSE=$pause run "$mode" ${args[@]+"${args[@]}"}
+  exit_is "$name" 2 "a $mode that cannot be made is no $mode: the call, the policy file or the machine is at fault, no image"
+  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout, no line about any reference" \
+    || fail "$name: stdout: nothing, no line about any reference, also not 'covered' for a good one that stands before a bad one" \
+         "stdout (as cat -A shows it: a tab reads ^I, a line's end \$):" "$(cat -A "$SB/stdout" 2>/dev/null | grep '' || echo nothing)" "wanted: nothing"
+  one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
+  begun_error
+  if [ "$held" = "as verify" ]; then
+    [ "$err" = "$want" ] || wrong+=("it is not byte for byte the line verify writes under the same fault")
+  else
+    [[ "$err" == *"$held"* ]] || wrong+=("it does not hold '$held'")
+    for each in "$@"; do
+      [ "$each" = ROOT ] || [ "$each" = "$held" ] || [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', a reference that is not at fault")
+    done
+    if [ "$mode" != report ]; then
+      other=", not the word report as the mode that was called"
+      [[ "$err" != *" report "* ]] || wrong+=("it holds the word report by itself, between two blanks: the mode called was $mode")
+    fi
+  fi
+  for each in "unbound variable" "command not found" "Traceback" "No such file"; do
+    [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', the shell's or python's own words")
+  done
+  if [ "$held" = "as verify" ]; then
+    [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, byte for byte the error line verify writes under the same fault" \
+      || fail "$name: stderr: one line and no more, byte for byte the error line verify writes under the same fault" \
+           "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted, verify's line:" "$want"
+  else
+    [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which holds '$held', no reference that is not at fault$other and nothing of the shell's or python's" \
+      || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that holds '$held', no reference that is not at fault$other and neither 'unbound variable' nor 'command not found' nor 'Traceback' nor 'No such file'" \
+           "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason that holds '$held'>"
+  fi
+  never_asked "$name" "a $mode that cannot be made asks about no reference, also not about a good one that stands before a bad one"
+}
+report_refusals() {
+  local first="registry.example.test/tools/sprocket@sha256:7c1e9a3b5d2f4a6c8e0b1d3f5a7c9e2b4d6f8a0c1e3b5d7f9a2c4e6b8d0f1a3c"
+  local second="ghcr.io/acme/anvil@sha256:e4a1c8f2b6d09e3a7c5b1f8d2e6a4c0b9f7d3e1a5c8b2f6d0e4a9c7b3f1d5e8a"
+  local third="ghcr.io/acme/gadgets-server@sha256:0d9b7f5e3c1a8e6c4b2f0d9a7e5c3b1f8d6a4e2c0b9f7d5a3e1c8b6f4d2a0e9c"
+  # the image of the bad references is none of the good ones', so that no
+  # good reference is found in the line by a part it shares with the bad one
+  local image="ghcr.io/acme/bellows" hex="d6e6951d951d9518ec2a251d90000000bf3200000bf37ba2a2a2a2a2a2a2a251"
+  local form='report <root> <image@sha256:digest>' n kind bad
+  report_asks_nothing "report and the root, no reference" "$form" none ROOT
+  report_asks_nothing "report alone, no root and no reference" "$form" none
+  for n in 0 1 2; do
+    case $n in
+      0) kind="named by tag, no digest"; bad="$image:1.2.3" ;;
+      1) kind="one with a digest of 63 hex characters"; bad="$image@sha256:${hex%?}" ;;
+      2) kind="the empty string"; bad="" ;;
+    esac
+    report_asks_nothing "report, the first of three references is $kind" "$bad" none ROOT "$bad" "$first" "$second"
+    report_asks_nothing "report, the second of three references is $kind" "$bad" none ROOT "$third" "$bad" "$first"
+    report_asks_nothing "report, the last of three references is $kind" "$bad" none ROOT "$second" "$third" "$bad"
+  done
+  report_asks_nothing "report, the root holds no catalogue-policy.yaml" "as verify" no-policy ROOT "$first" "$second" "$third"
+  report_asks_nothing "report, the policy file gives no verification.issuer" "as verify" no-issuer ROOT "$first" "$second" "$third"
+  report_asks_nothing "report, the policy file gives no verification.roles.releaser.identity" "as verify" no-identity ROOT "$first" "$second" "$third"
+  report_asks_nothing "report, cosign is not on PATH" "as verify" no-cosign ROOT "$first" "$second" "$third"
+  report_asks_nothing "report, the pause is soon" "as verify" pause ROOT "$first" "$second" "$third"
+}
+report_refusals
+
+# 19: require over references that are all covered ends as report does (plan
+#    slice 3.2.1, FR-3 as amended 2026-11-19). The mode require takes the root
+#    and then one or more references, as report does, and asks of each, in the
+#    order given, the question verify asks of one; it differs from report only
+#    where a reference is not covered, which a later slice holds. The inputs
+#    are case 16's, through case 16's helper under the mode word require: the
+#    three references that differ in name and digest, in their order, each
+#    answered with one envelope whose statement meets all five, and then the
+#    second of them alone. Wanted, as of report over the same answers: exit 0,
+#    no reference being uncovered; stdout exactly one line per reference,
+#    'covered', ONE tab and the reference, in the order given, each ended by
+#    its newline, and not a byte more (not the line verify prints either);
+#    nothing on stderr; cosign called once per reference in the order given,
+#    each call with the arguments verify hands it for that reference and not
+#    one more.
+required_covered() {
+  local first="registry.example.test/tools/sprocket@sha256:7c1e9a3b5d2f4a6c8e0b1d3f5a7c9e2b4d6f8a0c1e3b5d7f9a2c4e6b8d0f1a3c"
+  local second="ghcr.io/acme/anvil@sha256:e4a1c8f2b6d09e3a7c5b1f8d2e6a4c0b9f7d3e1a5c8b2f6d0e4a9c7b3f1d5e8a"
+  local third="ghcr.io/acme/gadgets-server@sha256:0d9b7f5e3c1a8e6c4b2f0d9a7e5c3b1f8d6a4e2c0b9f7d5a3e1c8b6f4d2a0e9c"
+  MODE=require all_covered "require over three covered references" "$first" "$second" "$third"
+  MODE=require all_covered "require over one covered reference" "$second"
+}
+required_covered
+
+# 20: under require an uncovered reference fails the run, after every
+#    reference was asked (plan slice 3.2.2, FR-3 as amended 2026-11-19).
+#    require is the mode for where a missing provenance has to stop the
+#    release: it tells of each reference what report tells, and of one that is
+#    not covered also what verify tells, and ends with 1. The inputs are case
+#    17's, through case 17's helper under the mode word require: the four ways
+#    a reference is not covered (refused by cosign at all three attempts, a
+#    statement built from another ref, no statement, no answer from jq), each
+#    between two covered references; then the uncovered one first, then last,
+#    then two of four. One input more, which case 17 has no use for: three of
+#    four uncovered, the first of them with no warning of its own (another
+#    ref) and after it two refused ones next to each other, so that warnings
+#    stand after an error line and two references' warnings would stand
+#    together if the error lines were kept for the end.
+#    Wanted of each input: exit 1; stdout byte for byte what report prints
+#    under the same answers, one line per reference in the order given,
+#    'covered' or 'uncovered' as in case 17; every reference asked, also those
+#    after an uncovered one, the same cosign calls as under report; stderr,
+#    for each uncovered reference in the order given, byte for byte what
+#    verify writes on stderr when asked about that reference alone under the
+#    same answers (the two ::warning:: lines of a refused reference's first
+#    two attempts, then the one ::error:: line verify ends on, once), the
+#    lines of one reference together, and nothing else: no line for a covered
+#    reference, nothing of cosign's or jq's own.
+required_uncovered() {
+  local first="registry.example.test/tools/sprocket@sha256:e951d951d900000bf3f37bf37bf37ba2adc7bf32d951d444fa2a2a2a22adf518"
+  local second="ghcr.io/acme/anvil@sha256:244444f97bf371d9518837bf37bf32a2a2a251d951d95188888837ba25000000"
+  local third="ghcr.io/acme/gadgets-server@sha256:6f51d4444444ccccc72a2a2a2a2a2a2adccccc7bf32060000bf3888888800000"
+  local fourth="ghcr.io/acme/bellows@sha256:d6e6951d951d9518ec2a251d90000000bf3200000bf37ba2a2a2a2a2a2a2a251"
+  local per_reference
+  # the jq calls of a run about one covered reference, counted as in case 17
+  fresh; jq_stand_in; envelopes "$(all_five)" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$first"; per_reference=$(grep -c '' "$SB/jq.log")
+  [ "$rc" -eq 0 ] && [ "$per_reference" -ge 2 ] \
+    || fail "require with an uncovered reference: the jq calls of a run about one covered reference are counted" "exit=$rc, wanted 0; jq calls the stand-in logged: $per_reference, wanted 2 or more" "stderr:" "${err:-nothing}"
+  MODE=require some_uncovered "require, the second of three references refused by cosign at all three attempts" covered "$first" refused "$second" covered "$third"
+  MODE=require some_uncovered "require, the second of three references with a statement built from another ref" covered "$first" "another ref" "$second" covered "$third"
+  MODE=require some_uncovered "require, the second of three references with no statement verified" covered "$first" "no statement" "$second" covered "$third"
+  MODE=require some_uncovered "require, the second of three references with jq giving no answer about its statement" covered "$first" "no answer from jq" "$second" covered "$third"
+  MODE=require some_uncovered "require, the first of three references refused by cosign at all three attempts" refused "$third" covered "$first" covered "$second"
+  MODE=require some_uncovered "require, the last of three references with a statement built from another ref" covered "$second" covered "$third" "another ref" "$first"
+  MODE=require some_uncovered "require, the second and the third of four references uncovered" covered "$fourth" refused "$first" "another ref" "$third" covered "$second"
+  MODE=require some_uncovered "require, three of four references uncovered, two refused ones after one with a statement built from another ref" "another ref" "$second" refused "$fourth" refused "$first" covered "$third"
+}
+required_uncovered
+
+# 21: a require that cannot be made asks nothing (plan slice 3.2.3, FR-3 as
+#    amended 2026-11-19). Everything verify ends with exit 2 on ends require
+#    the same way, before cosign is asked about ANY reference: require is the
+#    mode whose exit 1 stops a release for a provenance that is missing, and a
+#    call, a policy file or a machine at fault must never read as that, nor as
+#    the exit 0 of a release whose every digest is covered, which is what
+#    require over no reference at all would say. The inputs are case 18's,
+#    through case 18's helper under the mode word require, 16 of them, each
+#    over a fresh sandbox in which every cosign call would be answered with a
+#    statement that meets all five: no reference at all after the root, and
+#    require alone; among three references one that names no image by a
+#    sha256 digest (by tag, a digest of 63 hex characters, the empty string),
+#    standing first, in the middle and last; a root without
+#    catalogue-policy.yaml, a policy file that gives no issuer and one that
+#    gives no releaser identity; cosign missing from PATH; a pause that is no
+#    whole number.
+#    Wanted of each, as of report in case 18: exit 2; NOTHING on stdout, also
+#    no 'covered' line for the good references that stand before a bad one;
+#    stderr exactly one line, begun '::error::check-provenance: ', with
+#    nothing of the shell's or python's own words; cosign never called. For
+#    no reference the line holds the usage form that names require, and not
+#    the word report as the mode that was called; for a bad reference it holds
+#    that reference as given and neither of the two good ones; for the policy,
+#    tool and pause inputs it is byte for byte the line verify writes under
+#    the same fault, in the same sandbox.
+require_refusals() {
+  local first="registry.example.test/tools/sprocket@sha256:7c1e9a3b5d2f4a6c8e0b1d3f5a7c9e2b4d6f8a0c1e3b5d7f9a2c4e6b8d0f1a3c"
+  local second="ghcr.io/acme/anvil@sha256:e4a1c8f2b6d09e3a7c5b1f8d2e6a4c0b9f7d3e1a5c8b2f6d0e4a9c7b3f1d5e8a"
+  local third="ghcr.io/acme/gadgets-server@sha256:0d9b7f5e3c1a8e6c4b2f0d9a7e5c3b1f8d6a4e2c0b9f7d5a3e1c8b6f4d2a0e9c"
+  # the image of the bad references is none of the good ones', as in case 18
+  local image="ghcr.io/acme/bellows" hex="d6e6951d951d9518ec2a251d90000000bf3200000bf37ba2a2a2a2a2a2a2a251"
+  local form='require <root> <image@sha256:digest>...' n kind bad
+  MODE=require report_asks_nothing "require and the root, no reference" "$form" none ROOT
+  MODE=require report_asks_nothing "require alone, no root and no reference" "$form" none
+  for n in 0 1 2; do
+    case $n in
+      0) kind="named by tag, no digest"; bad="$image:1.2.3" ;;
+      1) kind="one with a digest of 63 hex characters"; bad="$image@sha256:${hex%?}" ;;
+      2) kind="the empty string"; bad="" ;;
+    esac
+    MODE=require report_asks_nothing "require, the first of three references is $kind" "$bad" none ROOT "$bad" "$first" "$second"
+    MODE=require report_asks_nothing "require, the second of three references is $kind" "$bad" none ROOT "$third" "$bad" "$first"
+    MODE=require report_asks_nothing "require, the last of three references is $kind" "$bad" none ROOT "$second" "$third" "$bad"
+  done
+  MODE=require report_asks_nothing "require, the root holds no catalogue-policy.yaml" "as verify" no-policy ROOT "$first" "$second" "$third"
+  MODE=require report_asks_nothing "require, the policy file gives no verification.issuer" "as verify" no-issuer ROOT "$first" "$second" "$third"
+  MODE=require report_asks_nothing "require, the policy file gives no verification.roles.releaser.identity" "as verify" no-identity ROOT "$first" "$second" "$third"
+  MODE=require report_asks_nothing "require, cosign is not on PATH" "as verify" no-cosign ROOT "$first" "$second" "$third"
+  MODE=require report_asks_nothing "require, the pause is soon" "as verify" pause ROOT "$first" "$second" "$third"
+}
+require_refusals
+
+# 22: a word that is no mode is told all three forms (plan slice 3.2.4, FR-3 as
+#    amended 2026-11-19). The script has three modes, and a caller whose first
+#    word is none of them has to read in the one line which words there are
+#    and what stands after each: told verify's form alone, as while verify was
+#    the one mode, whoever mistyped report or require would learn nothing of
+#    the mode he meant. Six inputs, each over a fresh sandbox and one envelope
+#    whose statement meets all five, so that a script that asks cosign anyway
+#    gets an answer that passes: the mode words reprot, check, REPORT and
+#    Require (a mode's name in other letters is no mode: the words are told
+#    apart to the letter) and the empty string as mode word, each followed by
+#    the root and one reference, and no argument at all. Wanted of each: exit
+#    2; nothing on stdout; stderr exactly one line, begun
+#    '::error::check-provenance: ', that holds ALL THREE usage forms, each
+#    written out, 'verify <root> <image@sha256:digest>' (as it stands, no
+#    three dots behind it: verify takes one reference),
+#    'report <root> <image@sha256:digest>...' and
+#    'require <root> <image@sha256:digest>...', and, where a word was given
+#    that is not empty, that word as given, a word of its own (check is also
+#    in the script's name, which does not count); nothing of the shell's or
+#    python's own words; cosign never called.
+# One input: $1 names it, $2 is the word its line holds (empty: none is asked
+# of it), the arguments after them go to the script as they are, the word
+# ROOT standing for the root
+no_mode() {
+  local name=$1 word=$2 each rest alone form='<root> <image@sha256:digest>'; local -a args=() wrong=(); shift 2
+  fresh
+  for each in "$@"; do [ "$each" = ROOT ] && each="$SB/root"; args+=("$each"); done
+  envelopes "$(all_five)" > "$SB/envelopes.jsonl"
+  run ${args[@]+"${args[@]}"}
+  exit_is "$name" 2 "a word that is no mode is wrong usage"
+  no_stdout "$name"
+  one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
+  begun_error
+  # verify's form counts where no three dots stand behind it: with them it
+  # would be the form of a mode over several references
+  rest=${err//"verify $form..."/}
+  [[ "$rest" == *"verify $form"* ]] || wrong+=("it does not hold verify's form, 'verify $form' with no three dots behind it")
+  for each in report require; do
+    [[ "$err" == *"$each $form..."* ]] || wrong+=("it does not hold $each's form, '$each $form...'")
+  done
+  if [ -n "$word" ]; then
+    # the word by itself: neither a letter, a digit nor a hyphen before it or
+    # behind it, so that check is not found in check-provenance
+    alone="(^|[^[:alnum:]-])${word}([^[:alnum:]-]|\$)"
+    [[ "$err" =~ $alone ]] || wrong+=("it does not hold the word as given, '$word', as a word of its own")
+  fi
+  for each in "unbound variable" "command not found" "Traceback" "No such file"; do
+    [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', the shell's or python's own words")
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which holds ${word:+the word '$word' and }all three usage forms, verify's, report's and require's, and nothing of the shell's or python's" \
+    || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that holds ${word:+the word '$word' and }all three usage forms and neither 'unbound variable' nor 'command not found' nor 'Traceback' nor 'No such file'" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason that holds ${word:+'$word', }'verify $form', 'report $form...' and 'require $form...'>"
+  never_asked "$name" "a word that is no mode is refused before cosign is asked"
+}
+no_modes() {
+  no_mode "the mode word is reprot, report mistyped" reprot reprot ROOT "$REF"
+  no_mode "the mode word is check" check check ROOT "$REF"
+  no_mode "the mode word is REPORT, report in capitals" REPORT REPORT ROOT "$REF"
+  no_mode "the mode word is Require, require begun with a capital" Require Require ROOT "$REF"
+  no_mode "the mode word is the empty string, the root and the reference after it" "" "" ROOT "$REF"
+  no_mode "no argument at all, told the three forms" ""
+}
+no_modes
 
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case

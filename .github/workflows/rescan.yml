@@ -101,6 +101,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "page=$(scripts/release-policy.sh . page)" >> "$GITHUB_OUTPUT"
+          echo "provenance=$(scripts/release-policy.sh . provenance)" >> "$GITHUB_OUTPUT"
 
       - name: log in to ghcr.io
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
@@ -687,6 +688,49 @@ jobs:
             gh issue create --title "$title" --body "$body" --label "$labels"
           done
 
+      # Task 18.4 (Req 2.29, 2.30): which of the supported digests carry a SLSA
+      # provenance attestation the verification policy would admit. Asked of
+      # every supported digest and of each platform manifest under it, the
+      # references a release attests, by the release's own self-check
+      # (scripts/check-provenance.sh, its suite holds what each mode does).
+      # With the mode `report` a reference that is not covered is reported and
+      # never fails the run; with `required`, the successor's position, it
+      # does, after the last reference was asked; with `off` nothing is asked
+      # and the status says so. A check that cannot be made (the policy file,
+      # a tool) fails the step by name in every mode but `off`, and the status
+      # below is then published without a coverage line: a check that was
+      # never made is not a day without coverage.
+      - name: provenance coverage over the supported set (Req 2.29, 2.30)
+        id: provenance
+        if: always() && steps.enumerate.outcome == 'success'
+        env:
+          MODE: ${{ steps.switches.outputs.provenance }}
+        run: |
+          set -euo pipefail
+          rm -f "$OUT/provenance.tsv"
+          if [ "$MODE" = off ]; then
+            echo "provenance is off: releases attest none and nothing is verified (Req 2.30)"
+            exit 0
+          fi
+          check=report
+          [ "$MODE" = required ] && check=require
+          # each reference once, in the enumeration's order: the digest a tag
+          # references, then the platform manifests under it
+          mapfile -t refs < <(awk -F'\t' '$6 == "supported" { print $1 "@" $3; print $1 "@" $5 }' "$OUT/enumeration.tsv" | awk '!seen[$0]++')
+          [ "${#refs[@]}" -gt 0 ] || { echo "::error::provenance coverage: today's enumeration holds no supported digest to ask about (Req 2.29)"; exit 1; }
+          rc=0
+          scripts/check-provenance.sh "$check" . "${refs[@]}" > "$OUT/provenance.part" || rc=$?
+          # only a check that asked every reference leaves a coverage behind
+          if [ "$rc" -ne 2 ]; then
+            mv "$OUT/provenance.part" "$OUT/provenance.tsv"
+            covered=$(grep -c '^covered' "$OUT/provenance.tsv" || true)
+            echo "covered=${covered}" >> "$GITHUB_OUTPUT"
+            echo "total=${#refs[@]}" >> "$GITHUB_OUTPUT"
+            echo "provenance coverage (mode ${MODE}): ${covered} of ${#refs[@]} supported digests and platform manifests"
+            grep '^uncovered' "$OUT/provenance.tsv" | cut -f2,3 || true
+          fi
+          exit "$rc"
+
       # Task 10.4 (Req 6.46, 6.47): the clocks over the supported set, read
       # from the attested statements and today's reports, published to one
       # status issue maintained the way Renovate maintains its dashboard
@@ -746,6 +790,8 @@ jobs:
       - name: catalogue status, the clocks over the supported set (Req 6.46)
         id: status
         if: always() && steps.status_previous.outcome == 'success'
+        env:
+          PROVENANCE_MODE: ${{ steps.switches.outputs.provenance }}
         run: |
           set -euo pipefail
           # The clocks read today's attested documents, today's reports, the
@@ -789,6 +835,16 @@ jobs:
           # one reader and published in the issue (Req 6.49; review D7): a
           # hole in the declaration fails here by name, not in the issue.
           support=$(scripts/triage-policy.sh . support)
+          # The provenance coverage joins the data and the issue (Req 2.29),
+          # or the statement that provenance is off (Req 2.30). Without a
+          # coverage from the step above, which then failed by name, the
+          # status carries no such line today.
+          provenance=()
+          if [ "$PROVENANCE_MODE" = off ] || [ -s "$OUT/provenance.tsv" ]; then
+            provenance=(--provenance-mode "$PROVENANCE_MODE" --provenance "$OUT/provenance.tsv")
+          else
+            echo "::warning::catalogue status: no provenance coverage was measured today (the provenance coverage step reports why); the status is published without that line (Req 2.29)"
+          fi
           go -C triage/rescan run ./cmd/rescan-status \
             --enumeration "$OUT/enumeration.tsv" --reattest "$OUT/reattest" --reports "$OUT/trivy" \
             --vex-reports "$OUT/vex" \
@@ -798,6 +854,7 @@ jobs:
             --run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             --definitions "$OUT/status/definitions.tsv" --admission "$OUT/verify-catalogue.json" --expiries "$OUT/accepted-risk.txt" \
             --source-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}" --statements "${GITHUB_WORKSPACE}/triage/vex" \
+            ${provenance[@]+"${provenance[@]}"} \
             --out-json "$OUT/status/metrics.json" --out-body "$OUT/status/issue.md" --out-html "$OUT/site/index.html"
           # The site is the page and the data it was drawn from, nothing else.
           cp "$OUT/status/metrics.json" "$OUT/site/metrics.json"
@@ -903,6 +960,7 @@ jobs:
             echo "- VEX portability: ${{ steps.portability.outputs.blocks || 0 }} supported platform manifest(s) compared, ${{ steps.portability.outputs.divergences || 0 }} divergence(s), ${{ steps.portability.outputs.unmeasured || 0 }} consumer scan(s) not measured"
             echo "- issues closed on evidence: ${{ steps.lifecycle_apply.outputs.closed || 0 }} of ${{ steps.lifecycle.outputs.close || 0 }} decided, reopened: ${{ steps.lifecycle_apply.outputs.reopened || 0 }} of ${{ steps.lifecycle.outputs.reopen || 0 }}, kept open: ${{ steps.lifecycle.outputs.kept || 0 }}, withheld (reports not attested): ${{ steps.lifecycle_apply.outputs.withheld || 0 }}"
             echo "- catalogue status: ${{ steps.status_publish.outputs.url || 'not published' }}, ${{ steps.status.outputs.undecided || 0 }} undecided (${{ steps.status.outputs.over_ceiling || 0 }} over ceiling), ${{ steps.status.outputs.decided || 0 }} decided, ${{ steps.status.outputs.fixed || 0 }} fixed"
+            echo "- provenance: mode ${{ steps.switches.outputs.provenance || 'not read' }}, ${{ steps.provenance.outputs.covered || 0 }} of ${{ steps.provenance.outputs.total || 0 }} supported digests and platform manifests covered"
             echo "- inactive definitions: ${{ steps.inactive.outputs.inactive || 'not checked' }}, ${{ steps.inactive.outputs.asserted || 0 }} tag(s) held to the last status, ${{ steps.inactive.outputs.gains || 0 }} gain(s)"
             echo
             # Req 6.33. Without this the run is green whether every statement

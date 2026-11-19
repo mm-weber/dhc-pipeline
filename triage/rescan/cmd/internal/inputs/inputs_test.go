@@ -1,8 +1,13 @@
 package inputs
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -132,6 +137,167 @@ func TestLoadAdmission(t *testing.T) {
 	}
 	if _, err := LoadAdmission(path); err == nil {
 		t.Errorf("a proof that does not parse is an error")
+	}
+}
+
+// The provenance coverage the rescan measured (Req 2.29, 2.30; task 18.4):
+// what scripts/check-provenance.sh printed on stdout, one line per reference.
+func TestLoadProvenance(t *testing.T) {
+	const (
+		grafana = "ghcr.io/acme/dhc/grafana@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		grafArm = "ghcr.io/acme/dhc/grafana@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		valkey  = "ghcr.io/acme/dhc/valkey@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+		valkArm = "ghcr.io/acme/dhc/valkey@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+		reason  = "no attestation: gh attestation verify found none covered by the policy"
+	)
+	dir := t.TempDir()
+	n := 0
+	write := func(t *testing.T, content string) string {
+		t.Helper()
+		n++
+		path := filepath.Join(dir, "provenance-"+strconv.Itoa(n)+".tsv")
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	absent := filepath.Join(dir, "absent.tsv")
+	mixed := "covered\t" + valkey + "\n" +
+		"uncovered\t" + valkArm + "\t" + reason + "\n" +
+		"covered\t" + grafana + "\n" +
+		"uncovered\t" + grafArm + "\t" + reason + "\n"
+
+	read := []struct {
+		name, mode, content string
+		covered, total      int
+		uncovered           []string
+		json                string
+	}{
+		{"report, covered and uncovered mixed", "report", mixed, 2, 4, []string{valkArm, grafArm},
+			`{"mode":"report","covered":2,"total":4,"uncovered":["` + valkArm + `","` + grafArm + `"]}`},
+		{"required, the same file", "required", mixed, 2, 4, []string{valkArm, grafArm},
+			`{"mode":"required","covered":2,"total":4,"uncovered":["` + valkArm + `","` + grafArm + `"]}`},
+		{"required, all covered", "required", "covered\t" + grafana + "\ncovered\t" + grafArm + "\n", 2, 2, []string{},
+			`{"mode":"required","covered":2,"total":2,"uncovered":[]}`},
+		{"report, the one reference uncovered", "report", "uncovered\t" + grafana + "\t" + reason + "\n", 0, 1, []string{grafana},
+			`{"mode":"report","covered":0,"total":1,"uncovered":["` + grafana + `"]}`},
+	}
+	for _, tc := range read {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := LoadProvenance(tc.mode, write(t, tc.content))
+			if err != nil {
+				t.Fatalf("what the check printed is read: %v", err)
+			}
+			if got == nil {
+				t.Fatalf("mode %s reads the file; got no result", tc.mode)
+			}
+			if got.Mode != tc.mode || got.Covered != tc.covered || got.Total != tc.total {
+				t.Errorf("mode %s, %d of %d covered; got %+v", tc.mode, tc.covered, tc.total, *got)
+			}
+			if got.Uncovered == nil || !slices.Equal(got.Uncovered, tc.uncovered) {
+				t.Errorf("the uncovered references in file order, empty and not nil when there are none: want %q, got %#v", tc.uncovered, got.Uncovered)
+			}
+			if data, err := json.Marshal(got); err != nil || string(data) != tc.json {
+				t.Errorf("the published form:\nwant %s\n got %s (%v)", tc.json, data, err)
+			}
+		})
+	}
+
+	off := []struct{ name, file string }{
+		{"off, a path that does not exist", absent},
+		{"off, the empty path", ""},
+		{"off, a file with lines is not read", write(t, mixed)},
+		{"off, a file that would not parse is not read", write(t, "nonsense\n")},
+	}
+	for _, tc := range off {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := LoadProvenance("off", tc.file)
+			if err != nil {
+				t.Fatalf("with the mode off nothing is read, so nothing can fail: %v", err)
+			}
+			if got == nil {
+				t.Fatalf("the mode off is a result of its own (Req 2.30), not an absent one")
+			}
+			if got.Mode != "off" || got.Covered != 0 || got.Total != 0 || got.Uncovered == nil || len(got.Uncovered) != 0 {
+				t.Errorf("off: nothing verified, 0 of 0, an empty list that is not nil; got %#v", *got)
+			}
+			if data, err := json.Marshal(got); err != nil || string(data) != `{"mode":"off","covered":0,"total":0,"uncovered":[]}` {
+				t.Errorf("the published form of off: %s (%v)", data, err)
+			}
+		})
+	}
+
+	for _, file := range []string{absent, "", write(t, mixed), write(t, "nonsense\n")} {
+		if got, err := LoadProvenance("", file); got != nil || err != nil {
+			t.Errorf("no mode given (file %q): nil and no error, nothing read; got %+v, %v", file, got, err)
+		}
+	}
+
+	for _, word := range []string{"REPORT", "on", "Off", "require", "enforced"} {
+		got, err := LoadProvenance(word, write(t, mixed))
+		if err == nil {
+			t.Errorf("mode %q is none of off, report, required: an error, not a guess; got %+v", word, got)
+			continue
+		}
+		if got != nil {
+			t.Errorf("mode %q: no result beside the error; got %+v", word, *got)
+		}
+		if !strings.Contains(err.Error(), strconv.Quote(word)) {
+			t.Errorf("mode %q: the error holds the word, quoted: %v", word, err)
+		}
+	}
+
+	good := "covered\t" + grafana + "\n"
+	bad := []struct {
+		name, mode, content string
+		line                int // the bad line's number, 0 when the file as a whole is at fault
+	}{
+		{"an empty file", "report", "", 0},
+		{"an empty file, required", "required", "", 0},
+		{"a file of one line end", "report", "\n", 0},
+		{"a first field that is neither word", "report", good + good + "maybe\t" + valkey + "\n" + good, 3},
+		{"a first field in another case", "required", good + "Covered\t" + valkey + "\n", 2},
+		{"a first field with a blank before it", "report", " covered\t" + valkey + "\n", 1},
+		{"a covered line with a third field", "report", good + "covered\t" + valkey + "\t" + reason + "\n" + good, 2},
+		{"an uncovered line without a third field", "report", good + good + "uncovered\t" + valkey + "\n", 3},
+		{"an uncovered line without a third field, required", "required", "uncovered\t" + valkey + "\n" + good, 1},
+		{"a covered line without a reference", "report", good + "covered\n" + good, 2},
+		{"a covered line with an empty reference", "report", good + "covered\t\n", 2},
+		{"an uncovered line with an empty reference", "report", good + good + good + "uncovered\t\t" + reason + "\n", 4},
+		{"the fields separated by blanks", "report", good + "uncovered " + valkey + " " + reason + "\n", 2},
+		{"a blank line in the middle", "report", good + "\n" + good, 2},
+		{"a blank line in the middle, required", "required", good + good + "\n" + "uncovered\t" + valkey + "\t" + reason + "\n", 3},
+	}
+	for _, tc := range bad {
+		t.Run(tc.name, func(t *testing.T) {
+			path := write(t, tc.content)
+			got, err := LoadProvenance(tc.mode, path)
+			if err == nil {
+				t.Fatalf("an error, not a coverage read past it; got %+v", got)
+			}
+			if got != nil {
+				t.Errorf("never a partial result beside an error; got %+v", *got)
+			}
+			if !strings.Contains(err.Error(), path) {
+				t.Errorf("the error names the file %s: %v", path, err)
+			}
+			rest := strings.ReplaceAll(err.Error(), path, "")
+			if tc.line != 0 && !regexp.MustCompile(`\b`+strconv.Itoa(tc.line)+`\b`).MatchString(rest) {
+				t.Errorf("the error names line %d: %v", tc.line, err)
+			}
+		})
+	}
+	for _, mode := range []string{"report", "required"} {
+		got, err := LoadProvenance(mode, "")
+		if err == nil || got != nil {
+			t.Errorf("mode %s without a file: an error and no result; got %+v, %v", mode, got, err)
+		}
+		got, err = LoadProvenance(mode, absent)
+		if err == nil || got != nil {
+			t.Errorf("mode %s with a file that does not exist: an error and no result; got %+v, %v", mode, got, err)
+		} else if !strings.Contains(err.Error(), absent) {
+			t.Errorf("mode %s: the error names the file %s: %v", mode, absent, err)
+		}
 	}
 }
 

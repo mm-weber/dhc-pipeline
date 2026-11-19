@@ -541,7 +541,16 @@ left of the program is the follow-up list below, one decision each.
           read (run 44500579834, dispatched); the plan's verification
           list has each read
     - [ ] the first scheduled release read: it waits for the first day
-          a scheduled rebuild differs from the released digest
+          a scheduled rebuild differs from the released digest (the
+          scheduled build of 2026-11-19, run 44538564027, found all
+          seven unchanged and published nothing)
+  - [ ] 18.4 by the plan's phase 3, the owner's go of 2026-11-19:
+    - [x] 3.1 report mode, 3.2 require mode (`check-provenance.sh`,
+          suite at 1135), 3.3 the status tool and `rescan.yml`; the
+          manual's section on the coverage line
+    - [ ] the pull request; the owner merges
+    - [ ] the first rescan after the merge read: the coverage line in
+          the status data and the issue
   - [ ] Candidate, the owner's idea of 2026-11-13, not started: reshape
         the pipeline into local composite actions where a group of steps
         is one unit (the provenance trio a first candidate). Its own
