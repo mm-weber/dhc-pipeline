@@ -328,7 +328,7 @@ The review (a subagent running the code-review skill on the pull request, read-o
   - Sliced 2026-11-19. The status tool (`triage/rescan`, Go) reads what the check printed and writes the coverage into the status data and the issue; its tests first, agents apart. `rescan.yml` by hand, under the lints
   - [x] **3.3.1 The loader**: `inputs.LoadProvenance(mode, file)` reads the check's lines into `rescan.ProvenanceStatus` (mode, covered, total, the uncovered references in file order); the mode `off` reads no file; no mode gives nothing; another mode word, a missing or empty file and a line of another form are errors naming the file and the line
   - [x] **3.3.2 The line in the issue and the data**: with a coverage of mode `report` or `required` the issue's summary gains one line, covered n of m, each uncovered reference named; the data carries it through the fenced block and back; without a coverage no line
-  - [ ] **3.3.3 The off line**: with the mode `off` the line states that provenance is off and nothing was verified (Req 2.30)
+  - [x] **3.3.3 The off line**: with the mode `off` the line states that provenance is off and nothing was verified (Req 2.30)
   - [ ] **3.3.4 The wiring**: `rescan-status` takes `--provenance-mode` and `--provenance`; `rescan.yml` reads the mode through `release-policy.sh`, runs `report` or `require` over every supported digest and each platform manifest under it, or neither with `off`, and hands the result to the status tool; the summary names the count
 
 ### Verification

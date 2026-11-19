@@ -658,6 +658,12 @@ func RenderStatusIssue(s StatusData) string {
 		}
 		b.WriteString("\n")
 	}
+	// With the mode off nothing was verified, and the line says exactly that
+	// (Req 2.30): no count and no list, whatever numbers the data carries. A
+	// mode that is none of the three writes no line at all.
+	if p := s.Provenance; p != nil && p.Mode == "off" {
+		b.WriteString("- provenance: off, releases attest no SLSA provenance and none was verified (mode off, Req 2.30)\n")
+	}
 	if len(s.Revocations) == 0 {
 		b.WriteString("- revocations: none\n\n")
 	} else {
