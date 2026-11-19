@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -588,6 +589,104 @@ func TestRenderStatusIssue_PublishesTheProvenanceCoverage(t *testing.T) {
 			}
 			if back.Provenance == nil || !reflect.DeepEqual(*back.Provenance, p) {
 				t.Errorf("the coverage round-trips through the data: want %+v, got %+v", p, back.Provenance)
+			}
+		})
+	}
+}
+
+// The provenance line for the mode off (task 18.4, plan 3.3.3; Req 2.30):
+// the statement that nothing was verified, at the coverage line's place,
+// with no count and no list; a mode the tool does not know writes no line.
+func TestRenderStatusIssue_PublishesProvenanceOff(t *testing.T) {
+	const (
+		offLine   = "- provenance: off, releases attest no SLSA provenance and none was verified (mode off, Req 2.30)"
+		valkeyArm = "ghcr.io/acme/dhc/valkey@sha256:505b98c4b31828bb25b20d2ca56047b127e6bfc480857fecd65f3089fb8ac714"
+	)
+	provenanceLines := func(body string) (lines []string, before, after string) {
+		all := strings.Split(body, "\n")
+		for i, l := range all {
+			if strings.HasPrefix(l, "- provenance:") {
+				lines = append(lines, l)
+				if i > 0 {
+					before = all[i-1]
+				}
+				if i+1 < len(all) {
+					after = all[i+1]
+				}
+			}
+		}
+		return lines, before, after
+	}
+	base := StatusData{SchemaVersion: 1, GeneratedAt: "2026-11-19T06:17:00Z"}
+
+	off := []struct {
+		name       string
+		provenance ProvenanceStatus
+	}{
+		{"off, nothing measured", ProvenanceStatus{Mode: "off", Covered: 0, Total: 0, Uncovered: []string{}}},
+		// Numbers that reached the data under the mode off are not published
+		// in the line: off states that nothing was verified.
+		{"off, stray numbers", ProvenanceStatus{Mode: "off", Covered: 3, Total: 5, Uncovered: []string{valkeyArm}}},
+	}
+	for _, tc := range off {
+		t.Run(tc.name, func(t *testing.T) {
+			s := base
+			p := tc.provenance
+			s.Provenance = &p
+			body := RenderStatusIssue(s)
+			lines, before, after := provenanceLines(body)
+			if len(lines) != 1 {
+				t.Fatalf("one provenance line in the summary list, got %d %q in:\n%s", len(lines), lines, body)
+			}
+			if lines[0] != offLine {
+				t.Errorf("the line for the mode off:\n got %q\nwant %q", lines[0], offLine)
+			}
+			if !strings.HasPrefix(before, "- median days to decision") {
+				t.Errorf("the line stands directly after the medians, got before it: %q", before)
+			}
+			if !strings.HasPrefix(after, "- revocations:") {
+				t.Errorf("the line stands directly before the revocations, got after it: %q", after)
+			}
+			summary, _, _ := strings.Cut(body, "```json\n")
+			for _, never := range []string{"not covered", "carry an admissible SLSA provenance attestation", "Req 2.29"} {
+				if strings.Contains(summary, never) {
+					t.Errorf("the mode off publishes no coverage, found %q in:\n%s", never, summary)
+				}
+			}
+			raw, ok := ExtractFencedJSON(body)
+			if !ok {
+				t.Fatalf("no fenced json block in:\n%s", body)
+			}
+			back, err := ParseStatus(raw)
+			if err != nil {
+				t.Fatalf("fenced block does not parse: %v", err)
+			}
+			if back.Provenance == nil || !reflect.DeepEqual(*back.Provenance, p) {
+				t.Errorf("the mode off round-trips through the data: want %+v, got %+v", p, back.Provenance)
+			}
+		})
+	}
+
+	// A mode the tool does not know is never dressed as a statement.
+	for _, mode := range []string{"", "audit", "OFF", "off ", "disabled"} {
+		t.Run("unknown mode "+strconv.Quote(mode), func(t *testing.T) {
+			s := base
+			p := ProvenanceStatus{Mode: mode, Covered: 0, Total: 0, Uncovered: []string{}}
+			s.Provenance = &p
+			body := RenderStatusIssue(s)
+			if lines, _, _ := provenanceLines(body); len(lines) != 0 {
+				t.Errorf("a mode the tool does not know writes no provenance line, got %q", lines)
+			}
+			raw, ok := ExtractFencedJSON(body)
+			if !ok {
+				t.Fatalf("no fenced json block in:\n%s", body)
+			}
+			back, err := ParseStatus(raw)
+			if err != nil {
+				t.Fatalf("fenced block does not parse: %v", err)
+			}
+			if back.Provenance == nil || !reflect.DeepEqual(*back.Provenance, p) {
+				t.Errorf("the data keeps the mode as given: want %+v, got %+v", p, back.Provenance)
 			}
 		})
 	}
