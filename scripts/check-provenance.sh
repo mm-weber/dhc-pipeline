@@ -45,14 +45,19 @@
 # its stderr holds the ::warning:: lines of failed attempts as verify writes
 # them, each reference's when its question is answered, and no ::error:: line
 # for a reference that is not covered; with every reference asked it ends
-# with 0. As the script stands the two tests of verify's arguments told next
-# are not made under report, and whatever ends verify with 2 ends report the
-# same way, with the same line.
+# with 0. A report that cannot be made asks nothing: whatever ends verify with
+# 2 ends report with 2 as well, with nothing on stdout and before cosign is
+# asked about any reference, the good ones that stand before a bad one among
+# them. The line is the one verify writes under the same fault, but for the
+# count of the arguments, told next.
 #
 # After the mode word verify come the root and the reference, the two and no
 # more: any other number of arguments is wrong usage the same way, the line
 # holding the usage form and the number given, and exit 2. A caller's slip
-# must read as that, not as the shell's "unbound variable".
+# must read as that, not as the shell's "unbound variable". After report come
+# the root and one or more references: the root alone, or nothing, is wrong
+# usage the same way, the line holding report's usage form and the number
+# given, and exit 2.
 #
 # The reference has to name the image by a sha256 digest: it ends in @sha256:
 # and 64 lower-case hex characters, after a name that is not empty and holds
@@ -63,7 +68,9 @@
 # cosign would verify whatever the tag points at, which need not be the digest
 # the release pushed, and a mistyped digest would cost three attempts. Any
 # other reference is wrong usage: the line holds the reference as it was
-# given, and exit 2.
+# given, and exit 2. report's references are tested so as well, all of them in
+# the order given and before any is asked: the first that names no image by a
+# digest ends the run with that line, which holds it and none of the others.
 #
 # The pause between two attempts, CHECK_PROVENANCE_RETRY_DELAY, is 10 seconds
 # where the variable is not set or is empty; otherwise it has to be a whole
@@ -250,21 +257,29 @@ refuse() {
 # the two after the mode word, counted before either is read: under set -u a
 # missing one would end the run in the shell's words, and one too many would
 # be dropped unseen, the caller's slip checked as if it were none. report
-# takes its references after the root, however many
+# takes its references after the root, however many, but one at the least: a
+# report about nothing is a caller's slip too, and is told report's form
+[ "$1" != report ] || [ "$#" -ge 3 ] \
+  || refuse 2 "$(($# - 1)) argument(s) after report where the root and one or more references belong, usage: check-provenance.sh report <root> <image@sha256:digest>..."
 [ "$1" = report ] || [ "$#" -eq 3 ] \
   || refuse 2 "$(($# - 1)) argument(s) after verify where two belong, usage: check-provenance.sh verify <root> <image@sha256:digest>"
-# the root that holds catalogue-policy.yaml, and the reference cosign is asked
-# about; under report the loop at the end names each of its references in turn
+# the root that holds catalogue-policy.yaml; the references cosign is asked
+# about stand after it, verify's one and report's several, and REF names each
+# in turn, here to be tested and under report in the loop at the end to be
+# asked
 ROOT="$2"
-REF="$3"
 # only a digest pins what the release pushed: a tag can be moved, and cosign
 # would verify whatever it points at. The hex digits are written out, a range
 # like a-f taking in capitals under some locales. No white space in the name:
 # a second reference behind a blank is no part of one image's name. No @ in it
 # either: an image's name holds none, the digest begins at the one @, and
-# cosign cannot read a reference with two. verify's one reference is tested
-[ "$1" = report ] || [[ "$REF" =~ ^[^[:space:]@]+@sha256:[0123456789abcdef]{64}$ ]] \
-  || refuse 2 "'$REF' does not name an image by a sha256 digest, which reads <image>@sha256: and 64 lower-case hex characters"
+# cosign cannot read a reference with two. Every reference is tested, in the
+# order given and before anything is asked about any: a report over the good
+# ones that stand before a bad one would be half a report
+for REF in "${@:3}"; do
+  [[ "$REF" =~ ^[^[:space:]@]+@sha256:[0123456789abcdef]{64}$ ]] \
+    || refuse 2 "'$REF' does not name an image by a sha256 digest, which reads <image>@sha256: and 64 lower-case hex characters"
+done
 # the pause between two attempts, 10 seconds unless the caller sets another.
 # Seconds in digits alone, the digits written out as above: sleep fails on
 # anything else, and the attempts would follow at once with nobody told. It is
