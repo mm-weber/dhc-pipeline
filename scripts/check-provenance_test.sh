@@ -2395,9 +2395,13 @@ uncovered_references
 # the arguments after them go to the script after the word report as they
 # are, the word ROOT standing for the root. Where $2 is a reference, every
 # other argument after the root is a good reference, which the line must not
-# hold
+# hold.
+# The mode word is report unless the caller names another in MODE (case 21);
+# under another the line of an input that is not 'as verify' must not hold
+# the word report standing by itself, a blank before it and one after it, be
+# it in the sentence or in a usage form: report was not the mode called
 report_asks_nothing() {
-  local name=$1 held=$2 fault=$3 each want="" told="" hide="" pause=""; local -a args=() wrong=(); shift 3
+  local name=$1 held=$2 fault=$3 mode=${MODE:-report} each want="" told="" hide="" pause="" other=""; local -a args=() wrong=(); shift 3
   fresh; envelopes "$(all_five)" > "$SB/envelopes.jsonl"
   case "$fault" in
     no-policy)   rm "$SB/root/catalogue-policy.yaml"; told="catalogue-policy.yaml" ;;
@@ -2418,8 +2422,8 @@ report_asks_nothing() {
     want=$err
   fi
   for each in "$@"; do [ "$each" = ROOT ] && each="$SB/root"; args+=("$each"); done
-  HIDE=$hide PAUSE=$pause run report ${args[@]+"${args[@]}"}
-  exit_is "$name" 2 "a report that cannot be made is no report: the call, the policy file or the machine is at fault, no image"
+  HIDE=$hide PAUSE=$pause run "$mode" ${args[@]+"${args[@]}"}
+  exit_is "$name" 2 "a $mode that cannot be made is no $mode: the call, the policy file or the machine is at fault, no image"
   [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout, no line about any reference" \
     || fail "$name: stdout: nothing, no line about any reference, also not 'covered' for a good one that stands before a bad one" \
          "stdout (as cat -A shows it: a tab reads ^I, a line's end \$):" "$(cat -A "$SB/stdout" 2>/dev/null | grep '' || echo nothing)" "wanted: nothing"
@@ -2432,6 +2436,10 @@ report_asks_nothing() {
     for each in "$@"; do
       [ "$each" = ROOT ] || [ "$each" = "$held" ] || [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', a reference that is not at fault")
     done
+    if [ "$mode" != report ]; then
+      other=", not the word report as the mode that was called"
+      [[ "$err" != *" report "* ]] || wrong+=("it holds the word report by itself, between two blanks: the mode called was $mode")
+    fi
   fi
   for each in "unbound variable" "command not found" "Traceback" "No such file"; do
     [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', the shell's or python's own words")
@@ -2441,11 +2449,11 @@ report_asks_nothing() {
       || fail "$name: stderr: one line and no more, byte for byte the error line verify writes under the same fault" \
            "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted, verify's line:" "$want"
   else
-    [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which holds '$held', no reference that is not at fault and nothing of the shell's or python's" \
-      || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that holds '$held', no reference that is not at fault and neither 'unbound variable' nor 'command not found' nor 'Traceback' nor 'No such file'" \
+    [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which holds '$held', no reference that is not at fault$other and nothing of the shell's or python's" \
+      || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that holds '$held', no reference that is not at fault$other and neither 'unbound variable' nor 'command not found' nor 'Traceback' nor 'No such file'" \
            "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason that holds '$held'>"
   fi
-  never_asked "$name" "a report that cannot be made asks about no reference, also not about a good one that stands before a bad one"
+  never_asked "$name" "a $mode that cannot be made asks about no reference, also not about a good one that stands before a bad one"
 }
 report_refusals() {
   local first="registry.example.test/tools/sprocket@sha256:7c1e9a3b5d2f4a6c8e0b1d3f5a7c9e2b4d6f8a0c1e3b5d7f9a2c4e6b8d0f1a3c"
@@ -2544,6 +2552,58 @@ required_uncovered() {
   MODE=require some_uncovered "require, three of four references uncovered, two refused ones after one with a statement built from another ref" "another ref" "$second" refused "$fourth" refused "$first" covered "$third"
 }
 required_uncovered
+
+# 21: a require that cannot be made asks nothing (plan slice 3.2.3, FR-3 as
+#    amended 2026-11-19). Everything verify ends with exit 2 on ends require
+#    the same way, before cosign is asked about ANY reference: require is the
+#    mode whose exit 1 stops a release for a provenance that is missing, and a
+#    call, a policy file or a machine at fault must never read as that, nor as
+#    the exit 0 of a release whose every digest is covered, which is what
+#    require over no reference at all would say. The inputs are case 18's,
+#    through case 18's helper under the mode word require, 16 of them, each
+#    over a fresh sandbox in which every cosign call would be answered with a
+#    statement that meets all five: no reference at all after the root, and
+#    require alone; among three references one that names no image by a
+#    sha256 digest (by tag, a digest of 63 hex characters, the empty string),
+#    standing first, in the middle and last; a root without
+#    catalogue-policy.yaml, a policy file that gives no issuer and one that
+#    gives no releaser identity; cosign missing from PATH; a pause that is no
+#    whole number.
+#    Wanted of each, as of report in case 18: exit 2; NOTHING on stdout, also
+#    no 'covered' line for the good references that stand before a bad one;
+#    stderr exactly one line, begun '::error::check-provenance: ', with
+#    nothing of the shell's or python's own words; cosign never called. For
+#    no reference the line holds the usage form that names require, and not
+#    the word report as the mode that was called; for a bad reference it holds
+#    that reference as given and neither of the two good ones; for the policy,
+#    tool and pause inputs it is byte for byte the line verify writes under
+#    the same fault, in the same sandbox.
+require_refusals() {
+  local first="registry.example.test/tools/sprocket@sha256:7c1e9a3b5d2f4a6c8e0b1d3f5a7c9e2b4d6f8a0c1e3b5d7f9a2c4e6b8d0f1a3c"
+  local second="ghcr.io/acme/anvil@sha256:e4a1c8f2b6d09e3a7c5b1f8d2e6a4c0b9f7d3e1a5c8b2f6d0e4a9c7b3f1d5e8a"
+  local third="ghcr.io/acme/gadgets-server@sha256:0d9b7f5e3c1a8e6c4b2f0d9a7e5c3b1f8d6a4e2c0b9f7d5a3e1c8b6f4d2a0e9c"
+  # the image of the bad references is none of the good ones', as in case 18
+  local image="ghcr.io/acme/bellows" hex="d6e6951d951d9518ec2a251d90000000bf3200000bf37ba2a2a2a2a2a2a2a251"
+  local form='require <root> <image@sha256:digest>...' n kind bad
+  MODE=require report_asks_nothing "require and the root, no reference" "$form" none ROOT
+  MODE=require report_asks_nothing "require alone, no root and no reference" "$form" none
+  for n in 0 1 2; do
+    case $n in
+      0) kind="named by tag, no digest"; bad="$image:1.2.3" ;;
+      1) kind="one with a digest of 63 hex characters"; bad="$image@sha256:${hex%?}" ;;
+      2) kind="the empty string"; bad="" ;;
+    esac
+    MODE=require report_asks_nothing "require, the first of three references is $kind" "$bad" none ROOT "$bad" "$first" "$second"
+    MODE=require report_asks_nothing "require, the second of three references is $kind" "$bad" none ROOT "$third" "$bad" "$first"
+    MODE=require report_asks_nothing "require, the last of three references is $kind" "$bad" none ROOT "$second" "$third" "$bad"
+  done
+  MODE=require report_asks_nothing "require, the root holds no catalogue-policy.yaml" "as verify" no-policy ROOT "$first" "$second" "$third"
+  MODE=require report_asks_nothing "require, the policy file gives no verification.issuer" "as verify" no-issuer ROOT "$first" "$second" "$third"
+  MODE=require report_asks_nothing "require, the policy file gives no verification.roles.releaser.identity" "as verify" no-identity ROOT "$first" "$second" "$third"
+  MODE=require report_asks_nothing "require, cosign is not on PATH" "as verify" no-cosign ROOT "$first" "$second" "$third"
+  MODE=require report_asks_nothing "require, the pause is soon" "as verify" pause ROOT "$first" "$second" "$third"
+}
+require_refusals
 
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case
