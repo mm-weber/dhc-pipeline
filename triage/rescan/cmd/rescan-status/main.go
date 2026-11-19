@@ -12,6 +12,7 @@
 //	  [--kev f] [--previous metrics.json | --previous-body issue.md] [--today YYYY-MM-DD] [--run url] \
 //	  [--definitions definitions.tsv --admission verify-catalogue.json --expiries accepted-risk.txt --out-html index.html] \
 //	  [--source-url <server>/<owner>/<repo>/blob/<ref> --statements triage/vex] \
+//	  [--provenance-mode off|report|required --provenance provenance.tsv] \
 //	  --out-json metrics.json --out-body issue.md
 //
 // --support is the support statement as scripts/triage-policy.sh prints it
@@ -25,6 +26,13 @@
 // from the statement its clock came from; --source-url turns the files a
 // statement's notes name into links, --statements marks the hand-written
 // statements on disk so their source is linked too.
+// --provenance-mode is the policy file's release.provenance and --provenance
+// what scripts/check-provenance.sh printed on stdout under it: with report or
+// required the issue and the data carry how many of the supported digests and
+// platform manifests are covered and which are not (Req 2.29), with off they
+// say that nothing was attested and nothing verified (Req 2.30). Without the
+// mode there is no provenance line at all; a file without its mode is an
+// error, since a coverage nobody reads would be dropped unseen.
 // --enumeration is the rescan's enumeration.tsv (repository, tag, digest,
 // platform, manifest, supported|superseded); only supported rows count.
 // --reattest is the re-attest work directory: <name>__<12 hex>/out/*.openvex.json
@@ -65,6 +73,8 @@ func main() {
 	supportFlag := flag.String("support", "", "the support statement as JSON {supported_set, superseded}, scripts/triage-policy.sh's support output; published in the issue (required)")
 	definitionsFile := flag.String("definitions", "", "the definitions list for the catalogue page: name, active|inactive, repository, tags comma-joined, tab-separated (required with --out-html)")
 	admissionFile := flag.String("admission", "", "scripts/verify-catalogue.sh's record; the verdict per digest joins the data and the page (optional)")
+	provenanceMode := flag.String("provenance-mode", "", "the policy file's release.provenance: off, report or required; with it the provenance coverage joins the data and the issue (optional; Req 2.29, 2.30)")
+	provenanceFile := flag.String("provenance", "", "what scripts/check-provenance.sh printed on stdout under that mode, one line per reference (required with --provenance-mode report or required)")
 	expiriesFile := flag.String("expiries", "", "scripts/lint-accepted-risk.sh's report as the expiries step keeps it; lapsing exceptions join the page (optional)")
 	outHTML := flag.String("out-html", "", "where to write the catalogue page, index.html (optional; Req 6.61)")
 	sourceURL := flag.String("source-url", "", "the base the repository's files are served under (<server>/<owner>/<repo>/blob/<ref>); with it, the files a statement's notes name become links (optional; task 15.9)")
@@ -188,6 +198,12 @@ func main() {
 				}
 			}
 		}
+	}
+	if *provenanceFile != "" && *provenanceMode == "" {
+		fatal("--provenance needs --provenance-mode: a coverage without the mode it was measured under would be dropped unseen (Req 2.29)")
+	}
+	if status.Provenance, err = inputs.LoadProvenance(*provenanceMode, *provenanceFile); err != nil {
+		fatal("provenance: " + err.Error())
 	}
 	if *revocationsFile != "" {
 		data, err := os.ReadFile(*revocationsFile)
