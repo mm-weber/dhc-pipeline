@@ -158,6 +158,16 @@ type SupportStatement struct {
 	Superseded   string `json:"superseded"`
 }
 
+// ProvenanceStatus is the coverage the rescan's provenance check measured
+// over the supported digests and their platform manifests (Req 2.29), or,
+// with the mode off, the statement that nothing was verified (Req 2.30).
+type ProvenanceStatus struct {
+	Mode      string   `json:"mode"` // off | report | required, the policy file's release.provenance
+	Covered   int      `json:"covered"`
+	Total     int      `json:"total"`
+	Uncovered []string `json:"uncovered"` // the references not covered, in the order the check printed them
+}
+
 // Definition is one definition directory as the catalogue page draws it
 // (Req 6.61): its name, whether the active set lists it, the repository it
 // publishes to and the tags it declares. Read from the list the status step

@@ -177,6 +177,12 @@ func LoadAdmission(path string) (map[string]bool, error) {
 	return out, nil
 }
 
+// LoadProvenance reads what scripts/check-provenance.sh printed on stdout
+// under the provenance mode given (Req 2.29, 2.30). Stub: slice 3.3.1 is red.
+func LoadProvenance(mode, file string) (*rescan.ProvenanceStatus, error) {
+	return nil, nil
+}
+
 // LoadExpiries reads scripts/lint-accepted-risk.sh's report as the rescan's
 // expiries step keeps it: every workflow-command line about an exception file
 // that says an entry "expires in" (lapsing within the warning window) or "is
