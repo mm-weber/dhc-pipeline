@@ -27,9 +27,11 @@
 # asked.
 #
 # The script has three modes, verify, report and require: any other first
-# word, or none, is wrong usage, the line holding the usage form, and exit 2,
-# before anything is read or asked. A caller who meant another thing is told
-# so, and no check is run that he did not ask for by its name.
+# word, or none, is wrong usage, the line holding the word as it was given and
+# the usage form of each of the three, and exit 2, before anything is read or
+# asked: whoever mistyped a mode reads in the one line which words there are
+# and what stands after each. A caller who meant another thing is told so, and
+# no check is run that he did not ask for by its name.
 #
 # verify asks about one reference, and all that follows tells its run. report
 # takes the root and then the references, and asks of each, in the order
@@ -273,11 +275,11 @@ refuse() {
   exit "$code"
 }
 # the three modes there are; a word that is none of them is a call that meant
-# another thing, and is told the form instead of being given this check. So is
-# a call with no word at all: under set -u a bare $1 would end it in the
-# shell's words
+# another thing, and is told the three forms instead of being given a check.
+# So is a call with no word at all: under set -u a bare $1 would end it in
+# the shell's words
 [ "${1-}" = verify ] || [ "${1-}" = report ] || [ "${1-}" = require ] \
-  || refuse 2 "'${1-}' is no mode of this script, usage: check-provenance.sh verify <root> <image@sha256:digest>"
+  || refuse 2 "'${1-}' is no mode of this script, usage: check-provenance.sh verify <root> <image@sha256:digest>, check-provenance.sh report <root> <image@sha256:digest>... or check-provenance.sh require <root> <image@sha256:digest>..."
 # the two after the mode word, counted before either is read: under set -u a
 # missing one would end the run in the shell's words, and one too many would
 # be dropped unseen, the caller's slip checked as if it were none. report
