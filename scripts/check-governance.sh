@@ -14,6 +14,27 @@
 # committed export carries it, SECURITY.md states it, and data/ holds the
 # admin view.
 #
+# Anonymous reads share a limit of 60 an hour per network address, and a
+# runner's address is shared with other GitHub customers, so a read can be
+# answered "rate limit exceeded" through no fault of this repository. A read
+# answered 403 or 429 with `x-ratelimit-remaining: 0` or a `retry-after`
+# header is therefore waited out: one warning line, `sleep` until the reset
+# (`x-ratelimit-reset`, or the seconds of `retry-after`) plus 5 seconds, then
+# the same read again, still anonymous. The read is unreadable, with the rate
+# limit named as the cause, when the wait would exceed
+# DHC_GOVERNANCE_MAX_WAIT seconds (default 3900), when the answer names no
+# reset, or when it is still rate-limited after two waits. Any other failure
+# is unreadable at once. The record lists every wait under
+# `rate_limit_waits`.
+#
+# If the waiting ever costs too much: the alternative that was considered and
+# not built is to repeat a rate-limited read with the workflow's own token,
+# since authenticated reads have their own, far larger allowance. It would
+# need criterion 9.9 amended, which says "through anonymous reads", the
+# record to say which reads were authenticated, and `GH_TOKEN` handed to the
+# posture step of `.github/workflows/rescan.yml`. The compared fields are the
+# same either way, since `bypass_actors` is withheld from this token as well.
+#
 # The comparison canonicalises by ruleset name over name, target,
 # enforcement, conditions and rules. Server-assigned fields (id, source,
 # source_type, node_id, _links, created_at, updated_at,
@@ -25,17 +46,20 @@
 # so a retired ruleset that returns is caught (review 3.9).
 #
 # Exit 1 on any failure; the record at <out.json> is what the workflow reads.
-# Seam for the tests: DHC_GITHUB_API (default https://api.github.com).
+# Seams for the tests: DHC_GITHUB_API (default https://api.github.com), and
+# the waiting is the external command `sleep`.
 set -uo pipefail
 DIR="${1:?usage: check-governance.sh <rulesets-dir> <owner/repo> <out.json>}"
 REPO="${2:?usage: check-governance.sh <rulesets-dir> <owner/repo> <out.json>}"
 OUT="${3:?usage: check-governance.sh <rulesets-dir> <owner/repo> <out.json>}"
 API="${DHC_GITHUB_API:-https://api.github.com}"
+MAX_WAIT="${DHC_GOVERNANCE_MAX_WAIT:-3900}"
 
-python3 - "$DIR" "$REPO" "$OUT" "$API" <<'PY'
-import glob, json, os, sys, urllib.error, urllib.request
+python3 - "$DIR" "$REPO" "$OUT" "$API" "$MAX_WAIT" <<'PY'
+import glob, json, os, subprocess, sys, time, urllib.error, urllib.request
 
 rulesets_dir, repo, out_path, api = sys.argv[1:5]
+max_wait = int(sys.argv[5])
 COMPARED = ("name", "target", "enforcement", "conditions", "rules")
 failures = []
 
@@ -49,8 +73,30 @@ def get(path):
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "dhc-pipeline check-governance (anonymous)",
     })
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.load(r)
+    for waited in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            h = e.headers
+            if e.code not in (403, 429) or not (h.get("x-ratelimit-remaining") == "0" or h.get("retry-after")):
+                raise
+            try:
+                if h.get("retry-after"):
+                    seconds = int(h["retry-after"]) + 5
+                else:
+                    seconds = max(0, int(h["x-ratelimit-reset"]) - int(time.time())) + 5
+            except (TypeError, ValueError):
+                raise RuntimeError("GitHub's anonymous rate limit is spent and the answer names no reset") from None
+            if seconds > max_wait:
+                raise RuntimeError(f"GitHub's anonymous rate limit is spent, its reset {seconds} seconds away, "
+                                   f"beyond the bound of {max_wait} seconds") from None
+            if waited == 2:
+                raise RuntimeError("GitHub's anonymous rate limit is still spent after two waits") from None
+            print(f"::warning::governance: {path}: GitHub's anonymous rate limit is spent, "
+                  f"waiting {seconds} seconds for its reset (Req 9.9)", flush=True)
+            record["rate_limit_waits"].append({"path": path, "seconds": seconds})
+            subprocess.run(["sleep", str(seconds)], check=True)
 
 def canon(v):
     if isinstance(v, dict):
@@ -90,7 +136,7 @@ def fmt(v):
         return json.dumps(v, sort_keys=True, separators=(",", ":"))
     return str(v)
 
-record = {"reporting": {"enabled": None, "ok": False}, "rulesets": [], "live_only": []}
+record = {"reporting": {"enabled": None, "ok": False}, "rulesets": [], "live_only": [], "rate_limit_waits": []}
 
 # Req 9.3: the reporting channel SECURITY.md names is switched on.
 try:

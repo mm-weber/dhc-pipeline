@@ -601,7 +601,17 @@ enforcement, conditions and rules, in both directions, with bypass actors
 outside the set because anonymous reads withhold them (the export carries
 them; `SECURITY.md` states the posture). The same step asserts that private
 vulnerability reporting is on (Req 9.3); either failing fails the run by
-name. `CODEOWNERS` names the maintainer per lane (Req 9.10), and
+name. Anonymous reads share GitHub's allowance of 60 an hour per network
+address, and a runner's address is shared with other customers, so a read
+can be answered "rate limit exceeded" through no fault of this repository.
+The script then waits for the reset the answer names (at most
+`DHC_GOVERNANCE_MAX_WAIT` seconds, 3900 by default, twice per read), says so
+in one warning line per wait, and reads again, still anonymously; only a
+read that stays limited fails the run, naming the rate limit. The rescan
+can therefore take up to about an hour longer on such a day. The
+alternative, repeating the read with the workflow's token, was not built:
+it needs criterion 9.9 amended, and the script's header says what else.
+`CODEOWNERS` names the maintainer per lane (Req 9.10), and
 `require_code_owner_review` in the export is the second-maintainer switch.
 
 ## Part III: Operating the catalogue
@@ -1494,7 +1504,7 @@ documentation — each states what it enforces and why it exists.
 | `render-tracking.sh` | `[--check] [root]` | Renders the active set into Renovate's ignore block; `--check` fails on drift (Req 1.14) |
 | `check-authenticity.sh` | `<root> <out.jsonl>` | Daily re-verification of every active definition's authenticity signal and the compat clocks (Req 3.10, 4.9) |
 | `check-attestation-count.sh` | `<enumeration.tsv> <out.json>` | Exactly one OpenVEX attestation on every tag-referenced digest and platform manifest (Req 6.44, 6.45) |
-| `check-governance.sh` | `<rulesets-dir> <owner/repo> <out.json>` | Committed rulesets against the live ones, both directions, and private vulnerability reporting, through anonymous reads (Req 9.3, 9.9) |
+| `check-governance.sh` | `<rulesets-dir> <owner/repo> <out.json>` | Committed rulesets against the live ones, both directions, and private vulnerability reporting, through anonymous reads; a rate-limited read waits for the reset and is made again (Req 9.3, 9.9) |
 | `check-revocations.sh` | `<revocations.yaml> <enumeration.tsv> <out.json>` | No catalogue tag references a revoked digest (Req 9.7) |
 | `check-inactive-digests.sh` | `<root> <enumeration.tsv> <previous-status.md> <out.json>` | No inactive definition gained a digest or a tag since the last published status (Req 1.15, the detective half) |
 | `fetch-sboms.sh` | `<root> <enumeration.tsv> <out-dir>` | The attested CycloneDX SBOMs of the supported set, read through verification against the declared identities (Req 6.58) |
