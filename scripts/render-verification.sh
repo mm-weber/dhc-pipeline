@@ -5,7 +5,9 @@
 # required predicate types (Req 7.7).
 #
 # Renders:
-#   - policies/verify-catalogue-images.yaml   (Kyverno verifyImages, Req 2.23)
+#   - policies/verify-catalogue-images.yaml   (Kyverno verifyImages, Req 2.23;
+#     with `release.provenance: required` it also holds the provenance
+#     attestation with the declared expectations as conditions, Req 2.28)
 #   - policies/restrict-registries.yaml       (Kyverno registry gate, Req 4.2;
 #     its allowed-image glob is `registry:`, so a fork's chart gate admits
 #     the fork's namespace; task 14.1)
@@ -34,7 +36,7 @@ POLICY_FILE="$ROOT/catalogue-policy.yaml"
 [ -f "$POLICY_FILE" ] || { echo "render-verification: no catalogue-policy.yaml under $ROOT" >&2; exit 1; }
 
 python3 - "$MODE" "$ROOT" "$POLICY_FILE" <<'PY'
-import os, sys, yaml
+import json, os, sys, yaml
 
 mode, root, policy_path = sys.argv[1], sys.argv[2], sys.argv[3]
 
@@ -59,6 +61,36 @@ if not aperture:
     sys.exit(2)
 registry, issuer = pol["registry"], pol["issuer"]
 roles, required = pol["roles"], pol["required"]
+
+# Req 2.28, ADR 0005 decision 5 as amended 2026-11-13: only the required mode
+# puts provenance into the admission policy, and then from the declared
+# expectations alone, never derived from the releaser's identity. The order is
+# the order of the rendered conditions; each field is a path inside the
+# predicate. A declaration that cannot serve ends the run here, before any
+# artifact is written, so no half-rendered tree can be committed.
+SLSA_V1 = "https://slsa.dev/provenance/v1"
+EXPECTATIONS = [
+    ("builder_identity", "runDetails.builder.id"),
+    ("build_type", "buildDefinition.buildType"),
+    ("source_repository", "buildDefinition.externalParameters.workflow.repository"),
+    ("workflow_path", "buildDefinition.externalParameters.workflow.path"),
+    ("ref", "buildDefinition.externalParameters.workflow.ref"),
+]
+provenance = None
+if (whole.get("release") or {}).get("provenance") == "required":
+    def refuse(key, why):
+        print(f"::error::render-verification: catalogue-policy.yaml {key} {why} (Req 2.28)", file=sys.stderr)
+        sys.exit(2)
+    provenance = pol.get("provenance")
+    if not isinstance(provenance, dict):
+        refuse("verification.provenance", "is missing, and release.provenance is required")
+    if provenance.get("predicate_type") != SLSA_V1:
+        refuse("verification.provenance.predicate_type", f"must be {SLSA_V1}")
+    expectations = provenance.get("expectations")
+    for name, _ in EXPECTATIONS:
+        value = expectations.get(name) if isinstance(expectations, dict) else None
+        if not isinstance(value, str) or not value:
+            refuse(f"verification.provenance.expectations.{name}", "must be a non-empty string")
 
 # cosign --type aliases to the predicateType URLs Kyverno matches on.
 PREDICATE = {
@@ -126,6 +158,18 @@ for alias in ["spdxjson", "openvex", "cyclonedx", "vuln"]:
     parts.append(f"            - type: {PREDICATE[alias]}\n              attestors:\n{head}")
     for role in att[alias]:
         parts.append(keyless(role, 20))
+if provenance:
+    # The releaser alone attests provenance (ADR 0005). Values are quoted as
+    # JSON strings, which YAML reads as the same string whatever they hold.
+    parts.append(f"            - type: {SLSA_V1}\n              attestors:\n                - entries:\n")
+    parts.append(keyless(sig_role, 20))
+    parts.append("              conditions:\n                - all:\n")
+    for name, field in EXPECTATIONS:
+        parts.append(
+            f'                    - key: "{{{{ {field} }}}}"\n'
+            f"                      operator: Equals\n"
+            f"                      value: {json.dumps(provenance['expectations'][name], ensure_ascii=False)}\n"
+        )
 kyverno_text = "".join(parts)
 
 rel = roles[sig_role]["identity"]
