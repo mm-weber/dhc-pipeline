@@ -257,7 +257,7 @@ Overview state the substrate attribution ("hardening substrate by Docker
 Hardened Images...; this catalogue contributes the operating model",
 critique:1180-1184). Task 13.1 changes CLAUDE.md and calls it "the last
 remaining occurrence" (tasks.md:336). Measured: README.md:3 opens with "A
-miniature [Docker Hardened Images](...)-style" (the same label construct,
+miniature `[Docker Hardened Images](...)`-style" (the same label construct,
 spelled out, in the document (c) names first), design.md:5 and
 requirements.md:5 both carry "miniature DHI-style hardened-image catalogue",
 and no task rewrites any of them or adds the attribution sentence; grep shows
