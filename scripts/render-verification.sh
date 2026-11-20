@@ -13,7 +13,10 @@
 #     the fork's namespace; task 14.1)
 #   - the fenced consumer snippet between
 #       <!-- render-verification:begin --> / <!-- render-verification:end -->
-#     in README.md and docs/user-manual.md   (Req 2.25)
+#     in README.md and docs/user-manual.md   (Req 2.25); with
+#     `release.provenance` report or required it holds the provenance step
+#     over the declared expectations, otherwise one line saying that
+#     releases attest none (Req 2.30)
 #
 # --check re-renders and fails naming each committed artifact that differs
 # (Req 7.9): validate.yml runs this on every PR, so a hand edit to a rendered
@@ -66,8 +69,11 @@ roles, required = pol["roles"], pol["required"]
 # puts provenance into the admission policy, and then from the declared
 # expectations alone, never derived from the releaser's identity. The order is
 # the order of the rendered conditions; each field is a path inside the
-# predicate. A declaration that cannot serve ends the run here, before any
-# artifact is written, so no half-rendered tree can be committed.
+# predicate. The consumer snippet's provenance step compares the same five
+# under report and required (Req 2.25, ADR 0005 decision 2); a mode that is
+# neither, or no key at all, reads as off. A declaration that cannot serve
+# ends the run here, before any artifact is written, so no half-rendered tree
+# can be committed.
 SLSA_V1 = "https://slsa.dev/provenance/v1"
 EXPECTATIONS = [
     ("builder_identity", "runDetails.builder.id"),
@@ -77,13 +83,14 @@ EXPECTATIONS = [
     ("ref", "buildDefinition.externalParameters.workflow.ref"),
 ]
 provenance = None
-if (whole.get("release") or {}).get("provenance") == "required":
+prov_mode = (whole.get("release") or {}).get("provenance")
+if prov_mode in ("report", "required"):
     def refuse(key, why):
-        print(f"::error::render-verification: catalogue-policy.yaml {key} {why} (Req 2.28)", file=sys.stderr)
+        print(f"::error::render-verification: catalogue-policy.yaml {key} {why} (Req 2.25, 2.28)", file=sys.stderr)
         sys.exit(2)
     provenance = pol.get("provenance")
     if not isinstance(provenance, dict):
-        refuse("verification.provenance", "is missing, and release.provenance is required")
+        refuse("verification.provenance", f"is missing, and release.provenance is {prov_mode}")
     if provenance.get("predicate_type") != SLSA_V1:
         refuse("verification.provenance.predicate_type", f"must be {SLSA_V1}")
     expectations = provenance.get("expectations")
@@ -158,7 +165,7 @@ for alias in ["spdxjson", "openvex", "cyclonedx", "vuln"]:
     parts.append(f"            - type: {PREDICATE[alias]}\n              attestors:\n{head}")
     for role in att[alias]:
         parts.append(keyless(role, 20))
-if provenance:
+if prov_mode == "required":
     # The releaser alone attests provenance (ADR 0005). Values are quoted as
     # JSON strings, which YAML reads as the same string whatever they hold.
     parts.append(f"            - type: {SLSA_V1}\n              attestors:\n                - entries:\n")
@@ -204,6 +211,25 @@ else:
         'cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" \\',
         "  | jq -r '.payload | @base64d | fromjson | .predicate' > openvex.json   # VEX, compiled per digest",
     ]
+# The provenance step (Req 2.25, 2.30): cosign holds the signer to the releaser,
+# jq holds one statement to all five declared values. `-s` with `any` so that
+# several statements pass on one that meets the five and no statement at all
+# fails; the values are JSON string literals, which jq reads as written.
+if provenance:
+    wanted = " and ".join(
+        f".predicate.{field} == {json.dumps(provenance['expectations'][name], ensure_ascii=False)}"
+        for name, field in EXPECTATIONS
+    )
+    snip += [
+        "# SLSA provenance (Req 2.25): every digest released while the provenance mode is not off carries it. A digest",
+        "# released before that carries none until its definition is released again; the catalogue status issue names",
+        "# the verification policy above admits no image without it." if prov_mode == "required" else "# the supported digests that lack it.",
+        'cosign verify-attestation $ISSUER $BUILD --type slsaprovenance1 "$REF" \\',
+        "  | jq -r '.payload | @base64d' \\",
+        f"  | jq -es 'any(.[]; {wanted})'   # SLSA provenance: signed by the release workflow, and built from this repository, workflow file and ref",
+    ]
+else:
+    snip.append("# Releases attest no SLSA provenance while release.provenance is off (Req 2.30); there is no step to run.")
 # One scan step per declared consumer, the authoritative one first (Req 9.11).
 # The scanners suppress a not_affected or fixed statement and show it as such;
 # an affected statement (an accepted risk) suppresses nothing, by design.
@@ -221,8 +247,8 @@ for c in ordered:
     tag = "# authoritative consumer" if c.get("authoritative") else "# declared consumer, informational"
     snip.append(f"{cmd:<83}{tag}")
 snip += [
-    "# BuildKit provenance is attached at build time and is not verified by the",
-    "# policy above (Req 2.25); inspect it with the buildx CLI plugin:",
+    "# BuildKit provenance is attached at build time as supplementary detail; no policy verifies it",
+    "# (Req 2.25). Inspect it with the buildx CLI plugin:",
     "docker buildx imagetools inspect \"$REF\" --format '{{ json .Provenance }}'",
     "```",
 ]

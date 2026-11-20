@@ -182,10 +182,16 @@ cosign verify-attestation $ISSUER $BUILD --type spdxjson "$REF" \
 { cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" 2>/dev/null \
   || cosign verify-attestation $ISSUER $RESCAN --type openvex "$REF"; } \
   | jq -r '.payload | @base64d | fromjson | .predicate' > openvex.json   # VEX: releaser or re-attester
+# SLSA provenance (Req 2.25): every digest released while the provenance mode is not off carries it. A digest
+# released before that carries none until its definition is released again; the catalogue status issue names
+# the supported digests that lack it.
+cosign verify-attestation $ISSUER $BUILD --type slsaprovenance1 "$REF" \
+  | jq -r '.payload | @base64d' \
+  | jq -es 'any(.[]; .predicate.runDetails.builder.id == "https://github.com/mm-weber/dhc-pipeline/.github/workflows/build.yml@refs/heads/main" and .predicate.buildDefinition.buildType == "https://actions.github.io/buildtypes/workflow/v1" and .predicate.buildDefinition.externalParameters.workflow.repository == "https://github.com/mm-weber/dhc-pipeline" and .predicate.buildDefinition.externalParameters.workflow.path == ".github/workflows/build.yml" and .predicate.buildDefinition.externalParameters.workflow.ref == "refs/heads/main")'   # SLSA provenance: signed by the release workflow, and built from this repository, workflow file and ref
 trivy image --vex openvex.json --show-suppressed --severity CRITICAL,HIGH "$REF"   # authoritative consumer
 grype "$REF" --vex openvex.json                                                    # declared consumer, informational
-# BuildKit provenance is attached at build time and is not verified by the
-# policy above (Req 2.25); inspect it with the buildx CLI plugin:
+# BuildKit provenance is attached at build time as supplementary detail; no policy verifies it
+# (Req 2.25). Inspect it with the buildx CLI plugin:
 docker buildx imagetools inspect "$REF" --format '{{ json .Provenance }}'
 ```
 <!-- render-verification:end -->
