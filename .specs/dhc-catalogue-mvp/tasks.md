@@ -546,7 +546,8 @@
     - _Requirements: Req 9.20, Req 9.21_
   - [ ] 19.2 The lanes document and the SLSA provenance lane, the pattern for the others
     - _Requirements: Req 9.21_
-  - [ ] 19.3 The link check in validate: a pinned link checker, offline, every tracked Markdown file, relative links and heading anchors; green on main; a broken link drilled red
+  - [x] 19.3 The link check in validate: a pinned link checker, offline, every tracked Markdown file, relative links and heading anchors; green on main; a broken link drilled red
+    - 2026-11-20 done (#430): lychee 0.24.2 through `install-tool.sh`, with a Renovate rule for its `lychee-v` tags; the one broken link on main repaired; the drill red at the link step alone (run 44803253992), green again after the revert (run 44803406409)
     - _Requirements: Req 9.20, Req 7.5_
   - [ ] 19.4 The archive: `docs/archive/` with its README, the review rounds, the closed todo items, the working notes of `concepts.md`
     - _Requirements: Req 9.20_
