@@ -220,10 +220,18 @@ if provenance:
         f".predicate.{field} == {json.dumps(provenance['expectations'][name], ensure_ascii=False)}"
         for name, field in EXPECTATIONS
     )
+    snip.append("# SLSA provenance (Req 2.25): every digest released while the provenance mode is not off carries it. A digest")
+    if prov_mode == "required":
+        snip += [
+            "# released before that carries none until its definition is released again, and the verification policy above",
+            "# admits no image without it.",
+        ]
+    else:
+        snip += [
+            "# released before that carries none until its definition is released again; the catalogue status issue names",
+            "# the supported digests that lack it.",
+        ]
     snip += [
-        "# SLSA provenance (Req 2.25): every digest released while the provenance mode is not off carries it. A digest",
-        "# released before that carries none until its definition is released again; the catalogue status issue names",
-        "# the verification policy above admits no image without it." if prov_mode == "required" else "# the supported digests that lack it.",
         'cosign verify-attestation $ISSUER $BUILD --type slsaprovenance1 "$REF" \\',
         "  | jq -r '.payload | @base64d' \\",
         f"  | jq -es 'any(.[]; {wanted})'   # SLSA provenance: signed by the release workflow, and built from this repository, workflow file and ref",
