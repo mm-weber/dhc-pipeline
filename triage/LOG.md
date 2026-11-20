@@ -4595,3 +4595,55 @@ takes a step down the retirement table.
 **What this unblocks.** The build-layer round, #393, can go green with grafana
 included once these entries are on main. The 13.1.9 bump follows and retires the
 first entry. Neither waits on the other.
+
+## 2026-11-20: SLSA provenance on every release, the evidence of task group 18 (#414, #421, #422, #423, #425, #426)
+
+*Images: all seven. Track slsa-build-l2_20261028, phases 2 to 6, built test-first
+on the owner's go per phase between 2026-11-13 and 2026-11-20.*
+
+**What changed for a consumer.** Every release since 2026-11-18 carries, beside
+its signature and its SBOM, scan-report and OpenVEX attestations, one SLSA
+provenance statement per index and platform manifest. GitHub's provenance
+service generates it from the release job's signed identity token, so who
+built, from which repository, workflow file, ref and commit, comes from the
+platform and from no value the job's own steps write; it is signed under the
+release workflow's identity. The README's recipe gained the step that verifies
+it: cosign for the signer, then jq for the five expectations the policy file
+declares under `verification.provenance`.
+
+**The reads.**
+
+| What | Run or record | Result |
+|---|---|---|
+| First release with the statement (push) | build 44353893731, 2026-11-18 | all seven images, a provenance layer beside the index and both platform manifests, every other attestation kept, tags after the self-check; hardened-app's statement names the run's own commit 55787b2 |
+| First dispatched release | build 44406052456 | the same; event `workflow_dispatch` |
+| Kyverno over the released digest | spike 44411812054 on #401 | admitted with the five expectations, index and both platforms; a ref that was not built refused |
+| Coverage in the status | rescan 44644239646 | "21 of 21" in the issue and the data; the run red on the posture step's ruleset read, GitHub's anonymous rate limit, fixed since by #424 |
+| The rendered `required` rule | spike 44749286832 on #401 | the digest with provenance admitted, hardened-app 0.1.0 (released before) rejected for the missing provenance attestation; under `report` both admitted |
+| The `off` position | #425; build 44763409487; rescan 44764641823 | valkey-compat released with every other attestation and no statement; the status said provenance is off |
+| Back to `report` | #426; build 44774440142 | valkey-compat released again, the statement back |
+
+**The claim.** `SECURITY.md` claims Build L1, measured against SLSA v1.2, and
+names the provenance of L2 grade beside it. The level is claimed only where the
+verification policy demands it, and this repository's mode is `report`: its
+policy admits an image without provenance, because the digests released before
+2026-11-18 carry none and provenance cannot be attested after the fact. The
+successor declares `required` from its first release and claims Build L2 from
+there (task 12.1); ledger row 2.28 waits for that first daily proof.
+
+**What the work found on the way.** The code review of #414 found ten points,
+seven built (among them: a later statement of another kind hid the provenance
+statement; a broken bundles file ended in a tool's raw error; a second writer
+to the same attestation manifest was not seen; the self-check stopped at the
+first failing digest). The test agents found two worse cases than the review
+named, both fixed before the merge: a broken line standing before the valid
+bundle was skipped in a green run, and a bundle without its log id was stored
+with a false one. The rescan's red run of 2026-11-20 was traced to GitHub's
+anonymous rate limit, which belongs to the runner's shared address; the
+governance read now waits for the reset (#424).
+
+**Carried, nothing to build.** The first scheduled release with the statement
+waits for the first day a scheduled rebuild differs from the released digest;
+the first scheduled rescan in the mode `report` reads the coverage line on a
+schedule; the spike's scratch package `ghcr.io/mm-weber/slsa-spike`, pull
+request #401 and its branch are the owner's to remove.
