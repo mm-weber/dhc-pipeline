@@ -1663,7 +1663,7 @@ floating tag with a shell attached. Installs run as the runner user into
 Two installers, deliberately siblings rather than one generalisation:
 `install-scanners.sh` has the tested contract "both scanners (trivy, grype)
 verified before either installs", which the gate depends on;
-`install-tool.sh <kind|kyverno|helm|ct|syft|crane|vexctl|cosign>` installs exactly one tool per call,
+`install-tool.sh <kind|kyverno|helm|ct|syft|crane|vexctl|cosign|lychee>` installs exactly one tool per call,
 including helm's nested-tarball member and ct's `etc/` lint configs from the
 same verified bytes. The checksum control varies by ecosystem, chosen rather
 than uniform: recorded sha256 for release binaries (the two scripts), the Go
