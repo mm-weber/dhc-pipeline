@@ -47,9 +47,12 @@ release:
   # boolean to one of the two YAML readers in play, so
   # scripts/release-policy.sh returns the text as written and refuses
   # anything outside the three. Task 18.7 (track slsa-build-l2_20261028,
-  # Decision 13's switch rule) sets it to off here for one dispatched
-  # release and one rescan on 2026-11-20, and back to report the same day.
-  provenance: off
+  # Decision 13's switch rule) set it to off for one dispatched release,
+  # build run 44763409487 of 2026-11-20 (valkey-compat released with its
+  # signature and every other attestation and no provenance statement), and
+  # one rescan, run 44764641823, whose status said that provenance is off;
+  # report again here the same day.
+  provenance: report
   # Req 2.14's daily rebuild cron; task 9.2 wires it into build.yml as the
   # literal GitHub requires, and lint-workflow-policy keeps the two equal.
   # Before the 06:17 rescan so the rescan sees fresh digests.
