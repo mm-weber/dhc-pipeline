@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install-tool.sh <kind|kyverno|helm|ct|syft|crane|vexctl|cosign> [<destdir>]
+# install-tool.sh <kind|kyverno|helm|ct|syft|crane|vexctl|cosign|lychee> [<destdir>]
 #
 # Install one workflow tool pinned to an exact version and verified against a
 # sha256 recorded in this file (Req 7.5, docs/CONVENTIONS.md "Pinning").
@@ -13,8 +13,8 @@
 # invocation: kind provisions the e2e cluster (e2e.yml), kyverno is the
 # policy engine behind the Req 4.6 gate (chart.yml, validate.yml), helm
 # renders and installs the charts (chart.yml, e2e.yml), ct lints the owned
-# charts (chart.yml). All run with the same runner privileges as the
-# scanners, and a version pin alone does not survive re-publication of a tag
+# charts (chart.yml), lychee checks the docs' links (validate.yml). All run
+# with the same runner privileges as the scanners, and a version pin alone does not survive re-publication of a tag
 # we already adopted — CVE-2026-33634's shape (see install-scanners.sh).
 #
 # What it replaces: kyverno arrived by `curl … | tar -xz -C /usr/local/bin`
@@ -92,6 +92,10 @@ VEXCTL_SHA256="d315e2778af88b999ad4bba30a08aa2677ed701638e16c341b6d57b43c1e064d"
 # renovate: datasource=github-releases depName=sigstore/cosign
 COSIGN_VERSION="2.6.5"
 COSIGN_SHA256="c3b4f5410e608af03a5eb0aaac84a4313d8da131248e08ff1759ac70c79d1644"
+
+# renovate: datasource=github-releases depName=lycheeverse/lychee
+LYCHEE_VERSION="0.24.2"
+LYCHEE_SHA256="73657a111819a30c47c08352896796f23d64e4eb2b3ed39b6d32149241566fc5"
 
 err() { printf '::error::install-tool: %s\n' "$1" >&2; }
 
@@ -198,8 +202,21 @@ case "$TOOL" in
     member=""
     extras=""
     ;;
+  lychee)
+    # Checks relative links and heading anchors in every tracked Markdown
+    # file, offline (validate.yml, Req 9.20). lychee's releases are tagged
+    # lychee-v<ver> (the library's lychee-lib-v<ver>), not v<ver>; the asset
+    # name carries no version and nests the binary in a subdirectory.
+    version="$LYCHEE_VERSION"
+    shipped="$LYCHEE_SHA256"
+    asset="lychee-x86_64-unknown-linux-musl.tar.gz"
+    url="${BASE_URL}/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/${asset}"
+    tarball=yes
+    member="lychee-x86_64-unknown-linux-musl/lychee"
+    extras=""
+    ;;
   *)
-    err "usage: install-tool.sh <kind|kyverno|helm|ct|syft|crane|vexctl|cosign> [<destdir>], got '${TOOL}'"
+    err "usage: install-tool.sh <kind|kyverno|helm|ct|syft|crane|vexctl|cosign|lychee> [<destdir>], got '${TOOL}'"
     exit 1
     ;;
 esac

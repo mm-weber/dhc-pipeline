@@ -433,8 +433,8 @@ check(
   // enumeration (9.3), vexctl with the rescan's re-attestation merge (10.3),
   // tag enumeration (task 9.3), cosign with review D4 (it arrived through an
   // installer action with a version and no checksum, and no manager matched
-  // its line; register row P1).
-  check("tool pins: install-tool.sh yields exactly eight deps", pins.length === 8, `${pins.length}`);
+  // its line; register row P1), lychee with validate's link check (Req 9.20).
+  check("tool pins: install-tool.sh yields exactly nine deps", pins.length === 9, `${pins.length}`);
 
   for (const [tool, depName] of [
     ["kind", "kubernetes-sigs/kind"],
@@ -445,6 +445,7 @@ check(
     ["crane", "google/go-containerregistry"],
     ["vexctl", "openvex/vexctl"],
     ["cosign", "sigstore/cosign"],
+    ["lychee", "lycheeverse/lychee"],
   ]) {
     const dep = pins.find((d) => d.depName === depName);
     check(`tool pins: ${tool} is tracked as ${depName}`, !!dep);
