@@ -164,8 +164,12 @@ manifest) and carries attestations bound to its digests: on every platform
 manifest an SPDX SBOM, a CycloneDX SBOM, the release-time scan report and
 the OpenVEX document; on the index each platform's SPDX SBOM and the same
 OpenVEX document (Req 2.9, 6.4; the index is what a tag resolves to, so
-admission is checked there). BuildKit SLSA provenance is attached by the
-build itself (Req 2.2). All signing is cosign keyless via GitHub OIDC —
+admission is checked there). Unless `release.provenance` is `off`, the index
+and each platform manifest also carry a SLSA provenance statement generated
+by GitHub's provenance service and signed under the release workflow's
+identity (Req 2.27); the recipe below verifies it. BuildKit's own provenance
+is attached by the build itself (Req 2.2) as supplementary detail that no
+policy verifies. All signing is cosign keyless via GitHub OIDC:
 verification pins the workflow identity, not a key:
 
 <!-- render-verification:begin -->
@@ -855,6 +859,34 @@ opening paragraph quotes it verbatim from there, so the statement and the
 status cannot disagree. A Pages dashboard, if one is ever wanted, is
 presentation over that JSON and nothing else.
 
+### What a provenance statement has to say
+
+Being signed by the release workflow is half of it: cosign answers who
+signed. The other half is what the statement says about the build, and the
+policy file declares it once, under `verification.provenance` (task 18.5;
+Req 2.28; ADR 0005, decision 5): the predicate type and five expectations,
+each compared for equality with one field of the statement.
+
+| Expectation | Field of the statement | Says |
+|---|---|---|
+| `builder_identity` | `runDetails.builder.id` | which workflow built, at which ref |
+| `build_type` | `buildDefinition.buildType` | that a GitHub workflow run wrote it |
+| `source_repository` | `...externalParameters.workflow.repository` | whose workflow file was run |
+| `workflow_path` | `...externalParameters.workflow.path` | which of its workflow files |
+| `ref` | `...externalParameters.workflow.ref` | from which branch the file was taken |
+
+Four readers take the five from there and derive none: the release's
+self-check and the rescan's coverage (`check-provenance.sh`), the consumer
+recipe in the README and here, which the daily smoke test runs verbatim,
+and the Kyverno rule. That rule is rendered into
+`policies/verify-catalogue-images.yaml` only where `release.provenance` is
+`required`: one more attestation of the image entry, admitted from the
+releaser alone, with the five as conditions. Under `report`, this
+repository's mode, the cluster policy asks for no provenance, since digests
+released before the provenance steps existed carry none. A declaration that
+lacks a value, or holds one that is no string, is refused by name by each
+reader that needs it.
+
 ### Provenance coverage in the status
 
 Unless `release.provenance` is `off`, every rescan asks each supported
@@ -1414,7 +1446,8 @@ docker buildx build -f image/hardened-app/image.yaml image/hardened-app/
   overlap; the action runs the full Renovate image, which installs the Go
   version `go.mod` names for the `gomod` manager's tidy (review D4).
 - **Forking:** the declared values live in `catalogue-policy.yaml` (the
-  registry namespace, the active set, the verification identities, the
+  registry namespace, the active set, the verification identities and the
+  provenance expectations that go with the releaser's identity, the
   clocks, the consumers); the rendered artifacts follow them by re-running
   `scripts/render-verification.sh` and `scripts/render-tracking.sh`. Two
   files carry the namespace as literals a fork edits once by hand:
@@ -1462,7 +1495,7 @@ documentation — each states what it enforces and why it exists.
 | `release-policy.sh` | `<root> <query>` | The one reader of the policy's `release` section, the page switch included; a misspelt switch is a refusal (Req 2.13, 2.14, 2.17, 6.61, 7.7) |
 | `unpack-provenance.sh` | `store <bundles> <repository> <digest>…` / `subjects <repository> <digest>…` | Names the provenance subjects for the action, and stores GitHub's signed provenance statement as one more layer of cosign's attestation manifest beside each digest; signs nothing (Req 2.27) |
 | `check-provenance.sh` | `verify <root> <image@sha256:digest>`; `report <root> <image@sha256:digest>...`; `require <root> <image@sha256:digest>...` | `verify` is the release's self-check: cosign under the declared issuer and build identity, then the statement's builder identity, build type, source repository, workflow path and ref; exit 1 for a statement that fails, exit 2 when the check could not be made (Req 2.9, 2.28). `report` and `require` ask the same of several references for the rescan and print one line each, `covered` or `uncovered` with the reason: `report` ends with 0 whatever the answers, `require` with 1 after the last reference when one is not covered; both end with 2, before any reference is asked, when the check cannot be made (Req 2.29) |
-| `render-verification.sh` | `[--check] [root]` | Renders the two Kyverno policies and the consumer recipe from the policy file; `--check` fails on drift (Req 7.8, 7.9) |
+| `render-verification.sh` | `[--check] [root]` | Renders the two Kyverno policies and the consumer recipe from the policy file, the provenance rule where `release.provenance` is `required` and the provenance step unless it is `off`; `--check` fails on drift (Req 7.8, 7.9, 2.25, 2.28) |
 | `render-tracking.sh` | `[--check] [root]` | Renders the active set into Renovate's ignore block; `--check` fails on drift (Req 1.14) |
 | `check-authenticity.sh` | `<root> <out.jsonl>` | Daily re-verification of every active definition's authenticity signal and the compat clocks (Req 3.10, 4.9) |
 | `check-attestation-count.sh` | `<enumeration.tsv> <out.json>` | Exactly one OpenVEX attestation on every tag-referenced digest and platform manifest (Req 6.44, 6.45) |
@@ -1473,7 +1506,7 @@ documentation — each states what it enforces and why it exists.
 | `reattest.sh` | `<root> <enumeration.tsv> <out-dir>` | Attests today's scan reports and re-attests each digest's OpenVEX document on change, replacing (Req 6.42, 6.43) |
 | `vex-consumer.sh` | `<consumer> <out.jsonl> --root <dir> (--report <trivy.json> \| --scan <ref> …)` | One adapter per declared consumer, emitting the normalised suppression shape (Req 9.11) |
 | `vex-portability.sh` | `--root <dir> --label <l> --out <md> --json <auth.jsonl> [<other.jsonl>…]` | The portability block: agree, DIVERGENCE, absent per statement and consumer (Req 9.12) |
-| `consumer-smoke.sh` | `--root <dir> --readme <file> --ref <digest> --out <md> --json <f>` | The README's verify recipe run verbatim against one supported digest (Req 9.13) |
+| `consumer-smoke.sh` | `--root <dir> --readme <file> --ref <digest> --out <md> --json <f>` | The README's verify recipe run verbatim against one supported digest, the provenance step among its steps; the report names each step with its result (Req 9.13) |
 
 ### Renovate managers
 
