@@ -662,11 +662,17 @@ left of the program is the follow-up list below, one decision each.
       (21 / 90) stay in the status issue and the page, carried from the
       previous data, after the definition left the catalogue. Drop or mark
       rows whose repository no definition declares; its own pull request.
-- [ ] The governance read before the run's API budget is spent (found by
-      16.16, 2026-11-08): the posture step runs last and its two governance
-      reads met GitHub's primary rate limit (run 42461602452), which the
-      reader does not wait out by design; read them early in the run, or
-      retry after the limit's reset; its own pull request.
+- [x] The governance read met GitHub's rate limit (found by 16.16,
+      2026-11-08, run 42461602452; again on 2026-11-20, run 44644239646).
+      Read again on 2026-11-20: the reads are anonymous by criterion 9.9,
+      and the anonymous allowance (60 an hour) belongs to the runner's
+      network address, which other customers share; the run does not
+      spend it itself, so reading earlier would not have helped. Built at
+      the owner's call of that day: `check-governance.sh` waits for the
+      reset the answer names and reads again, anonymously (bounded,
+      twice per read, test first). Not built and written down for a later
+      switch, in the script's header and the manual: repeating the read
+      with the workflow's token, which needs criterion 9.9 amended.
 - [x] 6.55 defect: the attested scan reports carried empty `scanner.db.uri` and
       `scanner.db.version` (trivy convert leaves them empty; measured
       2026-09-27 and 2026-10-08). FIXED 2026-11-08 in #382, test-first in four
