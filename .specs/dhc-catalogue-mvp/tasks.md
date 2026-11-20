@@ -541,6 +541,22 @@
     - The first release after 18.3 read: each digest's provenance verified with ADR 0005's verifier and the declared expectations, the predicate's fields recorded; the first rescan after 18.4 read (the coverage line); an offline must-reject: the rendered policy with provenance required, applied locally (`kyverno apply`) to one pre-18.3 supported digest, rejecting it by name, and to one post-18.3 digest, admitting it; one release with the mode `off` through a normal pull request and back the same day (Decision 13's switch rule): the digest released with every other signature and attestation and no provenance attestation, the rescan's line stating that provenance is off; ledger rows 2.27 and 2.29 exercised, 2.30 exercised by that flip, 9.19 measured present, 2.28 left to the successor's first proof (12.1); the LOG entry
     - _Requirements: Req 2.27, Req 2.28, Req 2.29, Req 2.30, Req 7.11, Req 9.19_
 
+- [ ] 19. The documentation consolidated, every lane drawn (Req 9.20, 9.21; design Decision 16; the owner's calls of 2026-11-20: Mermaid in the Markdown, working notes to one archive folder, overlapping documents merged into fewer, the SLSA lane first). Executes before task 12; one pull request per task; conductor track docs-consolidation_20261120
+  - [ ] 19.1 Spec amendment: 9.20 and 9.21, Decision 16, this group, ledger rows 9.20 and 9.21 (unexercised, each with its reason)
+    - _Requirements: Req 9.20, Req 9.21_
+  - [ ] 19.2 The lanes document and the SLSA provenance lane, the pattern for the others
+    - _Requirements: Req 9.21_
+  - [ ] 19.3 The link check in validate: a pinned link checker, offline, every tracked Markdown file, relative links and heading anchors; green on main; a broken link drilled red
+    - _Requirements: Req 9.20, Req 7.5_
+  - [ ] 19.4 The archive: `docs/archive/` with its README, the review rounds, the closed todo items, the working notes of `concepts.md`
+    - _Requirements: Req 9.20_
+  - [ ] 19.5 The merges and the contradictions, as Decision 16 places them
+    - _Requirements: Req 9.1, Req 9.15, Req 9.20_
+  - [ ] 19.6 The other lanes, and the stale diagrams retired
+    - _Requirements: Req 9.21_
+  - [ ] 19.7 Evidence: ledger rows 9.20 and 9.21, the LOG entry
+    - _Requirements: Req 7.11, Req 9.20, Req 9.21_
+
 ## Requirements Coverage
 
 | Requirement | Covered By Tasks |
@@ -552,7 +568,7 @@
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7, 14.3, 17.1, 17.2, 17.3, 17.4 |
 | Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5, 9.1, 9.3, 10.1, 10.2, 10.3, 10.4, 10.6, 10.7 |
 | Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5, 14.1, 16.1 to 16.16, 17.1, 17.2, 17.4, 18.1, 18.3, 18.5, 18.7 |
-| Req 9: Catalogue Posture | 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 18.1, 18.6, 18.7 |
+| Req 9: Catalogue Posture | 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 18.1, 18.6, 18.7, 19.1 to 19.7 |
 
 Requirement 8 was retired whole on 2026-08-26 (primitives pass, finding 5.8): its guidance
 lives in CLAUDE.md, design.md and CONVENTIONS.md, and its coverage row went with it.
@@ -562,6 +578,8 @@ Task group 16 (live drills) adds one criterion, 7.11; its other tasks exercise m
 Task group 17 (proof kinds) amends 5.8 and 7.7 and adds 5.9 and 5.10; 16.2 and 16.15 exercise the new criteria live, so their rows in the ledger read drill 16.2 and drill 16.15.
 
 Task group 18 (SLSA Build L2) amends 2.9, 2.10, 2.23, 2.25 and 7.7 and adds 2.27 to 2.30 and 9.19 (2.30 with the amendment of 2026-11-11: one provenance mode, `off`, `report` or `required`); the mode is `required` only from the successor's first release, so 2.28's ledger row waits for task 12.1.
+
+Task group 19 (the documentation) adds 9.20 and 9.21 and changes no behaviour of a script or workflow beyond the one validate step of 19.3.
 
 Task group 12 (greenfield successor) adds no new criterion: it executes the dated F9
 re-decision of 2026-08-25 (revised the same day to the successor mechanism) rather than

@@ -8,6 +8,14 @@
 
 ## Active tracks
 
+### [~] docs-consolidation_20261120: The documentation consolidated, every lane drawn with the decisions behind it
+
+**Description:** Every lane of the pipeline drawn as one Mermaid graph whose steps name the criterion and decision they rest on, the SLSA provenance lane first; the working notes moved to `docs/archive/`; overlapping documents merged into fewer, each topic explained once and the contradictions fixed; relative links checked in the pull request gate (Req 9.20, 9.21; design Decision 16; task group 19).
+**Priority:** high (the successor is seeded from this tree, task 12.1)
+**Folder:** [./tracks/docs-consolidation_20261120/](./tracks/docs-consolidation_20261120/)
+
+---
+
 ### [~] reactivate-grafana_20261110: Grafana returns to the active set, the fix rung reopened
 
 **Description:** Grafana returns to `active_set` by the same switch that removed it on 2026-10-19: the line back, the tracking block re-rendered, the live-state case moved to seven by four test-first, the README and manual rows and the LOG entry in the same pull request; the fix rung reopens for the three undecided HIGH findings on the frozen digest and for the nine transfers of 2026-10-13, whose exit the released 13.1.x line now carries; the first active day and the bot's bump read in a second pull request.

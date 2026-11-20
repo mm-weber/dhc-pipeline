@@ -583,6 +583,11 @@ left of the program is the follow-up list below, one decision each.
         digest (the spike workflow serves it once more): delete the
         package `ghcr.io/mm-weber/slsa-spike` (the workspace token cannot);
         #401 to be shut unmerged; delete branch `slsa-spike`.
+- [ ] The documentation consolidated, task group 19 (opened 2026-11-20, conductor
+      track docs-consolidation_20261120): the owner's calls of that day, Mermaid
+      graphs in the Markdown, working notes to `docs/archive/`,
+      overlapping documents merged into fewer, the SLSA lane drawn first.
+      Seven pull requests by the plan; phase 0 is the track itself.
 - [ ] Kyverno's `kyverno.io/v1` ClusterPolicy is deprecated (seen by 18.2,
       2026-11-11): Kyverno 1.19.2 prints on every `kyverno apply` that the
       kind "will be removed in a future release" in favour of its newer
