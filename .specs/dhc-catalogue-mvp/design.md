@@ -1158,6 +1158,46 @@ graph TB
       gate. ADR 0005 is amended the same day: no second `verifyImages` entry; the existing
       one gains the provenance attestation where the mode is `required`.
 
+16. **The documentation map: each topic explained once, every lane drawn with its decisions, the working notes archived (Req 9.20, 9.21; decided 2026-11-20, the owner's four calls)**
+    - **Context**: on 2026-11-20 the repository explained itself in about 30 reader documents
+      beside 33 review files, the release and rescan steps in four places, upstream tracking in
+      five, the triage treatments in four. Copies had drifted (the Renovate cadence stated as
+      Req 3.1's bound in four documents and as the configured cron in four others, a stack file
+      four tool versions and one design decision behind, a loop document counting four
+      definitions of seven), and every diagram predated the provenance steps. The successor is
+      seeded from this tree (task 12.1), so what is cut here is what it inherits.
+    - **Options, as put to the owner**: the graphs as Mermaid inside the Markdown (chosen: GitHub
+      draws them, they diff as text, a fork edits them like prose), as committed SVG files (best
+      looking, redrawn by hand at every change), or as a page published outside the repository
+      (interactive, not inherited by the successor); the working notes moved to one archive
+      folder (chosen), left in place behind a reader's guide, or deleted with git history as the
+      record; the duplication cut by merging documents into fewer (chosen), by one home per topic
+      with the other copies reduced to links, or not at all; the first lane drawn SLSA provenance
+      (chosen: its requirement, decision, measurements, ADR and plan each exist once and cite each
+      other), upstream tracking or the rescan.
+    - **Decision, the map**:
+
+      | Topic | Its one home | What the other documents keep |
+      |---|---|---|
+      | What runs, in which lane, and why | `docs/lanes.md`, one Mermaid graph per lane and a lane map | the manual explains each step; design.md's flows link their lane |
+      | What the catalogue promises, its SLSA claim | `SECURITY.md` | the README, one paragraph and the link |
+      | Verifying an image | the README's rendered block (also spliced into the manual) | |
+      | Operating the catalogue, upstream tracking, revocation | `docs/user-manual.md` (`operating-loop.md` and `revocation-runbook.md` merged into it) | CONVENTIONS the rules, SECURITY.md the runbook's location (Req 9.1) |
+      | The seams: builder contract (Req 1.17), trust boundary (Req 9.15), variant taxonomy | `docs/user-manual.md`, reference part (`concepts.md` merged into it) | |
+      | Triage: treatments, statements, exceptions | `triage/README.md` (two lints print its path, so it stays and the manual's copies merge into it) | the manual, what an operator does daily |
+      | The rules a contributor follows, the manual-controls register | `docs/CONVENTIONS.md` | |
+      | Requirements, decisions, tasks; ADRs | `.specs/dhc-catalogue-mvp/`; `docs/decisions/` | |
+      | Evidence; the record of decisions | `docs/live-evidence.md`; `triage/LOG.md` | |
+      | The stack: why each tool | design.md, Technology Stack | `conductor/tech-stack.md` points to the install scripts for versions, which live there alone |
+      | How the repository got here | `docs/archive/` (the review rounds, the closed todo items, the working notes of `concepts.md`) | `data/` stays the owner's research drop (CLAUDE.md) |
+
+    - **Consequences**: three documents leave the tree (`operating-loop.md`, `concepts.md`,
+      `revocation-runbook.md`) and about 115 links move with them, so the link check (Req 9.20)
+      enters the gate before the first move. A lane graph can lie the way prose can; Req 9.21's
+      second clause and review hold it, not a lint. The files code or a requirement opens stay
+      where they are (the README, the manual, the LOG, the ledger, the spec files, the conductor
+      core set, CONVENTIONS.md, `triage/README.md`, SECURITY.md).
+
 ## System Flows
 
 ### Release flow (Req 2.7 to 2.17, 2.26; as specified 2026-08-22, implementation task 9)
