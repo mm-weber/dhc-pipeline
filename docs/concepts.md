@@ -149,19 +149,35 @@ hatch for *computation*, never for *acquisition*. (See `triage/LOG.md`,
   builder, the invocation, and the **materials** — every input with its
   *resolved* digest (the frontend tag as resolved, the builder image, the git
   commit). It carries the ephemeral fetch-time facts forward into a durable
-  signed record. That enables: **audit** (SBOM claims vs provenance
-  materials), **identity** (who signed), and **reproduction** — rebuild from
+  record, a signed one where the build platform generates it (below). That
+  enables: **audit** (SBOM claims vs provenance materials), **identity** (who
+  signed, where it is signed), and **reproduction**: rebuild from
   the recorded inputs and compare digests. Reproducibility is what upgrades
   provenance from trusted claim to recomputable fact.
-- **SLSA levels grade the bridge**: exists ≈ L1 · signed by the build
-  platform ≈ L2 · non-forgeable builder identity (hardened CI + OIDC keyless
-  signing) ≈ L3. A local `--load` build carries unsigned self-attested
-  provenance (L1-ish); this repo's CI cosigns what it publishes (L2-ish);
-  full L3 hermeticity is explicitly out of scope (see design doc, Non-Goals).
+- **SLSA levels grade the bridge** (Build track, v1.2): provenance exists
+  and is distributed, L1; it is generated and signed by a hosted build
+  platform from the platform's own data, and consumers can check both, L2;
+  the build is isolated so the job cannot forge it, L3. A local `--load`
+  build carries BuildKit's unsigned, self-written provenance, which meets L1
+  only once the image is pushed and the provenance travels with it. This
+  repository's releases carried that and no more until 2026-11-18. Signing the image
+  did not lift that, because a signature on the image says who published it
+  and nothing about how it was built, and no verifier read the provenance.
+  Since 2026-11-18 a release also stores a statement that GitHub's provenance
+  service generates from the job's signed identity token and signs under the
+  release workflow's identity, and the release checks it before tagging: that
+  is provenance of L2 grade. The level claimed stays L1 while the
+  verification policy does not demand it (`release.provenance: report`); the
+  successor claims L2 from its first release, where it does. L3 is out of
+  scope (design Decision 15, option D; Non-Goals). `SECURITY.md`, "SLSA Build
+  level", is the statement of record.
 
-Verification, when images are in a registry: `docker buildx imagetools
-inspect <ref>` (see the attestation manifests), `cosign verify-attestation
---type slsaprovenance <ref>`, `docker scout attest list <ref>`.
+Verification, when images are in a registry: the README's recipe verifies
+the signed provenance statement (`cosign verify-attestation --type
+slsaprovenance1`, then the five expectations with jq). BuildKit's own
+provenance is read with `docker buildx imagetools inspect <ref>` (the
+attestation manifests inside the index) or `docker scout attest list <ref>`;
+it is unsigned, so there is nothing to verify it against.
 
 ## The builder contract per archetype
 
@@ -242,4 +258,4 @@ there.
 | Trivy (authoritative scanner and VEX consumer) | upstream-inherited, exact version plus recorded sha256 (Req 7.5) | the PR gate and the rescan | Grype as the measured second consumer and the daily consumer smoke test as migration insurance (task 13.4); a fork flips the authoritative consumer in the policy file |
 | Grype, syft, govulncheck, kind, kyverno, helm, ct, crane, cosign, renovate | upstream-inherited, exact version plus recorded sha256, Go sumdb or npm integrity (Req 7.5, 7.6) | tool pins with Renovate managers; the checksum half is human | each is a rendering of a declared value: cosign to notation and Kyverno to policy-controller are declared renderings, not built |
 | Sigstore public-good instance (Fulcio, Rekor) | upstream-inherited, service | identities pinned in the verification policy; keyless signing | a private Sigstore or a key with notation; the transparency-log disclosure fact changes with it |
-| GitHub: Actions (builds, OIDC identities), GHCR (registry), Issues (lifecycle, status), Pages (the catalogue page, an artifact deployment), rulesets (governance) | upstream-inherited, platform coupling accepted deliberately | owner, repository and registry names are declared values (Req 1.13 to 1.19); the OIDC issuer is pinned | another forge with OIDC, a registry and an issue tracker; the coupling is listed, not abstracted |
+| GitHub: Actions (builds, OIDC identities), the provenance service (`actions/attest-build-provenance`, the SLSA provenance statement of each release), GHCR (registry), Issues (lifecycle, status), Pages (the catalogue page, an artifact deployment), rulesets (governance) | upstream-inherited, platform coupling accepted deliberately | owner, repository and registry names are declared values (Req 1.13 to 1.19); the OIDC issuer is pinned; the provenance action pinned by commit, its statement held against the five declared expectations (Req 2.27, 2.28) | another forge with OIDC, a registry and an issue tracker; the coupling is listed, not abstracted. For provenance: on another forge, signing the build backend's own provenance per platform manifest (design Decision 15, option A); for Build L3 on GitHub, an isolated reusable workflow (option D); neither is built |

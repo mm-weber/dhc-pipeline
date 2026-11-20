@@ -556,9 +556,14 @@ left of the program is the follow-up list below, one decision each.
   - [ ] 18.5 by the plan's phase 4, the owner's go of 2026-11-20:
     - [x] 4.1 the declaration and its two readers, 4.2 the rule under
           `required`, 4.3 the consumer step, 4.4 the smoke test's report
-    - [ ] the pull request; the owner merges
+    - [x] the pull request #422, merged 2026-11-20
     - [ ] Kyverno applying the required shape to a digest without
-          provenance and to one with it (a run in Actions, the owner's go)
+          provenance and to one with it (a run in Actions; the owner's
+          call of 2026-11-20: with phase 6)
+  - [ ] 18.6 by the plan's phase 5, the owner's word of 2026-11-20:
+    - [x] `SECURITY.md` "SLSA Build level", `docs/concepts.md`, the
+          design's Security Considerations, the manual's glossary
+    - [ ] the pull request; the owner merges
   - [ ] Candidate, the owner's idea of 2026-11-13, not started: reshape
         the pipeline into local composite actions where a group of steps
         is one unit (the provenance trio a first candidate). Its own
