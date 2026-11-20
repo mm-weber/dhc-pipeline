@@ -1630,9 +1630,12 @@ three-day minimum release age first.
 - **EPSS / KEV** — Exploit Prediction Scoring System (FIRST.org) and CISA's
   Known Exploited Vulnerabilities catalogue — queue-ordering signals on
   rescan issues; never a justification for a status.
-- **Provenance (SLSA)** — signed in-toto attestation recording builder,
-  invocation, and resolved materials for a build — the bridge between SBOM
-  claims and verifiable inputs.
+- **Provenance (SLSA)**: an in-toto attestation recording who built a
+  digest, from which repository, workflow file, ref and commit. Two kinds
+  sit on a release here: the statement GitHub's provenance service generates
+  and signs, which the recipe verifies and the policy file's expectations
+  are held against, and BuildKit's own, unsigned, kept as supplementary
+  detail. The level claimed and why: `SECURITY.md`, "SLSA Build level".
 - **postUpgradeTask** — a script Renovate runs after bumping a pin so every
   derived field (checksums, vars, tags, ldflags) moves in lockstep and the PR
   is coherent.

@@ -374,13 +374,16 @@ The review (a subagent running the code-review skill on the pull request, read-o
 
 ### Tasks
 
-- [ ] **5.1 `SECURITY.md`**: the SLSA section (level claimed, v1.2, covered digests, the verification step, L2 from the successor's epoch); the statement follows the declared mode (`off`: Build L1, no SLSA provenance attested while it stands)
-- [ ] **5.2 `docs/concepts.md`**: the "L2-ish" sentence replaced by the measured state; the trust-boundary GitHub row names the provenance service, option D as the L3 path, option A as the other-forge seam
-- [ ] **5.3 `docs/user-manual.md`** and design.md's Security Considerations
+- [x] **5.1 `SECURITY.md`**: the SLSA section (level claimed, v1.2, covered digests, the verification step, L2 from the successor's epoch); the statement follows the declared mode (`off`: Build L1, no SLSA provenance attested while it stands)
+- [x] **5.2 `docs/concepts.md`**: the "L2-ish" sentence replaced by the measured state; the trust-boundary GitHub row names the provenance service, option D as the L3 path, option A as the other-forge seam
+- [x] **5.3 `docs/user-manual.md`** and design.md's Security Considerations
 
 ### Verification
 
-- [ ] No sentence claims Build L2 for this repository's digests; render drift check green
+- [x] No sentence claims Build L2 for this repository's digests; render drift check green
+  - Done 2026-11-20. `SECURITY.md` gains the section "SLSA Build level": Build L1 claimed, measured against v1.2; provenance of L2 grade attested on digests released since 2026-11-18 and how it is generated, checked and reported; why the claim stays at L1 under the mode `report`; L2 claimed from the successor's first release; the verifying step and the five expectations; the mode `off`; L3 not claimed. Its definition of a published digest follows criterion 2.10. `docs/concepts.md`: the "L2-ish" sentence replaced by the measured state and why a signature on the image did not lift the level; the verification paragraph names the signed statement's step; the GitHub row of the trust-boundary table names the provenance service with options A and D of Decision 15. design.md's Security Considerations and the manual's glossary entry follow
+  - Read for the claim: every line of the four documents that holds "L2" says "of L2 grade" or names the successor; none claims the level here. `render-verification.sh --check .`, `lint-live-evidence.sh`, `lint-log-anchors.sh` and `yamllint` exit 0
+  - Hand-written, as the statement is prose: no lint holds that the section's mode sentence agrees with `release.provenance`. A repository that flips the mode to `required` or `off` edits the section's claim by hand; the successor's seed does (task 12.1). Ledger row 9.19 stays for phase 6, which measures the section present
 
 ## Phase 6: the evidence (task 18.7)
 
