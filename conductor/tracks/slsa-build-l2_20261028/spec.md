@@ -69,6 +69,18 @@ WHEN the release's self-check runs THE CI Pipeline SHALL check the index and eve
 
 THE Repository SHALL declare the provenance expectations and the predicate type in `catalogue-policy.yaml`, and WHERE that file's provenance mode is required THE verification policy SHALL admit an image only with that attestation from the build workflow's identity whose fields equal the expectations.
 
+The clauses below sharpen that sentence before its first test (added 2026-11-20, the owner's go for phase 4).
+
+THE Repository SHALL declare under `verification.provenance` the predicate type and five expectations, each a string that is not empty: the builder identity, the build type, the source repository, the workflow path and the ref.
+
+WHEN the self-check or the coverage check judges a provenance statement THE CI Pipeline and THE Scan Pipeline SHALL compare the statement's five fields with the five declared values, for equality, and SHALL derive none of them from the build workflow's identity.
+
+IF the declaration is absent, or lacks one of the five expectations or the predicate type, or holds one of them as anything but a string that is not empty, or declares a predicate type other than `https://slsa.dev/provenance/v1`, THEN the check SHALL not be made, no verifier SHALL be asked, and the key that cannot serve SHALL be named by its dotted path, as FR-1 has it for every other value of the policy file.
+
+WHERE the policy file's provenance mode is required THE Repository SHALL render into the verification policy one more attestation of the existing image entry: the declared predicate type, the releaser's identity under the declared issuer, and the five declared values as conditions of equality on the statement's fields; WHERE the mode is report or off THE Repository SHALL render no such attestation, and the rendered policy SHALL equal the one rendered before this track.
+
+IF the committed policy or a committed instruction block differs from what the policy file renders, in any of the three modes, THEN the drift check SHALL fail naming the file (Req 7.9).
+
 **Acceptance criteria:**
 
 - [ ] `render-verification.sh --check` green in every shape (mode `off` or `report`: no rule; `required`: the rule), each shape covered by a suite case
@@ -97,7 +109,7 @@ WHILE the policy file's provenance mode is report or required THE Scan Pipeline 
 
 ### FR-4: Consumer instructions and the smoke test (Req 2.25, 9.13)
 
-THE Repository SHALL give in its verification instructions one step verifying a digest's SLSA provenance against the issuer, the identity and the expectations, SHALL state which digests carry it, and SHALL describe BuildKit provenance as supplementary detail no policy verifies; the consumer smoke test SHALL run that step verbatim and SHALL fail on a null or unverified result. WHERE the provenance mode is off the instructions SHALL state that releases attest none and give no step, and the smoke test SHALL run none.
+THE Repository SHALL give in its verification instructions one step verifying a digest's SLSA provenance against the issuer, the identity and the expectations (the five declared values, rendered into the step; sharpened 2026-11-20), SHALL state which digests carry it, and SHALL describe BuildKit provenance as supplementary detail no policy verifies; the consumer smoke test SHALL run that step verbatim and SHALL fail on a null or unverified result. WHERE the provenance mode is off the instructions SHALL state that releases attest none and give no step, and the smoke test SHALL run none.
 
 **Acceptance criteria:**
 

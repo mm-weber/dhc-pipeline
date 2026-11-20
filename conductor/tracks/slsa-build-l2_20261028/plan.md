@@ -347,9 +347,15 @@ The review (a subagent running the code-review skill on the pull request, read-o
 ### Tasks
 
 - [ ] **4.1 The declaration**: `verification.provenance` (expectations, predicate type) in `catalogue-policy.yaml`, read by `render-verification.sh` and, in place of phase 2's derivation from the build identity, by `check-provenance.sh`; refused by name when malformed
+  - Sliced 2026-11-20 (FR-2's clauses of that day). The declaration itself is a value of the policy file and stands there from the start; its readers are built test-first, agents apart
+  - [ ] **4.1.1 The self-check reads the five from the declaration** (`check-provenance_test.sh`): a policy file whose declared values differ from what the identity's parts would give: a statement that meets the declared ones passes, one that meets the identity's parts fails; the cases that held the derivation are retired with it
+  - [ ] **4.1.2 A declaration that cannot serve is refused by name**: absent, a key missing, a value that is no string or empty, another predicate type: exit 2, the dotted key named, cosign never asked, in all three modes
 - [ ] **4.2 The rule**: the mode `required` renders the 2.28 rule as one more attestation of the existing `Cosign` entry (ADR 0005 as amended 2026-11-13); `report` and `off` render none; every shape in the suite and in the drift check
+  - [ ] **4.2.1 The rule under required, none otherwise** (`render-verification_test.sh`): with the mode `required` the rendered policy holds the provenance attestation with the releaser's keyless entry and five conditions; with `report` and `off` it is byte for byte the policy rendered before; `--check` fails on drift in each mode; a malformed declaration is refused by name
 - [ ] **4.3 The consumer step**: the README and manual blocks gain the provenance step and the coverage sentence; BuildKit's inspect line kept, labelled supplementary; with the mode `off`, the sentence that releases attest none and no step
+  - [ ] **4.3.1 The step in the instruction blocks**: with `report` or `required` the block gains the cosign and jq step with the five declared values and the sentence naming which digests carry provenance; BuildKit's line stays, labelled supplementary; with `off` the sentence that releases attest none, and no step
 - [ ] **4.4 The smoke test**: `consumer-smoke.sh` targets a digest carrying provenance and fails on a null or unverified result (finding 2.4); with the mode `off` it runs no provenance step
+  - [ ] **4.4.1 The smoke test runs the step**: the provenance step from the block, run verbatim; a null, an empty or an unverified result fails by name; with `off` no provenance step is run
 
 ### Verification
 
