@@ -464,6 +464,54 @@ check(
   }
 }
 
+// --- lychee's release tags: extractVersion per dependency (Req 7.6) ---------
+// lycheeverse/lychee publishes three kinds of release: lychee-vX.Y.Z (the
+// command-line tool, the one install-tool.sh pins), lychee-lib-vX.Y.Z (the
+// library, same version numbers, different releases) and nightly (a
+// prerelease). The pin-script manager's shared extractVersionTemplate wants
+// vX.Y.Z, which no lychee tag is, so Renovate would see no versions at all and
+// never offer a bump, without a word. The extractVersion that applies to a
+// dependency is computed the way Renovate computes it: the manager's template,
+// then every packageRule that matches the dependency (Renovate's own matcher)
+// may override it. Asserted on real tag strings, for lychee and for every
+// other tool of both pin scripts, which must keep today's behaviour.
+{
+  const { applyPackageRules } = require("renovate/dist/util/package-rules/index.js");
+  const extractVersionFor = async (depName) =>
+    (await applyPackageRules({
+      extractVersion: scannerMgr.extractVersionTemplate,
+      packageRules: config.packageRules,
+      depName,
+      packageName: depName,
+      manager: "custom.regex",
+      datasource: "github-releases",
+    })).extractVersion;
+  const versionOf = (ev, tag) => (ev ? new RegExp(ev).exec(tag)?.groups?.version ?? null : null);
+
+  const lychee = "lycheeverse/lychee";
+  const ev = await extractVersionFor(lychee);
+  check("lychee tags: the command-line release lychee-v0.25.0 yields 0.25.0", versionOf(ev, "lychee-v0.25.0") === "0.25.0", `extractVersion=${ev}`);
+  // The release kinds lychee publishes, then near misses of the one we want
+  // (prefix without its dash or its v): only the exact lychee-v shape counts.
+  for (const tag of ["lychee-lib-v0.25.0", "nightly", "v0.25.0", "0.25.0", "lychee-0.25.0", "lycheev0.25.0"]) {
+    check(`lychee tags: ${tag} yields no version`, versionOf(ev, tag) === null, `extractVersion=${ev} gives ${versionOf(ev, tag)}`);
+  }
+
+  const others = ["scripts/install-scanners.sh", "scripts/install-tool.sh"]
+    .flatMap((f) => extract(scannerMgr, read(f)))
+    .map((d) => d.depName)
+    .filter((n) => n !== lychee);
+  check("lychee tags: the other pin-script tools are all seen (two scanners, eight tools)", others.length === 10, JSON.stringify(others));
+  for (const depName of others) {
+    const own = await extractVersionFor(depName);
+    check(
+      `lychee tags: ${depName} keeps its extractVersion (v0.72.0 gives 0.72.0, lychee-v0.72.0 gives nothing)`,
+      versionOf(own, "v0.72.0") === "0.72.0" && versionOf(own, "lychee-v0.72.0") === null,
+      `extractVersion=${own}`,
+    );
+  }
+}
+
 // --- workflow env pins: govulncheck + renovate/json5 (Req 7.5, 7.6) ----------
 // The pins whose checksum control lives outside this repo (Go sumdb, npm
 // registry integrity) sit as env vars in the workflows themselves, under the
