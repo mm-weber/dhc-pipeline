@@ -502,8 +502,13 @@ EOF
     echo '# Releases attest no SLSA provenance while release.provenance is off (Req 2.30); there is no step to run.'
   else
     echo '# SLSA provenance (Req 2.25): every digest released while the provenance mode is not off carries it. A digest'
-    echo '# released before that carries none until its definition is released again; the catalogue status issue names'
-    if [ "$1" = required ]; then echo '# the verification policy above admits no image without it.'; else echo '# the supported digests that lack it.'; fi
+    if [ "$1" = required ]; then
+      echo '# released before that carries none until its definition is released again, and the verification policy above'
+      echo '# admits no image without it.'
+    else
+      echo '# released before that carries none until its definition is released again; the catalogue status issue names'
+      echo '# the supported digests that lack it.'
+    fi
     cat <<'EOF'
 cosign verify-attestation $ISSUER $BUILD --type slsaprovenance1 "$REF" \
   | jq -r '.payload | @base64d' \
