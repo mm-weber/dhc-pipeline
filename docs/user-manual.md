@@ -1416,7 +1416,8 @@ for t in scripts/*_test.sh; do "$t"; done
 
 # The link check (Req 9.20), the way validate runs it
 scripts/install-tool.sh lychee ~/.local/bin
-git ls-files -z '*.md' | xargs -0 lychee --offline --include-fragments --no-progress
+git ls-files -z '*.md' | xargs -0 lychee --offline --include-fragments \
+  --root-dir "$PWD" --no-progress --format detailed
 
 # Chart render + policy gate (kyverno via the pinned installer)
 scripts/install-tool.sh kyverno ~/.local/bin

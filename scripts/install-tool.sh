@@ -14,7 +14,8 @@
 # policy engine behind the Req 4.6 gate (chart.yml, validate.yml), helm
 # renders and installs the charts (chart.yml, e2e.yml), ct lints the owned
 # charts (chart.yml), lychee checks the docs' links (validate.yml). All run
-# with the same runner privileges as the scanners, and a version pin alone does not survive re-publication of a tag
+# with the same runner privileges as the scanners, and a version pin alone
+# does not survive re-publication of a tag
 # we already adopted — CVE-2026-33634's shape (see install-scanners.sh).
 #
 # What it replaces: kyverno arrived by `curl … | tar -xz -C /usr/local/bin`

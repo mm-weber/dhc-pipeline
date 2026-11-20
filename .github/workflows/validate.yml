@@ -46,13 +46,17 @@ jobs:
       # tracked Markdown file resolves. lychee runs offline: no remote address
       # is fetched, so the answer never depends on another site being up, and
       # a link that leads nowhere fails naming the file, the line and the
-      # link. Pin + sha256 in install-tool.sh (Req 7.5).
+      # link. Pin + sha256 in install-tool.sh (Req 7.5). --root-dir lets a link
+      # written from the repository root (/docs/x.md) resolve. lychee also reads
+      # a lychee.toml or .lycheeignore at the root on its own; none exists, and
+      # adding one is a reviewed change to what this step checks.
       - name: relative links and heading anchors resolve (Req 9.20)
         run: |
           set -euo pipefail
           scripts/install-tool.sh lychee "${RUNNER_TEMP}/bin"
           git ls-files -z '*.md' | xargs -0 "${RUNNER_TEMP}/bin/lychee" \
-            --offline --include-fragments --no-progress --format detailed
+            --offline --include-fragments --root-dir "$PWD" --no-progress \
+            --format detailed
 
       # Req 1.4 (review D5): every definition runs as a non-root account with
       # uid 65532; nothing read the accounts block before this.

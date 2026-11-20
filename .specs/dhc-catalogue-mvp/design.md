@@ -87,6 +87,7 @@ graph TB
 | Policy gate | Kyverno CLI against rendered charts | Reuses owner's lab policies; admission-shaped CI gate |
 | Scanning/VEX | Trivy (gate + cron), Grype (second opinion), Syft (SBOM), OpenVEX/`vexctl` | Req 6; DHI's own triage model |
 | Signing | cosign keyless (GitHub OIDC) + buildx provenance | Req 2.2 |
+| Documentation | Markdown with Mermaid graphs (`docs/lanes.md`); lychee, offline, over every tracked Markdown file in validate | Req 9.20, 9.21; GitHub draws Mermaid itself, and an established link checker beats a bespoke one |
 
 ### Key Design Decisions
 

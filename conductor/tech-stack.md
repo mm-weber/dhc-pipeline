@@ -32,6 +32,7 @@ The authoritative table with rationale is `.specs/dhc-catalogue-mvp/design.md` (
 | Kyverno CLI | 1.19.1 | the policy gate on rendered charts |
 | crane | 0.22.1 | registry reads |
 | vexctl | 0.4.4 | OpenVEX |
+| lychee | 0.24.2 | the offline link check in validate (Req 9.20) |
 
 ## Infrastructure
 
