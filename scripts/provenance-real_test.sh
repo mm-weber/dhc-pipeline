@@ -276,8 +276,9 @@ fi
 #    .payload, a refusal as words on stderr and exit 1. Here the script meets
 #    cosign 2.6.5 itself and the real statement, case 1's stand-in image. The
 #    policy root gives the fixture certificate's issuer and subject as the
-#    releaser's identity, so the five values the script cuts from it are the
-#    statement's own: the check passes, on one call that carries the exact
+#    releaser's identity and declares the five values that identity's parts
+#    give, so the five the script reads are the statement's own: the check
+#    passes, on one call that carries the exact
 #    identity. With the identity's ref changed, cosign refuses the certificate
 #    on each of the three attempts and the check fails with cosign's reason.
 #    The script finds a wrapper named cosign first on PATH, in its runs alone:
@@ -302,10 +303,11 @@ TUF_ROOT=$(printf '%q' "$SB/tuf") SIGSTORE_ROOT_FILE=$(printf '%q' "$ROOTS/fulci
   exec $(printf '%q' "$REAL_COSIGN") "\$@" --offline --check-claims=false --allow-insecure-registry
 WRAP
 chmod +x "$SB/wrap/cosign"
-policy() { # root ref: a policy root whose releaser is the fixture's workflow at that ref, beside a second role
+policy() { # root ref: a policy root whose releaser is the fixture's workflow at that ref, beside a second role; it declares the five expected values that identity's parts and GitHub's build type give (plan slice 4.1.1)
   mkdir "$1"
-  printf 'verification:\n  issuer: %s\n  roles:\n    releaser:\n      identity: %s\n      attests: [spdxjson, cyclonedx]\n    re-attester:\n      identity: %s\n      attests: [vuln, openvex]\n' \
-    "$ISSUER" "$SIGNER@$2" "https://github.com/mm-weber/dhc-pipeline/.github/workflows/rescan.yml@refs/heads/main" > "$1/catalogue-policy.yaml"
+  printf 'verification:\n  issuer: %s\n  provenance:\n    predicate_type: https://slsa.dev/provenance/v1\n    expectations:\n      builder_identity: "%s"\n      build_type: "%s"\n      source_repository: "%s"\n      workflow_path: "%s"\n      ref: "%s"\n  roles:\n    releaser:\n      identity: %s\n      attests: [spdxjson, cyclonedx]\n    re-attester:\n      identity: %s\n      attests: [vuln, openvex]\n' \
+    "$ISSUER" "$SIGNER@$2" "https://actions.github.io/buildtypes/workflow/v1" "${SIGNER%%/.github/*}" "${SIGNER#*/dhc-pipeline/}" "$2" \
+    "$SIGNER@$2" "https://github.com/mm-weber/dhc-pipeline/.github/workflows/rescan.yml@refs/heads/main" > "$1/catalogue-policy.yaml"
 }
 self_check() { # root: one run of the self-check over the wrapper, stdout and stderr apart; sets rc and calls
   : > "$SB/wrap.log"
