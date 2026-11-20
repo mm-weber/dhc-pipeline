@@ -119,7 +119,8 @@
 # cosign three attempts would seem to have failed.
 #
 # The issuer is read from the file first, the identity after it and then the
-# five expected values (told below), each by a python3 call of its own, and
+# five expected values and the predicate type (told below), each by a python3
+# call of its own, and
 # what keeps any of them from being read is told the same way, by its cause. A
 # python3 whose import of yaml fails reads no file at all: the line names
 # python3 and its yaml module, and exit 2. The place to look is the machine
@@ -224,6 +225,18 @@
 # was run. The workflow path, key workflow_path, at .path, says which of the
 # repository's workflow files was run. The ref, key ref, at .ref, says from
 # which branch or tag the workflow file was taken.
+#
+# The predicate type the file declares beside them, key
+# verification.provenance.predicate_type, is read the same way after the five,
+# as one string, and a file that does not give it cannot serve as with any
+# other key: the line names the file and the key, and exit 2. It has to be
+# https://slsa.dev/provenance/v1 besides, the type cosign is asked for under
+# its own word slsaprovenance1: this script asks for that type and nothing
+# else, so a policy file that declares another type describes a check the
+# script does not make, and to go on would be to pass one check under the name
+# of another. Such a file cannot serve either: the line names the file and the
+# key and holds the type found and the type the script checks for, and exit 2,
+# in every mode and before cosign is asked about any reference.
 #
 # A miss does not end the run where it is found: met or missed, the next
 # expectation is read, all five, since a release run is expensive and one
@@ -403,6 +416,13 @@ policy_string BUILD_TYPE verification.provenance.expectations.build_type
 policy_string SOURCE verification.provenance.expectations.source_repository
 policy_string WORKFLOW verification.provenance.expectations.workflow_path
 policy_string WORKFLOW_REF verification.provenance.expectations.ref
+# the predicate type the file declares, read as the others are. It has to be
+# the type cosign is asked for below, slsaprovenance1 in cosign's words: this
+# script asks for no other, so a file that declares another describes a check
+# that is not made here, and cannot serve
+policy_string PREDICATE_TYPE verification.provenance.predicate_type
+[ "$PREDICATE_TYPE" = https://slsa.dev/provenance/v1 ] \
+  || refuse 2 "'$POLICY' gives a verification.provenance.predicate_type of '$PREDICATE_TYPE', which is another type than this script checks for, it asks cosign for the one type https://slsa.dev/provenance/v1 and no other"
 
 # the five expectations a statement is held against, a row of each list for
 # each, in the order they are read. First the name the clause and the question
