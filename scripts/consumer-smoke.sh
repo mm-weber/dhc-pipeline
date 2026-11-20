@@ -11,6 +11,8 @@
 #      line replaced by the smoke digest, and each step (a command with its
 #      continuation lines) run in a scratch directory with the recipe's own
 #      variables. A step that exits non-zero fails the run naming the step.
+#      Both reports name every step that ran with its result (ok or failed),
+#      in run order: one line each in the markdown, `.recipe.steps` in the JSON.
 #   2. The authoritative consumer's suppressions, from the same extracted
 #      document (openvex.json, which the recipe wrote). Every not_affected or
 #      fixed statement is counted into one of three buckets: it SUPPRESSED a
@@ -88,12 +90,13 @@ rc=$?; [ "$rc" -eq 0 ] || exit "$rc"
 prelude=$(head -n "$(grep -c '^[A-Z_]*=' "$WORK/steps" | head -1)" "$WORK/steps")
 mapfile -d $'\x1e' -t STEPS < <(tail -n +"$(( $(grep -c '^[A-Z_]*=' "$WORK/steps") + 1 ))" "$WORK/steps")
 mkdir -p "$WORK/run"
-ran=0; failed=0; failed_names=()
+ran=0; failed=0; failed_names=(); step_names=(); step_results=()
 for step in "${STEPS[@]}"; do
   [ -n "${step//[[:space:]]/}" ] || continue
   ran=$((ran + 1))
   name=$(printf '%s\n' "$step" | grep -v -E '^\s*#' | head -1 | sed 's/#.*//; s/[[:space:]]*\\$//; s/^[[:space:]]*[{]*[[:space:]]*//' | cut -c1-60)
   (cd "$WORK/run" && bash -o pipefail -c "$prelude"$'\n'"$step" > "$WORK/step-${ran}.out" 2>&1); rc=$?
+  step_names+=("$name"); step_results+=("$([ "$rc" -eq 0 ] && echo ok || echo failed)")
   if [ "$rc" -ne 0 ]; then
     failed=$((failed + 1)); failed_names+=("$name")
     err "recipe step ${ran} failed (exit ${rc}): ${name}"
@@ -178,6 +181,7 @@ fi
   echo
   echo "- digest: \`${REF}\`"
   echo "- recipe: ${ran} step(s) ran, ${failed} failed${failed_names:+ (${failed_names[*]})}"
+  for i in "${!step_names[@]}"; do echo "  - step $((i + 1)): \`${step_names[$i]}\`: ${step_results[$i]}"; done
   if [ -n "$measured" ]; then
     echo "- statements in the attested document: ${suppressing} suppressing (not_affected or fixed), ${affected} affected"
     echo "- ${AUTH} (authoritative): ${suppressing} suppressing statement(s): ${landed} suppressed a reported finding, ${unneeded} had nothing to suppress (finding not reported), ${missing} missing${missing_names:+: ${missing_names[*]}}"
@@ -199,11 +203,13 @@ if [ -n "$measured" ]; then
   "$HERE/vex-portability.sh" --root "$ROOT" --label "smoke ${REF}" --out "$OUT" --append --json "$WORK/portability.json" "${records[@]}" >/dev/null || true
 fi
 
-python3 - "$JSON" "$REF" "$ran" "$failed" "$suppressing" "$affected" "$landed" "$unneeded" "$missing" "$oci_agrees" "$oci_note" "$WORK/portability.json" <<'PY'
+for i in "${!step_names[@]}"; do printf '%s\t%s\n' "${step_results[$i]}" "${step_names[$i]}"; done > "$WORK/steps.tsv"
+python3 - "$JSON" "$REF" "$ran" "$failed" "$suppressing" "$affected" "$landed" "$unneeded" "$missing" "$oci_agrees" "$oci_note" "$WORK/portability.json" "$WORK/steps.tsv" <<'PY'
 import json, os, sys
-out, ref, ran, failed, supp, aff, landed, unneeded, missing, oci_agrees, oci_note, port = sys.argv[1:13]
+out, ref, ran, failed, supp, aff, landed, unneeded, missing, oci_agrees, oci_note, port, steps = sys.argv[1:14]
 p = json.load(open(port)) if os.path.exists(port) else None
-json.dump({"ref": ref, "recipe": {"ran": int(ran), "failed": int(failed)},
+json.dump({"ref": ref, "recipe": {"ran": int(ran), "failed": int(failed),
+                      "steps": [dict(zip(("result", "name"), l.rstrip("\n").split("\t", 1))) for l in open(steps)]},
            "authoritative": {"suppressing": int(supp), "affected": int(aff), "suppressed": int(landed), "unneeded": int(unneeded), "missing": int(missing)},
            "oci": {"agrees": None if oci_agrees == "null" else oci_agrees == "true", "note": oci_note},
            "portability": p}, open(out, "w"), indent=1)

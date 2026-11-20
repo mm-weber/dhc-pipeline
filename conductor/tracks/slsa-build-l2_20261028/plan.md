@@ -356,7 +356,7 @@ The review (a subagent running the code-review skill on the pull request, read-o
   - [x] **4.3.1 The step in the instruction blocks**: with `report` or `required` the block gains the cosign and jq step with the five declared values and the sentence naming which digests carry provenance; BuildKit's line stays, labelled supplementary; with `off` the sentence that releases attest none, and no step
   - [x] **4.3.2 The sentence under required reads as one** (added 2026-11-20: the text given to 4.3.1 for the mode `required` joined two clauses into a broken sentence, "the catalogue status issue names the verification policy above admits no image without it"; the session's slip in the wording, seen in the rendered block)
 - [ ] **4.4 The smoke test**: `consumer-smoke.sh` targets a digest carrying provenance and fails on a null or unverified result (finding 2.4); with the mode `off` it runs no provenance step
-  - [ ] **4.4.1 The smoke test runs the step**: the provenance step from the block, run verbatim; a null, an empty or an unverified result fails by name; with `off` no provenance step is run
+  - [x] **4.4.1 The smoke test runs the step**: the provenance step from the block, run verbatim; a null, an empty or an unverified result fails by name; with `off` no provenance step is run
 
 ### Verification
 
