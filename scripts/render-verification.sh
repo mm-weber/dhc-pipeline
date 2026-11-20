@@ -5,13 +5,18 @@
 # required predicate types (Req 7.7).
 #
 # Renders:
-#   - policies/verify-catalogue-images.yaml   (Kyverno verifyImages, Req 2.23)
+#   - policies/verify-catalogue-images.yaml   (Kyverno verifyImages, Req 2.23;
+#     with `release.provenance: required` it also holds the provenance
+#     attestation with the declared expectations as conditions, Req 2.28)
 #   - policies/restrict-registries.yaml       (Kyverno registry gate, Req 4.2;
 #     its allowed-image glob is `registry:`, so a fork's chart gate admits
 #     the fork's namespace; task 14.1)
 #   - the fenced consumer snippet between
 #       <!-- render-verification:begin --> / <!-- render-verification:end -->
-#     in README.md and docs/user-manual.md   (Req 2.25)
+#     in README.md and docs/user-manual.md   (Req 2.25); with
+#     `release.provenance` report or required it holds the provenance step
+#     over the declared expectations, otherwise one line saying that
+#     releases attest none (Req 2.30)
 #
 # --check re-renders and fails naming each committed artifact that differs
 # (Req 7.9): validate.yml runs this on every PR, so a hand edit to a rendered
@@ -34,7 +39,7 @@ POLICY_FILE="$ROOT/catalogue-policy.yaml"
 [ -f "$POLICY_FILE" ] || { echo "render-verification: no catalogue-policy.yaml under $ROOT" >&2; exit 1; }
 
 python3 - "$MODE" "$ROOT" "$POLICY_FILE" <<'PY'
-import os, sys, yaml
+import json, os, sys, yaml
 
 mode, root, policy_path = sys.argv[1], sys.argv[2], sys.argv[3]
 
@@ -59,6 +64,40 @@ if not aperture:
     sys.exit(2)
 registry, issuer = pol["registry"], pol["issuer"]
 roles, required = pol["roles"], pol["required"]
+
+# Req 2.28, ADR 0005 decision 5 as amended 2026-11-13: only the required mode
+# puts provenance into the admission policy, and then from the declared
+# expectations alone, never derived from the releaser's identity. The order is
+# the order of the rendered conditions; each field is a path inside the
+# predicate. The consumer snippet's provenance step compares the same five
+# under report and required (Req 2.25, ADR 0005 decision 2); a mode that is
+# neither, or no key at all, reads as off. A declaration that cannot serve
+# ends the run here, before any artifact is written, so no half-rendered tree
+# can be committed.
+SLSA_V1 = "https://slsa.dev/provenance/v1"
+EXPECTATIONS = [
+    ("builder_identity", "runDetails.builder.id"),
+    ("build_type", "buildDefinition.buildType"),
+    ("source_repository", "buildDefinition.externalParameters.workflow.repository"),
+    ("workflow_path", "buildDefinition.externalParameters.workflow.path"),
+    ("ref", "buildDefinition.externalParameters.workflow.ref"),
+]
+provenance = None
+prov_mode = (whole.get("release") or {}).get("provenance")
+if prov_mode in ("report", "required"):
+    def refuse(key, why):
+        print(f"::error::render-verification: catalogue-policy.yaml {key} {why} (Req 2.25, 2.28)", file=sys.stderr)
+        sys.exit(2)
+    provenance = pol.get("provenance")
+    if not isinstance(provenance, dict):
+        refuse("verification.provenance", f"is missing, and release.provenance is {prov_mode}")
+    if provenance.get("predicate_type") != SLSA_V1:
+        refuse("verification.provenance.predicate_type", f"must be {SLSA_V1}")
+    expectations = provenance.get("expectations")
+    for name, _ in EXPECTATIONS:
+        value = expectations.get(name) if isinstance(expectations, dict) else None
+        if not isinstance(value, str) or not value:
+            refuse(f"verification.provenance.expectations.{name}", "must be a non-empty string")
 
 # cosign --type aliases to the predicateType URLs Kyverno matches on.
 PREDICATE = {
@@ -126,6 +165,18 @@ for alias in ["spdxjson", "openvex", "cyclonedx", "vuln"]:
     parts.append(f"            - type: {PREDICATE[alias]}\n              attestors:\n{head}")
     for role in att[alias]:
         parts.append(keyless(role, 20))
+if prov_mode == "required":
+    # The releaser alone attests provenance (ADR 0005). Values are quoted as
+    # JSON strings, which YAML reads as the same string whatever they hold.
+    parts.append(f"            - type: {SLSA_V1}\n              attestors:\n                - entries:\n")
+    parts.append(keyless(sig_role, 20))
+    parts.append("              conditions:\n                - all:\n")
+    for name, field in EXPECTATIONS:
+        parts.append(
+            f'                    - key: "{{{{ {field} }}}}"\n'
+            f"                      operator: Equals\n"
+            f"                      value: {json.dumps(provenance['expectations'][name], ensure_ascii=False)}\n"
+        )
 kyverno_text = "".join(parts)
 
 rel = roles[sig_role]["identity"]
@@ -160,6 +211,33 @@ else:
         'cosign verify-attestation $ISSUER $BUILD --type openvex "$REF" \\',
         "  | jq -r '.payload | @base64d | fromjson | .predicate' > openvex.json   # VEX, compiled per digest",
     ]
+# The provenance step (Req 2.25, 2.30): cosign holds the signer to the releaser,
+# jq holds one statement to all five declared values. `-s` with `any` so that
+# several statements pass on one that meets the five and no statement at all
+# fails; the values are JSON string literals, which jq reads as written.
+if provenance:
+    wanted = " and ".join(
+        f".predicate.{field} == {json.dumps(provenance['expectations'][name], ensure_ascii=False)}"
+        for name, field in EXPECTATIONS
+    )
+    snip.append("# SLSA provenance (Req 2.25): every digest released while the provenance mode is not off carries it. A digest")
+    if prov_mode == "required":
+        snip += [
+            "# released before that carries none until its definition is released again, and the verification policy above",
+            "# admits no image without it.",
+        ]
+    else:
+        snip += [
+            "# released before that carries none until its definition is released again; the catalogue status issue names",
+            "# the supported digests that lack it.",
+        ]
+    snip += [
+        'cosign verify-attestation $ISSUER $BUILD --type slsaprovenance1 "$REF" \\',
+        "  | jq -r '.payload | @base64d' \\",
+        f"  | jq -es 'any(.[]; {wanted})'   # SLSA provenance: signed by the release workflow, and built from this repository, workflow file and ref",
+    ]
+else:
+    snip.append("# Releases attest no SLSA provenance while release.provenance is off (Req 2.30); there is no step to run.")
 # One scan step per declared consumer, the authoritative one first (Req 9.11).
 # The scanners suppress a not_affected or fixed statement and show it as such;
 # an affected statement (an accepted risk) suppresses nothing, by design.
@@ -177,8 +255,8 @@ for c in ordered:
     tag = "# authoritative consumer" if c.get("authoritative") else "# declared consumer, informational"
     snip.append(f"{cmd:<83}{tag}")
 snip += [
-    "# BuildKit provenance is attached at build time and is not verified by the",
-    "# policy above (Req 2.25); inspect it with the buildx CLI plugin:",
+    "# BuildKit provenance is attached at build time as supplementary detail; no policy verifies it",
+    "# (Req 2.25). Inspect it with the buildx CLI plugin:",
     "docker buildx imagetools inspect \"$REF\" --format '{{ json .Provenance }}'",
     "```",
 ]

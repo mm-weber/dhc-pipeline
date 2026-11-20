@@ -66,6 +66,8 @@ if [ "$1" = verify-attestation ]; then
   type=""; while [ $# -gt 0 ]; do [ "$1" = --type ] && type="$2"; shift; done
   case "$type" in
     spdxjson) printf '{"payload":"%s"}\n' "$(printf '{"predicateType":"https://spdx.dev/Document","predicate":{"spdxVersion":"SPDX-2.3"}}' | base64 -w0)" ;;
+    slsaprovenance1) [ -z "${STUB_PROV:-}" ] || cat "${STUB_PROV}"
+      [ "${STUB_PROV_FAIL:-}" = 1 ] && { echo "stub: slsaprovenance1 refused" >&2; exit 1; } ;;
     openvex) printf '{"payload":"%s"}\n' "$(printf '{"predicateType":"https://openvex.dev/ns","predicate":%s}' "$(cat "${STUB_VEXDOC}")" | base64 -w0)" ;;
   esac
 fi
@@ -159,6 +161,53 @@ unset STUB_GRYPE_FAIL
 printf '# nothing\n' > "$SB/root/README-empty.md"
 out=$(cd "$SB/root" && PATH="$SB/bin:$PATH" "$SMOKE" --root . --readme README-empty.md --ref "$REF" --out "$SB/s.md" --json "$SB/s.json" 2>&1); rc=$?
 [ "$rc" -eq 2 ] && grep -q "no rendered recipe between the render-verification markers" <<<"$out" && pass "a README without the recipe is refused" || fail "no recipe" "rc=$rc" "$out"
+
+# 7: the provenance leg is asserted (slice 4.4.1; Req 9.13; finding 2.4 of the review of 2026-09-09:
+#    "the provenance leg is never asserted, an empty result passes"). The recipe's provenance step, the
+#    real renderer's shape, runs verbatim as step 4; jq and base64 are the real ones. What cosign
+#    answers for --type slsaprovenance1 is the file STUB_PROV names (unset: nothing, exit 0).
+cat > "$SB/prov-step" <<'EOF'
+# SLSA provenance (Req 2.25): every digest released while the provenance mode is not off carries it. A digest
+# released before that carries none until its definition is released again; the catalogue status issue names
+# the supported digests that lack it.
+cosign verify-attestation $ISSUER $BUILD --type slsaprovenance1 "$REF" \
+  | jq -r '.payload | @base64d' \
+  | jq -es 'any(.[]; .predicate.runDetails.builder.id == "https://github.com/acme/dhc/.github/workflows/build.yml@refs/heads/main" and .predicate.buildDefinition.buildType == "https://actions.github.io/buildtypes/workflow/v1" and .predicate.buildDefinition.externalParameters.workflow.repository == "https://github.com/acme/dhc" and .predicate.buildDefinition.externalParameters.workflow.path == ".github/workflows/build.yml" and .predicate.buildDefinition.externalParameters.workflow.ref == "refs/heads/main")'   # SLSA provenance: signed by the release workflow, and built from this repository, workflow file and ref
+EOF
+echo '# Releases attest no SLSA provenance while release.provenance is off (Req 2.30); there is no step to run.' > "$SB/prov-off"
+cp "$SB/root/README.md" "$SB/README-plain.md"
+with_recipe_lines() { awk -v add="$1" '{print} /> openvex.json/ {while ((getline l < add) > 0) print l}' "$SB/README-plain.md" > "$SB/root/README.md"; }
+statement() { printf '{"payload":"%s"}\n' "$(printf '{"_type":"https://in-toto.io/Statement/v1","predicateType":"https://slsa.dev/provenance/v1","predicate":{"buildDefinition":{"buildType":"https://actions.github.io/buildtypes/workflow/v1","externalParameters":{"workflow":{"repository":"https://github.com/acme/dhc","path":".github/workflows/build.yml","ref":"%s"}}},"runDetails":{"builder":{"id":"https://github.com/acme/dhc/.github/workflows/build.yml@refs/heads/main"}}}}' "$1" | base64 -w0)"; }
+PROV_NAME='cosign verify-attestation $ISSUER $BUILD --type slsaprovenan'
+prov_fails() { # <label>: the run fails naming step 4, the provenance step, and the reports say so
+  out=$(run "$REF"); rc=$?
+  [ "$rc" -eq 1 ] && grep -qF "::error::consumer-smoke: recipe step 4 failed (exit 1): $PROV_NAME" <<<"$out" && grep -qF "recipe: 7 step(s) ran, 1 failed ($PROV_NAME)" "$SB/smoke.md" && jq -e '.recipe.ran == 7 and .recipe.failed == 1' "$SB/smoke.json" >/dev/null && pass "provenance: $1 fails the run naming the step" || fail "provenance: $1" "rc=$rc" "$out" "$(head -4 "$SB/smoke.md")"
+}
+with_recipe_lines "$SB/prov-step"
+statement refs/heads/main > "$SB/prov-good"; statement refs/heads/other > "$SB/prov-other-ref"
+printf '{"payload":"%s"}\n' "$(printf 'null' | base64 -w0)" > "$SB/prov-null"
+export STUB_PROV="$SB/prov-good"
+out=$(run "$REF"); rc=$?
+[ "$rc" -eq 0 ] && grep -q "recipe: 7 step(s) ran, 0 failed" "$SB/smoke.md" && pass "provenance: a statement meeting the five expectations passes, the step counted" || fail "provenance: good statement" "rc=$rc" "$out" "$(head -4 "$SB/smoke.md")"
+grep -q "cosign verify-attestation --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity https://github.com/acme/dhc/.github/workflows/build.yml@refs/heads/main --type slsaprovenance1 $REF" "$STUB_ARGV" && pass "provenance: the step ran with the releaser's identity and the smoke digest" || fail "provenance: step ran" "$(cat "$STUB_ARGV")"
+grep -E 'slsaprovenan' "$SB/smoke.md" | grep -qw ok && pass "provenance: the block names the step with its result (ok)" || fail "provenance: block names the step, ok" "$(cat "$SB/smoke.md")"
+jq -e '[.recipe.steps[]? | select(.name | contains("--type slsaprovenan"))] | length == 1 and .[0].result == "ok"' "$SB/smoke.json" >/dev/null && pass "provenance: the JSON record names the step with its result (ok)" || fail "provenance: json names the step, ok" "$(jq -c .recipe "$SB/smoke.json")"
+unset STUB_PROV
+prov_fails "an empty result (cosign prints nothing, exit 0)"
+jq -e '[.recipe.steps[]? | select(.name | contains("--type slsaprovenan"))] | length == 1 and .[0].result == "failed"' "$SB/smoke.json" >/dev/null && pass "provenance: the JSON record names the step with its result (failed)" || fail "provenance: json names the step, failed" "$(jq -c .recipe "$SB/smoke.json")"
+export STUB_PROV="$SB/prov-good" STUB_PROV_FAIL=1
+prov_fails "a refusal by cosign (exit 1), whatever it printed before"
+unset STUB_PROV_FAIL
+export STUB_PROV="$SB/prov-other-ref"
+prov_fails "a statement missing one of the five expectations (another ref)"
+export STUB_PROV="$SB/prov-null"
+prov_fails "a payload that decodes to JSON null"
+# the provenance mode off: the recipe holds a comment and no step; none is run, and the run is not failed for it
+with_recipe_lines "$SB/prov-off"
+unset STUB_PROV
+out=$(run "$REF"); rc=$?
+[ "$rc" -eq 0 ] && grep -q "recipe: 6 step(s) ran, 0 failed" "$SB/smoke.md" && ! grep -q slsaprovenance1 "$STUB_ARGV" && grep -q -- '--type openvex' "$STUB_ARGV" && pass "provenance off: no slsaprovenance1 step is run, the run passes" || fail "provenance off" "rc=$rc" "$out" "$(cat "$STUB_ARGV")"
+cp "$SB/README-plain.md" "$SB/root/README.md"
 
 echo
 if [ "$FAILURES" -eq 0 ]; then echo "all consumer-smoke tests passed"; else echo "$FAILURES test(s) failed"; exit 1; fi

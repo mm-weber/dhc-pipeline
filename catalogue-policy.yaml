@@ -131,6 +131,23 @@ verification:
     attestations:
       spdxjson: [releaser]
       openvex: [releaser, re-attester]
+  # Req 2.28 (task 18.5; ADR 0005, decision 5): what a SLSA provenance
+  # statement has to say to be admitted, beside being signed by the releaser
+  # under the issuer above. Each value is compared for equality with one
+  # field of the statement: the release's self-check and the rescan's
+  # coverage read them here (scripts/check-provenance.sh), and so do the
+  # rendered policy rule, where release.provenance is required, and the
+  # consumer step. A fork edits these five together with the releaser's
+  # identity: the builder identity is that identity, and the three below the
+  # build type are its parts.
+  provenance:
+    predicate_type: https://slsa.dev/provenance/v1
+    expectations:
+      builder_identity: https://github.com/mm-weber/dhc-pipeline/.github/workflows/build.yml@refs/heads/main
+      build_type: https://actions.github.io/buildtypes/workflow/v1
+      source_repository: https://github.com/mm-weber/dhc-pipeline
+      workflow_path: .github/workflows/build.yml
+      ref: refs/heads/main
   # Req 2.24's must-reject control for the daily proof (task 9.6): a digest
   # under a catalogue repository (so imageReferences match it) that carries
   # no signature. The amd64 child manifest of grafana:13.0.4-alpine3.23,

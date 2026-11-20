@@ -118,18 +118,20 @@
 # without jq what cosign verified would seem to hold no statement, and without
 # cosign three attempts would seem to have failed.
 #
-# The issuer is read from the file first and the identity after it, each by a
-# python3 call of its own, and what keeps either from being read is told the
-# same way, by its cause. A python3 whose import of yaml fails reads no file
-# at all: the line names python3 and its yaml module, and exit 2. The place to
-# look is the machine the check runs on, not the policy file. A file that is
-# there and cannot be opened, this user having no permission to read it, gives
-# no key: the line names the file and says that it cannot be opened, and exit
-# 2. The place to look is the file's mode and owner, not what stands in it. A
-# file that is no YAML, or no UTF-8 text, gives no key at all, and is told by
-# that cause, not by a key: the line names the file and says that it cannot be
-# read as YAML, and exit 2. Whoever repairs the release is to look at the
-# file's syntax, not for a key it seems to lack.
+# The issuer is read from the file first, the identity after it and then the
+# five expected values and the predicate type (told below), each by a python3
+# call of its own, and
+# what keeps any of them from being read is told the same way, by its cause. A
+# python3 whose import of yaml fails reads no file at all: the line names
+# python3 and its yaml module, and exit 2. The place to look is the machine
+# the check runs on, not the policy file. A file that is there and cannot be
+# opened, this user having no permission to read it, gives no key: the line
+# names the file and says that it cannot be opened, and exit 2. The place to
+# look is the file's mode and owner, not what stands in it. A file that is no
+# YAML, or no UTF-8 text, gives no key at all, and is told by that cause, not
+# by a key: the line names the file and says that it cannot be read as YAML,
+# and exit 2. Whoever repairs the release is to look at the file's syntax, not
+# for a key it seems to lack.
 #
 # The issuer and the identity each have to be there as a string that is not
 # empty: an empty one handed to cosign is a question about nobody, and a
@@ -141,16 +143,18 @@
 # key (a string where a mapping belongs): it prints no value then, and its own
 # words on stderr are kept back, the line being all there is.
 #
-# The identity has to hold an @ with something after it besides: the workflow
-# path ends and the ref begins at its first @, and an identity without one, or
-# with nothing after it, gives no ref. Before that first @ it has to read as
-# the cuts take it, <scheme>://<host>/<owner>/<repo>/ and then the workflow
-# path, which ends in no slash: with the @ right after the repository, or
-# after its slash, there is no workflow path. Scheme, host, owner and
-# repository are each a segment, not empty and holding no slash: where two
-# slashes stand together a segment is empty, and the cuts would take the next
-# for it. Cut all the same it would give nonsense, and the error line would
-# blame the statement for the policy file's fault. Such a file cannot serve
+# The identity has to read as a build workflow's identity does besides,
+# <scheme>://<host>/<owner>/<repo>/<workflow path>@<ref>. It holds an @ with
+# something after it, the ref, which begins at its first @. Before that first
+# @ stand scheme, host, owner and repository, each a segment, not empty and
+# holding no slash, and after them the workflow path, which is not empty and
+# ends in no slash: where two slashes stand together a segment is empty, and
+# with the @ right after the repository, or after its slash, there is no
+# workflow path. No expected value is taken from the identity, the five being
+# declared by themselves (told below). Its form is tested all the same, the
+# identity being what cosign is asked under: asked under one of another form,
+# cosign would be asked about a signer that is no workflow, and the line would
+# blame the digest for the policy file's fault. Such a file cannot serve
 # either: the line names the file and the key and holds the identity as it
 # stands there, and exit 2.
 #
@@ -205,24 +209,34 @@
 # field, or a path that cannot be walked, the builder a string where an object
 # belongs for one.
 #
-# The five, by the names their clauses carry. The builder identity, at
-# .predicate.runDetails.builder.id: the build workflow's identity, exactly the
-# one cosign was asked under. The build type, at
-# .predicate.buildDefinition.buildType: GitHub's build type for a workflow
-# run, which says what the fields under externalParameters mean. The other
-# three stand under .predicate.buildDefinition.externalParameters.workflow and
-# are held against the parts of the identity, which reads
-# https://github.com/<owner>/<repo>/<workflow path>@<ref>. The source
-# repository, at .repository, says whose workflow file was run: the build
-# workflow's repository, which is the identity's scheme, its host and the
-# first two segments of its path, what stands before the third slash after the
-# host. The workflow path, at .path, says which of the repository's workflow
-# files was run: the build workflow's path, what stands in the identity
-# between the slash after the repository and the first @ (a ref can hold an @,
-# a workflow file's name does not in practice). The ref, at .ref, says from
-# which branch or tag the workflow file was taken: the build workflow's ref,
-# all that stands in the identity after the first @, the @ at which the
-# workflow path ends.
+# The five, by the names their clauses carry, are the values the policy file
+# declares under verification.provenance.expectations, each read by its key
+# the way the issuer and the identity are read, as one string, after those
+# two. None is taken from the identity cosign is asked under, and none is
+# written into this script: what a statement has to say of who built is
+# declared in the one file, beside who has to have signed it. The builder
+# identity, key builder_identity, at .predicate.runDetails.builder.id, says
+# who ran the build. The build type, key build_type, at
+# .predicate.buildDefinition.buildType, says which kind of build wrote the
+# statement, and with it what the fields under externalParameters mean. The
+# other three stand under
+# .predicate.buildDefinition.externalParameters.workflow. The source
+# repository, key source_repository, at .repository, says whose workflow file
+# was run. The workflow path, key workflow_path, at .path, says which of the
+# repository's workflow files was run. The ref, key ref, at .ref, says from
+# which branch or tag the workflow file was taken.
+#
+# The predicate type the file declares beside them, key
+# verification.provenance.predicate_type, is read the same way after the five,
+# as one string, and a file that does not give it cannot serve as with any
+# other key: the line names the file and the key, and exit 2. It has to be
+# https://slsa.dev/provenance/v1 besides, the type cosign is asked for under
+# its own word slsaprovenance1: this script asks for that type and nothing
+# else, so a policy file that declares another type describes a check the
+# script does not make, and to go on would be to pass one check under the name
+# of another. Such a file cannot serve either: the line names the file and the
+# key and holds the type found and the type the script checks for, and exit 2,
+# in every mode and before cosign is asked about any reference.
 #
 # A miss does not end the run where it is found: met or missed, the next
 # expectation is read, all five, since a release run is expensive and one
@@ -379,32 +393,36 @@ policy_string ISSUER verification.issuer
 # its identity cosign would be asked about nobody, and no other role's
 # identity stands in
 policy_string IDENTITY verification.roles.releaser.identity
-# the ref is what follows the identity's first @: an identity without one, or
-# with nothing after it, has no ref. The workflow path ends at that @, and
-# begins after the repository's slash, the one the first cut below looks for:
-# without that slash before the @, or with it right before the @, there is no
-# path. Scheme, host, owner and repository are counted as segments, each one
-# or more characters that are no slash: a * would take an empty one, or two
-# for one. What the cuts below made of any of these would be held against
-# every statement, which is not at fault. The file cannot serve, as above
+# the identity has to read as a build workflow's does: a ref after its first
+# @, and before that @ scheme, host, owner and repository and then a workflow
+# path that ends in no slash. Scheme, host, owner and repository are counted
+# as segments, each one or more characters that are no slash: a * would take
+# an empty one, or two for one. Nothing is cut out of the identity, the five
+# expected values being declared by themselves below; the form is tested all
+# the same, the identity being what cosign is asked under, and under one of
+# another form cosign would be asked about a signer that is no workflow, the
+# digest blamed for it. The file cannot serve, as above
 [[ "$IDENTITY" == *@?* \
   && "${IDENTITY%%@*}" == +([!/])://+([!/])/+([!/])/+([!/])/*[!/] ]] \
   || refuse 2 "'$POLICY' gives a verification.roles.releaser.identity that cannot be cut into its parts, '$IDENTITY' holds no scheme, host, owner, repository and workflow path before its first @ or no ref after it, the form is <scheme>://<host>/<owner>/<repo>/<workflow path>@<ref>"
 
-# the build workflow's repository, cut from the identity in two steps: what
-# follows scheme, host, owner and repository, and then the identity without it
-# and without the slash before it
-SOURCE=${IDENTITY#*://*/*/*/}
-SOURCE=${IDENTITY%"/$SOURCE"}
-# the build workflow's path: what follows the repository and its slash, up to
-# the first @, where the ref begins (a ref can hold an @ of its own)
-WORKFLOW=${IDENTITY#"$SOURCE/"}
-WORKFLOW=${WORKFLOW%%@*}
-# the build workflow's ref: all that follows that first @
-WORKFLOW_REF=${IDENTITY#*@}
-# the build type GitHub's provenance service writes for a workflow run (ADR
-# 0005, decision 5)
-BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
+# the five values expected of a statement, each the string the policy file
+# declares under its key, read as the issuer and the identity are and none of
+# them made from either: who ran the build, which kind of build it was, whose
+# workflow file was run, which of that repository's workflow files, and from
+# which branch or tag it was taken
+policy_string BUILDER verification.provenance.expectations.builder_identity
+policy_string BUILD_TYPE verification.provenance.expectations.build_type
+policy_string SOURCE verification.provenance.expectations.source_repository
+policy_string WORKFLOW verification.provenance.expectations.workflow_path
+policy_string WORKFLOW_REF verification.provenance.expectations.ref
+# the predicate type the file declares, read as the others are. It has to be
+# the type cosign is asked for below, slsaprovenance1 in cosign's words: this
+# script asks for no other, so a file that declares another describes a check
+# that is not made here, and cannot serve
+policy_string PREDICATE_TYPE verification.provenance.predicate_type
+[ "$PREDICATE_TYPE" = https://slsa.dev/provenance/v1 ] \
+  || refuse 2 "'$POLICY' gives a verification.provenance.predicate_type of '$PREDICATE_TYPE', which is another type than this script checks for, it asks cosign for the one type https://slsa.dev/provenance/v1 and no other"
 
 # the five expectations a statement is held against, a row of each list for
 # each, in the order they are read. First the name the clause and the question
@@ -412,8 +430,8 @@ BUILD_TYPE="https://actions.github.io/buildtypes/workflow/v1"
 # built, and the policy's rule compares each of the five for equality (Req
 # 2.28), so no value found is tidied before it is compared
 EXPECTATIONS=(
-  # the builder has to be the build workflow too, exactly the identity cosign
-  # was asked under
+  # who ran the build: the builder the policy file declares, which is read by
+  # itself and is not the identity cosign was asked under
   "builder identity"
   # which kind of build wrote the statement, and with it what the fields under
   # externalParameters mean
@@ -437,7 +455,7 @@ FIELDS=(
   .predicate.buildDefinition.externalParameters.workflow.ref
 )
 # the value expected of each, and the name jq is handed it under
-VALUES=("$IDENTITY" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$WORKFLOW_REF")
+VALUES=("$BUILDER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$WORKFLOW_REF")
 ARGS=(identity type source workflow ref)
 # a jq call that gave no answer: the check has failed, and there is no clause
 # to show for it. One ::error:: line naming the reference and the question
@@ -576,7 +594,7 @@ ask() {
       || refuse 1 "${REF}: none of the ${count} provenance statements cosign verified is one the catalogue's verification policy would admit: ${misses}"
     refuse 1 "${REF}: the provenance statement cosign verified is not one the catalogue's verification policy would admit: ${missed}"
   fi
-  echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement whose builder identity is that identity, whose build type is ${BUILD_TYPE}, whose source repository is ${SOURCE}, whose workflow path is ${WORKFLOW} and whose ref is ${WORKFLOW_REF}, what else the statement says is not read"
+  echo "check-provenance: ${REF}: cosign was asked for a SLSA provenance statement signed by ${IDENTITY} and ended with exit code 0, what it printed holds a provenance statement whose builder identity is ${BUILDER}, whose build type is ${BUILD_TYPE}, whose source repository is ${SOURCE}, whose workflow path is ${WORKFLOW} and whose ref is ${WORKFLOW_REF}, what else the statement says is not read"
 }
 
 # report: each reference asked in the order given, the same question each

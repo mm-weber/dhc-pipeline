@@ -59,9 +59,24 @@ GIT_REF="refs/heads/trunk"
 # of the releaser's identity (either can be several lines, or empty: the key
 # is absent). fresh writes it with both lines as they belong; cases 10 and
 # 14 write it with a fault in one of them
+# Between the issuer and the roles stands the declaration of the five expected
+# values (plan slice 4.1.1), see declared: in every policy file written here
+# it holds the values the suite's identity gives at the time of the call
 policy_with() {
-  printf 'verification:\n%s  roles:\n    re-attester:\n      identity: %s\n      attests: [spdxjson, cyclonedx, vuln, openvex]\n    releaser:\n%s      attests: [spdxjson, cyclonedx, vuln, openvex]\n' \
-    "${1:+$1$'\n'}" "$RE_ATTESTER" "${2:+$2$'\n'}"
+  printf 'verification:\n%s%s\n  roles:\n    re-attester:\n      identity: %s\n      attests: [spdxjson, cyclonedx, vuln, openvex]\n    releaser:\n%s      attests: [spdxjson, cyclonedx, vuln, openvex]\n' \
+    "${1:+$1$'\n'}" "$(declared)" "$RE_ATTESTER" "${2:+$2$'\n'}"
+}
+
+# The declaration under verification.provenance, as the standing sandbox's
+# policy file holds it (plan slice 4.1.1): the predicate type and the five
+# expected values, each exactly what the releaser identity's parts and
+# GitHub's build type give, so that every case written while the script
+# derived the five keeps its meaning under a script that reads them. The
+# values are read when it is called, so under another identity (cases 7b and
+# 10c) it declares that identity's five. Case 23 alone declares other values
+declared() {
+  printf '  provenance:\n    predicate_type: https://slsa.dev/provenance/v1\n    expectations:\n      builder_identity: "%s"\n      build_type: "%s"\n      source_repository: "%s"\n      workflow_path: "%s"\n      ref: "%s"\n' \
+    "$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF"
 }
 
 fresh() {
@@ -470,6 +485,7 @@ fresh
 cat > "$SB/root/catalogue-policy.yaml" <<EOF
 verification:
   issuer: $ISSUER
+$(declared)
   roles:
     releaser:
       identity: $RELEASER
@@ -1290,18 +1306,21 @@ other_workflow "a statement with the expected workflow path in seven decoys, the
   'def decoys: {path: $e} + . + {decoy: {workflow: {path: $e}}}; .predicate.buildDefinition.externalParameters |= {path: $e} + .
    | .predicate.buildDefinition |= {path: $e} + . + {workflow: {path: $e}} | .predicate |= decoys | decoys'
 
-# 7b: the cut values come from the releaser identity (plan slice 2.5.7b, a
-#     guard). The source repository and the workflow path the script expects
-#     are the parts of the releaser identity in the policy file it is given,
-#     whatever that identity is: not written into the script, not taken from
-#     the image reference or from another role. The cases above have one
-#     identity, and $REF shares its owner and repository name, so they cannot
-#     tell. Three inputs under a second identity, every part of which differs
-#     from the first one's and from $REF's, owner and repository with a hyphen
-#     and a dot: a statement that meets its five values passes, and one from
-#     the first identity's repository, or built by the first identity's
-#     workflow path, misses by name. The inputs of slice 2.5.8 (the ref) run
-#     under the same identity, through the same function.
+# 7b: under a second policy file the declared values of that file are the ones
+#     compared (plan slice 2.5.7b, a guard; reworded with plan slice 4.1.2,
+#     the values being declared since slice 4.1.1 and no longer cut from the
+#     releaser identity). The source repository and the workflow path the
+#     script expects are the ones the policy file it is given declares,
+#     whatever they are: not written into the script, not taken from the image
+#     reference or from another role. The cases above have one policy file,
+#     and $REF shares its owner and repository name, so they cannot tell.
+#     Three inputs under a second policy file, whose releaser identity and
+#     declared values (see declared) all differ from the first one's and from
+#     $REF's, owner and repository with a hyphen and a dot: a statement that
+#     meets its five declared values passes, and one from the first file's
+#     source repository, or built by the first file's workflow path, misses
+#     by name. The inputs of slice 2.5.8 (the ref) run under the same second
+#     file, through the same function.
 first_source=$SOURCE; first_workflow=$WORKFLOW
 # runs the command it is given with the second identity in the suite's
 # values: fresh, statement and the helpers called below it read these
@@ -2668,6 +2687,338 @@ no_modes() {
   no_mode "no argument at all, told the three forms" ""
 }
 no_modes
+
+# 23: the five expected values are the ones the policy file declares (plan
+#    slice 4.1.1, FR-2 as sharpened 2026-11-20). The script reads them from
+#    verification.provenance.expectations of the root's policy file
+#    (builder_identity, build_type, source_repository, workflow_path, ref) and
+#    derives none of them from the releaser's identity; cosign is asked as
+#    before, under verification.issuer and verification.roles.releaser.identity.
+#    In every sandbox above the declared five are what the identity's parts
+#    give, so those cases cannot tell a script that reads from one that
+#    derives. Here the policy file declares five values that ALL differ from
+#    what the identity and GitHub's build type give, and none of which is a
+#    part of the declared builder identity either; the releaser's identity is
+#    the suite's first, which can be cut into its parts. The five keys stand
+#    in another order than in this repository's file, the predicate type after
+#    them, and a mapping provenance at the file's top, outside verification,
+#    holds the values the identity gives: only the keys' names under
+#    verification.provenance.expectations find the declared ones.
+#    Three inputs. verify over a statement that carries the declared five:
+#    exit 0, stdout one line begun 'check-provenance: ' that names the
+#    reference and each of the five declared values, nothing on stderr. verify
+#    over a statement that carries the five the identity gives: exit 1, nothing
+#    on stdout, stderr the one error line in its frame with a clause for each
+#    of the five, '<name> is <found>, expected <the declared value>', and
+#    ', expected ' five times. report over two references, the first answered
+#    with the one statement and the second with the other: exit 0, stdout
+#    'covered', a tab and the first, then 'uncovered', a tab, the second, a
+#    tab and verify's line for it with the five clauses, nothing on stderr.
+#    In each run every cosign call is the one of case 1, under the issuer and
+#    the RELEASER's identity, never under the declared builder identity.
+# a fresh sandbox whose policy file declares the five values given, in the
+# order of their names: builder identity, build type, source repository,
+# workflow path, ref
+declaring() {
+  fresh
+  cat > "$SB/root/catalogue-policy.yaml" <<EOF
+provenance:
+  predicate_type: https://slsa.dev/provenance/v1
+  expectations:
+    builder_identity: $RELEASER
+    build_type: $BUILD_TYPE
+    source_repository: $SOURCE
+    workflow_path: $WORKFLOW
+    ref: $GIT_REF
+verification:
+  issuer: $ISSUER
+  provenance:
+    expectations:
+      ref: $5
+      workflow_path: $4
+      source_repository: $3
+      build_type: $2
+      builder_identity: $1
+    predicate_type: https://slsa.dev/provenance/v1
+  roles:
+    re-attester:
+      identity: $RE_ATTESTER
+      attests: [spdxjson, cyclonedx, vuln, openvex]
+    releaser:
+      identity: $RELEASER
+      attests: [spdxjson, cyclonedx, vuln, openvex]
+EOF
+}
+# what a text ($1: the error line, or a line of stdout) lacks of the five
+# clauses ($2...), added to the caller's list wrong: each clause once, and
+# ', expected ' five times
+five_clauses() {
+  local text=$1 each n; shift
+  for each in "$@"; do
+    n=$(printf '%s' "$text" | occurs "$each")
+    [ "$n" -eq 1 ] || wrong+=("the clause '$each' stands in it $n times, wanted once")
+  done
+  n=$(printf '%s' "$text" | occurs ", expected ")
+  [ "$n" -eq 5 ] || wrong+=("', expected ' stands in it $n times, wanted 5, a clause for each of the five and no other")
+}
+# the cosign calls of the run, $2 of them, the n-th about the n-th reference
+# after them, each as case 1 wants it
+asked_as_ever() {
+  local name=$1 total=$2 calls got want nth=0 each; local -a wrong=(); shift 2
+  calls=$(grep -c '' "$SB/cosign.log")
+  [ "$calls" -eq "$total" ] || wrong+=("calls logged: $calls, wanted $total")
+  for each in "$@"; do
+    nth=$((nth + 1)); got=$(sed -n "${nth}p" "$SB/cosign.log" | asked)
+    want=$(echo verify-attestation; printf '%s\n' "--type slsaprovenance1" "--certificate-oidc-issuer $ISSUER" "--certificate-identity $RELEASER" "$each" | LC_ALL=C sort)
+    [ "$got" = "$want" ] || wrong+=("call $nth, wanted about $each under the releaser's identity, as the stub logged it: $(sed -n "${nth}p" "$SB/cosign.log" | grep '' || echo "there is no such call")")
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: cosign is called $total time(s), each under the policy file's issuer and the releaser's identity, with not one argument more" \
+    || fail "$name: the cosign calls the stub logged: $total, each verify-attestation with --type slsaprovenance1, verification.issuer, verification.roles.releaser.identity (not the declared builder identity) and its one reference" \
+         "${wrong[@]}" "the log:" "$([ -s "$SB/cosign.log" ] && cat "$SB/cosign.log" || echo "cosign was never called")"
+}
+declared_values() {
+  local builder="https://builders.example.test/forge/v2" type="https://buildtypes.example.test/forge/v1"
+  local source="https://git.example.test/smiths/anvil" workflow="ci/build.yaml" ref="refs/tags/v2.0.0"
+  local second="registry.example.test/tools/sprocket@sha256:e951d951d900000bf3f37bf37bf37ba2adc7bf32d951d444fa2a2a2a22adf518"
+  local over="the policy file declares five values that all differ from what the releaser identity gives"
+  local name each lines ended as_declared as_derived first_line second_line
+  local -a values=("$builder" "$type" "$source" "$workflow" "$ref") clauses=() wrong=()
+  clauses=(
+    "builder identity is \"$RELEASER\", expected \"$builder\""
+    "build type is \"$BUILD_TYPE\", expected \"$type\""
+    "source repository is \"$SOURCE\", expected \"$source\""
+    "workflow path is \"$WORKFLOW\", expected \"$workflow\""
+    "ref is \"$GIT_REF\", expected \"$ref\""
+  )
+  as_declared=$(statement "${values[@]}"); as_derived=$(all_five)
+
+  name="$over, verify over a statement that carries the declared five"
+  declaring "${values[@]}"
+  envelopes "$as_declared" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$REF"
+  exit_is "$name" 0 "the statement meets the five declared values, and none of the five is derived from the identity"
+  lines=$(grep -c '' "$SB/stdout"); ended=$(wc -l < "$SB/stdout")
+  [ "$lines" -eq 1 ] && [ "$ended" -eq 1 ] || wrong+=("lines on stdout: $lines, of them ended by a newline: $ended, wanted 1 and 1")
+  [[ "$out" == "check-provenance: "* ]] || wrong+=("it is not begun 'check-provenance: '")
+  for each in "$REF" "${values[@]}"; do
+    [[ "$out" == *"$each"* ]] || wrong+=("it does not hold '$each'")
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stdout is one line, begun 'check-provenance: ', naming the reference and each of the five declared values" \
+    || fail "$name: stdout: one line, begun 'check-provenance: ', that names the reference in full and each of the five declared values" \
+         "${wrong[@]}" "stdout:" "${out:-nothing}" "wanted: one line begun 'check-provenance: ' that carries $REF and ${values[*]}"
+  [ ! -s "$SB/stderr" ] && pass "$name: nothing on stderr" \
+    || fail "$name: stderr: nothing" "stderr:" "$(cat "$SB/stderr")" "wanted: nothing"
+  asked_as_ever "$name" 1 "$REF"
+
+  name="$over, verify over a statement that carries the five the identity gives"
+  wrong=()
+  declaring "${values[@]}"
+  envelopes "$as_derived" > "$SB/envelopes.jsonl"
+  run verify "$SB/root" "$REF"
+  exit_is "$name" 1 "the statement meets none of the five declared values: what the identity's parts give is not what is expected"
+  no_stdout "$name"
+  one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
+  in_frame; no_other_failure
+  five_clauses "$err" "${clauses[@]}"
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the error line in its frame, with a clause for each of the five, the value found and the DECLARED value expected" \
+    || fail "$name: stderr: one line and no more, '::error::check-provenance: ', the reference, a reason and ' (Req 2.28)', the reason holding for each of the five the clause '<name> is <found>, expected <the declared value>' once and ', expected ' five times" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: $REF: <words>$(printf '; %s' "${clauses[@]}") (Req 2.28), the words between the clauses free"
+  asked_as_ever "$name" 1 "$REF"
+
+  name="$over, report over a reference with the declared five and one with the five the identity gives"
+  wrong=()
+  declaring "${values[@]}"
+  envelopes "$as_declared" > "$SB/envelopes.jsonl.1"; envelopes "$as_derived" > "$SB/envelopes.jsonl.2"
+  # what no call may get: both calls of this run are answered above
+  : > "$SB/envelopes.jsonl"
+  run report "$SB/root" "$REF" "$second"
+  exit_is "$name" 0 "every reference was asked, and a reference that is not covered does not fail report (Req 2.29)"
+  lines=$(grep -c '' "$SB/stdout"); ended=$(wc -l < "$SB/stdout")
+  first_line=$(sed -n 1p "$SB/stdout"); second_line=$(sed -n 2p "$SB/stdout")
+  [ "$lines" -eq 2 ] && [ "$ended" -eq 2 ] || wrong+=("lines on stdout: $lines, of them ended by a newline: $ended, wanted 2 and 2")
+  [ "$first_line" = "covered"$'\t'"$REF" ] || wrong+=("the first line is not 'covered', one tab and the first reference: the statement with the declared five covers it")
+  [[ "$second_line" == "uncovered"$'\t'"$second"$'\t'"check-provenance: $second: "*" (Req 2.28)" ]] \
+    || wrong+=("the second line is not 'uncovered', one tab, the second reference, one tab and verify's line for it, begun 'check-provenance: ' and the reference and ended ' (Req 2.28)'")
+  five_clauses "$second_line" "${clauses[@]}"
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stdout is 'covered' for the first and 'uncovered' for the second, with the clause of each of the five against its declared value" \
+    || fail "$name: stdout: two lines, 'covered', a tab and the first reference, then 'uncovered', a tab, the second reference, a tab and the line verify ends on for it without '::error::', which holds for each of the five the clause '<name> is <found>, expected <the declared value>' once" \
+         "${wrong[@]}" "stdout (as cat -A shows it: a tab reads ^I, a line's end \$):" "$(cat -A "$SB/stdout" 2>/dev/null | grep '' || echo nothing)" \
+         "wanted, the same way:" "covered^I$REF\$" "uncovered^I$second^Icheck-provenance: $second: <words>$(printf '; %s' "${clauses[@]}") (Req 2.28)\$"
+  [ ! -s "$SB/stderr" ] && pass "$name: nothing on stderr" \
+    || fail "$name: stderr: nothing, report writes no '::error::' line and no attempt failed" "stderr:" "$(cat "$SB/stderr")" "wanted: nothing"
+  asked_as_ever "$name" 2 "$REF" "$second"
+}
+declared_values
+
+# 24: a declaration that cannot serve is refused by name (plan slice 4.1.2,
+#    FR-2's third clause of 2026-11-20). The five expected values and the
+#    predicate type stand under verification.provenance of the root's policy
+#    file, each a string that is not empty, and the type the one this script
+#    asks cosign for: it asks for slsaprovenance1 and nothing else, so a
+#    policy file that declares another type describes a check the script does
+#    not make. A declaration that is absent, lacks one of the six, holds one
+#    as anything but a string that is not empty, or declares another type
+#    cannot serve: the check is not made, and whoever broke the file is told
+#    which key, as for the issuer and the identity in case 10, not shown a
+#    python trace and not a statement blamed for the file's fault.
+#    Every input is the policy file as fresh writes it with the one fault,
+#    over a sandbox in which every cosign call would be answered with a
+#    statement that meets all five, so that a script that asks anyway gets an
+#    answer that passes. 41 inputs under verify: the section
+#    verification.provenance absent, expectations absent under it, provenance
+#    a string, expectations a list (each of the five behind a dash); each of
+#    the five expectations in turn absent, null, the empty string, a number, a
+#    list, a mapping; the predicate type absent, null, the empty string, a
+#    number, and three strings that are not the type: provenance v0.2, one
+#    that begins with the right text (v1.1), and cosign's own word for the
+#    type, slsaprovenance1. Eight of them again over three references, four
+#    under report and four under require, one of each family in each mode (the
+#    section, an expectation, the type as no string, the type as another
+#    string): the modes share the reading, so a sample across them shows that
+#    the refusal comes before the modes part, and all 41 under each would show
+#    no more.
+#    Wanted of each: exit 2; nothing on stdout; stderr exactly one line, begun
+#    '::error::check-provenance: ', that names the file catalogue-policy.yaml
+#    and the key by its dotted path, and holds nothing of python's or the
+#    shell's own words; cosign never called. For an expectation or the type
+#    the key named is that one and none of the other five. For the section
+#    absent or of the wrong shape it is a key under it, which one is left
+#    free. For a type that is another string the line holds the value found
+#    as well and, beside it, the value the script checks for.
+# stdin, with the line begun $1 taken out and $2 put in its place (empty:
+# nothing in its place, the key is absent)
+with_line() {
+  local line
+  while IFS= read -r line; do
+    if [[ "$line" != "$1"* ]]; then printf '%s\n' "$line"
+    elif [ -n "$2" ]; then printf '%s\n' "$2"
+    fi
+  done
+}
+# the policy file as fresh writes it
+declaring_all() { policy_with "  issuer: $ISSUER" "      identity: $RELEASER"; }
+# the same with the one fault: the expectation whose key ends in $1 and whose
+# declared value is $2, held as $3 (absent, null, empty, number, list, mapping)
+faulty_expectation() {
+  local at="      $1:" line=""
+  case $3 in
+    null)    line="$at ~" ;;
+    empty)   line="$at \"\"" ;;
+    number)  line="$at 7" ;;
+    list)    line="$at"$'\n'"        - \"$2\"" ;;
+    mapping) line="$at"$'\n'"        value: \"$2\"" ;;
+  esac
+  declaring_all | with_line "$at" "$line"
+}
+# the same with $1 for what stands after the predicate type's key (the word
+# absent: the key is not there)
+faulty_type() {
+  local at="    predicate_type:" line=""
+  [ "$1" = absent ] || line="$at $1"
+  declaring_all | with_line "$at" "$line"
+}
+# the six keys of the declaration by their dotted paths, the five expectations
+# in the order of their names and then the type, and the type the script
+# asks cosign for, as a policy file has to declare it
+DECLARED_KEYS=(
+  verification.provenance.expectations.builder_identity
+  verification.provenance.expectations.build_type
+  verification.provenance.expectations.source_repository
+  verification.provenance.expectations.workflow_path
+  verification.provenance.expectations.ref
+  verification.provenance.predicate_type
+)
+CHECKED_TYPE="https://slsa.dev/provenance/v1"
+# One input: $1 is the mode word, $2 names the fault, $3 is the policy file's
+# text; the arguments after them are the keys of which the line names one or
+# more. With one key given the line names none of the other five. Under
+# verify the script is asked about the suite's reference, under report and
+# require about three. Where the caller names in FOUND the value the file
+# holds as its type, the line holds that value and, with every copy of it
+# taken out, still the type the script checks for
+declaration_refused() {
+  local mode=$1 name="$1, $2" policy=$3 key named=no each rest; local -a wrong=() refs=("$REF"); shift 3
+  [ "$mode" = verify ] || refs=(
+    "registry.example.test/tools/sprocket@sha256:7c1e9a3b5d2f4a6c8e0b1d3f5a7c9e2b4d6f8a0c1e3b5d7f9a2c4e6b8d0f1a3c"
+    "$REF"
+    "ghcr.io/acme/anvil@sha256:e4a1c8f2b6d09e3a7c5b1f8d2e6a4c0b9f7d3e1a5c8b2f6d0e4a9c7b3f1d5e8a"
+  )
+  fresh
+  printf '%s\n' "$policy" > "$SB/root/catalogue-policy.yaml"
+  envelopes "$(all_five)" > "$SB/envelopes.jsonl"
+  run "$mode" "$SB/root" "${refs[@]}"
+  exit_is "$name" 2 "a declaration that cannot serve is the policy file's fault, the check is not made"
+  [ ! -s "$SB/stdout" ] && pass "$name: nothing on stdout" \
+    || fail "$name: stdout: nothing, no line says that a digest passed or is covered" \
+         "stdout (as cat -A shows it: a tab reads ^I, a line's end \$):" "$(cat -A "$SB/stdout" 2>/dev/null | grep '' || echo nothing)" "wanted: nothing"
+  one_line "$SB/stderr" || wrong+=("stderr is not exactly one line, ended by its newline: lines on it: $(grep -c '' "$SB/stderr"), of them ended by a newline: $(wc -l < "$SB/stderr")")
+  begun_error
+  [[ "$err" == *"catalogue-policy.yaml"* ]] || wrong+=("it does not name the file catalogue-policy.yaml")
+  for key in "$@"; do [[ "$err" == *"$key"* ]] && named=yes; done
+  [ "$named" = yes ] || wrong+=("it names no key by its dotted path, wanted: $(printf '%s' "$*" | sed 's/ / or /g')")
+  if [ $# -eq 1 ]; then
+    for each in "${DECLARED_KEYS[@]}"; do
+      [ "$each" = "$1" ] || [[ "$err" != *"$each"* ]] || wrong+=("it names $each, a key that is not at fault")
+    done
+  fi
+  if [ -n "${FOUND:-}" ]; then
+    [[ "$err" == *"$FOUND"* ]] || wrong+=("it does not hold '$FOUND', the value found at the key")
+    rest=${err//"$FOUND"/}
+    [[ "$rest" == *"$CHECKED_TYPE"* ]] || wrong+=("it does not hold '$CHECKED_TYPE' beside the value found, the type the script checks for")
+  fi
+  for each in "Traceback" 'File "' "AttributeError" "TypeError" "KeyError" "unbound variable" "command not found"; do
+    [[ "$err" != *"$each"* ]] || wrong+=("it holds '$each', python's or the shell's own words")
+  done
+  [ "${#wrong[@]}" -eq 0 ] && pass "$name: stderr is one line, the script's error line, which names catalogue-policy.yaml and the key${FOUND:+, the value found and the type the script checks for} and holds nothing of python's or the shell's" \
+    || fail "$name: stderr: one line and no more, begun '::error::check-provenance: ', that names catalogue-policy.yaml and the key by its dotted path${FOUND:+, holds the value found and the type the script checks for} and nothing of python's or the shell's own words" \
+         "${wrong[@]}" "stderr:" "${err:-nothing}" "wanted: ::error::check-provenance: <a reason that names catalogue-policy.yaml and $(printf '%s' "$*" | sed 's/ / or /g')${FOUND:+, and holds $FOUND and $CHECKED_TYPE}>"
+  never_asked "$name" "a declaration that cannot serve ends the run before cosign is asked about any reference"
+}
+declaration_faults() {
+  local kp=verification.provenance ke=verification.provenance.expectations kt=verification.provenance.predicate_type
+  local n kind what text other
+  local -a five=("${DECLARED_KEYS[@]:0:5}") goods=("$RELEASER" "$BUILD_TYPE" "$SOURCE" "$WORKFLOW" "$GIT_REF")
+  local -a kinds=(absent null empty number list mapping)
+  local -a words=("absent" "null, written ~" "the empty string, written \"\"" "a number" "a list" "a mapping")
+  local -a sections=() shapes=()
+  # the section and its shape: from the key provenance, or from expectations,
+  # down to the last of the five, which fresh writes last
+  sections=("$kp is absent" "$ke is absent" "$kp is a string" "$ke is a list, each of the five behind a dash")
+  shapes=(
+    "$(declaring_all | sed '/^  provenance:/,/^      ref:/d')"
+    "$(declaring_all | sed '/^    expectations:/,/^      ref:/d')"
+    "$(declaring_all | sed -e '/^    predicate_type:/,/^      ref:/d' -e 's/^  provenance:$/  provenance: a string/')"
+    "$(declaring_all | sed '/^    expectations:/,/^      ref:/s/^      \([a-z_]*: \)/      - \1/')"
+  )
+  declaration_refused verify "${sections[0]}" "${shapes[0]}" "${DECLARED_KEYS[@]}"
+  declaration_refused verify "${sections[1]}" "${shapes[1]}" "${five[@]}"
+  declaration_refused verify "${sections[2]}" "${shapes[2]}" "${DECLARED_KEYS[@]}"
+  declaration_refused verify "${sections[3]}" "${shapes[3]}" "${five[@]}"
+  for n in 0 1 2 3 4; do
+    for kind in 0 1 2 3 4 5; do
+      declaration_refused verify "${five[n]} is ${words[kind]}" "$(faulty_expectation "${five[n]##*.}" "${goods[n]}" "${kinds[kind]}")" "${five[n]}"
+    done
+  done
+  declaration_refused verify "$kt is absent" "$(faulty_type absent)" "$kt"
+  declaration_refused verify "$kt is null, written ~" "$(faulty_type "~")" "$kt"
+  declaration_refused verify "$kt is the empty string, written \"\"" "$(faulty_type '""')" "$kt"
+  declaration_refused verify "$kt is a number" "$(faulty_type 1)" "$kt"
+  for other in "https://slsa.dev/provenance/v0.2" "${CHECKED_TYPE}.1" "slsaprovenance1"; do
+    FOUND=$other declaration_refused verify "$kt is $other, another type than the script checks for" "$(faulty_type "$other")" "$kt"
+  done
+  # the sample across the other two modes, over three references
+  declaration_refused report "${sections[0]}" "${shapes[0]}" "${DECLARED_KEYS[@]}"
+  declaration_refused report "${five[1]} is ${words[2]}" "$(faulty_expectation build_type "$BUILD_TYPE" empty)" "${five[1]}"
+  declaration_refused report "$kt is absent" "$(faulty_type absent)" "$kt"
+  other="https://slsa.dev/provenance/v0.2"
+  FOUND=$other declaration_refused report "$kt is $other, another type than the script checks for" "$(faulty_type "$other")" "$kt"
+  declaration_refused require "${sections[3]}" "${shapes[3]}" "${five[@]}"
+  declaration_refused require "${five[4]} is ${words[3]}" "$(faulty_expectation ref "$GIT_REF" number)" "${five[4]}"
+  declaration_refused require "$kt is a number" "$(faulty_type 1)" "$kt"
+  other="${CHECKED_TYPE}.1"
+  FOUND=$other declaration_refused require "$kt is $other, another type than the script checks for" "$(faulty_type "$other")" "$kt"
+}
+declaration_faults
 
 # every run of the script above, held to what it left behind and to the
 # stub's note of its cosign calls (plan slice 2.5.3b, see run); a later case

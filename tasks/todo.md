@@ -549,8 +549,16 @@ left of the program is the follow-up list below, one decision each.
           suite at 1135), 3.3 the status tool and `rescan.yml`; the
           manual's section on the coverage line
     - [ ] the pull request; the owner merges
-    - [ ] the first rescan after the merge read: the coverage line in
-          the status data and the issue
+    - [x] the first rescan after the merge read: run 44644239646 of
+          2026-11-20, the line reads 21 of 21 (mode report); the run is
+          red on the posture step's ruleset read, the rate limit item
+          below, not on this step
+  - [ ] 18.5 by the plan's phase 4, the owner's go of 2026-11-20:
+    - [x] 4.1 the declaration and its two readers, 4.2 the rule under
+          `required`, 4.3 the consumer step, 4.4 the smoke test's report
+    - [ ] the pull request; the owner merges
+    - [ ] Kyverno applying the required shape to a digest without
+          provenance and to one with it (a run in Actions, the owner's go)
   - [ ] Candidate, the owner's idea of 2026-11-13, not started: reshape
         the pipeline into local composite actions where a group of steps
         is one unit (the provenance trio a first candidate). Its own
