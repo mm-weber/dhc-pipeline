@@ -53,17 +53,17 @@ WHEN the release's self-check runs THE CI Pipeline SHALL check the index and eve
 
 **Acceptance criteria:**
 
-- [ ] A release run whose digest and every platform manifest carry the attestation, verified with ADR 0005's verifier against the declared identity and expectations
-- [ ] The builder identity, build type, repository, workflow path, ref and commit in the predicate equal the token's claims (read from the run)
-- [ ] On that released digest cosign 2.6.5 still verifies the signature and every other attestation, and no `sha256-<hex>` tag without a suffix exists (added 2026-11-13)
-- [ ] `unpack-provenance_test.sh` and `check-provenance_test.sh` green: the layer's five parts, the other layers untouched, a second unpack replacing its own layer, each refusal by name with nothing written (added 2026-11-13)
-- [ ] `check-provenance_test.sh`: a policy file that cannot be opened, one that cannot be read as YAML, a `python3` without its yaml module, a tool missing from `PATH` (`cosign`, `jq`, `python3`) and a `mktemp` that fails each end the self-check with exit 2 and one line that names that cause and no other, before cosign is asked (added 2026-11-17; plan 2.5.14)
-- [ ] `check-provenance_test.sh`: a releaser identity without a scheme, a reference whose image name holds an `@`, and a pause between attempts that is no whole number of seconds are refused the same way; a pause variable that is not set, or set and empty, means 10 seconds (added 2026-11-17; plan 2.5.15)
-- [ ] `unpack-provenance_test.sh`: a later statement of another predicate type naming the same digest leaves the provenance statement stored; a bundles file that is not JSON, an entry that is no bundle, and a bundle without its certificate, its integrated time, its log index or its log's id are each refused with one error line naming the digest and what could not be read, nothing pulled and nothing pushed (added 2026-11-18; plan 2.9.1 to 2.9.3)
-- [ ] `unpack-provenance_test.sh`: a manifest the registry calls unknown is refused after one pull, with no warning line; three pulls failed for another cause end with a line that says the pull failed and does not say the manifest is absent; `provenance-real_test.sh` holds what the pinned crane says of a tag that is not there (added 2026-11-18; plan 2.9.4, 2.9.5)
-- [ ] `unpack-provenance_test.sh`: a manifest rewritten between the store's pull and its push is not overwritten with the stale layout, the layer is prepared again on the manifest now there and the other writer's layer is kept; a manifest that keeps changing is refused by name after three attempts (added 2026-11-18; plan 2.9.6, 2.9.7)
-- [ ] The self-check step asks every digest and ends red when one fails, the others asked all the same (`build.yml`, by hand; `lint-release-steps.sh` green; added 2026-11-18; plan 2.9.8)
-- [ ] `lint-workflow-policy.sh .` green with `attestations: write` declared; the rescan workflow attests no provenance
+- [x] A release run whose digest and every platform manifest carry the attestation, verified with ADR 0005's verifier against the declared identity and expectations
+- [x] The builder identity, build type, repository, workflow path, ref and commit in the predicate equal the token's claims (read from the run)
+- [x] On that released digest cosign 2.6.5 still verifies the signature and every other attestation, and no `sha256-<hex>` tag without a suffix exists (added 2026-11-13)
+- [x] `unpack-provenance_test.sh` and `check-provenance_test.sh` green: the layer's five parts, the other layers untouched, a second unpack replacing its own layer, each refusal by name with nothing written (added 2026-11-13)
+- [x] `check-provenance_test.sh`: a policy file that cannot be opened, one that cannot be read as YAML, a `python3` without its yaml module, a tool missing from `PATH` (`cosign`, `jq`, `python3`) and a `mktemp` that fails each end the self-check with exit 2 and one line that names that cause and no other, before cosign is asked (added 2026-11-17; plan 2.5.14)
+- [x] `check-provenance_test.sh`: a releaser identity without a scheme, a reference whose image name holds an `@`, and a pause between attempts that is no whole number of seconds are refused the same way; a pause variable that is not set, or set and empty, means 10 seconds (added 2026-11-17; plan 2.5.15)
+- [x] `unpack-provenance_test.sh`: a later statement of another predicate type naming the same digest leaves the provenance statement stored; a bundles file that is not JSON, an entry that is no bundle, and a bundle without its certificate, its integrated time, its log index or its log's id are each refused with one error line naming the digest and what could not be read, nothing pulled and nothing pushed (added 2026-11-18; plan 2.9.1 to 2.9.3)
+- [x] `unpack-provenance_test.sh`: a manifest the registry calls unknown is refused after one pull, with no warning line; three pulls failed for another cause end with a line that says the pull failed and does not say the manifest is absent; `provenance-real_test.sh` holds what the pinned crane says of a tag that is not there (added 2026-11-18; plan 2.9.4, 2.9.5)
+- [x] `unpack-provenance_test.sh`: a manifest rewritten between the store's pull and its push is not overwritten with the stale layout, the layer is prepared again on the manifest now there and the other writer's layer is kept; a manifest that keeps changing is refused by name after three attempts (added 2026-11-18; plan 2.9.6, 2.9.7)
+- [x] The self-check step asks every digest and ends red when one fails, the others asked all the same (`build.yml`, by hand; `lint-release-steps.sh` green; added 2026-11-18; plan 2.9.8)
+- [x] `lint-workflow-policy.sh .` green with `attestations: write` declared; the rescan workflow attests no provenance
 
 ### FR-2: The declaration and the policy rule (Req 2.23, 2.28, 7.7)
 
@@ -83,8 +83,8 @@ IF the committed policy or a committed instruction block differs from what the p
 
 **Acceptance criteria:**
 
-- [ ] `render-verification.sh --check` green in every shape (mode `off` or `report`: no rule; `required`: the rule), each shape covered by a suite case
-- [ ] An offline `kyverno apply` of the required shape rejecting a pre-track supported digest by name and admitting a post-track digest
+- [x] `render-verification.sh --check` green in every shape (mode `off` or `report`: no rule; `required`: the rule), each shape covered by a suite case
+- [x] An offline `kyverno apply` of the required shape rejecting a pre-track supported digest by name and admitting a post-track digest
 
 ### FR-3: Coverage reported daily (Req 2.29)
 
@@ -104,8 +104,8 @@ WHILE the policy file's provenance mode is report or required THE Scan Pipeline 
 
 **Acceptance criteria:**
 
-- [ ] `check-provenance.sh` suite green (report and require modes): one line per reference in the order given, an uncovered reference reported with exit 0 and no error line, a check that cannot be made ending with exit 2 before any reference is asked, `require` ending with exit 1 and one error line per uncovered reference after all were asked (sharpened 2026-11-19; plan 3.1, 3.2)
-- [ ] A scheduled rescan whose status data and issue carry the coverage line, the uncovered digests named
+- [x] `check-provenance.sh` suite green (report and require modes): one line per reference in the order given, an uncovered reference reported with exit 0 and no error line, a check that cannot be made ending with exit 2 before any reference is asked, `require` ending with exit 1 and one error line per uncovered reference after all were asked (sharpened 2026-11-19; plan 3.1, 3.2)
+- [ ] A scheduled rescan whose status data and issue carry the coverage line, the uncovered digests named (2026-11-20: the coverage line ran in a dispatched rescan, 44644239646, "21 of 21"; a scheduled one in the mode `report` is the first after #426, carried in `tasks/todo.md`)
 
 ### FR-4: Consumer instructions and the smoke test (Req 2.25, 9.13)
 
@@ -113,8 +113,8 @@ THE Repository SHALL give in its verification instructions one step verifying a 
 
 **Acceptance criteria:**
 
-- [ ] README and manual blocks rendered, drift check green
-- [ ] `consumer-smoke_test.sh` holds a case where an empty provenance result fails (finding 2.4 of the 2026-09-09 review)
+- [x] README and manual blocks rendered, drift check green
+- [x] `consumer-smoke_test.sh` holds a case where an empty provenance result fails (finding 2.4 of the 2026-09-09 review)
 
 ### FR-5: The claim, stated (Req 9.19)
 
@@ -122,7 +122,7 @@ THE Repository SHALL state in `SECURITY.md` the SLSA Build level it claims, meas
 
 **Acceptance criteria:**
 
-- [ ] The SLSA section in `SECURITY.md`; `docs/concepts.md`'s "L2-ish" sentence replaced; the trust-boundary table names the provenance service
+- [x] The SLSA section in `SECURITY.md`; `docs/concepts.md`'s "L2-ish" sentence replaced; the trust-boundary table names the provenance service
 
 ### FR-6: The evidence (Req 7.11)
 
@@ -130,7 +130,7 @@ THE Repository SHALL flip ledger rows 2.27, 2.29 and 2.30 to `exercised`, measur
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` green; `scripts/lint-log-anchors.sh all .` green; task group 18 ticked; this track listed under Completed
+- [x] `scripts/lint-live-evidence.sh .` green; `scripts/lint-log-anchors.sh all .` green; task group 18 ticked; this track listed under Completed
 
 ### FR-7: The provenance mode and its off position (Req 2.30, 7.7; added 2026-11-11, the owner's call)
 
@@ -138,8 +138,8 @@ THE Repository SHALL declare in `catalogue-policy.yaml`'s release section one pr
 
 **Acceptance criteria:**
 
-- [ ] `release-policy_test.sh` holds the three accepted values and a refusal by name for a missing key and for a value outside them
-- [ ] One release with the mode `off` through a normal pull request and back: every other signature and attestation present, no provenance attestation, the rescan's line stating that provenance is off
+- [x] `release-policy_test.sh` holds the three accepted values and a refusal by name for a missing key and for a value outside them
+- [x] One release with the mode `off` through a normal pull request and back: every other signature and attestation present, no provenance attestation, the rescan's line stating that provenance is off
 
 ## Scope
 
@@ -184,7 +184,7 @@ THE Repository SHALL declare in `catalogue-policy.yaml`'s release section one pr
 - [x] The mechanism: GitHub's provenance service (decided 2026-10-28)
 - [x] When the requirement binds: the successor's epoch (decided 2026-10-28)
 - [x] One provenance mode with an `off` position, built with task 18.3 (decided 2026-11-11)
-- [ ] The spike's scratch repository name outside the catalogue namespace (drafted: `ghcr.io/mm-weber/slsa-spike`, deleted after ADR 0005)
+- [ ] The spike's scratch repository name outside the catalogue namespace (drafted: `ghcr.io/mm-weber/slsa-spike`, deleted after ADR 0005) (the name was used and never inside the catalogue namespace; the package, pull request #401 and its branch are still there, the owner's to remove, carried in `tasks/todo.md`)
 - [x] If 18.2 finds only cosign v3 reads the bundle: not the case (cosign 2.6.5 reads it); ADR 0003's gate stays shut
 - [x] Where the provenance is stored: unpacked into the `.att` layout beside the digest, no bundle in the registry (decided 2026-11-13, after paths 3, 4 and the sibling repository were ruled out on 2026-11-12)
 

@@ -358,7 +358,7 @@ left of the program is the follow-up list below, one decision each.
 
 ## Open items outside the drills (one decision each, the owner's)
 
-- [ ] SLSA Build L2, task group 18 (opened 2026-10-28, conductor track
+- [x] SLSA Build L2, task group 18 (opened 2026-10-28, conductor track
       slsa-build-l2_20261028): measured against SLSA v1.2, provenance is
       attached but neither signed nor verified, and BuildKit writes it from
       the job's own values. Owner's calls of 2026-10-28: GitHub's provenance
@@ -466,7 +466,7 @@ left of the program is the follow-up list below, one decision each.
         owner's call: `report` keeps withholding a release whose
         provenance cannot be produced; both scripts get retries and
         thorough tests.
-  - [ ] 18.3 by the plan's phase 2, each step after the owner's go:
+  - [x] 18.3 by the plan's phase 2, each step after the owner's go:
     - [x] 2.1 one measuring run on #401: one statement naming the index
           and a platform manifest (`subject-checksums`), unpacked beside
           both, verified on both by cosign 2.6.5, Kyverno 1.19.2 and
@@ -540,30 +540,39 @@ left of the program is the follow-up list below, one decision each.
           digest (spike run 44411812054, the owner's go); the next rescan
           read (run 44500579834, dispatched); the plan's verification
           list has each read
-    - [ ] the first scheduled release read: it waits for the first day
+    - [ ] CARRIED, a read: the first scheduled release read: it waits for the first day
           a scheduled rebuild differs from the released digest (the
           scheduled build of 2026-11-19, run 44538564027, found all
           seven unchanged and published nothing)
-  - [ ] 18.4 by the plan's phase 3, the owner's go of 2026-11-19:
+  - [x] 18.4 by the plan's phase 3, the owner's go of 2026-11-19:
     - [x] 3.1 report mode, 3.2 require mode (`check-provenance.sh`,
           suite at 1135), 3.3 the status tool and `rescan.yml`; the
           manual's section on the coverage line
-    - [ ] the pull request; the owner merges
+    - [x] the pull request #421, merged 2026-11-19
     - [x] the first rescan after the merge read: run 44644239646 of
           2026-11-20, the line reads 21 of 21 (mode report); the run is
           red on the posture step's ruleset read, the rate limit item
           below, not on this step
-  - [ ] 18.5 by the plan's phase 4, the owner's go of 2026-11-20:
+  - [x] 18.5 by the plan's phase 4, the owner's go of 2026-11-20:
     - [x] 4.1 the declaration and its two readers, 4.2 the rule under
           `required`, 4.3 the consumer step, 4.4 the smoke test's report
     - [x] the pull request #422, merged 2026-11-20
-    - [ ] Kyverno applying the required shape to a digest without
-          provenance and to one with it (a run in Actions; the owner's
-          call of 2026-11-20: with phase 6)
-  - [ ] 18.6 by the plan's phase 5, the owner's word of 2026-11-20:
+    - [x] Kyverno applying the required shape to a digest without
+          provenance and to one with it: spike run 44749286832 of
+          2026-11-20, the one without rejected, the one with admitted
+  - [x] 18.6 by the plan's phase 5, the owner's word of 2026-11-20:
     - [x] `SECURITY.md` "SLSA Build level", `docs/concepts.md`, the
           design's Security Considerations, the manual's glossary
-    - [ ] the pull request; the owner merges
+    - [x] the pull request #423, merged 2026-11-20
+  - [x] 18.7 by the plan's phase 6, the owner's go of 2026-11-20: the
+        Kyverno read of the `required` rule, the `off` flip (#425) and back
+        (#426), the ledger rows and the LOG entry of 2026-11-20
+    - [ ] CARRIED, a read: the first scheduled rescan in the mode `report`
+          after #426, its status line "21 of 21" (FR-3's last criterion;
+          its smoke test is also the provenance step's first daily run)
+    - [ ] CARRIED, the owner's: remove the spike's scratch package
+          `ghcr.io/mm-weber/slsa-spike`, close #401 unmerged, delete the
+          branch `slsa-spike` (ADR 0005 and the LOG keep the record)
   - [ ] Candidate, the owner's idea of 2026-11-13, not started: reshape
         the pipeline into local composite actions where a group of steps
         is one unit (the provenance trio a first candidate). Its own

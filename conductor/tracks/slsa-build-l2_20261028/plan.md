@@ -31,7 +31,7 @@ Dependency: phase 0 merged. Worktree `slsa-spike`. [OPERATOR: one dispatch on th
 
 - [x] **1.1 The spike workflow** on a branch only, never merged: build a scratch image, push it to the scratch repository outside `verification.registry`, attest it with `actions/attest-build-provenance` pinned by commit, `push-to-registry: true`, subjects one index and one platform manifest
 - [x] **1.2 The reads**: the predicate as emitted (builder id, build type, external parameters, resolved dependencies), the bundle's location and artifact type, an anonymous read; verification by Kyverno 1.19.1, cosign 2.6.5, `gh attestation verify --bundle-from-oci` (with and without a login), Trivy 0.72.0 if it reads it (measured at the pins of the day, Kyverno 1.19.2 and Trivy 0.76.1; without a login the GitHub client refused to start inside Actions, so that half stays unmeasured)
-- [ ] **1.3 The record**: `data/slsa-provenance-spike-<date>.md` and `docs/decisions/0005-slsa-provenance-verifier.md` naming the policy verifier, the consumer command and the five expectations' exact values; the scratch package deleted; if only cosign v3 reads the bundle, the owner's call on ADR 0003 before phase 2
+- [ ] **1.3 The record**: `data/slsa-provenance-spike-<date>.md` and `docs/decisions/0005-slsa-provenance-verifier.md` naming the policy verifier, the consumer command and the five expectations' exact values; the scratch package deleted; if only cosign v3 reads the bundle, the owner's call on ADR 0003 before phase 2 (2026-11-20: the record and ADR 0005 stand; the scratch package is the one part left, the owner's, carried in `tasks/todo.md`)
   - Written 2026-11-11: `data/slsa-provenance-spike-2026-11-11.md`, ADR 0005; the pinned cosign 2.6.5 reads the bundle, so ADR 0003's gate is not triggered. Open: the scratch package `ghcr.io/mm-weber/slsa-spike` (six image tags, twelve bundle tags) is the owner's to delete, the workspace token cannot; #401 closed unmerged after this record merges
 
 ### Verification
@@ -368,7 +368,8 @@ The review (a subagent running the code-review skill on the pull request, read-o
   - Kept on purpose: the test of the releaser identity's form (case 10c). The identity is no longer cut into parts, but it is still what cosign is asked under, and a malformed one would otherwise cost three attempts before it showed
   - Not built: a single quote inside a declared value would end the shell quoting of the rendered jq program (no declared value holds one; a lint or a refusal would be its own slice). Nothing checks that the declared builder identity equals the releaser's identity or that the three parts agree with it: a fork that edits one and not the other gets a self-check that fails by name at its first release, which is where it would be seen. Which key is named when both an expectation and the type are at fault is left free. The suite's header comment in `check-provenance_test.sh` still says the five are derived
   - shellcheck 0.9.0: nothing in `check-provenance.sh` and `render-verification.sh`; one note in `consumer-smoke.sh` at its usage line, which this branch did not touch (`A && B || C`, where C is an `exit`, so the case the note warns of cannot occur)
-- [ ] An offline `kyverno apply` of the required shape rejecting a digest without provenance and admitting one with it (recorded for phase 6). Kyverno needs Sigstore's trust root, so this is a run in Actions on the owner's go, as in phase 2; every supported digest carries provenance since 2026-11-18, so the digest to be rejected is a superseded one
+- [x] An offline `kyverno apply` of the required shape rejecting a digest without provenance and admitting one with it (recorded for phase 6). Kyverno needs Sigstore's trust root, so this is a run in Actions on the owner's go, as in phase 2; every supported digest carries provenance since 2026-11-18, so the digest to be rejected is a superseded one
+  - Done 2026-11-20 with phase 6, the owner's call: spike run 44749286832 on #401 (read-only). Kyverno 1.19.2 applied the policy as `render-verification.sh` renders it from main's policy file (7420bb7): under `required` hardened-app's digest de937d87086d (with provenance) was admitted and its 0.1.0 digest c559928e156c (released before the provenance steps) rejected, "attestations not found for predicate type https://slsa.dev/provenance/v1"; under `report` both were admitted
 
 ## Phase 5: the claim, stated (task 18.6)
 
@@ -389,16 +390,19 @@ The review (a subagent running the code-review skill on the pull request, read-o
 
 ### Tasks
 
-- [ ] **6.1 The reads**: the first release after phase 2 and the first rescan after phase 3, with run ids; the offline must-reject and must-admit from phase 4; the `off` flip: one release with the mode `off` through a normal pull request and back the same day, read for every other attestation present, no provenance attestation and the rescan's line
-- [ ] **6.2 The ledger and the LOG**: rows 2.27, 2.29 and 2.30 exercised, 9.19 measured present, 2.28 left to 12.1; the LOG entry; group 18 ticked; this track closed
+- [x] **6.1 The reads**: the first release after phase 2 and the first rescan after phase 3, with run ids; the offline must-reject and must-admit from phase 4; the `off` flip: one release with the mode `off` through a normal pull request and back the same day, read for every other attestation present, no provenance attestation and the rescan's line
+  - Done 2026-11-20, with run ids in the LOG entry of that day and the ledger: first release 44353893731 (and dispatched 44406052456); first rescan 44644239646; the `required` rule 44749286832; the `off` flip #425 (build 44763409487, rescan 44764641823) and back #426 (build 44774440142). The statement's commit read against the run: 55787b2 both
+- [x] **6.2 The ledger and the LOG**: rows 2.27, 2.29 and 2.30 exercised, 9.19 measured present, 2.28 left to 12.1; the LOG entry; group 18 ticked; this track closed
+  - Done 2026-11-20: rows 2.27, 2.29, 2.30 exercised, 9.19 exercised as measured present, 2.28 unexercised with the Kyverno read in its evidence; rows 2.10 and 2.25 brought up to date; the LOG entry; group 18 ticked in `tasks.md`; the track listed under Completed with three carried items (below)
 
 ### Verification
 
-- [ ] `scripts/lint-live-evidence.sh .` and `scripts/lint-log-anchors.sh all .` green
+- [x] `scripts/lint-live-evidence.sh .` and `scripts/lint-log-anchors.sh all .` green
 
 ## Final verification
 
 - [ ] Every FR's acceptance criteria met
-- [ ] Every touched suite and real-repository lint green
-- [ ] Documentation updated (README, manual, SECURITY.md, concepts.md)
-- [ ] The successor's 12.1 bullet carries the switch-on
+  - All met but two, carried in `tasks/todo.md` because each is a read or a removal, nothing to build: FR-3's scheduled rescan with the coverage line (a dispatched one carried it), and the scope item of the spike's scratch package (the owner's). Phase 2's first scheduled release is carried the same way
+- [x] Every touched suite and real-repository lint green
+- [x] Documentation updated (README, manual, SECURITY.md, concepts.md)
+- [x] The successor's 12.1 bullet carries the switch-on
