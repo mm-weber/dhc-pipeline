@@ -163,7 +163,8 @@ hatch for *computation*, never for *acquisition*. (See `triage/LOG.md`,
   repository's releases carried that and no more until 2026-11-18. Signing the image
   did not lift that, because a signature on the image says who published it
   and nothing about how it was built, and no verifier read the provenance.
-  Since 2026-11-18 a release also stores a statement that GitHub's provenance
+  Since 2026-11-18 a release made while the provenance mode is not `off` also
+  stores a statement that GitHub's provenance
   service generates from the job's signed identity token and signs under the
   release workflow's identity, and the release checks it before tagging: that
   is provenance of L2 grade. The level claimed stays L1 while the

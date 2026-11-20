@@ -37,6 +37,10 @@ digests, platforms, whether each digest was scanned, attested and admitted by
 the verification policy that day, findings by severity, lapsing exceptions),
 the clocks beneath, the status data itself beside it.
 
+**How it works, at a glance:** [the lanes](docs/lanes.md), one graph per lane
+of the pipeline, each step naming the requirement and the design decision it
+rests on.
+
 ## Layout
 
 | Path | What |
