@@ -110,8 +110,10 @@ distributed with it, inside the index. The legacy stratum before that date
 ("Digest states, the epoch, retention") is outside the claim.
 
 **Attested beyond the claim: provenance of Build L2 grade**, on every digest
-released from the release of 2026-11-18, 17:01 UTC, on (build run
-44353893731). For the index and each platform manifest a release
+released while the provenance mode is not `off`, from the release of
+2026-11-18, 17:01 UTC, on (build run 44353893731). One release has run under
+`off` since: the proof of that position on 2026-11-20 (build run
+44763409487), whose digest was released again with provenance the same day. For the index and each platform manifest a release
 stores one provenance statement (predicate type
 `https://slsa.dev/provenance/v1`) beside the digest's other attestations.
 GitHub's provenance service generates it from the release job's signed

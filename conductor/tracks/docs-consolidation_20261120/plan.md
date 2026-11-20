@@ -13,13 +13,14 @@ Seven phases, one pull request each. Phase 0 is this pull request: the track, De
 
 - [x] **0.1 The track**: this folder, `conductor/tracks.md`, `conductor/index.md`
 - [x] **0.2 The spec amendment**: requirements 9.20 (relative links resolve) and 9.21 (every lane drawn) with the dated paragraph; design Decision 16 (the documentation map); task group 19 and the coverage row; ledger rows 9.20 and 9.21 unexercised, each with its reason
-- [ ] **0.3 The pull request**; the owner merges
+- [x] **0.3 The pull request**; the owner merges (#428, 2026-11-20)
 
 ## Phase 1: the lanes document and the SLSA provenance lane (task 19.2)
 
-- [ ] **1.1 `docs/lanes.md`**: what a lane is, how to read a graph (a box is a step, its label names the criterion and the decision, a click leads to the explanation), the lane map with every lane as a node (only SLSA expanded yet)
-- [ ] **1.2 The SLSA provenance lane**: the release side (name the subjects, attest, store, verify, tag), the rescan side (coverage, the status line), the consumer side (the recipe step, the Kyverno rule under `required`), and the three modes as the branch points; each step naming Req 2.9, 2.27 to 2.30, 9.19 and Decision 15 or ADR 0005 where it rests on them
-- [ ] **1.3 Rendered and read**: each graph rendered by the Mermaid command-line tool in a container before the push; the README links the document; a read-only review against `build.yml`, `rescan.yml` and the scripts
+- [x] **1.1 `docs/lanes.md`**: what a lane is, how to read a graph (a box is a step, its label names the criterion and the decision, a click leads to the explanation), the lane map with every lane as a node (only SLSA expanded yet)
+- [x] **1.2 The SLSA provenance lane**: the release side (name the subjects, attest, store, verify, tag), the rescan side (coverage, the status line), the consumer side (the recipe step, the Kyverno rule under `required`), and the three modes as the branch points; each step naming Req 2.9, 2.27 to 2.30, 9.19 and Decision 15 or ADR 0005 where it rests on them
+- [x] **1.3 Rendered and read**: each graph rendered by the Mermaid command-line tool in a container before the push; the README links the document; a read-only review against `build.yml`, `rescan.yml` and the scripts
+  - Done 2026-11-20: four graphs (the lane map and the SLSA lane at release, in the daily rescan, for a consumer), each rendered with the Mermaid command-line tool (`ghcr.io/mermaid-js/mermaid-cli`, in a container) and looked at before the push. The first draft drew the lane as one graph; the lines from the policy file to every part made it unreadable, so it is three. A separate read-only agent held the page against the workflows, the scripts, the requirements and the ADR and found ten points, all taken: among them the page's "every release since 2026-11-18 carries one", which the deliberate `off` release of 2026-11-20 disproves and which `SECURITY.md`, design.md and `concepts.md` said as well (all four now say "while the mode is not off"); a failing first step drawn without its stop; the steps' entry condition (only on main, only a scheduled rebuild that publishes); the scan reports attested before "sign and attest", not in it; the rescan's check that cannot be made; the consumer step absent under `off`; a label citing Req 2.28 where the source is the SLSA track's FR-3; the gate's Req 7 and the dispatch entry missing from the map; the smoke test linked to the wrong section
 
 ## Phase 2: the link check (task 19.3; Req 9.20)
 

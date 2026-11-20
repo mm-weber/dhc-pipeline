@@ -542,7 +542,7 @@
     - _Requirements: Req 2.27, Req 2.28, Req 2.29, Req 2.30, Req 7.11, Req 9.19_
 
 - [ ] 19. The documentation consolidated, every lane drawn (Req 9.20, 9.21; design Decision 16; the owner's calls of 2026-11-20: Mermaid in the Markdown, working notes to one archive folder, overlapping documents merged into fewer, the SLSA lane first). Executes before task 12; one pull request per task; conductor track docs-consolidation_20261120
-  - [ ] 19.1 Spec amendment: 9.20 and 9.21, Decision 16, this group, ledger rows 9.20 and 9.21 (unexercised, each with its reason)
+  - [x] 19.1 Spec amendment: 9.20 and 9.21, Decision 16, this group, ledger rows 9.20 and 9.21 (unexercised, each with its reason)
     - _Requirements: Req 9.20, Req 9.21_
   - [ ] 19.2 The lanes document and the SLSA provenance lane, the pattern for the others
     - _Requirements: Req 9.21_
