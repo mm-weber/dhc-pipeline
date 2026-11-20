@@ -149,16 +149,18 @@ hatch for *computation*, never for *acquisition*. (See `triage/LOG.md`,
   builder, the invocation, and the **materials** — every input with its
   *resolved* digest (the frontend tag as resolved, the builder image, the git
   commit). It carries the ephemeral fetch-time facts forward into a durable
-  signed record. That enables: **audit** (SBOM claims vs provenance
-  materials), **identity** (who signed), and **reproduction** — rebuild from
+  record, a signed one where the build platform generates it (below). That
+  enables: **audit** (SBOM claims vs provenance materials), **identity** (who
+  signed, where it is signed), and **reproduction**: rebuild from
   the recorded inputs and compare digests. Reproducibility is what upgrades
   provenance from trusted claim to recomputable fact.
 - **SLSA levels grade the bridge** (Build track, v1.2): provenance exists
   and is distributed, L1; it is generated and signed by a hosted build
   platform from the platform's own data, and consumers can check both, L2;
   the build is isolated so the job cannot forge it, L3. A local `--load`
-  build carries BuildKit's unsigned, self-written provenance: L1. This
-  repository's releases carried the same until 2026-11-18. Signing the image
+  build carries BuildKit's unsigned, self-written provenance, which meets L1
+  only once the image is pushed and the provenance travels with it. This
+  repository's releases carried that and no more until 2026-11-18. Signing the image
   did not lift that, because a signature on the image says who published it
   and nothing about how it was built, and no verifier read the provenance.
   Since 2026-11-18 a release also stores a statement that GitHub's provenance

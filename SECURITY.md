@@ -104,11 +104,14 @@ reproducible (BuildKit provenance is attached, not verified by the policy).
 
 Measured against SLSA v1.2 (released 2025-11-24), the Build track (Req 9.19).
 
-**Claimed for this repository's digests: Build L1.** Provenance exists for
-every published digest and is distributed with it.
+**Claimed for this repository's digests: Build L1**, for the digests released
+since 2026-09-01: BuildKit provenance exists for each of them and is
+distributed with it, inside the index. The legacy stratum before that date
+("Digest states, the epoch, retention") is outside the claim.
 
 **Attested beyond the claim: provenance of Build L2 grade**, on every digest
-released since 2026-11-18. For the index and each platform manifest a release
+released from the release of 2026-11-18, 17:01 UTC, on (build run
+44353893731). For the index and each platform manifest a release
 stores one provenance statement (predicate type
 `https://slsa.dev/provenance/v1`) beside the digest's other attestations.
 GitHub's provenance service generates it from the release job's signed
@@ -123,8 +126,8 @@ platform manifests carry it and names each that does not (Req 2.29).
 verification policy demands what the level requires. This repository's policy
 file declares `release.provenance: report`: provenance is attested and
 reported, and the policy under `policies/` admits an image without it. Digests
-released before 2026-11-18 carry none, and provenance cannot be attested after
-the fact, so demanding it here would refuse them. **Build L2 is claimed from
+released before that release carry none, and provenance cannot be attested
+after the fact, so demanding it here would refuse them. **Build L2 is claimed from
 the successor repository's first release**, where the mode is `required` and
 the rendered policy admits no image without a statement that meets the
 expectations (Req 2.28).
@@ -140,9 +143,10 @@ ref. A step without the second half verifies the signer only.
 attestations, releases attest no SLSA provenance and the claim is Build L1
 for as long as that mode stands (Req 2.30).
 
-**Not claimed: Build L3.** That level asks for a build isolated from the
-workflow that calls it; GitHub's route to it is a reusable workflow
-(design Decision 15, option D), which is not built. BuildKit's own provenance
+**Not claimed: Build L3.** That level asks for provenance the job cannot
+forge, from an isolated build. On GitHub the route is an isolated reusable
+workflow, slsa-github-generator's container workflow being the one design
+Decision 15 names (option D); it is not built. BuildKit's own provenance
 stays attached to every digest as supplementary detail that no policy
 verifies.
 
