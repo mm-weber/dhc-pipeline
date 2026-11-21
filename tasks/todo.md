@@ -16,18 +16,17 @@ track (`conductor/tracks.md`).
       after #426, its status line "21 of 21" (FR-3's last criterion;
       its smoke test is also the provenance step's first daily run)
 - [ ] CARRIED, the owner's: remove the spike's scratch package
-      `ghcr.io/mm-weber/slsa-spike`, close #401 unmerged, delete the
-      branch `slsa-spike` (ADR 0005 and the LOG keep the record)
+      `ghcr.io/mm-weber/slsa-spike` (the workspace token cannot), close
+      #401 unmerged, delete the branch `slsa-spike` (ADR 0005 and the LOG
+      keep the record). Its condition, Kyverno's read of the first
+      released digest through the spike workflow, is met (spike run
+      44411812054).
 - [ ] Candidate, the owner's idea of 2026-11-13, not started: reshape
       the pipeline into local composite actions where a group of steps
       is one unit (the provenance trio a first candidate). Its own
       track: the lints (`lint-release-steps.sh`,
       `lint-workflow-policy.sh`) read `build.yml`'s steps and would
       have to follow a `uses: ./...` step into the action first.
-- [ ] The owner's cleanup, after Kyverno's read of the first released
-      digest (the spike workflow serves it once more): delete the
-      package `ghcr.io/mm-weber/slsa-spike` (the workspace token cannot);
-      #401 to be shut unmerged; delete branch `slsa-spike`.
 
 ## Open items
 
