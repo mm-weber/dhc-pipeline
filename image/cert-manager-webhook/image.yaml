@@ -1,4 +1,4 @@
-# syntax=dhi.io/build:2-alpine3.23@sha256:6a1c7de1668d793a3183d4aaef062997e54bc149cee2d1604286f5e1b4aa8340
+# syntax=dhi.io/build:2-alpine3.23@sha256:6f8d1df0db4d635a88fb06a8a5a453010c9bca5dff53d2421688aad3d05a4335
 
 name: cert-manager webhook 1.21.x
 image: ghcr.io/mm-weber/dhc/cert-manager-webhook
