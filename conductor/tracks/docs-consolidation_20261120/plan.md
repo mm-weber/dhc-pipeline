@@ -33,7 +33,8 @@ Seven phases, one pull request each. Phase 0 is this pull request: the track, De
 
 ## Phase 3: the archive (task 19.4)
 
-- [ ] **3.1 `docs/archive/`** with its README; `reviews/` moved; the closed items of `tasks/todo.md` moved, the open ones kept; the working-notes half of `concepts.md` moved; every link updated, the link check green
+- [x] **3.1 `docs/archive/`** with its README; `reviews/` moved; the closed items of `tasks/todo.md` moved, the open ones kept; the working-notes half of `concepts.md` moved; every link updated, the link check green
+  - Done 2026-11-21: the 34 review files by `git mv`; `tasks/todo.md` moved whole to `docs/archive/todo-until-2026-11-21.md` and a new one holding the open items word for word (five carried from the SLSA track, two of them one item now; sixteen open; the calendar, the working rules, the ledger recipes) and one new item, the requirements checked against the code, a track of its own after this one (the owner's call of 2026-11-21); Spikes, BuildKit and Actions from `concepts.md` to `docs/archive/concepts-working-notes.md`. The link check green over 320 links. A read-only review found no lost or altered sentence; four points taken, two not (stale `reviews/` paths in `data/`, the owner's research drop; an ambiguous "FR-3" under a heading that names its track)
 
 ## Phase 4: the merges and the contradictions (task 19.5)
 
@@ -41,6 +42,7 @@ Seven phases, one pull request each. Phase 0 is this pull request: the track, De
 - [ ] **4.2 `concepts.md`'s reference half** into the manual (the builder contract, the trust-boundary table, the variant taxonomy), the anchors that README, SECURITY.md, the ledger, a chart README and a definition comment use moved with it
 - [ ] **4.3 `revocation-runbook.md`** into the manual, SECURITY.md naming the new location (Req 9.1)
 - [ ] **4.4 The triage chapters and the stack facts** as Decision 16 places them; the cadence, the tool versions, the counts made consistent
+- [ ] **4.5 Back from the archive** (found by the review of phase 3): the reason the `# syntax=` line is digest-pinned (the frontend's digest is the actions' implementation hash) and what a frontend is, today explained only in `docs/archive/concepts-working-notes.md`, which `CONVENTIONS.md`, `lint-pins.sh` and `concepts.md` point to; two sentences into the manual's reference part, the pointers moved with them
 
 ## Phase 5: the other lanes (task 19.6)
 
