@@ -1,0 +1,72 @@
+name: slsa spike
+
+# Track slsa-build-l2_20261028. This file lives on its branch and is never
+# merged; its earlier forms are in this branch's history.
+#
+# This form is phase 6's read (task 18.7; the owner's go of 2026-11-20):
+# Kyverno applies the verification policy AS scripts/render-verification.sh
+# RENDERS IT from main's catalogue-policy.yaml, once with the provenance mode
+# `required` and once with `report`, to two digests of one repository: one
+# released with a SLSA provenance statement and one released before the
+# provenance steps existed. The two rendered policies stand under spike/ as
+# files, rendered at main 7420bb7 on a scratch copy; nothing is rendered here.
+# Wanted: under `required` the digest with provenance is admitted and the one
+# without is rejected; under `report` both are admitted, which shows that the
+# rejection is the provenance rule's and nothing else's.
+#
+# The run is READ-ONLY: it builds nothing, signs nothing, pushes nothing.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/slsa-spike.yml
+
+permissions: {}
+
+env:
+  IMAGE: ghcr.io/mm-weber/dhc/hardened-app
+  # 0.1.1-alpine3.23 as released by build run 44353893731 (2026-11-18)
+  WITH: sha256:de937d87086d5e92a95f755dbe94755e6017b3e359b2389d564bea79bef10b3b
+  # 0.1.0-alpine3.23, superseded, released before the provenance steps
+  WITHOUT: sha256:c559928e156c094c4e88f5d83c88a9dd2c6ed5dc45f2d2135370ce777e1c9b10
+
+jobs:
+  spike:
+    name: the rendered policy, applied by kyverno
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: install kyverno at this repository's pin
+        run: |
+          set -euo pipefail
+          scripts/install-tool.sh kyverno "${RUNNER_TEMP}/bin"
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+
+      - name: kyverno, the rendered policy in both modes over both digests
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # A refusal is a result here, not a failure of the step: each read
+          # is said as a notice with its exit code (the log host is not
+          # reachable from where the run is read).
+          set +e
+          set -uo pipefail
+          echo "::notice title=kyverno version::$(kyverno version 2>/dev/null | head -1)"
+          apply() { # <mode> <label> <digest>
+            printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: spike\nspec:\n  containers:\n    - name: spike\n      image: %s@%s\n' "${IMAGE}" "$3" > "${RUNNER_TEMP}/pod.yaml"
+            kyverno apply "spike/verify-catalogue-images.$1.yaml" --resource "${RUNNER_TEMP}/pod.yaml" </dev/null > "${RUNNER_TEMP}/out" 2>&1
+            local rc=$? body
+            body=$(grep -v 'is deprecated and will be removed' "${RUNNER_TEMP}/out" | sed -n '1,30p' | LC_ALL=C tr -cd '\11\12\40-\176' | cut -c1-600)
+            body="${body//'%'/%25}"; body="${body//$'\r'/%0D}"; body="${body//$'\n'/%0A}"
+            echo "::notice title=mode $1 over the digest $2 (exit ${rc})::${body}"
+          }
+          apply required "with provenance" "${WITH}"
+          apply required "without provenance" "${WITHOUT}"
+          apply report "with provenance" "${WITH}"
+          apply report "without provenance" "${WITHOUT}"
