@@ -84,6 +84,18 @@ COSIGN_URLDIR="sigstore/cosign/releases/download/v${COSIGN_VER}"
 COSIGN_PIN=c3b4f5410e608af03a5eb0aaac84a4313d8da131248e08ff1759ac70c79d1644
 COSIGN_DEP=sigstore/cosign
 
+# lychee checks the links in the docs from validate (Req 9.20); a github
+# tarball whose binary sits in a subdirectory, like helm's, beside README.md,
+# docs/ and complete/ that must not reach destdir. Upstream tags it
+# lychee-v<ver>, not v<ver>, and the asset name carries no version (the
+# static musl build, which needs no particular glibc).
+LYCHEE_VER=0.24.2
+LYCHEE_ASSET="lychee-x86_64-unknown-linux-musl.tar.gz"
+LYCHEE_MEMBER_DIR="lychee-x86_64-unknown-linux-musl"
+LYCHEE_URLDIR="lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VER}"
+LYCHEE_PIN=73657a111819a30c47c08352896796f23d64e4eb2b3ed39b6d32149241566fc5
+LYCHEE_DEP=lycheeverse/lychee
+
 DEFAULT_ARCH=x86_64
 ARCH="$DEFAULT_ARCH"
 
@@ -95,6 +107,7 @@ SYFT_MARKER="syft v${SYFT_VER} (dhc-test-fixture)"
 CRANE_MARKER="crane v${CRANE_VER} (dhc-test-fixture)"
 VEXCTL_MARKER="vexctl v${VEXCTL_VER} (dhc-test-fixture)"
 COSIGN_MARKER="cosign v${COSIGN_VER} (dhc-test-fixture)"
+LYCHEE_MARKER="lychee v${LYCHEE_VER} (dhc-test-fixture)"
 
 list_real_bin() { find /usr/local/bin -maxdepth 1 -printf '%f\n' 2>/dev/null | sort; }
 BIN_BEFORE=$(list_real_bin)
@@ -277,6 +290,22 @@ make_crane_asset() { # marker
   rm -rf "$stage"
 }
 
+# lychee nests its binary under lychee-x86_64-unknown-linux-musl/, next to a
+# README.md and a docs/ tree: a decoy for an install that takes more than the
+# one member.
+make_lychee_asset() { # marker
+  local stage
+  stage=$(mktemp -d "$SB/stage.XXXXXX")
+  mkdir -p "$stage/$LYCHEE_MEMBER_DIR/docs"
+  printf '#!/bin/sh\necho "%s"\n' "$1" > "$stage/$LYCHEE_MEMBER_DIR/lychee"
+  chmod +x "$stage/$LYCHEE_MEMBER_DIR/lychee"
+  printf '# lychee (dhc-test-fixture readme)\n' > "$stage/$LYCHEE_MEMBER_DIR/README.md"
+  printf '# dhc-test-fixture docs\n' > "$stage/$LYCHEE_MEMBER_DIR/docs/TROUBLESHOOTING.md"
+  mkdir -p "$UP/$LYCHEE_URLDIR"
+  tar -czf "$UP/$LYCHEE_URLDIR/$LYCHEE_ASSET" -C "$stage" "$LYCHEE_MEMBER_DIR"
+  rm -rf "$stage"
+}
+
 setup() { # fresh sandbox: all assets served, empty destdir, shipped pins in force
   SB=$(mktemp -d)
   UP="$SB/upstream"
@@ -292,6 +321,7 @@ setup() { # fresh sandbox: all assets served, empty destdir, shipped pins in for
   make_crane_asset "$CRANE_MARKER"
   make_vexctl_asset "$VEXCTL_MARKER"
   make_cosign_asset "$COSIGN_MARKER"
+  make_lychee_asset "$LYCHEE_MARKER"
 }
 
 write_pins() { # record the fixtures' real digests — the offline success path
@@ -305,6 +335,7 @@ write_pins() { # record the fixtures' real digests — the offline success path
   (cd "$UP/$CRANE_URLDIR" && sha256sum "$CRANE_ASSET") >> "$PINS"
   (cd "$UP/$VEXCTL_URLDIR" && sha256sum "$VEXCTL_ASSET") >> "$PINS"
   (cd "$UP/$COSIGN_URLDIR" && sha256sum "$COSIGN_ASSET") >> "$PINS"
+  (cd "$UP/$LYCHEE_URLDIR" && sha256sum "$LYCHEE_ASSET") >> "$PINS"
 }
 
 asset_sha() { sha256sum "$1" | cut -d' ' -f1; }
@@ -381,6 +412,18 @@ for f in "$DEST"/* "$DEST"/.[!.]*; do
 done
 if [ -z "$stray" ]; then pass "only ct and ct-etc land in destdir"
 else fail "only ct and ct-etc land in destdir" "destdir also holds:$stray"; fi
+
+setup; write_pins; invoke lychee
+assert_rc        "lychee: matching checksum installs cleanly" 0
+assert_installed "lychee is installed and executable" lychee
+assert_payload   "installed lychee is the nested member that was verified" lychee "$LYCHEE_MARKER"
+assert_out       "reports the lychee version it installed" "$LYCHEE_VER"
+
+# The archive's README.md, docs/ and its member directory stay out of the
+# PATH dir, at any depth.
+stray=$(cd "$DEST" && find . -mindepth 1 ! -name lychee -printf ' %P')
+if [ -z "$stray" ]; then pass "only the lychee binary lands in destdir"
+else fail "only the lychee binary lands in destdir" "destdir also holds:$stray"; fi
 
 # --- 2: destdir handling ----------------------------------------------------
 
@@ -482,6 +525,11 @@ assert_rc        "cosign: matching checksum installs cleanly" 0
 assert_installed "cosign is installed and executable" cosign
 assert_payload   "installed cosign is the artifact that was verified" cosign "$COSIGN_MARKER"
 
+setup; invoke lychee
+assert_rc     "with no pin override the lychee fixture is rejected" 1
+assert_absent "nothing is installed when the shipped pin does not match (lychee)" lychee
+assert_out    "the shipped lychee pin is the documented digest" "$LYCHEE_PIN"
+
 # --- 6: an asset with no recorded pin ---------------------------------------
 
 setup; write_pins
@@ -527,6 +575,7 @@ assert_pin_block vexctl VEXCTL "$VEXCTL_DEP" "$VEXCTL_VER" "$VEXCTL_PIN"
 assert_pin_block cosign COSIGN "$COSIGN_DEP" "$COSIGN_VER" "$COSIGN_PIN"
 assert_pin_block ct CT "$CT_DEP" "$CT_VER" "$CT_PIN"
 assert_pin_block syft SYFT "$SYFT_DEP" "$SYFT_VER" "$SYFT_PIN"
+assert_pin_block lychee LYCHEE "$LYCHEE_DEP" "$LYCHEE_VER" "$LYCHEE_PIN"
 
 # --- 10: what the source must and must not contain --------------------------
 

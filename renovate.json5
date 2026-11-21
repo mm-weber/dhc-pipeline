@@ -154,9 +154,10 @@
       matchStrings: [
         "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*\\w+_VERSION=\"(?<currentValue>[^\"]+)\"",
       ],
-      // Both projects tag releases v-prefixed; the pins are bare so the URL
-      // template can add the `v` itself and the asset names (which are bare)
-      // stay derivable from one variable.
+      // The projects tag releases v-prefixed, except lychee (its own
+      // packageRule below); the pins are bare so the URL template can add the
+      // `v` itself and the asset names (which are bare) stay derivable from
+      // one variable.
       extractVersionTemplate: "^v(?<version>\\d+\\.\\d+\\.\\d+)$",
       // NO postUpgradeTask, unlike the definition managers above — deliberate.
       // Renovate bumps the version and leaves the sha256 behind, so the bump PR
@@ -171,7 +172,7 @@
       // also never automerge: that rule is scoped to github-tags, and this
       // manager is github-releases.
       //
-      // Four tools, a handful of bumps a year each. Cheap enough to keep
+      // A handful of bumps a year per tool. Cheap enough to keep
       // manual.
     },
     {
@@ -496,6 +497,15 @@
       matchPackageNames: ["dhi.io/build", "dhi.io/golang"],
       groupName: "dhi.io build layer",
       automerge: false,
+    },
+    {
+      // lychee tags its tool releases lychee-v<ver> and its library
+      // lychee-lib-v<ver> (same numbers, other releases), plus a prerelease
+      // nightly. The pin-script manager's shared ^v<ver>$ template sees none
+      // of them, so the tool would never be bumped, silently (Req 7.6). Only
+      // the tool's own tag counts; every other pinned tool keeps the template.
+      matchDepNames: ["lycheeverse/lychee"],
+      extractVersion: "^lychee-v(?<version>\\d+\\.\\d+\\.\\d+)$",
     },
   ],
 }
