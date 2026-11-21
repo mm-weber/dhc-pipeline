@@ -146,7 +146,8 @@ named; a rule naming none is a convention held at review):
 
 - Line 1 is the frontend pin, **digest-pinned** — one step stricter than the
   upstream catalog (the frontend is the compiler AND the actions stdlib; its
-  digest is their implementation hash — see docs/concepts.md):
+  digest is their implementation hash; see
+  docs/archive/concepts-working-notes.md, "Actions"):
 
   ```yaml
   # syntax=dhi.io/build:2-alpine3.22@sha256:<digest>
