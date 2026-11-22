@@ -200,7 +200,7 @@ drives the mechanics: the daily rescan fails by name while any catalogue tag
 still references a recorded digest (`scripts/check-revocations.sh`,
 Req 9.7), and the status issue lists every entry. How an entry gets here,
 and what GHCR can and cannot do about a tag, is
-[`docs/revocation-runbook.md`](../docs/revocation-runbook.md).
+[Revoke a digest](../docs/user-manual.md#revoke-a-digest) in the user manual.
 
 ## `LOG.md`
 

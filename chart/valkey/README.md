@@ -103,7 +103,7 @@ rest of the catalogue keeps, and `busybox` joins its CVE surface (scanned and
 triaged like any other package — `triage/accepted-risk/valkey-compat.yaml` when
 it comes to that). The runtime image remains the published default and the one
 to deploy anywhere this chart is not involved, per the taxonomy rule in
-[`docs/concepts.md`](../../docs/concepts.md): *deploy the least capable variant
+[the user manual](../../docs/user-manual.md#the-variant-taxonomy): *deploy the least capable variant
 that works.*
 
 The alternative — a fork of the chart with the init container removed — was

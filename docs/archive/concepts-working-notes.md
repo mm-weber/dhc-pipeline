@@ -1,6 +1,6 @@
 # Concepts: the working notes
 
-> **Archived 2026-11-21** (documentation track, plan 3.1). These sections were the working-notes half of `docs/concepts.md`: the ideas behind the tools, written down while building the catalogue. They are kept as written and are not maintained; the reference half (the definition anatomy, the trust chain, the builder contract, the trust boundary) stays in [docs/concepts.md](../concepts.md). Their history before this date is `git log -- docs/concepts.md`.
+> **Archived 2026-11-21** (documentation track, plan 3.1). These sections were the working-notes half of `docs/concepts.md`: the ideas behind the tools, written down while building the catalogue. They are kept as written and are not maintained; the reference half (the definition anatomy, the trust chain, the builder contract, the trust boundary) stayed in `docs/concepts.md` and is now the user manual's [Part VI: Reference](../user-manual.md#part-vi-reference) (plan 4.2). Their history before this date is `git log -- docs/concepts.md`.
 
 Running example: the DHI catalog's
 [netdata-agent-sd definition](https://github.com/docker-hardened-images/catalog/blob/main/image/netdata-agent-sd/alpine-3.23/0.yaml)
