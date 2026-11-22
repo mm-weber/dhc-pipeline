@@ -82,23 +82,10 @@ passes the same four gates. Merging to main triggers the release path. Two
 crons then feed published state back into new pull requests, and the triage
 directory sits in the middle: every scan, PR-side or scheduled, consumes it.
 
-```
-change (human or machine) ─► pull request
-  ─► gates: validate · build + scan gate · chart policy · e2e on kind
-  ─► merge ─► release: push by digest (amd64 + arm64) · scan every platform manifest · sign · SBOMs · VEX · tag last
-              · VEX attest (compiled per digest)
-  ─► published: ghcr.io/mm-weber/dhc
-
-published ─► daily rescan (06:17 UTC, VEX- and exception-aware)
-  ─► one issue per new HIGH/CRITICAL (severity · EPSS · KEV)
-  ─► triage decision (VEX / exception / fix bump) ─► pull request  ↻
-
-upstream release ─► Renovate cron (every 4h; Req 3.1: at most 6h)
-  ─► bump PR (postUpgradeTask recomputes derived fields) ─► pull request  ↻
-
-triage/ (vex/ + accepted-risk/) is consumed by every scan, PR-side and
-scheduled.
-```
+Both loops, and how they meet, are drawn in [the lane map](lanes.md#the-lane-map), each
+step in its lane: [upstream tracking](lanes.md#upstream-tracking),
+[the pull-request gate](lanes.md#the-pull-request-gate), [the release](lanes.md#the-release)
+and [the daily rescan and triage](lanes.md#the-daily-rescan-and-triage).
 
 Ground rule: GitHub Actions is the **authoritative** environment for builds,
 kind clusters, registry pushes, and scans. Local runs are for

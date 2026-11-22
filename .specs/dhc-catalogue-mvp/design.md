@@ -59,8 +59,8 @@ graph TB
     subgraph Automation["GitHub Actions"]
         REN["Renovate cron, at most every 6 h (Req 3.1), configured every 4 h"]
         CI[PR gates: schema, build, ct, kind e2e, trivy+VEX, kyverno]
-        REL[main: build, push by digest, scan, sign, SBOM + VEX attest, tag]
-        SCAN[daily rescan → issues]
+        REL["release on main: a merge, the daily rebuild or a dispatch; build, push by digest, scan, sign, SBOM + VEX + SLSA provenance attest, tag"]
+        SCAN["daily rescan: re-attest scan reports and VEX, issues"]
     end
 
     GHCR[(ghcr.io/mm-weber/dhc)]
@@ -74,6 +74,9 @@ graph TB
     GHCR --> SCAN --> TRI
     TRI --> CI
 ```
+
+The paths work takes through these parts are drawn one lane at a time in
+[docs/lanes.md](../../docs/lanes.md#the-lane-map).
 
 ### Technology Stack
 
@@ -1205,83 +1208,34 @@ The table names no tool versions: each is declared once, in `scripts/install-sca
 
 ### Release flow (Req 2.7 to 2.17, 2.26; as specified 2026-08-22, implementation task 9)
 
-```
-merge to main, the daily schedule, or a manual dispatch
-  ─► build (per-arch pins verified) ─► SBOM of the local build output
-  ─► scheduled run, publish policy on-change: package set equal to the published
-      digest of the full release tag? stop here: nothing pushed, signed or attested
-  ─► push by digest, no tag
-  ─► compile VEX, pass 1: not_affected / fixed from triage/vex/, stamped with this
-      digest and every platform manifest digest, as one document
-  ─► scan every platform manifest (by its own digest), VEX + exceptions applied
-        no report for any platform manifest ─► sign nothing, tag nothing, red run (2.26)
-        fail-closed setting on and anything uncovered ─► attest nothing, sign nothing,
-        tag nothing, red run naming each finding per manifest (2.13; the gate runs before
-        the attestations, so under fail-closed no scan report is attested either)
-  ─► attest each platform manifest's scan report (cosign `vuln` predicate, via `trivy convert`)
-  ─► compile VEX, pass 2: append affected from unexpired exceptions (6.38) and
-      under_investigation for every uncovered finding (2.12)
-  ─► cosign sign, recursive · SBOM attest per platform manifest, each SPDX also on the index · one OpenVEX attest on
-      index and platform manifests (ADR 0003)
-  ─► apply tags (imagetools create on the index) ─► published (Req 2.10)
-```
+The release is drawn in [the release lane](../../docs/lanes.md#the-release), its provenance steps in
+[SLSA provenance, at release](../../docs/lanes.md#at-release). Three choices in its order carry the
+design. The publish-on-change comparison runs before the push, so an unchanged scheduled
+rebuild is never pushed, signed or attested. The fail-closed gate runs before the
+attestations, so under fail-closed no scan report is attested either. The OpenVEX document
+is compiled in two passes: the statements from `triage/vex/` before the scan, then
+`affected` from unexpired exceptions (6.38) and `under_investigation` for every uncovered
+finding (2.12) after it.
 
 ### Rescan flow (Req 2.20 to 2.24, 3.10, 6.42 to 6.54, 9.3, 9.7, 9.9, 9.13; as specified 2026-08-23, amended 2026-08-26; implementation tasks 10, 11.3, 13)
 
-```
-daily 06:17 UTC ─► enumerate every catalogue tag → digest (2.22)
-  ─► scan every platform manifest of every tag-referenced digest by its own digest (2.22),
-      each digest's source VEX compiled first (pass 1); a failed manifest is counted, named
-  ─► issue lifecycle, evidence and decision (6.52 to 6.57): every cve issue against today's
-      reports, the SBOMs read through verification (6.58) and the merged triage artifacts;
-      decided now, applied only after the reports are attested (below)
-  ─► open cve issue map, finding → URL, for the compiler's tracking links (6.37)
-  per tag-referenced digest:
-  ─► attest each scan report, --replace (6.42)
-  ─► compile VEX (6.37): source statements · affected from unexpired exceptions (6.38)
-        · carry-forward, timestamp kept, last_updated on change (6.40)
-        · lapsed exception ─► under_investigation, original timestamp, status note (6.41)
-        · new uncovered finding ─► under_investigation from the attested report
-  ─► differs from the attested document? ─► cosign attest --replace on digest + manifests (6.43)
-  ─► issue lifecycle, applied: close with evidence-graded labels (6.52 to 6.56) · reopen on
-      recurrence (6.57); withheld whole, by digest name, on a day any digest's reports
-      failed to attest (6.54, review D2)
-  ─► invariants, four independent assertions: anonymous pull per repository and tag (2.21)
-        · verification proof + control digest (2.24) · exceptions against current severity
-        and KEV, the feed fetched here, an outage a red non-evaluation (6.51, 6.60)
-        · exactly one OpenVEX attestation (6.44); the revocation record read for the status
-  ─► authenticity signals (3.10) · lapsed compat review-by dates (4.9)
-  ─► VEX portability block over the supported set (9.12, informational)
-  ─► consumer smoke, the README recipe verbatim (9.13)
-  ─► expiry warnings (6.10)
-  ─► issues: enrich (EPSS, KEV) · dedup · issue set · file new-CVE issues (6.3)
-  ─► clocks from attestations over the supported set (6.46) ─► status issue + artifact (6.47)
-  ─► posture: private reporting enabled (9.3) · ruleset drift (9.9) · no revoked tag (9.7)
-  ─► summary, artifacts
-  every step after the scan runs under always() with its producer's outcome as its
-  only condition, refusing by name on a missing input (review D1); the run fails once,
-  naming every promise not kept that day
-```
+The rescan is drawn in [the daily rescan and triage lane](../../docs/lanes.md#the-daily-rescan-and-triage),
+with its provenance check in [SLSA provenance, in the daily rescan](../../docs/lanes.md#in-the-daily-rescan),
+the consumer checks in [held true every day](../../docs/lanes.md#held-true-every-day) and the posture checks
+in [posture](../../docs/lanes.md#posture-rulesets-reporting-revocations). Two rules in it carry the design.
+The issue lifecycle is decided before the re-attestation and applied only after it, and
+withheld whole, by digest name, on a day any digest's reports failed to attest (6.54,
+review D2). Every step after the scan runs under `always()` with its producer's outcome as
+its only condition, refusing by name on a missing input (review D1); the run fails once,
+naming every promise not kept that day.
 
 ### Upstream bump flow (the operating heart)
 
-```mermaid
-sequenceDiagram
-    participant U as Upstream release
-    participant R as Renovate (cron)
-    participant PR as Pull Request
-    participant CI as CI gates
-    participant M as main / release job
-    participant G as GHCR
-
-    U->>R: new tag matches version policy (after a 3-day minimum release age, Req 3.7)
-    R->>PR: refresh verifies the declared authenticity signal (Req 3.8), then bump pin+checksum (grouped; majors → dashboard)
-    PR->>CI: parallel gates: validate / build+trivy+VEX+govulncheck / chart (ct lint, kyverno) / kind e2e
-    CI-->>PR: checks green (digest and patch bumps: automerge)
-    PR->>M: merge (human review otherwise)
-    M->>G: build, push by digest, scan per platform, cosign sign, SBOM + one OpenVEX attest, tag (Req 2.7 to 2.9)
-    G->>CI: daily rescan → new CVE? issue → VEX or fix-bump PR
-```
+The bump is drawn across three lanes: [upstream tracking](../../docs/lanes.md#upstream-tracking), from
+the upstream release to the pull request; [the pull-request gate](../../docs/lanes.md#the-pull-request-gate);
+and [the release](../../docs/lanes.md#the-release). The daily rescan that turns a new CVE into an issue, and
+the issue into a VEX statement or a fix bump, is
+[the daily rescan and triage](../../docs/lanes.md#the-daily-rescan-and-triage).
 
 ### Chart pins ride the same loop (task 8.7)
 
