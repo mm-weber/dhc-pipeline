@@ -20,7 +20,7 @@ flowchart LR
     D --> GOV(["Posture: rulesets, reporting,<br/>revocations · Req 9"])
     T --> C(["Consumer: verify recipe,<br/>Kyverno policy · Req 2.23, 2.25"])
     classDef drawn fill:#d7ecff,stroke:#1f6feb,stroke-width:2px
-    class U,G,P drawn
+    class U,G,R,S,DSP,P drawn
 ```
 
 ## Upstream tracking
@@ -460,6 +460,144 @@ flowchart TB
 | The suite | `e2e.yml`, step "run e2e suite", `go test ./e2e/` with `DHC_E2E=1`; the Ginkgo specs under [`test/e2e/`](../test/e2e/) | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.3 to 5.6; Decision 14: one probe per chart, standing for every definition it deploys |
 | Diagnostics | `e2e.yml`, steps "collect diagnostics on failure", "upload diagnostics", then "delete kind cluster" | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.7 |
 | The fan-in | `e2e.yml`, job "e2e gate", its one step (no `name:`) | [branch protection](user-manual.md#branch-protection) | Req 9.8 |
+
+## The release
+
+This lane turns a definition into a published image: one that carries tags, a signature, SBOMs, a VEX document and scan reports. It runs in `build.yml` on `main` and has three entries: a merge to `main` that changes a definition, the daily rebuild at 04:47 UTC, and a dispatch by the owner naming one image or none (none means every active definition). The daily rebuild first builds locally and publishes only when the packages inside changed. Every release pushes the image by digest (its content address) with no tag, scans exactly that digest, signs and attests it, and moves the tags last. Why this order: Decision 6, "publish with status". The provenance steps between the attestations and the tags are drawn once, in the [SLSA provenance](#slsa-provenance) lane.
+
+### Which definitions
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    CRON[/"release.schedule<br/>47 4 * * * · Req 2.14, 7.10"/]
+    SET[/"active_set<br/>Req 1.13"/]
+    PUSH(["A merge to main"])
+    SCH(["The daily rebuild, 04:47 UTC"])
+    DSP(["A dispatch by the owner,<br/>an image name or blank"])
+    PD["The definitions whose image.yaml<br/>the push changed · Req 2.1"]
+    ALL["Every active definition<br/>Req 2.14"]
+    DQ{"An image named?"}
+    DA{"Is it active?"}
+    ONE["That one definition"]
+    FIL["Keep only active definitions;<br/>each one dropped is named in the log<br/>Req 1.14, 1.15 · Decision 11"]
+    ANY{"Any left?"}
+    LEG(["One leg per definition,<br/>drawn in the next two graphs"])
+    NONE(["No leg runs, nothing released"])
+    RED(["The run fails, the name given · Req 1.15"])
+    CRON --> SCH
+    PUSH --> PD --> FIL
+    SCH --> ALL --> FIL
+    DSP --> DQ
+    DQ -->|yes| DA
+    DQ -->|no| ALL
+    DA -->|yes| ONE --> FIL
+    DA -.->|no| RED
+    SET --> FIL
+    FIL --> ANY
+    ANY -->|yes| LEG
+    ANY -->|no| NONE
+    FIL -.->|active set unreadable| RED
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| The three entries | [`build.yml`](../.github/workflows/build.yml), `on: push: branches: [main]`, `schedule: cron: "47 4 * * *"` and `workflow_dispatch` with the free-text input `image`; cron and input held equal to `catalogue-policy.yaml` by `validate.yml`, step "workflow schedule + permissions vs policy file (Req 7.10)" | [crons and cadence](user-manual.md#crons-and-cadence), [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) | Req 2.1, 2.14, 7.10; Decision 6 |
+| Which definitions | `build.yml`, job "affected definitions", its one step (`id: detect`, no `name:`): on a push, the `image/*/image.yaml` files changed between the previous and the new head; on the schedule, the whole active set; on a dispatch, the named image or the whole active set | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) | Req 2.1, 2.14. A merge that changes only a VEX statement, an exception or a chart releases nothing; the daily rescan carries a VEX change to the published digests |
+| Keep only active ones | the same step, after the branches; `active_definitions` in [`definition-lib.sh`](../scripts/definition-lib.sh) | [deactivate a definition](user-manual.md#deactivate-a-definition) | Req 1.14, 1.15; Decision 11 |
+
+### One definition: built, or discarded by the nightly
+
+Each leg runs the job "build ${{ matrix.name }}". The scheduled rebuild builds locally first and asks whether anything a consumer could receive has changed; a merge and a dispatch never ask.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    NS[/"verification.registry,<br/>release.platforms · Req 7.7"/]
+    POL[/"release.publish_policy<br/>on-change · always · Req 2.15, 2.17"/]
+    LEG(["One leg, one definition"])
+    META["Read the definition: its image inside the<br/>declared namespace, every platform admitted,<br/>tags from the definition<br/>Req 2.1, 2.3, 7.7 · Decision 11"]
+    ARCH["Verify every per-architecture checksum<br/>against the bytes upstream serves · Req 1.3"]
+    EV{"Which entry?"}
+    LOC["Build every declared platform locally<br/>into an archive, nothing pushed<br/>Req 2.14 · Decision 6"]
+    CMP["Compare the package set per platform<br/>with the CycloneDX SBOMs attested to<br/>the full release tag's digest<br/>Req 2.15, 2.16 · Decision 6"]
+    EQ{"Equal, and the policy<br/>is on-change?"}
+    DISC(["Discarded: nothing pushed, signed,<br/>attested or tagged; the leg is green · Req 2.15"])
+    BLD["Build every declared platform,<br/>with BuildKit provenance on main<br/>Req 2.1, 2.2"]
+    MAIN{"On main?"}
+    PUSHD(["Pushed by digest, no tag,<br/>released in the next graph · Req 2.7"])
+    ONLY(["A dispatch from another branch:<br/>built, nothing pushed"])
+    STOP(["Leg red, the cause named;<br/>nothing published from it · Req 2.5"])
+    LEG --> META
+    NS --> META
+    META --> ARCH --> EV
+    EV -->|the daily rebuild| LOC --> CMP --> EQ
+    POL --> EQ
+    EQ -->|yes| DISC
+    EQ -->|no: the difference in the<br/>summary · Req 2.16, 2.17| BLD
+    EV -->|a merge or a dispatch| BLD
+    BLD --> MAIN
+    MAIN -->|yes| PUSHD
+    MAIN -->|no| ONLY
+    META -.->|outside the namespace,<br/>a platform not admitted| STOP
+    ARCH -.->|checksum differs| STOP
+    CMP -.->|a tool missing, no admitted identity| STOP
+    BLD -.->|does not build or push| STOP
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Read the definition | [`build.yml`](../.github/workflows/build.yml), the step `id: meta` (no `name:`); [`release-policy.sh`](../scripts/release-policy.sh) reads the switches and the admitted platforms | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 4 | Req 2.1, 2.3, 7.7; Decision 11 |
+| Checksums | `build.yml`, step "verify per-arch pinned checksums"; [`verify-arch-pins.sh`](../scripts/verify-arch-pins.sh) | [build, the scan gate](user-manual.md#build--the-scan-gate) | Req 1.3: the pull request builds amd64 only, so an arm64 pin is first exercised here |
+| Local build | `build.yml`, step "scheduled rebuild, local only (Req 2.14)", `if: github.event_name == 'schedule'` | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), "The nightly" | Req 2.14; Decision 6 |
+| The comparison | `build.yml`, step "publish-on-change comparator (Req 2.15-2.17)"; [`package-set-diff.sh`](../scripts/package-set-diff.sh), read through `cosign verify-attestation` against the admitted identities; verdict `equal` or `different` with a reason, each of which publishes (`package-set-differs`, `no-published-digest`, `attestation-unreadable`, `platform-set-differs`); cosign is installed before it by step "install cosign and crane" | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), "The nightly" | Req 2.15 to 2.17; Decision 6, its reproducibility paragraph: package type, name, version and pull checksum, never SBOM bytes. Only proven equality discards; a missing tool is a refusal, not a difference |
+| Build and push | `build.yml`, the step `id: build` (no `name:`), `docker/build-push-action` with `provenance: mode=max` and, on `main` only, `push-by-digest=true`; skipped when the comparator discarded | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 1 | Req 2.1, 2.2, 2.7; Decision 6. A failure in one leg leaves the other legs running (`fail-fast: false`) |
+
+### One definition: scanned, signed, tagged
+
+Every step here runs only on `main`, and on the schedule only when the comparator said publish. A failed step skips every step after it, so a digest stopped here stays pushed but untagged: frozen, pullable by digest only.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    FC[/"release.fail_closed<br/>false here · Req 2.13"/]
+    DIG(["A digest pushed, no tag"])
+    MAN["List the platform manifests,<br/>BuildKit's attestation manifests left out<br/>Req 2.8, 2.26"]
+    SCAN["Scan each platform manifest by its own digest<br/>with the gate's VEX and accepted-risk inputs<br/>Req 2.8 · Decision 6"]
+    FCD{"Fail-closed on,<br/>and anything uncovered?"}
+    ATTR["Attest each manifest's scan report,<br/>the scanner's database written in<br/>Req 2.9, 6.55 · Decision 6"]
+    VEX["Compile the digest's one OpenVEX document<br/>an uncovered finding: under_investigation,<br/>with the report's timestamp<br/>Req 2.12, 6.37 · ADR 0003"]
+    SIGN["Sign the index and every manifest<br/>each manifest: SPDX, CycloneDX, OpenVEX<br/>the index: each SPDX, the same OpenVEX<br/>Req 2.9 · Decision 6 · ADR 0003"]
+    PROV["SLSA provenance, unless its mode is off<br/>drawn in the SLSA provenance lane<br/>Req 2.27 to 2.30 · Decision 15"]
+    TAG["Apply the definition's tags, then read each tag<br/>back and check it resolves to the signed digest<br/>Req 2.7, 2.9"]
+    PUB(["Published: tagged, signed, attested<br/>Req 2.10; the daily rescan takes over"])
+    WITH(["Withheld: each finding named, nothing<br/>signed or attested, no tag · Req 2.13"])
+    STOP(["No tag moves; the digest stays<br/>frozen, the step named · Req 2.11, 2.26"])
+    MOVED(["Run red; that tag has already moved,<br/>the error names where it points"])
+    DIG --> MAN --> SCAN --> FCD
+    FC --> FCD
+    FCD -->|no| ATTR --> VEX --> SIGN --> PROV --> TAG --> PUB
+    FCD -.->|yes| WITH
+    MAN -.->|no platform manifest| STOP
+    SCAN -.->|a manifest without a report| STOP
+    ATTR -.->|fails| STOP
+    VEX -.->|fails| STOP
+    SIGN -.->|fails| STOP
+    PROV -.->|fails| STOP
+    TAG -.->|a tag resolves elsewhere| MOVED
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Platform manifests | [`build.yml`](../.github/workflows/build.yml), step "enumerate platform manifests" | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 2 | Req 2.8, 2.26 and the Terms of Req 2: a manifest under `unknown/unknown` or with a reference-type annotation is BuildKit's, not a platform |
+| Release-time scan | `build.yml`, step "release-time scan of the pushed digest (Req 2.8)"; [`compile-vex.sh`](../scripts/compile-vex.sh) for the source statements, then [`scan-image.sh`](../scripts/scan-image.sh) `--remote`, the script the gate uses | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 3 | Req 2.8, 2.26; Decision 6: scan what you sign. That later steps stay skipped after a failed scan is checked by `validate.yml`, step "release steps stay stopped by a failed scan (Req 2.26)" |
+| Fail-closed | `build.yml`, step "fail-closed release gate (Req 2.13)", run only when the switch is on and the scan left a finding uncovered | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 4 | Req 2.13; Decision 6: off by default, option B of that decision was rejected |
+| Scan reports | `build.yml`, step "attest each platform manifest's scan report (Req 2.9)": `trivy convert --format cosign-vuln`, [`fill-scanner-db.sh`](../scripts/fill-scanner-db.sh), `cosign attest --type vuln` | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 5 | Req 2.9, 6.55; Decision 6, "scan reports are attested" |
+| The OpenVEX document | `build.yml`, step "compile the digest's OpenVEX document (Req 2.12, 6.37)"; `compile-vex.sh` a second time, with the scan reports | [writing a VEX statement](user-manual.md#writing-a-vex-statement) | Req 2.12, 6.37; [ADR 0003](decisions/0003-one-openvex-document-per-digest.md): one document per digest, empty when nothing applies. The rescan later replaces it, never adds a second ([ADR 0004](decisions/0004-re-attestation-replaces.md)) |
+| Sign and attest | `build.yml`, step "sign and attest (Req 2.9)": `cosign sign --recursive` on the index; Syft's SBOMs and each `cosign attest` made per target, not by `--recursive` | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 7 | Req 2.9; Decision 6; ADR 0003 |
+| Provenance | the four steps from "name the provenance subjects (Req 2.27)" to "verify the provenance of each digest (Req 2.9, 2.28)" | [SLSA provenance](#slsa-provenance), the graph "At release" | Req 2.27 to 2.30; Decision 15 |
+| Tags | `build.yml`, step "apply definition-derived tags (Req 2.7, 2.9)": `docker buildx imagetools create` with every tag, then `imagetools inspect` per tag | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 9 | Req 2.7, 2.9, 2.10. The check runs after the tags are written, so a mismatch leaves that tag moved, not untouched |
+| The fan-in | `build.yml`, job "build gate", its one step (no `name:`), on `main` as on a pull request | [branch protection](user-manual.md#branch-protection) | Req 9.8: a red leg makes the run's build gate red |
 
 ## SLSA provenance
 
