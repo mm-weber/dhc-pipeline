@@ -551,7 +551,7 @@
     - _Requirements: Req 9.20, Req 7.5_
   - [x] 19.4 The archive: `docs/archive/` with its README, the review rounds, the closed todo items, the working notes of `concepts.md`
     - _Requirements: Req 9.20_
-  - [ ] 19.5 The merges and the contradictions, as Decision 16 places them
+  - [x] 19.5 The merges and the contradictions, as Decision 16 places them
     - _Requirements: Req 9.1, Req 9.15, Req 9.20_
   - [ ] 19.6 The other lanes, and the stale diagrams retired
     - _Requirements: Req 9.21_

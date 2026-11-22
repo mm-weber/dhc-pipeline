@@ -38,11 +38,12 @@ Seven phases, one pull request each. Phase 0 is this pull request: the track, De
 
 ## Phase 4: the merges and the contradictions (task 19.5)
 
-- [ ] **4.1 `operating-loop.md`** into the manual (the operator's view) and the archive (the run of 2026-07-21)
-- [ ] **4.2 `concepts.md`'s reference half** into the manual (the builder contract, the trust-boundary table, the variant taxonomy), the anchors that README, SECURITY.md, the ledger, a chart README and a definition comment use moved with it
-- [ ] **4.3 `revocation-runbook.md`** into the manual, SECURITY.md naming the new location (Req 9.1)
-- [ ] **4.4 The triage chapters and the stack facts** as Decision 16 places them; the cadence, the tool versions, the counts made consistent
-- [ ] **4.5 Back from the archive** (found by the review of phase 3): the reason the `# syntax=` line is digest-pinned (the frontend's digest is the actions' implementation hash) and what a frontend is, today explained only in `docs/archive/concepts-working-notes.md`, which `CONVENTIONS.md`, `lint-pins.sh` and `concepts.md` point to; two sentences into the manual's reference part, the pointers moved with them
+- [x] **4.1 `operating-loop.md`** into the manual (the operator's view) and the archive (the run of 2026-07-21)
+- [x] **4.2 `concepts.md`'s reference half** into the manual (the builder contract, the trust-boundary table, the variant taxonomy), the anchors that README, SECURITY.md, the ledger, a chart README and a definition comment use moved with it
+- [x] **4.3 `revocation-runbook.md`** into the manual, SECURITY.md naming the new location (Req 9.1)
+- [x] **4.4 The triage chapters and the stack facts** as Decision 16 places them; the cadence, the tool versions, the counts made consistent
+- [x] **4.5 Back from the archive** (found by the review of phase 3): the reason the `# syntax=` line is digest-pinned (the frontend's digest is the actions' implementation hash) and what a frontend is, today explained only in `docs/archive/concepts-working-notes.md`, which `CONVENTIONS.md`, `lint-pins.sh` and `concepts.md` point to; two sentences into the manual's reference part, the pointers moved with them
+  - Done 2026-11-22: `concepts.md` became the first sections of the manual's Part VI (headings kept, so their anchors did not move), with "The frontend and its actions" brought back from the archive (4.5); `revocation-runbook.md` became "Revoke a digest" in Part III, SECURITY.md naming it (Req 9.1); `operating-loop.md` moved whole to the archive, the manual already explaining the loop. The manual's triage chapters keep what an operator does and link to `triage/README.md`, which took the explanation the manual alone had. Stated once from the declaration: four retired criterion numbers, the example exception (now a live entry, the old one long retired), Req 6.9 beside 6.41, the Renovate cadence (at most six hours, configured every four), and `tech-stack.md` without versions (five were stale), sixteen decisions and five ADRs. Not repointed: the comment in `image/valkey-compat/image.yaml`, since a definition change republishes the image. A read-only review found nothing lost; three points taken, two not (the variant taxonomy in Part I and Part VI, linked; the identifier rules as bullets and as a table in `triage/README.md`)
 
 ## Phase 5: the other lanes (task 19.6)
 
