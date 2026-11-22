@@ -1,0 +1,10 @@
+{
+  "id": "requirements-check_20261122",
+  "type": "chore",
+  "status": "pending",
+  "created_at": "2026-11-22T23:00:00Z",
+  "updated_at": "2026-11-22T23:00:00Z",
+  "description": "Every live criterion of requirements.md read against the code at one commit, with its mechanism and a verdict, the reader documents' statements of behaviour beside it, every finding re-checked by a second reader; each finding the owner's decision; the fixes one pull request per cluster, code test-first; the evidence in the LOG and the ledger (the owner's call of 2026-11-21; task group 20)",
+  "spec_path": "conductor/tracks/requirements-check_20261122/spec.md",
+  "plan_path": "conductor/tracks/requirements-check_20261122/plan.md"
+}

@@ -558,6 +558,14 @@
   - [x] 19.7 Evidence: ledger rows 9.20 and 9.21, the LOG entry
     - _Requirements: Req 7.11, Req 9.20, Req 9.21_
 
+- [ ] 20. The requirements checked against the code (the owner's call of 2026-11-21: the requirements kept as written and checked in a track of their own; the method of the review of 2026-09-09). Executes before task 12; one pull request per task, phase 3 one per fix cluster; conductor track requirements-check_20261122
+  - [ ] 20.1 The reading: every live criterion held against the code at one commit, nine readings and a re-check, the documentation track's phase-5 findings confirmed or refuted; `review.md` in the track's folder
+    - _Requirements: Req 7.11_
+  - [ ] 20.2 The dispositions: each finding the owner's decision, the fix clusters ordered
+  - [ ] 20.3 The fixes, one pull request per cluster, code test-first
+  - [ ] 20.4 Evidence: the LOG entry, the ledger rows whose mechanism changed
+    - _Requirements: Req 7.11_
+
 ## Requirements Coverage
 
 | Requirement | Covered By Tasks |
@@ -568,7 +576,7 @@
 | Req 4: Helm Chart Adaptation | 1.1, 5.3, 5.4, 5.5, 8.1, 8.4, 8.7, 11.3, 11.4, 14.4 |
 | Req 5: Go Integration Tests | 6.1, 6.2, 6.3, 6.4, 6.5, 8.7, 14.3, 17.1, 17.2, 17.3, 17.4 |
 | Req 6: CVE Triage | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.5, 9.1, 9.3, 10.1, 10.2, 10.3, 10.4, 10.6, 10.7 |
-| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5, 14.1, 16.1 to 16.16, 17.1, 17.2, 17.4, 18.1, 18.3, 18.5, 18.7 |
+| Req 7: Conventions and Review | 1.1, 1.2, 1.3, 8.6, 9.7, 9.8, 10.7, 11.5, 14.1, 16.1 to 16.16, 17.1, 17.2, 17.4, 18.1, 18.3, 18.5, 18.7, 20.1, 20.4 |
 | Req 9: Catalogue Posture | 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 18.1, 18.6, 18.7, 19.1 to 19.7 |
 
 Requirement 8 was retired whole on 2026-08-26 (primitives pass, finding 5.8): its guidance
@@ -581,6 +589,8 @@ Task group 17 (proof kinds) amends 5.8 and 7.7 and adds 5.9 and 5.10; 16.2 and 1
 Task group 18 (SLSA Build L2) amends 2.9, 2.10, 2.23, 2.25 and 7.7 and adds 2.27 to 2.30 and 9.19 (2.30 with the amendment of 2026-11-11: one provenance mode, `off`, `report` or `required`); the mode is `required` only from the successor's first release, so 2.28's ledger row waits for task 12.1.
 
 Task group 19 (the documentation) adds 9.20 and 9.21 and changes no behaviour of a script or workflow beyond the one validate step of 19.3.
+
+Task group 20 (the requirements checked against the code) reads every criterion and adds none; the criteria its fixes touch are named in each cluster's pull request.
 
 Task group 12 (greenfield successor) adds no new criterion: it executes the dated F9
 re-decision of 2026-08-25 (revised the same day to the successor mechanism) rather than
