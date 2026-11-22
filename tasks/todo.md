@@ -47,6 +47,39 @@ track (`conductor/tracks.md`).
       ledger and lists what it finds; each fix is its own decision and pull
       request, code test-first. It reads the consolidated documents and
       lands before the successor is seeded (task 12.1).
+      Input already found while the lanes were drawn (phase 5 of the
+      documentation track, 2026-11-22; each read in the code, none yet in
+      a run; docs/lanes.md draws what the code does today):
+      - The code: the refresh-definition.sh task is keyed on the
+        github-tags datasource only (renovate.json5:416), which the
+        github-actions manager also uses, so an Actions bump would run it
+        on .github/workflows and fail; no Actions bump pull request has
+        ever opened, and the Dependency Dashboard (#5) holds ten Actions
+        updates under "Other Branches"; the one read, actions/checkout,
+        has no branch. The published
+        verify recipe has no pipefail, so a failed cosign|jq pipe exits 0
+        for a consumer (render-verification.sh; the smoke test adds
+        pipefail itself). The tag step writes every tag before checking
+        any (build.yml:1229-1238). rescan.yml:102-104 cannot fail on a
+        malformed switch. A KEV file that downloads but does not parse
+        still yields an issue set (Req 6.60). The build portability step
+        and consumers.gating can stay green on a failed consumer. No
+        workflow step checks that main_sec.json requires the gates
+        (Req 9.8). A pull request changing only the gate's scripts builds
+        nothing; one changing only test/go.mod runs no e2e leg.
+      - The documents: Req 2.5 ("no artifacts from that run") against
+        fail-fast: false; Decision 2 and CONVENTIONS.md say every built-in
+        Renovate manager is off (two are on); Decision 6's --recursive
+        attest and its retired Req citations; Decision 10 names the
+        manual's recipe (the README's runs); the manual's scan gate list
+        lacks the KEV tiers step, its cron table names one publish reason
+        of five, its tag line says a mismatch leaves tags untouched, its
+        smoke summary claims exit codes; design.md's error table files an
+        issue on a Trivy outage (none is filed); triage/README.md says
+        feed failures soft-fail (KEV fails the run), "one issue per CVE"
+        (GHSA ids too) and that vex/ and accepted-risk/ start empty;
+        SECURITY.md says no digest has been revoked (the drill entry,
+        2026-11-05) and dates its advisory line 2026-09-07.
 - [ ] Kyverno's `kyverno.io/v1` ClusterPolicy is deprecated (seen by 18.2,
       2026-11-11): Kyverno 1.19.2 prints on every `kyverno apply` that the
       kind "will be removed in a future release" in favour of its newer

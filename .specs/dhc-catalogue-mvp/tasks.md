@@ -553,7 +553,7 @@
     - _Requirements: Req 9.20_
   - [x] 19.5 The merges and the contradictions, as Decision 16 places them
     - _Requirements: Req 9.1, Req 9.15, Req 9.20_
-  - [ ] 19.6 The other lanes, and the stale diagrams retired
+  - [x] 19.6 The other lanes, and the stale diagrams retired
     - _Requirements: Req 9.21_
   - [ ] 19.7 Evidence: ledger rows 9.20 and 9.21, the LOG entry
     - _Requirements: Req 7.11, Req 9.20, Req 9.21_

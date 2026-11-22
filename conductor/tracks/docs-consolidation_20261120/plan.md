@@ -47,8 +47,9 @@ Seven phases, one pull request each. Phase 0 is this pull request: the track, De
 
 ## Phase 5: the other lanes (task 19.6)
 
-- [ ] **5.1 One graph per lane** in the lane map, in the pattern of phase 1, one commit each, each reviewed against its workflow
-- [ ] **5.2 The stale diagrams** in design.md and the manual replaced by links to their lane, or brought up to date
+- [x] **5.1 One graph per lane** in the lane map, in the pattern of phase 1, one commit each, each reviewed against its workflow
+- [x] **5.2 The stale diagrams** in design.md and the manual replaced by links to their lane, or brought up to date
+  - Done 2026-11-22: six lanes drawn, one commit each (upstream tracking, the pull-request gate, the release with its three entries, the daily rescan and triage, posture, the consumer), 31 graphs on the page, each with its table of exact step names, explaining sections and criteria, each rendered with the Mermaid command-line tool and looked at. Where a lane passes through the SLSA lane it links it instead of drawing it twice. Of the seven diagrams in design.md and the manual, four flows became links to their lane (their design reasoning kept as prose), the architecture graph was brought up to date, the onboarding flow and the four treatments kept. A separate read-only review held every lane against its workflow and scripts: every box and step name exists, but failure edges and "fails" claims were wrong in each lane; all taken, the page now draws what the code does today. The code problems the drawing and the review found (among them a Renovate rule that keeps GitHub Actions bumps from ever opening, and a published verify recipe without pipefail) are input to the requirements-vs-code track, listed in `tasks/todo.md`; none is fixed here
 
 ## Phase 6: the evidence (task 19.7)
 
