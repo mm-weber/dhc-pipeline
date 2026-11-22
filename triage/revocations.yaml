@@ -16,8 +16,9 @@
 # repository) and date. Nothing is ever removed from this list.
 revocations:
   # Drill 16.12 (track revocation_20261105): the drill definition's published
-  # digest withdrawn by its own maintainer to execute docs/revocation-runbook.md
-  # as written, Move B1; nothing was compromised. Recorded while the three tags
+  # digest withdrawn by its own maintainer to execute the revocation runbook
+  # as written (then docs/revocation-runbook.md, since 2026-11-22 the manual's
+  # "Revoke a digest"), Move B1; nothing was compromised. Recorded while the three tags
   # still referenced the digest, so that the posture step's refusal was read
   # (Req 9.7, LOG 2026-11-05); the version deleted afterwards.
   - image: ghcr.io/mm-weber/dhc/drill-app
