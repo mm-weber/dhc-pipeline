@@ -20,8 +20,127 @@ flowchart LR
     D --> GOV(["Posture: rulesets, reporting,<br/>revocations · Req 9"])
     T --> C(["Consumer: verify recipe,<br/>Kyverno policy · Req 2.23, 2.25"])
     classDef drawn fill:#d7ecff,stroke:#1f6feb,stroke-width:2px
-    class P drawn
+    class U,P drawn
 ```
+
+## Upstream tracking
+
+This lane turns a new upstream release into a pull request, so nobody has to watch upstream by hand. Renovate (a bot that reads version pins and proposes updates) runs self-hosted in GitHub Actions every 4 hours, or when the owner dispatches it. It reads every pin in the repository, holds back what is too young or too big to offer, makes each bumped definition consistent again with a refresh script, and opens a pull request. That pull request then enters the [pull-request gate](user-manual.md#part-ii-the-pipeline) like any other change. Why Renovate and not a custom tracker: Decision 2. How much to trust an upstream release: Decision 8 and, for grafana, [ADR 0002](decisions/0002-grafana-upstream-tracking.md). Renovate cannot read `catalogue-policy.yaml`, so the two policy values it depends on reach it through a lint and a rendered block in `renovate.json5`.
+
+### What is offered
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    SCHED[/"workflows: renovate.yml, schedule<br/>every 4 h · Req 3.1, 7.10"/]
+    SET[/"active_set<br/>the definitions tracked · Req 1.13, 1.14"/]
+    RT["Render the tracking scope into renovate.json5<br/>one ignored path per inactive definition<br/>and per chart deploying none · Req 1.14 · Decision 11"]
+    IN(["The cron, or the owner's dispatch<br/>with dry run and log level"])
+    RUN["Renovate runs, self-hosted<br/>one manager per pin surface · Req 3.1 · Decision 2"]
+    DS{"Datasource?"}
+    AGE{"At least three days old,<br/>and Renovate can date it?<br/>Req 3.7 · Decision 8"}
+    WAIT(["Pending on the Dependency Dashboard,<br/>offered once it has aged"])
+    MAJ{"A major,<br/>or a grafana minor?"}
+    DASH(["Waits for the owner's approval<br/>on the Dependency Dashboard · Req 3.4"])
+    GRP["One branch per upstream<br/>cert-manager x3, valkey and compat,<br/>the cert-manager chart pins · Req 3.3"]
+    BR(["A bump branch: one version moved,<br/>refreshed in the next graph"])
+    ALERT(["GitHub reports a vulnerability alert<br/>on the repository's own tooling"])
+    DIS{"Dismissed with a reason?"}
+    SEC(["A SECURITY fix pull request<br/>to the lowest fixed version · Req 3.14"])
+    NOPR(["No pull request · Req 3.15"])
+    LINT(["validate fails by name"])
+    SCHED --> IN
+    SET --> RT --> RUN
+    IN --> RUN --> DS
+    DS -->|third-party version| AGE
+    DS -->|docker: own digests, build layer| MAJ
+    AGE -->|no| WAIT
+    AGE -->|yes| MAJ
+    MAJ -->|yes| DASH
+    MAJ -->|no| GRP --> BR
+    ALERT --> DIS
+    DIS -->|no| SEC
+    DIS -->|yes| NOPR
+    SCHED -.->|cron differs from the declaration| LINT
+    RT -.->|rendered block differs| LINT
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| The schedule | [`renovate.yml`](../.github/workflows/renovate.yml), `cron: "0 */4 * * *"`; held equal to the declaration by [`validate.yml`](../.github/workflows/validate.yml), step "workflow schedule + permissions vs policy file (Req 7.10)", [`lint-workflow-policy.sh`](../scripts/lint-workflow-policy.sh) | [crons and cadence](user-manual.md#crons-and-cadence) | Req 3.1 (at most 6 h; 4 h leaves margin for GitHub's scheduler delay), 7.10 |
+| The tracking scope | [`render-tracking.sh`](../scripts/render-tracking.sh), run by whoever edits the active set; `validate.yml`, step "tracking scope rendering drift check (Req 1.14)" | [deactivate a definition](user-manual.md#deactivate-a-definition), [Renovate managers](user-manual.md#renovate-managers) | Req 1.13, 1.14; Decision 11 |
+| Renovate runs | `renovate.yml`, its one step, which has no `name:`: `renovatebot/github-action` v43.0.9, pinned by commit; the managers in [`renovate.json5`](../renovate.json5) | [Renovate managers](user-manual.md#renovate-managers) | Req 3.1; Decision 2 |
+| The age | `renovate.json5`, the rule with `minimumReleaseAge: "3 days"` and `timestamp-required` over github-tags, github-releases, npm, pypi, helm and go | [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.7; Decision 8 (a): docker is exempt, it carries the catalogue's own digests and the hand-reviewed build layer |
+| The dashboard | `renovate.json5`, the rules with `dependencyDashboardApproval: true`: every major, and every grafana minor | [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.4; Decision 2: grafana rides the stable maintenance line, a minor is the owner's call (register row M24) |
+| The grouping | `renovate.json5`, the three rules with a `groupName` naming one upstream | [Renovate managers](user-manual.md#renovate-managers) | Req 3.3 |
+| The vulnerability alert | `renovate.json5`, `vulnerabilityAlerts: { enabled: true }` | [Renovate managers](user-manual.md#renovate-managers) | Req 3.14, 3.15: a dismissal in GitHub is the not-affected record for the repository's own dependencies |
+
+### A bump made consistent
+
+Renovate moves one value, the version. Every field derived from it (commit, checksum, tags, name) is then stale, so a script Renovate runs after the bump (a `postUpgradeTask`) rewrites them. Before it writes anything it checks the authenticity signal the definition declares in its `# authenticity:` comment, and a failed check writes nothing.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    BR(["A bump branch from the graph above"])
+    K{"Which pin moved?"}
+    DEF["refresh-definition.sh<br/>resolve the new tag to its commit<br/>with git ls-remote · Req 3.2 · Decision 2"]
+    C1{"Declared class?"}
+    VT["GitHub's verification statement<br/>for the tag object · Req 3.8 · Decision 8"]
+    VC["GitHub's verification statement<br/>for the commit · Req 3.8 · Decision 8"]
+    W1["Rewrite commit, checksum, versions,<br/>alias tags, name; stamp the evidence<br/>beside the pin · Req 3.2, 3.8"]
+    GRA["refresh-grafana.sh<br/>the build id from the versions API,<br/>the apt index and the GitHub release · ADR 0002"]
+    SRV["dl.grafana.com serves both tarballs;<br/>read each sha256 sidecar · ADR 0002"]
+    XO["Class is cross-origin-checksum, and the<br/>versions API sha256 equals the sidecar,<br/>per architecture · Req 3.8 · Decision 8"]
+    W2["Rebuild the url; rewrite versions, tags,<br/>both checksums; stamp the evidence · Req 3.2, 3.8"]
+    NOTASK["No task: tool and CI Python pins<br/>keep their old hash on purpose · Req 7.5"]
+    PR(["Pull request opened, into the gate"])
+    REF1(["Refused by name, nothing written · Req 3.8"])
+    REF2(["Refused by name, nothing written · Req 3.8"])
+    BR --> K
+    K -->|a from-source definition| DEF --> C1
+    C1 -->|signed-tag| VT --> W1
+    C1 -->|signed-commit| VC --> W1
+    W1 --> PR
+    K -->|grafana| GRA --> SRV --> XO --> W2 --> PR
+    K -->|any other pin| NOTASK --> PR
+    C1 -.->|none, missing, or cross-origin-checksum| REF1
+    VT -.->|lightweight tag, not verified, unreadable| REF1
+    VC -.->|not verified, unreadable| REF1
+    GRA -.->|no id, or the sources disagree| REF2
+    SRV -.->|not served, bad checksum| REF2
+    XO -.->|another class, or a mismatch| REF2
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Which pin moved | `renovate.json5`, the two `postUpgradeTasks` rules: one keyed on the github-tags datasource, one on the name `grafana/grafana`; both commands allowlisted in `renovate.yml` (`RENOVATE_ALLOWED_POST_UPGRADE_COMMANDS`) | [Renovate managers](user-manual.md#renovate-managers) | Decision 2: the two definition archetypes, compile-from-source and tarball-repackage |
+| From-source refresh | [`refresh-definition.sh`](../scripts/refresh-definition.sh), inside the Renovate run; its tests: `validate.yml`, step "refresh-definition unit tests (postUpgradeTask, Req 3.2)" | [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.2, 3.8; Decision 8 (b) |
+| Grafana refresh | [`refresh-grafana.sh`](../scripts/refresh-grafana.sh), inside the Renovate run; its tests: `validate.yml`, step "refresh-grafana unit tests (postUpgradeTask, ADR 0002)" | [handling Renovate PRs](user-manual.md#handling-renovate-prs) (with the corner case of a build id no index carries yet, register M11) | Req 3.2, 3.8; ADR 0002 and its amendments of 2026-08-07, 2026-08-11 and 2026-08-25 |
+| No task | the pin-script, Python and workflow-pin managers in `renovate.json5` | [handling Renovate PRs](user-manual.md#handling-renovate-prs): completing a tool-pin bump (register M1) | Req 7.5: a checksum that updates itself verifies nothing |
+
+### Merged by a machine, or by the owner
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    PR(["A bump pull request, its checks run<br/>in the pull-request gate"])
+    A1{"From-source definition,<br/>patch or digest?"}
+    A2{"The catalogue's own image<br/>in a chart, digest only?"}
+    AUTO(["Automerged once the required checks are green<br/>Req 3.5, 3.12 · Decision 8 (c)"])
+    REV(["Reviewed and merged by the owner: grafana,<br/>chart versions, build layer, Actions,<br/>tool pins, every minor and major<br/>Req 3.5, 3.11 · Decision 2"])
+    PR --> A1
+    A1 -->|yes| AUTO
+    A1 -->|no| A2
+    A2 -->|yes| AUTO
+    A2 -->|no| REV
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| From-source automerge | `renovate.json5`, the rule `matchDatasources: ["github-tags"]` with `matchUpdateTypes: ["patch", "digest"]`; the later rule `matchManagers: ["github-actions"]` takes Actions back out | [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.5; Decision 2: Actions are third-party code holding the workflow's token (review D4) |
+| Chart digest automerge | `renovate.json5`, the rule over `ghcr.io/mm-weber/dhc/**` with `matchUpdateTypes: ["digest"]`, ordered before the build-layer rule | [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.12; Decision 8 (c) |
+| Reviewed | `renovate.json5`, `automerge: false` on grafana, the helm datasource, the build layer and the Actions manager; no automerge rule reaches the rest | [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.11; Decision 2: a repackage bump swaps a binary this repository did not build |
 
 ## SLSA provenance
 
