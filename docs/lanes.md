@@ -4,7 +4,7 @@ The catalogue is a set of lanes: each is one path work takes through the reposit
 
 ## The lane map
 
-How the lanes connect. The lanes not yet drawn below are drawn in the next steps of the documentation track; until then the [manual](user-manual.md#part-ii-the-pipeline) explains them.
+How the lanes connect. Each lane is drawn below.
 
 ```mermaid
 %%{init: {"flowchart": {"wrappingWidth": 340}}}%%
@@ -20,7 +20,7 @@ flowchart LR
     D --> GOV(["Posture: rulesets, reporting,<br/>revocations · Req 9"])
     T --> C(["Consumer: verify recipe,<br/>Kyverno policy · Req 2.23, 2.25"])
     classDef drawn fill:#d7ecff,stroke:#1f6feb,stroke-width:2px
-    class U,G,R,S,DSP,P,D,GOV drawn
+    class U,G,R,S,DSP,P,D,GOV,C drawn
 ```
 
 ## Upstream tracking
@@ -695,7 +695,7 @@ flowchart TB
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
 | The recipe step | the README's block, rendered by [`render-verification.sh`](../scripts/render-verification.sh) from the declaration | [verify an image](../README.md#verify-an-image) | Req 2.25; ADR 0005, decision 2: a step without the jq half verifies the signer only |
-| The smoke test | `rescan.yml`, step "consumer smoke test"; [`consumer-smoke.sh`](../scripts/consumer-smoke.sh) | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.13; the review of 2026-09-09, finding 2.4: an empty result passed |
+| The smoke test | `rescan.yml`, step "consumer smoke test (Req 9.13)"; [`consumer-smoke.sh`](../scripts/consumer-smoke.sh) | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.13; the review of 2026-09-09, finding 2.4: an empty result passed |
 | The Kyverno rule | [`policies/verify-catalogue-images.yaml`](../policies/verify-catalogue-images.yaml), rendered only under `required` | [what a provenance statement has to say](user-manual.md#what-a-provenance-statement-has-to-say) | Req 2.28; ADR 0005, amendment: one more attestation of the existing entry |
 | The claim | [SECURITY.md](../SECURITY.md#slsa-build-level) | the same | Req 9.19: no level above what the policy demands |
 
@@ -998,3 +998,141 @@ flowchart TB
 | The status list | `rescan.yml`, step "invariants (Req 2.21, 2.24, 6.44, 6.51)", [`check-revocations.sh`](../scripts/check-revocations.sh) with `\|\| true`; then step "catalogue status, the clocks over the supported set (Req 6.46)", which publishes no status when the list is missing | [the catalogue status issue](user-manual.md#the-catalogue-status-issue) | Req 9.5, 6.46; Decision 10 |
 | The verdict | `rescan.yml`, step "posture invariants (Req 9.3, 9.7, 9.9)", `check-revocations.sh` again; its tests: `validate.yml`, step "check-revocations unit tests (Req 9.5 to 9.7)" | [revoke a digest](user-manual.md#revoke-a-digest) | Req 9.7; Decision 10, as built: in the posture step rather than the invariants step |
 | The summary line | `rescan.yml`, step "summary", the line "revocations:" | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.7 |
+
+## The consumer
+
+This lane is what a person who pulls an image gets to check it with, and the daily proof that those checks still work. It has two outputs, both rendered from one place, the `verification` section of `catalogue-policy.yaml`: a verification recipe (a short list of shell commands) in the [README](../README.md#verify-an-image) and the [manual](user-manual.md#verify-what-you-pull), and a Kyverno admission policy (a rule a Kubernetes cluster applies before it runs a Pod) in [`policies/verify-catalogue-images.yaml`](../policies/verify-catalogue-images.yaml). A person triggers the rendering by editing the policy file; `validate` holds the outputs equal to it on every pull request. The consumer then runs the recipe by hand, or installs the policy in a cluster; nothing in this repository installs it in one. Once a day the rescan does both itself, against the live registry, and fails by name when either no longer holds. The provenance half of the consumer side is drawn in [SLSA provenance, for a consumer](#for-a-consumer) and is not repeated here. Why the recipe and the policy are rendered rather than written: Decision 6. Why the recipe is run every day: Decision 10.
+
+### What a consumer is given
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    VER[/"verification: registry, issuer,<br/>the two roles and their identities,<br/>what is required from whom · Req 2.23, 7.7"/]
+    CON[/"consumers.list, triage.aperture<br/>one authoritative consumer · Req 9.11, 6.49"/]
+    PRV[/"release.provenance, verification.provenance<br/>drawn in the SLSA provenance lane · Req 2.28, 2.30"/]
+    IN(["A person edits catalogue-policy.yaml<br/>and runs the renderer"])
+    REN["render-verification.sh: render every<br/>artifact from the one file · Req 7.8 · Decision 6"]
+    POL(["The admission policy: signature and SPDX SBOM<br/>from the release workflow, OpenVEX<br/>from it or the rescan workflow · Req 2.23"])
+    REG(["The chart gate's registry rule,<br/>the same namespace · Req 4.2 · Decision 11"])
+    SNIP(["The recipe between the markers<br/>in README.md and the manual · Req 2.25"])
+    PR(["Every pull request"])
+    DRIFT["validate: re-render and compare<br/>with the committed copies · Req 7.9 · Decision 6"]
+    REF(["Refused by name, nothing written"])
+    DFAIL(["validate fails, naming each artifact<br/>that differs · Req 7.9"])
+    IN --> REN
+    VER & CON & PRV --> REN
+    REN --> POL & REG & SNIP
+    PR --> DRIFT
+    REN -.->|not exactly one authoritative consumer,<br/>no aperture, an incomplete provenance declaration| REF
+    DRIFT -.->|a hand edit, or a value changed<br/>without re-rendering| DFAIL
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| The declared values | [`catalogue-policy.yaml`](../catalogue-policy.yaml), sections `verification` and `consumers`, and `triage.aperture` | [SECURITY.md, the promise](../SECURITY.md#the-promise) | Req 2.23, 7.7, 9.11; Decision 6 |
+| Render | [`render-verification.sh`](../scripts/render-verification.sh), run by whoever edits the values; it refuses before writing anything | [verify what you pull](user-manual.md#verify-what-you-pull), [policies](user-manual.md#policies) | Req 7.8; Decision 6: rendered, so the instructions cannot drift from the policy |
+| The admission policy | [`policies/verify-catalogue-images.yaml`](../policies/verify-catalogue-images.yaml): one keyless signature entry, one attestor set per required type; the OpenVEX set takes either role (`count: 1`) | [verify what you pull](user-manual.md#verify-what-you-pull) | Req 2.23; Decision 6. The provenance rule is added only under `required` ([SLSA provenance, for a consumer](#for-a-consumer)) |
+| The registry rule | [`policies/restrict-registries.yaml`](../policies/restrict-registries.yaml), rendered by the same script for the [pull-request gate](user-manual.md#part-ii-the-pipeline) | [policies](user-manual.md#policies) | Req 4.2; Decision 11 (task 14.1): one namespace for both policies |
+| The recipe | the fenced block between `render-verification:begin` and `render-verification:end` in [README.md](../README.md#verify-an-image) and [the manual](user-manual.md#verify-what-you-pull) | [verify an image](../README.md#verify-an-image) | Req 2.25; Decision 6 |
+| The drift check | [`validate.yml`](../.github/workflows/validate.yml), step "verification renderings drift check (Req 7.8, 7.9)": `render-verification.sh --check`; its tests: step "render-verification unit tests (Req 7.8, 7.9)" | [validate, the lint battery](user-manual.md#validate--the-lint-battery) | Req 7.9; Decision 6 |
+
+### Two ways to verify
+
+The recipe asks the same questions as the policy, one command at a time, and adds the scans. Each `cosign` command checks two things: that the issuer is GitHub's, and that the signing identity is exactly the named workflow file on `main`.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    REF(["A catalogue tag or digest"])
+    HOW{"By hand, or in a cluster?"}
+    SIG["cosign verify: signed by build.yml on main<br/>Req 2.23, 2.25 · Decision 6"]
+    SBOM["cosign verify-attestation: the SPDX SBOM,<br/>from build.yml · Req 2.25"]
+    VEX["The OpenVEX document from build.yml,<br/>else from rescan.yml, saved as openvex.json<br/>Req 2.25, 6.44 · ADR 0004"]
+    PROV["The SLSA provenance step, drawn in<br/>SLSA provenance, for a consumer<br/>Req 2.25 · Decision 15"]
+    TRV["trivy with openvex.json, the declared aperture:<br/>the authoritative consumer · Req 9.11 · Decision 10"]
+    GRY["grype with openvex.json:<br/>a declared consumer, informational · Req 9.11"]
+    BK["docker buildx imagetools inspect:<br/>BuildKit provenance, read only,<br/>no policy verifies it · Req 2.25"]
+    DONE(["Verified: the findings left after the<br/>published statements, read beside them"])
+    KYV["Kyverno, the published policy installed<br/>by the consumer: signature, SPDX SBOM, OpenVEX<br/>from the declared identities · Req 2.23"]
+    RUN(["The Pod runs"])
+    STOP(["A command fails: do not trust this digest"])
+    DENY(["The Pod is refused"])
+    REF --> HOW
+    HOW -->|by hand| SIG --> SBOM --> VEX --> PROV --> TRV --> GRY --> BK --> DONE
+    HOW -->|in a cluster| KYV -->|all present| RUN
+    SIG -.->|another signer, or none| STOP
+    SBOM -.->|missing, or another signer| STOP
+    VEX -.->|neither role signed one| STOP
+    KYV -.->|any one missing or from another identity| DENY
+```
+
+The scanners do not decide trust: `trivy` and `grype` exit 0 with findings, and a statement suppresses a finding only when it says `not_affected` or `fixed`. What a signature means and does not mean: [SECURITY.md](../SECURITY.md#what-a-signature-attests-and-what-it-does-not).
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Signature, SBOM | the recipe, its first two commands | [verify what you pull](user-manual.md#verify-what-you-pull) | Req 2.23, 2.25; Decision 6 |
+| OpenVEX | the recipe, the braced command: the releaser first, the re-attester when that fails; the braces keep `\|\|` from swallowing the pipe (found by the smoke test's first run, 2026-09-08) | [what VEX means for you](user-manual.md#what-vex-means-for-you) | Req 2.25, 6.44; ADR 0004: exactly one OpenVEX attestation per digest, whichever role signed it |
+| Provenance | the recipe, present while `release.provenance` is not `off` | [SLSA provenance, for a consumer](#for-a-consumer) | Req 2.25; Decision 15, [ADR 0005](decisions/0005-slsa-provenance-verifier.md) |
+| The scans | the recipe, one line per entry of `consumers.list`, the authoritative one first; `--severity` is `triage.aperture` | [what VEX means for you](user-manual.md#what-vex-means-for-you) | Req 9.11; Decision 10 |
+| BuildKit provenance | the recipe, its last line | [verify what you pull](user-manual.md#verify-what-you-pull) | Req 2.25: supplementary detail, stated as such |
+| Kyverno | [`policies/verify-catalogue-images.yaml`](../policies/verify-catalogue-images.yaml) in the consumer's cluster; this repository applies it only through the CLI, below | [verify what you pull](user-manual.md#verify-what-you-pull) | Req 2.23; Decision 6 |
+
+### Held true every day
+
+Both ways are run by the [daily rescan](#the-daily-rescan-and-triage) against the live registry, with no shortcut a consumer would not have. Each of the two checks below fails the run by name and does not stop the other. The first applies the policy the way a cluster would.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    IN(["The daily rescan: today's enumeration<br/>of every tag and digest · Req 2.22"])
+    CTRL[/"verification.control<br/>an unsigned digest that must be refused · Req 2.24"/]
+    ADM["kyverno apply with the rendered policy,<br/>one call per tag-referenced digest<br/>and one for the control · Req 2.24 · Decision 6"]
+    AV{"Every digest admitted,<br/>the control refused?"}
+    COS["A cosign second opinion on each refused<br/>digest and its platform manifests, to name why"]
+    OK(["The step's log: n admitted, control refused;<br/>the verdicts reach the status and the page"])
+    RED(["The run fails, naming each digest<br/>and the reason"])
+    REFU(["Refused by name: no enumeration,<br/>or no control declared"])
+    IN --> ADM
+    CTRL --> ADM --> AV
+    AV -->|yes| OK
+    AV -.->|a digest refused| COS -.-> RED
+    AV -.->|the control admitted| RED
+    ADM -.->|kyverno could not verify:<br/>not verified is not admitted| RED
+    ADM -.->|an input missing| REFU
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| The admission proof | [`rescan.yml`](../.github/workflows/rescan.yml), step "invariants (Req 2.21, 2.24, 6.44, 6.51)", run when the scan step succeeded; [`verify-catalogue.sh`](../scripts/verify-catalogue.sh), the verdicts in `verify-catalogue.json`; its tests: [`validate.yml`](../.github/workflows/validate.yml), step "admission proof unit tests (Req 2.24)" | [the catalogue page](user-manual.md#the-catalogue-page), [SECURITY.md, the promise](../SECURITY.md#the-promise) | Req 2.24; Decision 6: one `kyverno apply` per digest, because a batch verdict was measured wrong on 2026-09-03 |
+| The control | `catalogue-policy.yaml`, `verification.control` | [verify what you pull](user-manual.md#verify-what-you-pull) | Req 2.24: a policy that admits everything looks like one that works, until the control gets through |
+
+The second runs the README recipe itself, word for word.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    IN(["The daily rescan: today's enumeration · Req 2.22"])
+    CON[/"consumers.list<br/>trivy authoritative, grype · Req 9.11"/]
+    PICK["Pick the first supported full-release tag<br/>in the enumeration, as a digest · Req 9.13"]
+    RUN["Extract the README recipe, set REF<br/>to that digest, run each step<br/>in a scratch directory · Req 9.13 · Decision 10"]
+    SUP["Count each not_affected or fixed statement<br/>in the authoritative consumer: suppressed,<br/>nothing to suppress, or missing · Req 9.13"]
+    OCI["Trivy reading the attestation itself, --vex oci:<br/>at least the same suppressions · ADR 0004"]
+    OTH(["Each other consumer's result in the<br/>portability block, never fails the run<br/>Req 9.12, 9.13 · Decision 10"])
+    OK(["Summary: the smoke line, each step<br/>with its result, the three counts"])
+    RED(["The run fails, naming the step<br/>or the statement"])
+    IN --> PICK --> RUN --> SUP --> OCI --> OK
+    CON --> SUP
+    SUP --> OTH
+    PICK -.->|no supported full-release digest| RED
+    RUN -.->|any step exits non-zero,<br/>the grype line included| RED
+    SUP -.->|a statement missing,<br/>or the consumer could not run| RED
+    OCI -.->|fewer suppressions| RED
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| The smoke test | `rescan.yml`, step "consumer smoke test (Req 9.13)", run when the enumeration succeeded; [`consumer-smoke.sh`](../scripts/consumer-smoke.sh); its tests: `validate.yml`, step "consumer-smoke unit tests (Req 9.13)" | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.13; Decision 10: the README section becomes a tested contract. It reads the README's copy; the drift check keeps the manual's equal |
+| The `--vex oci` check | the same script, only when Trivy is the authoritative consumer; more suppressions through the attestation are reported, not failed | [reading job summaries](user-manual.md#reading-job-summaries) | ADR 0004; Req 6.44 |
+| The other consumers | the same script, then [`vex-portability.sh`](../scripts/vex-portability.sh) | [what VEX means for you](user-manual.md#what-vex-means-for-you) | Req 9.12, 9.13; Decision 10: informational while `consumers.gating` is false |
+| The summary | `rescan.yml`, step "summary", the line "consumer smoke test:" and the smoke block | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.13 |
