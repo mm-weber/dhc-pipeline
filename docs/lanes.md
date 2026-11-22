@@ -42,7 +42,7 @@ flowchart TB
     WAIT(["Pending on the Dependency Dashboard,<br/>offered once it has aged"])
     MAJ{"A major,<br/>or a grafana minor?"}
     DASH(["Waits for the owner's approval<br/>on the Dependency Dashboard · Req 3.4"])
-    GRP["One branch per upstream<br/>cert-manager x3, valkey and compat,<br/>the cert-manager chart pins · Req 3.3"]
+    GRP["Grouped: cert-manager x3, valkey and<br/>compat, the cert-manager chart pins · Req 3.3;<br/>the dhi.io build layer. Grafana: one<br/>branch per minor stream"]
     BR(["A bump branch: one version moved,<br/>refreshed in the next graph"])
     ALERT(["GitHub reports a vulnerability alert<br/>on the repository's own tooling"])
     DIS{"Dismissed with a reason?"}
@@ -53,7 +53,7 @@ flowchart TB
     SET --> RT --> RUN
     IN --> RUN --> DS
     DS -->|third-party version| AGE
-    DS -->|docker: own digests, build layer| MAJ
+    DS -->|docker: own digests,<br/>build layer, e2e probe image| MAJ
     AGE -->|no| WAIT
     AGE -->|yes| MAJ
     MAJ -->|yes| DASH
@@ -70,9 +70,9 @@ flowchart TB
 | The schedule | [`renovate.yml`](../.github/workflows/renovate.yml), `cron: "0 */4 * * *"`; held equal to the declaration by [`validate.yml`](../.github/workflows/validate.yml), step "workflow schedule + permissions vs policy file (Req 7.10)", [`lint-workflow-policy.sh`](../scripts/lint-workflow-policy.sh) | [crons and cadence](user-manual.md#crons-and-cadence) | Req 3.1 (at most 6 h; 4 h leaves margin for GitHub's scheduler delay), 7.10 |
 | The tracking scope | [`render-tracking.sh`](../scripts/render-tracking.sh), run by whoever edits the active set; `validate.yml`, step "tracking scope rendering drift check (Req 1.14)" | [deactivate a definition](user-manual.md#deactivate-a-definition), [Renovate managers](user-manual.md#renovate-managers) | Req 1.13, 1.14; Decision 11 |
 | Renovate runs | `renovate.yml`, its one step, which has no `name:`: `renovatebot/github-action` v43.0.9, pinned by commit; the managers in [`renovate.json5`](../renovate.json5) | [Renovate managers](user-manual.md#renovate-managers) | Req 3.1; Decision 2 |
-| The age | `renovate.json5`, the rule with `minimumReleaseAge: "3 days"` and `timestamp-required` over github-tags, github-releases, npm, pypi, helm and go | [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.7; Decision 8 (a): docker is exempt, it carries the catalogue's own digests and the hand-reviewed build layer |
+| The age | `renovate.json5`, the rule with `minimumReleaseAge: "3 days"` and `timestamp-required` over github-tags, github-releases, npm, pypi, helm and go | [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.7; Decision 8 (a): docker is exempt, it carries the catalogue's own digests and the hand-reviewed build layer. The exemption also reaches the third-party e2e probe image (`PROBE_IMAGE` in `e2e.yml`, tracked through the docker datasource), whose bump is reviewed, never automerged |
 | The dashboard | `renovate.json5`, the rules with `dependencyDashboardApproval: true`: every major, and every grafana minor | [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.4; Decision 2: grafana rides the stable maintenance line, a minor is the owner's call (register row M24) |
-| The grouping | `renovate.json5`, the three rules with a `groupName` naming one upstream | [Renovate managers](user-manual.md#renovate-managers) | Req 3.3 |
+| The grouping | `renovate.json5`, the four rules with a `groupName`: "cert-manager monorepo", "valkey runtime and compat", "cert-manager chart pins" and "dhi.io build layer"; grafana's rule with `separateMinorPatch` and `separateMultipleMinor` gives each grafana minor stream its own branch | [Renovate managers](user-manual.md#renovate-managers) | Req 3.3 for the first three, each one upstream moving several pins; the build-layer group only tidies the dashboard and rests on no criterion |
 | The vulnerability alert | `renovate.json5`, `vulnerabilityAlerts: { enabled: true }` | [Renovate managers](user-manual.md#renovate-managers) | Req 3.14, 3.15: a dismissal in GitHub is the not-affected record for the repository's own dependencies |
 
 ### A bump made consistent
@@ -104,7 +104,8 @@ flowchart TB
     W1 --> PR
     K -->|grafana| GRA --> SRV --> XO --> W2 --> PR
     K -->|any other pin| NOTASK --> PR
-    C1 -.->|none, missing, or cross-origin-checksum| REF1
+    DEF -.->|the tag does not resolve| REF1
+    C1 -.->|none, missing, unknown,<br/>or cross-origin-checksum| REF1
     VT -.->|lightweight tag, not verified, unreadable| REF1
     VC -.->|not verified, unreadable| REF1
     GRA -.->|no id, or the sources disagree| REF2
@@ -144,7 +145,7 @@ flowchart TB
 
 ## The pull-request gate
 
-This lane decides whether a change may reach `main`. Every pull request starts it, whether a person or Renovate opened it, and so does every push to an open pull request. Four workflows run side by side: `validate` checks conventions and declared values and runs every test suite, `build` builds and scans each definition the change touches, `chart` renders every chart and checks it against the Kyverno policies, and `e2e` installs each touched chart on a throwaway Kubernetes cluster. It produces no image and no tag: its result is five check results, and the branch ruleset admits the merge only when all five are green. The merge then starts the [release](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) on `main`. Two step names in `build.yml` contain a long dash; the tables below print it as a colon.
+This lane decides whether a change may reach `main`. Every pull request starts it, whether a person or Renovate opened it, and so does every push to an open pull request. Four workflows run side by side: `validate` checks conventions and declared values and runs every test suite, `build` builds and scans each definition the change touches, `chart` renders every chart and checks it against the Kyverno policies, and `e2e` installs each touched chart on a throwaway Kubernetes cluster. It produces no image and no tag: its result is five check results, and the branch ruleset admits the merge only when all five are green and its other rules hold: one approving review, every review thread resolved, signed commits, the branch up to date with `main`, and no CodeQL alert at its threshold. The merge then starts the [release](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) on `main`. Two step names in `build.yml` contain a long dash; the tables below print it as a colon.
 
 ### What must be green
 
@@ -157,7 +158,7 @@ flowchart TB
     C["chart.yml<br/>every chart rendered and checked by Kyverno<br/>Req 4.6 · Decision 4"]
     E["e2e.yml<br/>one kind cluster per affected chart<br/>Req 5.2 · Decision 11"]
     REQ{"All five required checks green?<br/>the two validate jobs, build gate,<br/>render + policy gate, e2e gate · Req 9.8"}
-    OK(["Mergeable; the merge starts the release"])
+    OK(["Mergeable once also approved, threads<br/>resolved, commits signed, branch up to date,<br/>CodeQL clean; the merge starts the release"])
     RED(["Blocked; the red check names its cause<br/>Req 7.4"])
     PR --> V & B & C & E
     V & B & C & E --> REQ
@@ -168,7 +169,7 @@ flowchart TB
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
 | The four workflows | [`validate.yml`](../.github/workflows/validate.yml), [`build.yml`](../.github/workflows/build.yml), [`chart.yml`](../.github/workflows/chart.yml), [`e2e.yml`](../.github/workflows/e2e.yml), each `on: pull_request` | [the six workflows](user-manual.md#the-six-workflows) | Req 7.2, 7.4 |
-| The required checks | [`.github/rulesets/main_sec.json`](../.github/rulesets/main_sec.json), `required_status_checks`: the job names "yamllint, pin lint, policy tests", "go modules (e2e + rescan tool)", "build gate", "render + policy gate", "e2e gate" | [branch protection](user-manual.md#branch-protection) | Req 9.8: a matrix leg has a name per image, so only the fan-in jobs can be required |
+| The required checks | [`.github/rulesets/main_sec.json`](../.github/rulesets/main_sec.json), `required_status_checks`: the job names "yamllint, pin lint, policy tests", "go modules (e2e + rescan tool)", "build gate", "render + policy gate", "e2e gate" | [branch protection](user-manual.md#branch-protection) | Req 9.8: a matrix leg has a name per image, so only the fan-in jobs can be required. The same ruleset also holds `required_approving_review_count: 1`, `required_review_thread_resolution`, `required_signatures`, `strict_required_status_checks_policy` (up to date with `main`) and `code_scanning` (CodeQL); its bypass for the repository admin role is stated in [SECURITY.md, governance](../SECURITY.md#governance-one-maintainer-the-bypass-kept-in-force) |
 
 ### validate: the declared values
 
@@ -251,7 +252,7 @@ The boxes group the job's steps by subject; in the workflow they run in a slight
 
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
-| yamllint | `validate.yml`, step "yamllint (Req 7.2)", over every YAML file, not only changed ones | [validate, the lint battery](user-manual.md#validate--the-lint-battery) | Req 7.2 |
+| yamllint | `validate.yml`, step "yamllint (Req 7.2)", over every YAML file, not only changed ones, except the `ignore` list in [`.yamllint.yaml`](../.yamllint.yaml) (`data/`, `temp/`, `chart/*/templates/`) | [validate, the lint battery](user-manual.md#validate--the-lint-battery) | Req 7.2 |
 | Chart pins and compat | `validate.yml`, step "chart pins and compat decisions (Req 4.5, 4.8)"; `yamale` and [`lint-compat.sh`](../scripts/lint-compat.sh) | [adapt a chart](user-manual.md#adapt-a-chart) | Req 4.5, 4.8; Decision 8 |
 | Definition lint | `validate.yml`, step "pin + definition lint against docs/CONVENTIONS.md (Req 1.6, 7.2, 7.4)"; [`lint-pins.sh`](../scripts/lint-pins.sh) | [validate, the lint battery](user-manual.md#validate--the-lint-battery), [CONVENTIONS.md](CONVENTIONS.md) | Req 1.3, 1.6, 1.10 to 1.12, 7.4; Decision 8. The schema half of Req 7.2 is the frontend compiling the definition in `build.yml` (Decision 1) |
 | Runtime account | `validate.yml`, step "runtime account lint (Req 1.4)"; [`lint-accounts.sh`](../scripts/lint-accounts.sh) | [add an image definition](user-manual.md#add-an-image-definition) | Req 1.4 |
@@ -300,7 +301,7 @@ flowchart TB
 
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
-| Which paths changed | [`build.yml`](../.github/workflows/build.yml), job "affected definitions", its one step (`id: detect`, no `name:`), the `pull_request` branch | [build, the scan gate](user-manual.md#build--the-scan-gate), item 1 | Req 6.4, 6.9: a statement or exception change re-proves itself on the images it names |
+| Which paths changed | [`build.yml`](../.github/workflows/build.yml), job "affected definitions", the step after the checkout (`id: detect`, no `name:`), the `pull_request` branch | [build, the scan gate](user-manual.md#build--the-scan-gate), item 1 | Req 6.4, 6.9: a statement or exception change re-proves itself on the images it names |
 | Keep only active ones | the same step, after the branches; `active_definitions` in [`definition-lib.sh`](../scripts/definition-lib.sh) | [deactivate a definition](user-manual.md#deactivate-a-definition) | Req 1.14, 1.15; Decision 11. `validate` fails such a pull request separately (Req 1.16) |
 | The fan-in | `build.yml`, job "build gate", its one step (no `name:`) | [branch protection](user-manual.md#branch-protection) | Req 9.8: "skipped" passes only when detection itself succeeded |
 
@@ -322,20 +323,20 @@ flowchart TB
     LEG --> META
     NS --> META
     META --> ARCH --> BLD --> LR --> NEXT
-    META -.->|outside the namespace,<br/>a platform not admitted| STOP
+    META -.->|outside the namespace, a platform not admitted,<br/>no platforms declared, a misspelt switch| STOP
     ARCH -.->|checksum differs| STOP
     BLD -.->|does not compile| STOP
 ```
 
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
-| Read the definition | [`build.yml`](../.github/workflows/build.yml), job "build ${{ matrix.name }}", the step `id: meta` (no `name:`); [`release-policy.sh`](../scripts/release-policy.sh) | [build, the scan gate](user-manual.md#build--the-scan-gate), item 3 | Req 2.1, 2.2, 7.7; Decision 11. It runs on every event, so a pull request is refused the same way a release would be |
+| Read the definition | [`build.yml`](../.github/workflows/build.yml), job "build ${{ matrix.name }}", the step `id: meta` (no `name:`); [`release-policy.sh`](../scripts/release-policy.sh) | [images and naming](user-manual.md#images-and-naming), its platform note; [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 4, for the switches read through `release-policy.sh` | Req 2.1, 2.2, 7.7; Decision 11. It runs on every event, so a pull request is refused the same way a release would be |
 | Build | `build.yml`, the step `id: build` (no `name:`), `docker/build-push-action` with `platforms: linux/amd64` and `load: true` on a pull request | [anatomy of a DHI definition](user-manual.md#anatomy-of-a-dhi-definition) | Req 7.2 (the frontend is the schema check); Decision 1, [ADR 0001](decisions/0001-build-layer.md) |
 | Local registry | `build.yml`, step "local registry: give the image an identity VEX can match" | [build, the scan gate](user-manual.md#build--the-scan-gate), item 4 | Req 6.29; Trivy builds the product identifier from the digest a push mints (upstream trivy#9399) |
 
 ### build: the scan and the decision
 
-Only the last step fails the leg on a finding; the one before it fails on an exception that outlives its ceiling. An expired exception covers nothing, so its finding counts. Two earlier steps are evidence: when they fail, the step shows red and the leg goes on.
+The scan gate fails the leg on a finding; it is the second-to-last step, and the upload of the scan reports runs after it whatever happened. The exception tiers step before it fails the leg on an exception that outlives its ceiling. An expired exception covers nothing, so its finding counts. Two earlier steps are evidence and never stop the leg: govulncheck shows red when it fails; VEX portability writes a warning and stays green. The Grype step reports and never fails on a finding, but a Grype that does not run turns the leg red.
 
 ```mermaid
 %%{init: {"flowchart": {"wrappingWidth": 340}}}%%
@@ -348,6 +349,7 @@ flowchart TB
     PT["VEX portability: Grype reads the same image<br/>Req 9.12 · Decision 10"]
     GV["govulncheck over every Go binary<br/>Req 6.13"]
     EV(["Step red, the leg goes on:<br/>evidence, not a gate"])
+    PW(["A warning, that consumer reported as<br/>not measured; the step stays green,<br/>the leg goes on"])
     CR{"An uncovered CRITICAL?"}
     GR["Grype second opinion, informational<br/>a convention, its criterion retired"]
     TI["Exception tiers: each exception within<br/>its severity or KEV ceiling<br/>Req 6.50, 6.59 · Decision 7"]
@@ -359,9 +361,10 @@ flowchart TB
     AP --> SC
     SC --> PT --> GV --> CR
     CO --> PT
-    PT -.->|a consumer failed| EV
+    PT -.->|another consumer fails| PW
     GV -.->|a tool or a binary gave no output| EV
     CR -->|yes| GR --> TI
+    GR -.->|the tool fails| STOP
     CR -->|no| TI
     CE --> TI
     TI --> GA
@@ -374,9 +377,9 @@ flowchart TB
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
 | Compile and scan | `build.yml`, step "Trivy scan (VEX + accepted risk)"; [`compile-vex.sh`](../scripts/compile-vex.sh), [`scan-image.sh`](../scripts/scan-image.sh), the same script the release scan uses | [writing a VEX statement](user-manual.md#writing-a-vex-statement), [reading job summaries](user-manual.md#reading-job-summaries) | Req 6.1, 6.26 to 6.30; Decision 5, [ADR 0003](decisions/0003-one-openvex-document-per-digest.md) |
-| VEX portability | `build.yml`, step "VEX portability (Req 9.12)", `continue-on-error: true`; [`vex-consumer.sh`](../scripts/vex-consumer.sh), [`vex-portability.sh`](../scripts/vex-portability.sh) | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.11, 9.12; Decision 10: `consumers.gating` is off, so a divergence is reported, never failed |
+| VEX portability | `build.yml`, step "VEX portability (Req 9.12)", `continue-on-error: true`; [`vex-consumer.sh`](../scripts/vex-consumer.sh), [`vex-portability.sh`](../scripts/vex-portability.sh) | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.11, 9.12; Decision 10: `consumers.gating` is off, so a divergence is reported, never failed. The step runs under `set -uo pipefail` without `-e` and ends on writing the summary, so today it stays green even when the authoritative consumer's record or `vex-portability.sh` fails; recorded as an open item |
 | govulncheck | `build.yml`, step "govulncheck reachability (Req 6.13)", `continue-on-error: true`; [`govulncheck-report.sh`](../scripts/govulncheck-report.sh) | [reachability evidence](user-manual.md#reachability-evidence-govulncheck) | Req 6.13; review D3: a tool that gave no output fails the step by name |
-| Grype | `build.yml`, step "Grype second opinion (CRITICAL present)", run only when Trivy left a CRITICAL uncovered | [build, the scan gate](user-manual.md#build--the-scan-gate), item 7 | A convention: its criterion, Req 6.6, is retired |
+| Grype | `build.yml`, step "Grype second opinion (CRITICAL present)", run only when Trivy left a CRITICAL uncovered; under `set -euo pipefail` and without `continue-on-error`, so a Grype that does not run fails the leg | [build, the scan gate](user-manual.md#build--the-scan-gate), item 7 | A convention: its criterion, Req 6.6, is retired; a finding never fails it, only the tool failing does |
 | Exception tiers | `build.yml`, step "exception tiers against KEV (Req 6.50)"; [`check-exceptions.sh gate`](../scripts/check-exceptions.sh) with the KEV feed fetched fresh | [writing an accepted-risk exception](user-manual.md#writing-an-accepted-risk-exception) | Req 6.50, 6.59; Decision 7: an unavailable feed fails closed, by name |
 | The scan gate | `build.yml`, step "Scan gate: fail on uncovered findings within the aperture" | [clearing a red gate](user-manual.md#clearing-a-red-gate--the-four-treatments) | Req 6.1, 6.9 (Trivy drops an expired ignore entry, so its finding counts); Decision 5 |
 | Reports | `build.yml`, step "upload scan reports", `if: always()` | [reading job summaries](user-manual.md#reading-job-summaries) | Req 6.26, 6.27: the summary names what each exception suppressed |
@@ -425,8 +428,8 @@ flowchart TB
     ANY{"Any?"}
     NONE(["No leg runs"])
     KC["A kind cluster, its nodes given<br/>ghcr pull credentials · Req 5.1, 5.2"]
-    IS["Runner image store checked, the probe<br/>image loaded by digest · Req 5.5"]
-    UP{"A bump: the chart version or the<br/>deployed values file changed? · Req 5.6"}
+    IS["Runner image store checked; the probe image<br/>pulled by digest, loaded into kind by tag · Req 5.5"]
+    UP{"A bump: the pinned upstream chart version<br/>or the deployed values file changed? · Req 5.6"}
     IN["Install the proposed chart"]
     UG["Install the base state, upgrade to<br/>the proposed one, wait for the rollout<br/>Req 5.6"]
     AS["Pods Ready within five minutes; restricted<br/>securityContext on live pods; the chart's probe,<br/>once · Req 5.3 to 5.5 · Decision 14"]
@@ -453,10 +456,10 @@ flowchart TB
 
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
-| Affected components | [`e2e.yml`](../.github/workflows/e2e.yml), job "affected components", its one step (`id: detect`, no `name:`); `active_components` in [`definition-lib.sh`](../scripts/definition-lib.sh) | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 1.14, 5.2; Decision 11: a definition reaches its chart through `deploys:`, never a name prefix |
+| Affected components | [`e2e.yml`](../.github/workflows/e2e.yml), job "affected components", the step after the checkout (`id: detect`, no `name:`); `active_components` in [`definition-lib.sh`](../scripts/definition-lib.sh) | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 1.14, 5.2; Decision 11: a definition reaches its chart through `deploys:`, never a name prefix |
 | Cluster | `e2e.yml`, job "e2e ${{ matrix.component }}", steps "install helm + kind", "create kind cluster", "give kind nodes ghcr pull credentials" | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.1, 5.2: the charts pin the index digest, which a loaded image cannot match |
-| Image store and probe image | `e2e.yml`, steps "runner image and image store (kind issue 3795)", [`check-runner-image-store.sh`](../scripts/check-runner-image-store.sh), and "load probe image into kind" | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.5 (the probe's image); the job is pinned to `ubuntu-24.04` until kind can load from the containerd store |
-| Bump or not | `e2e.yml`, step "compute upgrade-from on a bump" | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.6 |
+| Image store and probe image | `e2e.yml`, steps "runner image and image store (kind issue 3795)", [`check-runner-image-store.sh`](../scripts/check-runner-image-store.sh), and "load probe image into kind": pulled by the pinned digest, tagged, and loaded into kind by that tag, because a loaded image cannot match a digest | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.5 (the probe's image); the job is pinned to `ubuntu-24.04` until kind can load from the containerd store |
+| Bump or not | `e2e.yml`, step "compute upgrade-from on a bump": an adapted chart's `upstream.version` in `chart/<name>/chart.yaml`, or its deployed values file, differs from the base branch | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.6 |
 | The suite | `e2e.yml`, step "run e2e suite", `go test ./e2e/` with `DHC_E2E=1`; the Ginkgo specs under [`test/e2e/`](../test/e2e/) | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.3 to 5.6; Decision 14: one probe per chart, standing for every definition it deploys |
 | Diagnostics | `e2e.yml`, steps "collect diagnostics on failure", "upload diagnostics", then "delete kind cluster" | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.7 |
 | The fan-in | `e2e.yml`, job "e2e gate", its one step (no `name:`) | [branch protection](user-manual.md#branch-protection) | Req 9.8 |
@@ -503,7 +506,7 @@ flowchart TB
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
 | The three entries | [`build.yml`](../.github/workflows/build.yml), `on: push: branches: [main]`, `schedule: cron: "47 4 * * *"` and `workflow_dispatch` with the free-text input `image`; cron and input held equal to `catalogue-policy.yaml` by `validate.yml`, step "workflow schedule + permissions vs policy file (Req 7.10)" | [crons and cadence](user-manual.md#crons-and-cadence), [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) | Req 2.1, 2.14, 7.10; Decision 6 |
-| Which definitions | `build.yml`, job "affected definitions", its one step (`id: detect`, no `name:`): on a push, the `image/*/image.yaml` files changed between the previous and the new head; on the schedule, the whole active set; on a dispatch, the named image or the whole active set | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) | Req 2.1, 2.14. A merge that changes only a VEX statement, an exception or a chart releases nothing; the daily rescan carries a VEX change to the published digests |
+| Which definitions | `build.yml`, job "affected definitions", the step after the checkout (`id: detect`, no `name:`): on a push, the `image/*/image.yaml` files changed between the previous and the new head; on the schedule, the whole active set; on a dispatch, the named image or the whole active set | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) | Req 2.1, 2.14. A merge that changes only a VEX statement, an exception or a chart releases nothing; the daily rescan carries a VEX change to the published digests |
 | Keep only active ones | the same step, after the branches; `active_definitions` in [`definition-lib.sh`](../scripts/definition-lib.sh) | [deactivate a definition](user-manual.md#deactivate-a-definition) | Req 1.14, 1.15; Decision 11 |
 
 ### One definition: built, or discarded by the nightly
@@ -539,7 +542,7 @@ flowchart TB
     BLD --> MAIN
     MAIN -->|yes| PUSHD
     MAIN -->|no| ONLY
-    META -.->|outside the namespace,<br/>a platform not admitted| STOP
+    META -.->|outside the namespace, a platform not admitted,<br/>no platforms declared, a misspelt switch| STOP
     ARCH -.->|checksum differs| STOP
     CMP -.->|a tool missing, no admitted identity| STOP
     BLD -.->|does not build or push| STOP
@@ -547,11 +550,11 @@ flowchart TB
 
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
-| Read the definition | [`build.yml`](../.github/workflows/build.yml), the step `id: meta` (no `name:`); [`release-policy.sh`](../scripts/release-policy.sh) reads the switches and the admitted platforms | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 4 | Req 2.1, 2.3, 7.7; Decision 11 |
+| Read the definition | [`build.yml`](../.github/workflows/build.yml), the step `id: meta` (no `name:`); [`release-policy.sh`](../scripts/release-policy.sh) reads the switches and the admitted platforms | [images and naming](user-manual.md#images-and-naming), its platform note; [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 4, for the switches | Req 2.1, 2.3, 7.7; Decision 11. It refuses a definition outside the namespace, a platform not admitted, a definition declaring no platform, and a misspelt switch |
 | Checksums | `build.yml`, step "verify per-arch pinned checksums"; [`verify-arch-pins.sh`](../scripts/verify-arch-pins.sh) | [build, the scan gate](user-manual.md#build--the-scan-gate) | Req 1.3: the pull request builds amd64 only, so an arm64 pin is first exercised here |
 | Local build | `build.yml`, step "scheduled rebuild, local only (Req 2.14)", `if: github.event_name == 'schedule'` | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), "The nightly" | Req 2.14; Decision 6 |
 | The comparison | `build.yml`, step "publish-on-change comparator (Req 2.15-2.17)"; [`package-set-diff.sh`](../scripts/package-set-diff.sh), read through `cosign verify-attestation` against the admitted identities; verdict `equal` or `different` with a reason, each of which publishes (`package-set-differs`, `no-published-digest`, `attestation-unreadable`, `platform-set-differs`); cosign is installed before it by step "install cosign and crane" | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), "The nightly" | Req 2.15 to 2.17; Decision 6, its reproducibility paragraph: package type, name, version and pull checksum, never SBOM bytes. Only proven equality discards; a missing tool is a refusal, not a difference |
-| Build and push | `build.yml`, the step `id: build` (no `name:`), `docker/build-push-action` with `provenance: mode=max` and, on `main` only, `push-by-digest=true`; skipped when the comparator discarded | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 1 | Req 2.1, 2.2, 2.7; Decision 6. A failure in one leg leaves the other legs running (`fail-fast: false`) |
+| Build and push | `build.yml`, the step `id: build` (no `name:`), `docker/build-push-action` with, on `main` only, `provenance: mode=max` and `push-by-digest=true` (elsewhere `provenance: false`); skipped when the comparator discarded | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 1 | Req 2.1, 2.2, 2.7; Decision 6. A failure in one leg leaves the other legs running (`fail-fast: false`) |
 
 ### One definition: scanned, signed, tagged
 
@@ -569,11 +572,11 @@ flowchart TB
     VEX["Compile the digest's one OpenVEX document<br/>an uncovered finding: under_investigation,<br/>with the report's timestamp<br/>Req 2.12, 6.37 · ADR 0003"]
     SIGN["Sign the index and every manifest<br/>each manifest: SPDX, CycloneDX, OpenVEX<br/>the index: each SPDX, the same OpenVEX<br/>Req 2.9 · Decision 6 · ADR 0003"]
     PROV["SLSA provenance, unless its mode is off<br/>drawn in the SLSA provenance lane<br/>Req 2.27 to 2.30 · Decision 15"]
-    TAG["Apply the definition's tags, then read each tag<br/>back and check it resolves to the signed digest<br/>Req 2.7, 2.9"]
+    TAG["Write every tag in one call, then read<br/>each tag back and check it resolves<br/>to the signed digest · Req 2.7, 2.9"]
     PUB(["Published: tagged, signed, attested<br/>Req 2.10; the daily rescan takes over"])
     WITH(["Withheld: each finding named, nothing<br/>signed or attested, no tag · Req 2.13"])
     STOP(["No tag moves; the digest stays<br/>frozen, the step named · Req 2.11, 2.26"])
-    MOVED(["Run red; that tag has already moved,<br/>the error names where it points"])
+    MOVED(["Run red; every tag has already moved,<br/>the error names the first one that<br/>resolves elsewhere and where it points"])
     DIG --> MAN --> SCAN --> FCD
     FC --> FCD
     FCD -->|no| ATTR --> VEX --> SIGN --> PROV --> TAG --> PUB
@@ -596,7 +599,7 @@ flowchart TB
 | The OpenVEX document | `build.yml`, step "compile the digest's OpenVEX document (Req 2.12, 6.37)"; `compile-vex.sh` a second time, with the scan reports | [writing a VEX statement](user-manual.md#writing-a-vex-statement) | Req 2.12, 6.37; [ADR 0003](decisions/0003-one-openvex-document-per-digest.md): one document per digest, empty when nothing applies. The rescan later replaces it, never adds a second ([ADR 0004](decisions/0004-re-attestation-replaces.md)) |
 | Sign and attest | `build.yml`, step "sign and attest (Req 2.9)": `cosign sign --recursive` on the index; Syft's SBOMs and each `cosign attest` made per target, not by `--recursive` | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 7 | Req 2.9; Decision 6; ADR 0003 |
 | Provenance | the four steps from "name the provenance subjects (Req 2.27)" to "verify the provenance of each digest (Req 2.9, 2.28)" | [SLSA provenance](#slsa-provenance), the graph "At release" | Req 2.27 to 2.30; Decision 15 |
-| Tags | `build.yml`, step "apply definition-derived tags (Req 2.7, 2.9)": `docker buildx imagetools create` with every tag, then `imagetools inspect` per tag | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 9 | Req 2.7, 2.9, 2.10. The check runs after the tags are written, so a mismatch leaves that tag moved, not untouched |
+| Tags | `build.yml`, step "apply definition-derived tags (Req 2.7, 2.9)": one `docker buildx imagetools create` with every tag, then `imagetools inspect` per tag | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch), item 9 | Req 2.7, 2.9, 2.10. The check runs after all the tags are written, so a mismatch leaves every tag moved, not untouched |
 | The fan-in | `build.yml`, job "build gate", its one step (no `name:`), on `main` as on a pull request | [branch protection](user-manual.md#branch-protection) | Req 9.8: a red leg makes the run's build gate red |
 
 ## SLSA provenance
@@ -634,11 +637,11 @@ flowchart TB
 
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
-| Name the subjects | [`build.yml`](../.github/workflows/build.yml), step "name the provenance subjects"; [`unpack-provenance.sh subjects`](../scripts/unpack-provenance.sh) | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) | Req 2.27; Decision 15 |
-| Attest | `build.yml`, step "attest provenance for the index and every platform manifest"; `actions/attest-build-provenance`, pinned by commit | [ADR 0005](decisions/0005-slsa-provenance-verifier.md) | Req 2.27; Decision 15, option B |
-| Store | `build.yml`, step "store the provenance beside each digest"; [`unpack-provenance.sh store`](../scripts/unpack-provenance.sh) | [a release stopped at the provenance steps](user-manual.md#a-release-stopped-at-the-provenance-steps) | Req 2.27; ADR 0005, amendment of 2026-11-13: no bundle beside a digest, it hid the other attestations from cosign |
-| Self-check | `build.yml`, step "verify the provenance of each digest"; [`check-provenance.sh verify`](../scripts/check-provenance.sh) | [what a provenance statement has to say](user-manual.md#what-a-provenance-statement-has-to-say) | Req 2.9, 2.28; ADR 0005, decisions 2 and 5 |
-| Tags, or none | `build.yml`, step "apply definition-derived tags" | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) | Req 2.7, 2.9: any failure above moves no tag, consumers keep the previous digest |
+| Name the subjects | [`build.yml`](../.github/workflows/build.yml), step "name the provenance subjects (Req 2.27)"; [`unpack-provenance.sh subjects`](../scripts/unpack-provenance.sh) | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) | Req 2.27; Decision 15 |
+| Attest | `build.yml`, step "attest provenance for the index and every platform manifest (Req 2.9, 2.27)"; `actions/attest-build-provenance`, pinned by commit | [ADR 0005](decisions/0005-slsa-provenance-verifier.md) | Req 2.27; Decision 15, option B |
+| Store | `build.yml`, step "store the provenance beside each digest (Req 2.27)"; [`unpack-provenance.sh store`](../scripts/unpack-provenance.sh) | [a release stopped at the provenance steps](user-manual.md#a-release-stopped-at-the-provenance-steps) | Req 2.27; ADR 0005, amendment of 2026-11-13: no bundle beside a digest, it hid the other attestations from cosign |
+| Self-check | `build.yml`, step "verify the provenance of each digest (Req 2.9, 2.28)"; [`check-provenance.sh verify`](../scripts/check-provenance.sh) | [what a provenance statement has to say](user-manual.md#what-a-provenance-statement-has-to-say) | Req 2.9, 2.28; ADR 0005, decisions 2 and 5 |
+| Tags, or none | `build.yml`, step "apply definition-derived tags (Req 2.7, 2.9)" | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) | Req 2.7, 2.9: any failure above moves no tag, consumers keep the previous digest |
 
 ### In the daily rescan
 
@@ -663,8 +666,8 @@ flowchart TB
 
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
-| Ask every reference | [`rescan.yml`](../.github/workflows/rescan.yml), step "provenance coverage over the supported set"; `check-provenance.sh report` or `require` | [provenance coverage in the status](user-manual.md#provenance-coverage-in-the-status) | Req 2.29; an absent statement never fails the run under `report`; what `require` and a check that cannot be made do is the SLSA track's FR-3 ([spec](../conductor/tracks/slsa-build-l2_20261028/spec.md)), the owner's call of 2026-11-19 |
-| The status line | `rescan.yml`, step "catalogue status, the clocks over the supported set"; the status tool in [`triage/rescan`](../triage/rescan/) | [the catalogue status issue](user-manual.md#the-catalogue-status-issue) | Req 2.29, 2.30, 6.46, 6.47 |
+| Ask every reference | [`rescan.yml`](../.github/workflows/rescan.yml), step "provenance coverage over the supported set (Req 2.29, 2.30)"; `check-provenance.sh report` or `require` | [provenance coverage in the status](user-manual.md#provenance-coverage-in-the-status) | Req 2.29; an absent statement never fails the run under `report`; what `require` and a check that cannot be made do is the SLSA track's FR-3 ([spec](../conductor/tracks/slsa-build-l2_20261028/spec.md)), the owner's call of 2026-11-19 |
+| The status line | `rescan.yml`, step "catalogue status, the clocks over the supported set (Req 6.46)"; the status tool in [`triage/rescan`](../triage/rescan/) | [the catalogue status issue](user-manual.md#the-catalogue-status-issue) | Req 2.29, 2.30, 6.46, 6.47 |
 
 ### For a consumer
 
@@ -720,13 +723,14 @@ flowchart TB
     EV["Lifecycle evidence: every cve issue, the scanner,<br/>the SBOMs read through verification<br/>Req 6.52 to 6.58 · Decision 7"]
     DEC["Lifecycle decided by the tested tool:<br/>close, reopen, relabel, keep open<br/>Req 6.52 to 6.57 · Decision 7"]
     MAP["Map each open cve issue, finding to link,<br/>for the statements' tracking links · Req 6.37"]
-    ATT["Per digest: attest today's reports, replacing;<br/>compile the document again; re-attest it,<br/>replacing, when it differs · Req 6.42, 6.43<br/>ADR 0003, ADR 0004"]
+    ATT["Per digest: attest today's reports, replacing;<br/>compile the document again; re-attest it,<br/>replacing, when it differs or its attestation<br/>count is not one · Req 6.42, 6.43<br/>ADR 0003, ADR 0004"]
     APPLY["Lifecycle applied: close with a graded label,<br/>reopen, shed labels · Req 6.52, 6.53, 6.56, 6.57"]
     VEXR(["VEX compile report in the summary:<br/>every statement applied or dropped · Req 6.33"])
     ISS(["cve issues closed and reopened on evidence,<br/>each comment naming what it examined<br/>Req 6.54"])
     ENFAIL(["Run fails by name; nothing is scanned,<br/>only the checks that need no enumeration run"])
-    SKIP(["Manifest skipped, warned, counted;<br/>its digest blocks every close, is not re-attested"])
+    SKIP(["Manifest skipped, warned, counted; its digest<br/>is not re-attested, and blocks every close<br/>when it is a supported digest"])
     HOLD(["Closes and reopens withheld today,<br/>the unattested digests named · Req 6.54"])
+    NOLC(["The run fails by name; the lifecycle is neither<br/>decided nor applied, no issue closed<br/>or reopened today"])
     SCHED --> IN --> SW --> ENUM --> SCAN
     AP --> SCAN
     TRI --> SCAN
@@ -741,25 +745,28 @@ flowchart TB
     ATT --> APPLY --> ISS
     ENUM -.->|registry unreadable| ENFAIL
     SCAN -.->|one scan fails| SKIP
+    EV -.->|no supported SBOM verifies| NOLC
     APPLY -.->|a digest's reports not attested| HOLD
 ```
 
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
 | The schedule | [`rescan.yml`](../.github/workflows/rescan.yml), `cron: "17 6 * * *"`, and the dispatch input `drill`; held equal to the declaration by `validate.yml`, step "workflow schedule + permissions vs policy file (Req 7.10)" | [crons and cadence](user-manual.md#crons-and-cadence) | Req 2.22 (at least once a day), 7.10 |
-| Release switches | `rescan.yml`, step "release switches (Req 7.7)"; [`release-policy.sh`](../scripts/release-policy.sh) | [the catalogue page](user-manual.md#the-catalogue-page) | Req 7.7; review D3: a malformed switch fails here by name |
+| Release switches | `rescan.yml`, step "release switches (Req 7.7)"; [`release-policy.sh`](../scripts/release-policy.sh) | [the catalogue page](user-manual.md#the-catalogue-page) | Req 7.7. The intent (review D3) is that a malformed switch fails here by name; today it does not: `echo "page=$(release-policy.sh …)"` exits 0 whatever the reader returns, so a malformed switch turns the page off and the provenance check runs as `report`; recorded as an open item. On a pull request `validate.yml`, step "release switches well-formed (Req 2.13, 2.14, 2.17, 7.7)", refuses the malformed value |
 | Enumerate | `rescan.yml`, step "enumerate the catalogue (Req 2.22)"; [`enumerate-catalogue.sh`](../scripts/enumerate-catalogue.sh) | [crons and cadence](user-manual.md#crons-and-cadence) | Req 2.22; Decision 6: the one step that fails hard, a partial list would shrink what is watched |
-| Compile and scan | `rescan.yml`, step "scan every platform manifest of every tag-referenced digest"; [`compile-vex.sh`](../scripts/compile-vex.sh), [`scan-image.sh`](../scripts/scan-image.sh) with `--remote` | [what VEX means for you](user-manual.md#what-vex-means-for-you), [reading job summaries](user-manual.md#reading-job-summaries) | Req 2.22, 6.28 to 6.30, 6.55; Decision 5; a failed scan skips one manifest and does not fail the step |
-| Lifecycle evidence | `rescan.yml`, step "issue lifecycle, the evidence (Req 6.52 to 6.57)"; [`fetch-sboms.sh`](../scripts/fetch-sboms.sh), [`triage-policy.sh`](../scripts/triage-policy.sh) `resolved-labels` | [rescan CVE issues](user-manual.md#rescan-cve-issues) | Req 6.52 to 6.58; Decision 7 |
+| Compile and scan | `rescan.yml`, step "scan every platform manifest of every tag-referenced digest"; [`compile-vex.sh`](../scripts/compile-vex.sh), [`scan-image.sh`](../scripts/scan-image.sh) with `--remote` | [what VEX means for you](user-manual.md#what-vex-means-for-you), [reading job summaries](user-manual.md#reading-job-summaries) | Req 2.22, 6.28 to 6.30, 6.55; Decision 5; a failed scan skips one manifest and does not fail the step. A skipped manifest blocks closes only through a supported digest: the lifecycle reads the supported rows of the enumeration alone |
+| Lifecycle evidence | `rescan.yml`, step "issue lifecycle, the evidence (Req 6.52 to 6.57)"; [`fetch-sboms.sh`](../scripts/fetch-sboms.sh), [`triage-policy.sh`](../scripts/triage-policy.sh) `resolved-labels` | [rescan CVE issues](user-manual.md#rescan-cve-issues) | Req 6.52 to 6.58; Decision 7. When not one supported SBOM verifies, `fetch-sboms.sh` exits 1, this step fails, and the two lifecycle steps after it are skipped (an identity, registry or Sigstore problem, not evidence about the images) |
 | Lifecycle decided | `rescan.yml`, step "issue lifecycle, decided on evidence (tested)"; `cmd/rescan-lifecycle` in [`triage/rescan`](../triage/rescan/) | [rescan CVE issues](user-manual.md#rescan-cve-issues) | Req 6.52 to 6.57; Decision 7 |
 | Issue map | `rescan.yml`, step "open cve issues (finding -> issue)" | [rescan CVE issues](user-manual.md#rescan-cve-issues) | Req 6.37: the open issue map is the compiler's fifth input |
-| Attest and re-attest | `rescan.yml`, step "attest today's reports, re-attest OpenVEX on change (Req 6.42, 6.43)"; [`reattest.sh`](../scripts/reattest.sh) | [triage README, the daily rescan](../triage/README.md#the-daily-rescan-req-222-63-642-to-657) | Req 6.42, 6.43, 6.58; [ADR 0003](decisions/0003-one-openvex-document-per-digest.md), [ADR 0004](decisions/0004-re-attestation-replaces.md): one document per digest, replaced, never appended |
+| Attest and re-attest | `rescan.yml`, step "attest today's reports, re-attest OpenVEX on change (Req 6.42, 6.43)"; [`reattest.sh`](../scripts/reattest.sh), which re-attests when the statement set differs or when the digest or a platform manifest does not carry exactly one OpenVEX attestation | [triage README, the daily rescan](../triage/README.md#the-daily-rescan-req-222-63-642-to-657) | Req 6.42, 6.43, 6.58; [ADR 0003](decisions/0003-one-openvex-document-per-digest.md), [ADR 0004](decisions/0004-re-attestation-replaces.md): one document per digest, replaced, never appended |
 | Lifecycle applied | `rescan.yml`, step "issue lifecycle, applied (Req 6.52, 6.53, 6.56, 6.57)" | [rescan CVE issues](user-manual.md#rescan-cve-issues) | Req 6.52 to 6.57; Decision 7, review D2: it runs after re-attestation because closes rest on attested reports |
 | Compile report | `rescan.yml`, step "summary", the block "VEX compilation (Req 6.28-6.30)"; the step "upload rescan artifacts" keeps every file the run wrote | [reading job summaries](user-manual.md#reading-job-summaries) | Req 6.32, 6.33: "compiled nothing" and "never compiled" stay apart |
 
 ### The daily checks
 
-Each check reports by name. A check that does not hold fails the run, but never stops the next one from being made.
+Each check reports by name. A check that does not hold fails the run, but never stops the next one from being made. They are drawn in three groups: the invariants step; the checks of what a consumer is given; and the checks that read the repository's own records, which run whatever failed above them.
+
+#### The invariants step
 
 ```mermaid
 %%{init: {"flowchart": {"wrappingWidth": 340}}}%%
@@ -767,54 +774,79 @@ flowchart TB
     IN(["Today's enumeration and reports,<br/>from the graph above"])
     FEED[/"triage.kev_feed, triage.drills<br/>Req 6.60, 7.7"/]
     TIERS[/"triage.ceilings, triage.kev_ceiling<br/>Req 6.49, 6.51"/]
-    CONS[/"consumers<br/>trivy authoritative, grype · Req 9.11"/]
-    WIN[/"triage.expiry_warning<br/>Req 6.10, 6.49"/]
     VIS["Every repository and tag pulls anonymously<br/>Req 2.21 · Decision 6"]
     ADM["The admission policy admits every<br/>tagged digest, rejects the unsigned control<br/>Req 2.24 · Decision 6"]
     DR{"Drill input?"}
     KEV["Fetch the KEV feed, or the drill's substitute<br/>Req 6.60 · Decision 13"]
     TIER["Each unexpired exception against today's<br/>severity and KEV status · Req 6.51 · Decision 7"]
     CNT["Exactly one OpenVEX attestation on every<br/>digest and platform manifest · Req 6.44, 6.45<br/>ADR 0004"]
-    AUTH["Each definition's authenticity signal against<br/>its origin; lapsed compat review dates<br/>Req 3.10, 3.13, 4.9 · Decision 8"]
-    PORT["VEX portability: each other consumer scans<br/>what Trivy suppressed · Req 9.12 · Decision 10"]
-    SMOKE["Consumer smoke test: the README recipe<br/>run verbatim on one supported digest<br/>Req 9.13 · Decision 10"]
-    EXP["Accepted-risk expiries: lapsed,<br/>or lapsing within the window · Req 6.10"]
-    PROV["Provenance coverage, drawn in<br/>the SLSA provenance lane<br/>Req 2.29, 2.30 · Decision 15"]
-    POST["Posture: rulesets equal the live ones,<br/>private reporting on, no tag<br/>on a revoked digest<br/>Req 9.3, 9.7, 9.9 · Decision 10"]
-    SCI(["One supply-chain issue per definition,<br/>kept open while the mismatch lasts · Req 3.10"])
-    PB(["Portability block in the summary,<br/>never fails the run · Req 9.12"])
-    EXPL(["Listed in the summary,<br/>never fails the run · Req 6.10"])
     NOEVAL(["Not evaluated: the run fails by name;<br/>no issue set, status or page today · Req 6.60"])
     RED(["The run fails, naming each check<br/>that did not hold"])
-    IN --> VIS & ADM & CNT & PORT & SMOKE & PROV & POST
-    IN --> DR
+    IN --> VIS & ADM & DR & CNT
     FEED --> DR
     DR -->|none: the declared feed| KEV
     DR -->|kev-outage or kev-synthetic| KEV
     KEV --> TIER
     TIERS --> TIER
-    CONS --> PORT --> PB
-    WIN --> EXP --> EXPL
     KEV -.->|unreachable| NOEVAL
     VIS -.-> RED
     ADM -.-> RED
     TIER -.->|over its tier| RED
     CNT -.-> RED
-    AUTH -.->|mismatch| SCI
-    AUTH -.->|mismatch, or origin not measured| RED
-    SMOKE -.->|a step fails, or a suppression is missing| RED
-    POST -.-> RED
 ```
 
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
 | Visibility, admission, tiers, count | `rescan.yml`, step "invariants (Req 2.21, 2.24, 6.44, 6.51)"; [`check-visibility.sh`](../scripts/check-visibility.sh), [`verify-catalogue.sh`](../scripts/verify-catalogue.sh), [`check-exceptions.sh`](../scripts/check-exceptions.sh) `rescan`, [`check-attestation-count.sh`](../scripts/check-attestation-count.sh); the four run independently and fail the step together | [reading job summaries](user-manual.md#reading-job-summaries), [policies](user-manual.md#policies) | Req 2.21, 2.24, 6.44, 6.45, 6.51; Decision 6, review D1 |
-| The KEV feed and drills | the same step; `triage-policy.sh kev-feed`, or `drill-feed` when the dispatch's `drill` input is not `none` | [crons and cadence](user-manual.md#crons-and-cadence) | Req 6.60: an outage is a failure, not a pass; Decision 13 (live drills, task 16.8) |
-| Authenticity | `rescan.yml`, step "authenticity signals (Req 3.10, 3.13, 4.9)"; [`check-authenticity.sh`](../scripts/check-authenticity.sh) | [SECURITY.md, upstream authenticity](../SECURITY.md#upstream-authenticity-per-definition), [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.10, 3.13, 4.9; Decision 8: an origin that did not answer files no issue |
+| The KEV feed and drills | the same step; `triage-policy.sh kev-feed` is always read, and when the dispatch's `drill` input is not `none`, `triage-policy.sh drill-feed` replaces its address | [crons and cadence](user-manual.md#crons-and-cadence) | Req 6.60: an outage is a failure, not a pass; Decision 13 (live drills, task 16.8) |
+
+#### What a consumer is given
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    IN(["Today's enumeration and reports,<br/>from the graph above"])
+    CONS[/"consumers<br/>trivy authoritative, grype · Req 9.11"/]
+    PORT["VEX portability: each other consumer scans<br/>what Trivy suppressed · Req 9.12 · Decision 10"]
+    SMOKE["Consumer smoke test: the README recipe<br/>run on one supported digest<br/>Req 9.13 · Decision 10"]
+    PROV["Provenance coverage, drawn in<br/>the SLSA provenance lane<br/>Req 2.29, 2.30 · Decision 15"]
+    PB(["Portability block in the summary,<br/>never fails the run · Req 9.12"])
+    RED(["The run fails, naming each check<br/>that did not hold"])
+    IN --> PORT & SMOKE & PROV
+    CONS --> PORT --> PB
+    SMOKE -.->|a step fails, or a suppression is missing| RED
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
 | Portability | `rescan.yml`, step "VEX portability over the supported set (Req 9.12)", `continue-on-error: true`; [`vex-consumer.sh`](../scripts/vex-consumer.sh), [`vex-portability.sh`](../scripts/vex-portability.sh) | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.11, 9.12; Decision 10: informational while `consumers.gating` is false |
 | Smoke test | `rescan.yml`, step "consumer smoke test (Req 9.13)"; [`consumer-smoke.sh`](../scripts/consumer-smoke.sh) | [reading job summaries](user-manual.md#reading-job-summaries), [verify what you pull](user-manual.md#verify-what-you-pull) | Req 9.13; Decision 10, ADR 0004's `--vex oci` check rides inside it |
-| Expiries | `rescan.yml`, step "accepted-risk expiries (Req 6.10)"; [`lint-accepted-risk.sh`](../scripts/lint-accepted-risk.sh) | [expiries](user-manual.md#expiries) | Req 6.10: one implementation of "expired" for the gate and the notice |
 | Provenance coverage | `rescan.yml`, step "provenance coverage over the supported set (Req 2.29, 2.30)" | drawn in [SLSA provenance, in the daily rescan](#in-the-daily-rescan) | Req 2.29, 2.30; Decision 15 |
+
+#### The repository's own records
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    IN(["The daily rescan, whatever failed above"])
+    WIN[/"triage.expiry_warning<br/>Req 6.10, 6.49"/]
+    AUTH["Each active definition's authenticity signal<br/>against its origin; lapsed compat review dates<br/>Req 3.10, 3.13, 4.9 · Decision 8"]
+    EXP["Accepted-risk expiries: lapsed,<br/>or lapsing within the window · Req 6.10"]
+    POST["Posture: rulesets equal the live ones,<br/>private reporting on, no tag<br/>on a revoked digest; drawn in the posture lane<br/>Req 9.3, 9.7, 9.9 · Decision 10"]
+    SCI(["One supply-chain issue per definition,<br/>kept open while the mismatch lasts · Req 3.10"])
+    EXPL(["Listed in the summary,<br/>never fails the run · Req 6.10"])
+    RED(["The run fails, naming each check<br/>that did not hold"])
+    IN --> AUTH & EXP & POST
+    WIN --> EXP --> EXPL
+    AUTH -.->|mismatch| SCI
+    AUTH -.->|mismatch, or origin not measured| RED
+    POST -.-> RED
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Authenticity | `rescan.yml`, step "authenticity signals (Req 3.10, 3.13, 4.9)"; [`check-authenticity.sh`](../scripts/check-authenticity.sh) | [SECURITY.md, upstream authenticity](../SECURITY.md#upstream-authenticity-per-definition), [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.10, 3.13, 4.9; Decision 8: an origin that did not answer files no issue. Only active definitions are checked; an inactive one is counted, not re-verified |
+| Expiries | `rescan.yml`, step "accepted-risk expiries (Req 6.10)"; [`lint-accepted-risk.sh`](../scripts/lint-accepted-risk.sh) | [expiries](user-manual.md#expiries) | Req 6.10: one implementation of "expired" for the gate and the notice |
 | Posture | `rescan.yml`, step "posture invariants (Req 9.3, 9.7, 9.9)"; [`check-governance.sh`](../scripts/check-governance.sh), [`check-revocations.sh`](../scripts/check-revocations.sh) | [branch protection](user-manual.md#branch-protection), [revoke a digest](user-manual.md#revoke-a-digest) | Req 9.3, 9.7, 9.9; Decision 10: it runs last so a governance failure never starves the issues and status |
 
 ### New issues
@@ -957,7 +989,7 @@ flowchart TB
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
 | The decision | by hand, the owner | [revoke a digest](user-manual.md#revoke-a-digest), [what GHCR can and cannot do](user-manual.md#what-ghcr-can-and-cannot-do) | Req 9.5; the manual-controls register in [CONVENTIONS.md](CONVENTIONS.md), row M14 |
-| Move A | the [release](#the-release): `build.yml`, step "apply definition-derived tags" | [move A](user-manual.md#move-a-replacement-through-the-release-path) | Req 2.7 to 2.9: the revoked digest is left untagged, which is frozen (Req 2.11) |
+| Move A | the [release](#the-release): `build.yml`, step "apply definition-derived tags (Req 2.7, 2.9)" | [move A](user-manual.md#move-a-replacement-through-the-release-path) | Req 2.7 to 2.9: the revoked digest is left untagged, which is frozen (Req 2.11) |
 | Move B1 | by hand: `gh api -X DELETE` on the package version; GitHub refuses it for a public version past 5,000 downloads | [move B](user-manual.md#move-b-withdrawal-nothing-replaces-it) | Req 9.5; Decision 10. Move B2, parking the tags on a signed "tombstone" image, is described in the manual and not built |
 | The advisory | by hand, on the repository's Security tab | [then, whichever move](user-manual.md#then-whichever-move), [SECURITY.md, advisories](../SECURITY.md#advisories) | Req 9.4; Decision 10 |
 | The entry | a pull request to `triage/revocations.yaml` | [SECURITY.md, revocation](../SECURITY.md#revocation) | Req 9.5; Decision 10: the record drives the mechanics, so the runbook stays short |
@@ -994,7 +1026,7 @@ flowchart TB
 
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
-| The enumeration | `rescan.yml`, step "enumerate the catalogue (Req 2.22)" | [the daily rescan and triage](#scan-attest-and-the-issue-lifecycle) | Req 2.22; Decision 6 |
+| The enumeration | `rescan.yml`, step "enumerate the catalogue (Req 2.22)" | [scan, attest, and the issue lifecycle](#scan-attest-and-the-issue-lifecycle) | Req 2.22; Decision 6 |
 | The status list | `rescan.yml`, step "invariants (Req 2.21, 2.24, 6.44, 6.51)", [`check-revocations.sh`](../scripts/check-revocations.sh) with `\|\| true`; then step "catalogue status, the clocks over the supported set (Req 6.46)", which publishes no status when the list is missing | [the catalogue status issue](user-manual.md#the-catalogue-status-issue) | Req 9.5, 6.46; Decision 10 |
 | The verdict | `rescan.yml`, step "posture invariants (Req 9.3, 9.7, 9.9)", `check-revocations.sh` again; its tests: `validate.yml`, step "check-revocations unit tests (Req 9.5 to 9.7)" | [revoke a digest](user-manual.md#revoke-a-digest) | Req 9.7; Decision 10, as built: in the posture step rather than the invariants step |
 | The summary line | `rescan.yml`, step "summary", the line "revocations:" | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.7 |
@@ -1014,7 +1046,7 @@ flowchart TB
     IN(["A person edits catalogue-policy.yaml<br/>and runs the renderer"])
     REN["render-verification.sh: render every<br/>artifact from the one file · Req 7.8 · Decision 6"]
     POL(["The admission policy: signature and SPDX SBOM<br/>from the release workflow, OpenVEX<br/>from it or the rescan workflow · Req 2.23"])
-    REG(["The chart gate's registry rule,<br/>the same namespace · Req 4.2 · Decision 11"])
+    REG(["The chart gate's registry rule,<br/>the same namespace · Req 4.6 · Decision 11"])
     SNIP(["The recipe between the markers<br/>in README.md and the manual · Req 2.25"])
     PR(["Every pull request"])
     DRIFT["validate: re-render and compare<br/>with the committed copies · Req 7.9 · Decision 6"]
@@ -1033,7 +1065,7 @@ flowchart TB
 | The declared values | [`catalogue-policy.yaml`](../catalogue-policy.yaml), sections `verification` and `consumers`, and `triage.aperture` | [SECURITY.md, the promise](../SECURITY.md#the-promise) | Req 2.23, 7.7, 9.11; Decision 6 |
 | Render | [`render-verification.sh`](../scripts/render-verification.sh), run by whoever edits the values; it refuses before writing anything | [verify what you pull](user-manual.md#verify-what-you-pull), [policies](user-manual.md#policies) | Req 7.8; Decision 6: rendered, so the instructions cannot drift from the policy |
 | The admission policy | [`policies/verify-catalogue-images.yaml`](../policies/verify-catalogue-images.yaml): one keyless signature entry, one attestor set per required type; the OpenVEX set takes either role (`count: 1`) | [verify what you pull](user-manual.md#verify-what-you-pull) | Req 2.23; Decision 6. The provenance rule is added only under `required` ([SLSA provenance, for a consumer](#for-a-consumer)) |
-| The registry rule | [`policies/restrict-registries.yaml`](../policies/restrict-registries.yaml), rendered by the same script for the [pull-request gate](user-manual.md#part-ii-the-pipeline) | [policies](user-manual.md#policies) | Req 4.2; Decision 11 (task 14.1): one namespace for both policies |
+| The registry rule | [`policies/restrict-registries.yaml`](../policies/restrict-registries.yaml), rendered by the same script for the [pull-request gate](user-manual.md#part-ii-the-pipeline) | [policies](user-manual.md#policies) | Req 4.6; Decision 11 (task 14.1): one namespace for both policies |
 | The recipe | the fenced block between `render-verification:begin` and `render-verification:end` in [README.md](../README.md#verify-an-image) and [the manual](user-manual.md#verify-what-you-pull) | [verify an image](../README.md#verify-an-image) | Req 2.25; Decision 6 |
 | The drift check | [`validate.yml`](../.github/workflows/validate.yml), step "verification renderings drift check (Req 7.8, 7.9)": `render-verification.sh --check`; its tests: step "render-verification unit tests (Req 7.8, 7.9)" | [validate, the lint battery](user-manual.md#validate--the-lint-battery) | Req 7.9; Decision 6 |
 
@@ -1057,13 +1089,14 @@ flowchart TB
     KYV["Kyverno, the published policy installed<br/>by the consumer: signature, SPDX SBOM, OpenVEX<br/>from the declared identities · Req 2.23"]
     RUN(["The Pod runs"])
     STOP(["A command fails: do not trust this digest"])
+    QUIET(["Today this command shows no failure:<br/>it ends in jq and the recipe sets no<br/>pipefail, so it exits 0 with empty output;<br/>recorded as an open item"])
     DENY(["The Pod is refused"])
     REF --> HOW
     HOW -->|by hand| SIG --> SBOM --> VEX --> PROV --> TRV --> GRY --> BK --> DONE
     HOW -->|in a cluster| KYV -->|all present| RUN
     SIG -.->|another signer, or none| STOP
-    SBOM -.->|missing, or another signer| STOP
-    VEX -.->|neither role signed one| STOP
+    SBOM -.->|missing, or another signer| QUIET
+    VEX -.->|neither role signed one| QUIET
     KYV -.->|any one missing or from another identity| DENY
 ```
 
@@ -1071,16 +1104,16 @@ The scanners do not decide trust: `trivy` and `grype` exit 0 with findings, and 
 
 | Step | Runs in | Explained in | Rests on |
 |---|---|---|---|
-| Signature, SBOM | the recipe, its first two commands | [verify what you pull](user-manual.md#verify-what-you-pull) | Req 2.23, 2.25; Decision 6 |
-| OpenVEX | the recipe, the braced command: the releaser first, the re-attester when that fails; the braces keep `\|\|` from swallowing the pipe (found by the smoke test's first run, 2026-09-08) | [what VEX means for you](user-manual.md#what-vex-means-for-you) | Req 2.25, 6.44; ADR 0004: exactly one OpenVEX attestation per digest, whichever role signed it |
+| Signature, SBOM | the recipe, its first two commands | [verify what you pull](user-manual.md#verify-what-you-pull) | Req 2.23, 2.25; Decision 6. The SBOM command pipes `cosign verify-attestation` into `jq`, and the recipe, as [`render-verification.sh`](../scripts/render-verification.sh) writes it, sets no `pipefail`, so today a failed SBOM check exits 0 with empty output for a person running it; recorded as an open item |
+| OpenVEX | the recipe, the braced command: the releaser first, the re-attester when that fails; the braces keep `\|\|` from swallowing the pipe (found by the smoke test's first run, 2026-09-08); with no `pipefail` in the recipe, a failed check today exits 0 and leaves an empty `openvex.json`, recorded as an open item | [what VEX means for you](user-manual.md#what-vex-means-for-you) | Req 2.25, 6.44; ADR 0004: exactly one OpenVEX attestation per digest, whichever role signed it |
 | Provenance | the recipe, present while `release.provenance` is not `off` | [SLSA provenance, for a consumer](#for-a-consumer) | Req 2.25; Decision 15, [ADR 0005](decisions/0005-slsa-provenance-verifier.md) |
-| The scans | the recipe, one line per entry of `consumers.list`, the authoritative one first; `--severity` is `triage.aperture` | [what VEX means for you](user-manual.md#what-vex-means-for-you) | Req 9.11; Decision 10 |
+| The scans | the recipe, one line per entry of `consumers.list`, the authoritative one first; on the trivy line `--severity` is `triage.aperture`, the grype line has no `--severity` and shows every severity | [what VEX means for you](user-manual.md#what-vex-means-for-you) | Req 9.11; Decision 10 |
 | BuildKit provenance | the recipe, its last line | [verify what you pull](user-manual.md#verify-what-you-pull) | Req 2.25: supplementary detail, stated as such |
 | Kyverno | [`policies/verify-catalogue-images.yaml`](../policies/verify-catalogue-images.yaml) in the consumer's cluster; this repository applies it only through the CLI, below | [verify what you pull](user-manual.md#verify-what-you-pull) | Req 2.23; Decision 6 |
 
 ### Held true every day
 
-Both ways are run by the [daily rescan](#the-daily-rescan-and-triage) against the live registry, with no shortcut a consumer would not have. Each of the two checks below fails the run by name and does not stop the other. The first applies the policy the way a cluster would.
+Both ways are run by the [daily rescan](#the-daily-rescan-and-triage) against the live registry. One thing a consumer would not have: the job is logged in to ghcr.io with the workflow's token (`rescan.yml`, step "log in to ghcr.io"), so its pulls and reads are not anonymous. Each of the two checks below fails the run by name and does not stop the other. The first applies the policy the way a cluster would.
 
 ```mermaid
 %%{init: {"flowchart": {"wrappingWidth": 340}}}%%
@@ -1107,7 +1140,7 @@ flowchart TB
 | The admission proof | [`rescan.yml`](../.github/workflows/rescan.yml), step "invariants (Req 2.21, 2.24, 6.44, 6.51)", run when the scan step succeeded; [`verify-catalogue.sh`](../scripts/verify-catalogue.sh), the verdicts in `verify-catalogue.json`; its tests: [`validate.yml`](../.github/workflows/validate.yml), step "admission proof unit tests (Req 2.24)" | [the catalogue page](user-manual.md#the-catalogue-page), [SECURITY.md, the promise](../SECURITY.md#the-promise) | Req 2.24; Decision 6: one `kyverno apply` per digest, because a batch verdict was measured wrong on 2026-09-03 |
 | The control | `catalogue-policy.yaml`, `verification.control` | [verify what you pull](user-manual.md#verify-what-you-pull) | Req 2.24: a policy that admits everything looks like one that works, until the control gets through |
 
-The second runs the README recipe itself, word for word.
+The second runs the README recipe's commands, but not word for word: it runs each one under `bash -o pipefail`, which the recipe itself does not set. So the smoke test catches a failed SBOM or VEX check that a person running the recipe would not see (the open item above).
 
 ```mermaid
 %%{init: {"flowchart": {"wrappingWidth": 340}}}%%
@@ -1115,7 +1148,7 @@ flowchart TB
     IN(["The daily rescan: today's enumeration · Req 2.22"])
     CON[/"consumers.list<br/>trivy authoritative, grype · Req 9.11"/]
     PICK["Pick the first supported full-release tag<br/>in the enumeration, as a digest · Req 9.13"]
-    RUN["Extract the README recipe, set REF<br/>to that digest, run each step<br/>in a scratch directory · Req 9.13 · Decision 10"]
+    RUN["Extract the README recipe, set REF<br/>to that digest, run each step under<br/>pipefail in a scratch directory<br/>Req 9.13 · Decision 10"]
     SUP["Count each not_affected or fixed statement<br/>in the authoritative consumer: suppressed,<br/>nothing to suppress, or missing · Req 9.13"]
     OCI["Trivy reading the attestation itself, --vex oci:<br/>at least the same suppressions · ADR 0004"]
     OTH(["Each other consumer's result in the<br/>portability block, never fails the run<br/>Req 9.12, 9.13 · Decision 10"])
@@ -1134,5 +1167,5 @@ flowchart TB
 |---|---|---|---|
 | The smoke test | `rescan.yml`, step "consumer smoke test (Req 9.13)", run when the enumeration succeeded; [`consumer-smoke.sh`](../scripts/consumer-smoke.sh); its tests: `validate.yml`, step "consumer-smoke unit tests (Req 9.13)" | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.13; Decision 10: the README section becomes a tested contract. It reads the README's copy; the drift check keeps the manual's equal |
 | The `--vex oci` check | the same script, only when Trivy is the authoritative consumer; more suppressions through the attestation are reported, not failed | [reading job summaries](user-manual.md#reading-job-summaries) | ADR 0004; Req 6.44 |
-| The other consumers | the same script, then [`vex-portability.sh`](../scripts/vex-portability.sh) | [what VEX means for you](user-manual.md#what-vex-means-for-you) | Req 9.12, 9.13; Decision 10: informational while `consumers.gating` is false |
+| The other consumers | the same script, then [`vex-portability.sh`](../scripts/vex-portability.sh), its exit code discarded (`\|\| true`) | [what VEX means for you](user-manual.md#what-vex-means-for-you) | Req 9.12, 9.13; Decision 10: informational while `consumers.gating` is false. Today it stays informational whatever `consumers.gating` says, because the exit code is discarded; recorded as an open item |
 | The summary | `rescan.yml`, step "summary", the line "consumer smoke test:" and the smoke block | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.13 |
