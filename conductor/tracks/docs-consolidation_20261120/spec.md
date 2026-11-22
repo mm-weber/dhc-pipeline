@@ -61,7 +61,7 @@ THE Repository SHALL explain each topic in one document, SHALL merge a document 
 
 **Acceptance criteria:**
 
-- [x] `docs/operating-loop.md`, `docs/concepts.md` and `docs/revocation-runbook.md` merged into the documents named in design Decision 16 and removed; every link to them, and every comment that names them, updated
+- [x] `docs/operating-loop.md`, `docs/concepts.md` and `docs/revocation-runbook.md` merged into the documents named in design Decision 16 and removed; every link to them, and every comment that names them, updated (except the comment on line 4 of `image/valkey-compat/image.yaml`, carried: a definition change republishes its image)
 - [x] The Renovate cadence stated the same way everywhere: at most six hours (Req 3.1), configured every four (`catalogue-policy.yaml`); `conductor/tech-stack.md` names the install scripts as the home of tool versions instead of repeating them; the decision and ADR counts and the definition counts current
 - [x] The manual's triage chapters reduced to what an operator does and a link to `triage/README.md` for the rest; design.md's stack table reduced to the reasons, the versions living in one place
 - [x] The link check green; `render-verification.sh --check`, `lint-live-evidence.sh`, `lint-log-anchors.sh` green

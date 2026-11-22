@@ -4659,9 +4659,9 @@ archive folder, overlapping documents merged into fewer, the SLSA lane first.*
 each step naming the criterion it fulfils and the decision it rests on, each
 graph's table naming the workflow step that runs it. The working notes (the
 review rounds, the closed todo items, the spike and BuildKit notes) are in
-[docs/archive/](../docs/archive/README.md), marked as not current. Three
-documents merged into others (`concepts.md` and `revocation-runbook.md` into
-the manual, `operating-loop.md` archived whole), and values the documents
+[docs/archive/](../docs/archive/README.md), marked as not current. Two
+documents merged into the manual (`concepts.md` and `revocation-runbook.md`)
+and a third archived whole (`operating-loop.md`), and values the documents
 stated differently are stated once from where each is declared.
 
 **The reads.**
