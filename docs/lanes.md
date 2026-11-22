@@ -20,7 +20,7 @@ flowchart LR
     D --> GOV(["Posture: rulesets, reporting,<br/>revocations · Req 9"])
     T --> C(["Consumer: verify recipe,<br/>Kyverno policy · Req 2.23, 2.25"])
     classDef drawn fill:#d7ecff,stroke:#1f6feb,stroke-width:2px
-    class U,G,R,S,DSP,P drawn
+    class U,G,R,S,DSP,P,D drawn
 ```
 
 ## Upstream tracking
@@ -698,3 +698,193 @@ flowchart TB
 | The smoke test | `rescan.yml`, step "consumer smoke test"; [`consumer-smoke.sh`](../scripts/consumer-smoke.sh) | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.13; the review of 2026-09-09, finding 2.4: an empty result passed |
 | The Kyverno rule | [`policies/verify-catalogue-images.yaml`](../policies/verify-catalogue-images.yaml), rendered only under `required` | [what a provenance statement has to say](user-manual.md#what-a-provenance-statement-has-to-say) | Req 2.28; ADR 0005, amendment: one more attestation of the existing entry |
 | The claim | [SECURITY.md](../SECURITY.md#slsa-build-level) | the same | Req 9.19: no level above what the policy demands |
+
+## The daily rescan and triage
+
+This lane keeps watching what is already published. New advisories land against images every day, long after their pull request passed the gate, so once a day at 06:17 UTC, or when the owner dispatches it, `rescan.yml` lists every tag the catalogue serves, scans every platform manifest behind it, and acts on what it finds. It produces four things: today's scan reports and VEX document attested to each digest; `cve` issues opened, closed on evidence and reopened; the "Catalogue status" issue with its clocks, and the catalogue page; and a set of daily checks that fail the run by name when a promise is not kept. It decides nothing itself. A triage decision is a pull request a person writes (an OpenVEX statement, an accepted-risk exception, or a fix), and the next rescan reads it. Issues and clocks cover the supported set, the digests a definition's current tags point to; an older digest a tag still reaches keeps its scans and attestations but holds no issues (Req 6.49). Every step after the scan runs whatever failed above it and refuses by name when its own input is missing (review disposition D1, Decision 6), so a red run names every promise not kept that day. Why the rescan works this way: [the daily rescan](../triage/README.md#the-daily-rescan-req-222-63-642-to-657) in the triage README. Two step names in `rescan.yml` contain a long dash; the tables below print it as a colon.
+
+### Scan, attest, and the issue lifecycle
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    SCHED[/"workflows: rescan.yml, schedule<br/>daily 06:17 UTC · Req 2.22, 7.10"/]
+    AP[/"triage.aperture<br/>CRITICAL, HIGH · Req 6.49"/]
+    ROLES[/"verification.roles<br/>who may attest what · Req 2.23, 6.58"/]
+    LBL[/"triage.resolved_labels<br/>Req 6.56"/]
+    IN(["The cron, or the owner's dispatch<br/>with its drill input · Req 7.10"])
+    TRI(["Merged triage records: triage/vex/,<br/>triage/accepted-risk/ · Req 6.4, 6.7"])
+    SW["Read the release switches<br/>page and provenance · Req 7.7"]
+    ENUM["Enumerate every catalogue tag<br/>to its digest and platform manifests<br/>Req 2.22 · Decision 6"]
+    SCAN["Per digest: compile its VEX, then scan each<br/>platform manifest by its own digest,<br/>statements and exceptions applied<br/>Req 2.22, 6.28 to 6.30, 6.55 · Decision 5"]
+    EV["Lifecycle evidence: every cve issue, the scanner,<br/>the SBOMs read through verification<br/>Req 6.52 to 6.58 · Decision 7"]
+    DEC["Lifecycle decided by the tested tool:<br/>close, reopen, relabel, keep open<br/>Req 6.52 to 6.57 · Decision 7"]
+    MAP["Map each open cve issue, finding to link,<br/>for the statements' tracking links · Req 6.37"]
+    ATT["Per digest: attest today's reports, replacing;<br/>compile the document again; re-attest it,<br/>replacing, when it differs · Req 6.42, 6.43<br/>ADR 0003, ADR 0004"]
+    APPLY["Lifecycle applied: close with a graded label,<br/>reopen, shed labels · Req 6.52, 6.53, 6.56, 6.57"]
+    VEXR(["VEX compile report in the summary:<br/>every statement applied or dropped · Req 6.33"])
+    ISS(["cve issues closed and reopened on evidence,<br/>each comment naming what it examined<br/>Req 6.54"])
+    ENFAIL(["Run fails by name; nothing is scanned,<br/>only the checks that need no enumeration run"])
+    SKIP(["Manifest skipped, warned, counted;<br/>its digest blocks every close, is not re-attested"])
+    HOLD(["Closes and reopens withheld today,<br/>the unattested digests named · Req 6.54"])
+    SCHED --> IN --> SW --> ENUM --> SCAN
+    AP --> SCAN
+    TRI --> SCAN
+    SCAN --> VEXR
+    SCAN --> EV --> DEC
+    ROLES --> EV
+    LBL --> DEC
+    SCAN --> MAP --> ATT
+    ROLES --> ATT
+    TRI --> ATT
+    DEC --> APPLY
+    ATT --> APPLY --> ISS
+    ENUM -.->|registry unreadable| ENFAIL
+    SCAN -.->|one scan fails| SKIP
+    APPLY -.->|a digest's reports not attested| HOLD
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| The schedule | [`rescan.yml`](../.github/workflows/rescan.yml), `cron: "17 6 * * *"`, and the dispatch input `drill`; held equal to the declaration by `validate.yml`, step "workflow schedule + permissions vs policy file (Req 7.10)" | [crons and cadence](user-manual.md#crons-and-cadence) | Req 2.22 (at least once a day), 7.10 |
+| Release switches | `rescan.yml`, step "release switches (Req 7.7)"; [`release-policy.sh`](../scripts/release-policy.sh) | [the catalogue page](user-manual.md#the-catalogue-page) | Req 7.7; review D3: a malformed switch fails here by name |
+| Enumerate | `rescan.yml`, step "enumerate the catalogue (Req 2.22)"; [`enumerate-catalogue.sh`](../scripts/enumerate-catalogue.sh) | [crons and cadence](user-manual.md#crons-and-cadence) | Req 2.22; Decision 6: the one step that fails hard, a partial list would shrink what is watched |
+| Compile and scan | `rescan.yml`, step "scan every platform manifest of every tag-referenced digest"; [`compile-vex.sh`](../scripts/compile-vex.sh), [`scan-image.sh`](../scripts/scan-image.sh) with `--remote` | [what VEX means for you](user-manual.md#what-vex-means-for-you), [reading job summaries](user-manual.md#reading-job-summaries) | Req 2.22, 6.28 to 6.30, 6.55; Decision 5; a failed scan skips one manifest and does not fail the step |
+| Lifecycle evidence | `rescan.yml`, step "issue lifecycle, the evidence (Req 6.52 to 6.57)"; [`fetch-sboms.sh`](../scripts/fetch-sboms.sh), [`triage-policy.sh`](../scripts/triage-policy.sh) `resolved-labels` | [rescan CVE issues](user-manual.md#rescan-cve-issues) | Req 6.52 to 6.58; Decision 7 |
+| Lifecycle decided | `rescan.yml`, step "issue lifecycle, decided on evidence (tested)"; `cmd/rescan-lifecycle` in [`triage/rescan`](../triage/rescan/) | [rescan CVE issues](user-manual.md#rescan-cve-issues) | Req 6.52 to 6.57; Decision 7 |
+| Issue map | `rescan.yml`, step "open cve issues (finding -> issue)" | [rescan CVE issues](user-manual.md#rescan-cve-issues) | Req 6.37: the open issue map is the compiler's fifth input |
+| Attest and re-attest | `rescan.yml`, step "attest today's reports, re-attest OpenVEX on change (Req 6.42, 6.43)"; [`reattest.sh`](../scripts/reattest.sh) | [triage README, the daily rescan](../triage/README.md#the-daily-rescan-req-222-63-642-to-657) | Req 6.42, 6.43, 6.58; [ADR 0003](decisions/0003-one-openvex-document-per-digest.md), [ADR 0004](decisions/0004-re-attestation-replaces.md): one document per digest, replaced, never appended |
+| Lifecycle applied | `rescan.yml`, step "issue lifecycle, applied (Req 6.52, 6.53, 6.56, 6.57)" | [rescan CVE issues](user-manual.md#rescan-cve-issues) | Req 6.52 to 6.57; Decision 7, review D2: it runs after re-attestation because closes rest on attested reports |
+| Compile report | `rescan.yml`, step "summary", the block "VEX compilation (Req 6.28-6.30)"; the step "upload rescan artifacts" keeps every file the run wrote | [reading job summaries](user-manual.md#reading-job-summaries) | Req 6.32, 6.33: "compiled nothing" and "never compiled" stay apart |
+
+### The daily checks
+
+Each check reports by name. A check that does not hold fails the run, but never stops the next one from being made.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    IN(["Today's enumeration and reports,<br/>from the graph above"])
+    FEED[/"triage.kev_feed, triage.drills<br/>Req 6.60, 7.7"/]
+    TIERS[/"triage.ceilings, triage.kev_ceiling<br/>Req 6.49, 6.51"/]
+    CONS[/"consumers<br/>trivy authoritative, grype · Req 9.11"/]
+    WIN[/"triage.expiry_warning<br/>Req 6.10, 6.49"/]
+    VIS["Every repository and tag pulls anonymously<br/>Req 2.21 · Decision 6"]
+    ADM["The admission policy admits every<br/>tagged digest, rejects the unsigned control<br/>Req 2.24 · Decision 6"]
+    DR{"Drill input?"}
+    KEV["Fetch the KEV feed, or the drill's substitute<br/>Req 6.60 · Decision 13"]
+    TIER["Each unexpired exception against today's<br/>severity and KEV status · Req 6.51 · Decision 7"]
+    CNT["Exactly one OpenVEX attestation on every<br/>digest and platform manifest · Req 6.44, 6.45<br/>ADR 0004"]
+    AUTH["Each definition's authenticity signal against<br/>its origin; lapsed compat review dates<br/>Req 3.10, 3.13, 4.9 · Decision 8"]
+    PORT["VEX portability: each other consumer scans<br/>what Trivy suppressed · Req 9.12 · Decision 10"]
+    SMOKE["Consumer smoke test: the README recipe<br/>run verbatim on one supported digest<br/>Req 9.13 · Decision 10"]
+    EXP["Accepted-risk expiries: lapsed,<br/>or lapsing within the window · Req 6.10"]
+    PROV["Provenance coverage, drawn in<br/>the SLSA provenance lane<br/>Req 2.29, 2.30 · Decision 15"]
+    POST["Posture: rulesets equal the live ones,<br/>private reporting on, no tag<br/>on a revoked digest<br/>Req 9.3, 9.7, 9.9 · Decision 10"]
+    SCI(["One supply-chain issue per definition,<br/>kept open while the mismatch lasts · Req 3.10"])
+    PB(["Portability block in the summary,<br/>never fails the run · Req 9.12"])
+    EXPL(["Listed in the summary,<br/>never fails the run · Req 6.10"])
+    NOEVAL(["Not evaluated: the run fails by name;<br/>no issue set, status or page today · Req 6.60"])
+    RED(["The run fails, naming each check<br/>that did not hold"])
+    IN --> VIS & ADM & CNT & PORT & SMOKE & PROV & POST
+    IN --> DR
+    FEED --> DR
+    DR -->|none: the declared feed| KEV
+    DR -->|kev-outage or kev-synthetic| KEV
+    KEV --> TIER
+    TIERS --> TIER
+    CONS --> PORT --> PB
+    WIN --> EXP --> EXPL
+    KEV -.->|unreachable| NOEVAL
+    VIS -.-> RED
+    ADM -.-> RED
+    TIER -.->|over its tier| RED
+    CNT -.-> RED
+    AUTH -.->|mismatch| SCI
+    AUTH -.->|mismatch, or origin not measured| RED
+    SMOKE -.->|a step fails, or a suppression is missing| RED
+    POST -.-> RED
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Visibility, admission, tiers, count | `rescan.yml`, step "invariants (Req 2.21, 2.24, 6.44, 6.51)"; [`check-visibility.sh`](../scripts/check-visibility.sh), [`verify-catalogue.sh`](../scripts/verify-catalogue.sh), [`check-exceptions.sh`](../scripts/check-exceptions.sh) `rescan`, [`check-attestation-count.sh`](../scripts/check-attestation-count.sh); the four run independently and fail the step together | [reading job summaries](user-manual.md#reading-job-summaries), [policies](user-manual.md#policies) | Req 2.21, 2.24, 6.44, 6.45, 6.51; Decision 6, review D1 |
+| The KEV feed and drills | the same step; `triage-policy.sh kev-feed`, or `drill-feed` when the dispatch's `drill` input is not `none` | [crons and cadence](user-manual.md#crons-and-cadence) | Req 6.60: an outage is a failure, not a pass; Decision 13 (live drills, task 16.8) |
+| Authenticity | `rescan.yml`, step "authenticity signals (Req 3.10, 3.13, 4.9)"; [`check-authenticity.sh`](../scripts/check-authenticity.sh) | [SECURITY.md, upstream authenticity](../SECURITY.md#upstream-authenticity-per-definition), [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.10, 3.13, 4.9; Decision 8: an origin that did not answer files no issue |
+| Portability | `rescan.yml`, step "VEX portability over the supported set (Req 9.12)", `continue-on-error: true`; [`vex-consumer.sh`](../scripts/vex-consumer.sh), [`vex-portability.sh`](../scripts/vex-portability.sh) | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.11, 9.12; Decision 10: informational while `consumers.gating` is false |
+| Smoke test | `rescan.yml`, step "consumer smoke test (Req 9.13)"; [`consumer-smoke.sh`](../scripts/consumer-smoke.sh) | [reading job summaries](user-manual.md#reading-job-summaries), [verify what you pull](user-manual.md#verify-what-you-pull) | Req 9.13; Decision 10, ADR 0004's `--vex oci` check rides inside it |
+| Expiries | `rescan.yml`, step "accepted-risk expiries (Req 6.10)"; [`lint-accepted-risk.sh`](../scripts/lint-accepted-risk.sh) | [expiries](user-manual.md#expiries) | Req 6.10: one implementation of "expired" for the gate and the notice |
+| Provenance coverage | `rescan.yml`, step "provenance coverage over the supported set (Req 2.29, 2.30)" | drawn in [SLSA provenance, in the daily rescan](#in-the-daily-rescan) | Req 2.29, 2.30; Decision 15 |
+| Posture | `rescan.yml`, step "posture invariants (Req 9.3, 9.7, 9.9)"; [`check-governance.sh`](../scripts/check-governance.sh), [`check-revocations.sh`](../scripts/check-revocations.sh) | [branch protection](user-manual.md#branch-protection), [revoke a digest](user-manual.md#revoke-a-digest) | Req 9.3, 9.7, 9.9; Decision 10: it runs last so a governance failure never starves the issues and status |
+
+### New issues
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    IN(["Today's supported reports and the KEV feed,<br/>from the graphs above"])
+    AP[/"triage.aperture<br/>Req 6.49"/]
+    ENR["Enrich: EPSS for each CVE, best effort;<br/>KEV from the feed fetched above<br/>Req 6.3, 6.60"]
+    DED["Dedup: the ids open cve issues carry<br/>in their hidden marker · Req 6.3"]
+    REP["Build the issue set, the tested reporter:<br/>new findings within the aperture<br/>Req 6.3 · Decision 7"]
+    ANY{"Any new finding?"}
+    GRY["Grype second opinion on each CRITICAL,<br/>in the log · a convention, Req 9.11 to 9.13"]
+    FILE["File one issue per new finding: severity,<br/>EPSS, KEV, affected images · Req 6.3"]
+    NEW(["New cve issues: a person decides<br/>by pull request, a statement,<br/>an exception or a fix · Req 6.4, 6.5, 6.7"])
+    NONE(["Nothing filed"])
+    NOSET(["No issue set today, named · Req 6.60"])
+    IN --> ENR --> DED --> REP --> ANY
+    AP --> REP
+    ANY -->|yes| GRY --> FILE --> NEW
+    ANY -->|no| NONE
+    ENR -.->|no KEV file| NOSET
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Enrich | `rescan.yml`, step "enrich: EPSS + CISA KEV"; the EPSS API of FIRST.org, the KEV file the invariants step fetched | [rescan CVE issues](user-manual.md#rescan-cve-issues) | Req 6.3, 6.60: no issue set is built on a KEV status nobody evaluated |
+| Dedup | `rescan.yml`, step "dedup: already-open CVE issues" | [rescan CVE issues](user-manual.md#rescan-cve-issues) | Req 6.3; the marker carries the scanner's id, a CVE or a GHSA advisory, never the title |
+| Issue set | `rescan.yml`, step "build issue set (tested reporter)"; `cmd/rescan-report` in [`triage/rescan`](../triage/rescan/), reading the supported reports only | [rescan CVE issues](user-manual.md#rescan-cve-issues) | Req 6.3, 6.49; Decision 7: the supported set only |
+| Grype | `rescan.yml`, step "Grype second opinion on CRITICAL (convention; Req 9.11 to 9.13)" | [rescan CVE issues](user-manual.md#rescan-cve-issues) | A convention beside the declared consumers of Req 9.11 to 9.13: a second scanner's reading of what is about to be filed, never a gate |
+| File | `rescan.yml`, step "file new-CVE issues (Req 6.3)" | [rescan CVE issues](user-manual.md#rescan-cve-issues), [the four treatments](user-manual.md#clearing-a-red-gate--the-four-treatments) | Req 6.3; the decision after it is Req 6.4, 6.5, 6.7 |
+
+### The status issue and the page
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    IN(["Today's attested documents, reports,<br/>KEV feed and checks, from the graphs above"])
+    TRI[/"triage: aperture, ceilings, kev_ceiling,<br/>support statement · Req 6.49"/]
+    PG[/"release.page<br/>Req 6.61"/]
+    PREV["Read the last status issue,<br/>found by its hidden marker · Req 6.46"]
+    INACT["No inactive definition gained a digest<br/>or a tag since that status<br/>Req 1.15 · Decision 11"]
+    CLK["The clocks over the supported set: first seen,<br/>decided, fixed, age against the ceilings;<br/>the page drawn from the same data<br/>Req 6.46, 6.47, 6.61 · Decision 7, 12"]
+    PUB(["The Catalogue status issue, edited in place,<br/>and the catalogue-status artifact · Req 6.47"])
+    PON{"Page on?"}
+    UP["Upload the page and its data<br/>as a Pages artifact · Req 6.61 · Decision 12"]
+    DEP["Job publish the catalogue page:<br/>deploy, then read the data back<br/>until it is this run's · Req 6.61, 6.62"]
+    LIVE(["The catalogue page is live"])
+    OFF(["No page; the run stays green"])
+    NOSTAT(["No status and no page today,<br/>the missing input named · Req 6.46, 6.47"])
+    PFAIL(["The page job fails by name · Req 6.62"])
+    GAIN(["The run fails, the definition<br/>and tag named · Req 1.15"])
+    IN --> PREV --> CLK --> PUB
+    PREV --> INACT
+    TRI --> CLK
+    CLK --> PON
+    PG --> PON
+    PON -->|yes| UP --> DEP --> LIVE
+    PON -->|no| OFF
+    PREV -.->|re-attestation failed above| NOSTAT
+    CLK -.->|an input missing| NOSTAT
+    INACT -.->|a gain| GAIN
+    DEP -.->|deploy fails, or old data still served| PFAIL
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Last status | `rescan.yml`, step "catalogue status, the previously published data (Req 6.46)"; runs only when re-attestation succeeded | [the catalogue status issue](user-manual.md#the-catalogue-status-issue) | Req 6.46: its fenced JSON carries the fix dates forward |
+| Inactive definitions | `rescan.yml`, step "no inactive definition gained a digest or a tag (Req 1.15)"; [`check-inactive-digests.sh`](../scripts/check-inactive-digests.sh) | [deactivate a definition](user-manual.md#deactivate-a-definition) | Req 1.15; Decision 11, review D7: the detective half, `build.yml` holds the preventive one |
+| The clocks | `rescan.yml`, step "catalogue status, the clocks over the supported set (Req 6.46)"; `cmd/rescan-status` in [`triage/rescan`](../triage/rescan/); it needs the KEV file, the revocation record, the admission proof and the expiry report, and adds the provenance line when one was measured | [the catalogue status issue](user-manual.md#the-catalogue-status-issue), [the catalogue page](user-manual.md#the-catalogue-page) | Req 6.46, 6.47, 6.49, 6.61, and the provenance line of Req 2.29, 2.30; Decision 7, 12 |
+| Publish | `rescan.yml`, steps "catalogue status, published to the status issue (Req 6.47)" and "upload the status data (Req 6.47)" | [the catalogue status issue](user-manual.md#the-catalogue-status-issue) | Req 6.47 |
+| Page | `rescan.yml`, step "upload the catalogue page (Req 6.61)"; the job "publish the catalogue page", steps "deploy the catalogue page (Req 6.61)" and "the served status data is this run's (Req 6.62)" | [the catalogue page](user-manual.md#the-catalogue-page) | Req 6.61, 6.62; Decision 12: an artifact, never a commit, and that job alone holds `pages: write` |
