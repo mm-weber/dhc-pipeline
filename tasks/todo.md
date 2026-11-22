@@ -46,7 +46,8 @@ track (`conductor/tracks.md`).
       `.specs/dhc-catalogue-mvp/requirements.md` against the code and the
       ledger and lists what it finds; each fix is its own decision and pull
       request, code test-first. It reads the consolidated documents and
-      lands before the successor is seeded (task 12.1).
+      lands before the successor is seeded (task 12.1). Track
+      requirements-check_20261122, task group 20 (opened 2026-11-22).
       Input already found while the lanes were drawn (phase 5 of the
       documentation track, 2026-11-22; each read in the code, none yet in
       a run; docs/lanes.md draws what the code does today):

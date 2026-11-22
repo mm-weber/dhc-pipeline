@@ -24,6 +24,7 @@ Navigation for the project context and the work tracks. Context first, then spec
 
 | Track | Status | Priority | Spec | Plan |
 | --- | --- | --- | --- | --- |
+| requirements-check_20261122 | pending | high | [spec](./tracks/requirements-check_20261122/spec.md) | [plan](./tracks/requirements-check_20261122/plan.md) |
 | docs-consolidation_20261120 | completed | high | [spec](./tracks/docs-consolidation_20261120/spec.md) | [plan](./tracks/docs-consolidation_20261120/plan.md) |
 | slsa-build-l2_20261028 | completed | high | [spec](./tracks/slsa-build-l2_20261028/spec.md) | [plan](./tracks/slsa-build-l2_20261028/plan.md) |
 | reactivate-grafana_20261110 | in progress | high | [spec](./tracks/reactivate-grafana_20261110/spec.md) | [plan](./tracks/reactivate-grafana_20261110/plan.md) |

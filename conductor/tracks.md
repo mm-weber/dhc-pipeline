@@ -8,6 +8,14 @@
 
 ## Active tracks
 
+### [ ] requirements-check_20261122: The requirements checked against the code
+
+**Description:** Every live criterion of requirements.md read against the code at one commit, the mechanism named and a verdict given (held, partial, not held, owner-side), the reader documents' statements of behaviour beside it, every finding re-checked by a second reader; each finding put to the owner as a decision; the fixes one pull request per cluster, code test-first; the evidence in the LOG and the ledger (the owner's call of 2026-11-21; task group 20).
+**Priority:** high (executes before the successor, task 12)
+**Folder:** [./tracks/requirements-check_20261122/](./tracks/requirements-check_20261122/)
+
+---
+
 ### [~] reactivate-grafana_20261110: Grafana returns to the active set, the fix rung reopened
 
 **Description:** Grafana returns to `active_set` by the same switch that removed it on 2026-10-19: the line back, the tracking block re-rendered, the live-state case moved to seven by four test-first, the README and manual rows and the LOG entry in the same pull request; the fix rung reopens for the three undecided HIGH findings on the frozen digest and for the nine transfers of 2026-10-13, whose exit the released 13.1.x line now carries; the first active day and the bot's bump read in a second pull request.
