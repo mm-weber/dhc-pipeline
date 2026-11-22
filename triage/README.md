@@ -72,21 +72,24 @@ unreachable the check does not run and the PR or rescan fails closed
 ### Authoring an exception
 
 ```yaml
-# triage/accepted-risk/grafana.yaml (abbreviated from the live file)
+# triage/accepted-risk/grafana.yaml (one live entry, quoted whole; comments added)
 vulnerabilities:
-  - id: CVE-2026-27145
-    purls: ["pkg:golang/stdlib"]                    # versionless, survives rebuilds
-    paths: ["usr/share/grafana/…/elasticsearch/*"]  # THE binary this decision covers
-    treatment: transfer                             # accept | transfer
+  - id: CVE-2026-78667
+    purls: ["pkg:golang/stdlib"]                  # versionless, survives rebuilds
+    paths: ["usr/share/grafana/bin/grafana"]      # THE binary this decision covers
+    treatment: transfer                           # accept | transfer
     owner: mm-weber
-    issue: "https://github.com/grafana/…/issues/410"  # required for transfer
-    ref: "LOG.md#transfer--stdlib-cve-2026-27145-…"   # where the reasoning lives
-    blocked: "avoidance is available and declined, not unavailable: dropping
-              the plugin would remove the datasource … remediation is measured
-              closed: the newest release is itself built with go1.26.3"
-    statement: "transfer: waiting on a release built with go1.26.4+"
-    decided_at: 2026-09-02                          # the clock starts here (Req 6.7)
-    expired_at: 2026-11-02                          # ≤ decided_at + the tier's ceiling, enforced
+    issue: "https://github.com/grafana/grafana/pull/134622"  # required for transfer
+    ref: "LOG.md#transfer-the-server-binary-four-findings-waiting-on-1318"  # where the reasoning lives
+    blocked: "avoidance would remove Grafana from the Grafana image. Remediation
+              is closed to us: the definition repackages the official release
+              tarball, so no fetch-phase bump or toolchain change reaches
+              bin/grafana. net/http.parseRange and its callers are present in
+              the symbol table, which forbids not_affected (Req 6.14). Fixed
+              upstream on release-13.1.8 (Go 1.26.9, #134622), not released"
+    statement: "transfer: waiting on grafana 13.1.8, whose release branch carries Go 1.26.9 (grafana/grafana#134622)"
+    decided_at: 2026-10-13                        # the clock starts here (Req 6.7)
+    expired_at: 2026-12-12                        # at most decided_at + the tier's ceiling, enforced
 ```
 
 - **The filename is the scope.** One file per image, so accepting a finding for

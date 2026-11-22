@@ -1030,25 +1030,8 @@ The decision is register row M3; a transfer's upstream filing is M12; the
 fix-forward hand-bump is M10.
 
 `triage/accepted-risk/<image>.yaml` is a native Trivy ignorefile plus the
-fields that make an entry reviewable. Real shape (abbreviated from the live
-grafana file):
-
-```yaml
-vulnerabilities:
-  - id: CVE-2026-27145
-    purls: ["pkg:golang/stdlib"]                    # versionless — survives rebuilds
-    paths: ["usr/share/grafana/…/elasticsearch/*"]  # THE binary this decision covers
-    treatment: transfer                             # accept | transfer
-    owner: mm-weber
-    issue: "https://github.com/grafana/…/issues/410"  # required for transfer
-    ref: "LOG.md#transfer--stdlib-cve-2026-27145-…"   # where the reasoning lives
-    blocked: "avoidance is available and declined, not unavailable: dropping
-              the plugin would remove the datasource … remediation is measured
-              closed — the newest release is itself built with go1.26.3"
-    statement: "transfer: waiting on a release built with go1.26.4+"
-    decided_at: 2026-09-02                          # the clock starts here (Req 6.7)
-    expired_at: 2026-11-02                          # ≤ decided_at + the tier's ceiling — enforced
-```
+fields that make an entry reviewable. A live entry, each field
+explained: [triage/README.md, "Authoring an exception"](../triage/README.md#authoring-an-exception).
 
 The rules, all machine-enforced by `lint-accepted-risk.sh` (Req 6.7, 6.11,
 6.25), and why each exists:

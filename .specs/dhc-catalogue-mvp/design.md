@@ -1040,7 +1040,7 @@ The table names no tool versions: each is declared once, in `scripts/install-sca
       (finding 2.4: the provenance leg never asserted, Req 2.10 PARTIAL, the smoke test's
       provenance step passing on a null result), and its eight proposed dispositions (D1 to
       D8) carry no row for it, so it fell through. The only SLSA scope ever written down is
-      a non-goal, "full SLSA L3 hermeticity" (Overview); `docs/concepts.md` calls the
+      a non-goal, "full SLSA L3 hermeticity" (Overview); `docs/concepts.md` called the
       catalogue "L2-ish", a claim the verification policy does not back. The substrate's own
       catalogue images carry SLSA Build L3 provenance (`data/docker_internal_build.md`); this
       catalogue's rebuilds of them publish L1.
