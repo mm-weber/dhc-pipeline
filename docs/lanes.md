@@ -20,7 +20,7 @@ flowchart LR
     D --> GOV(["Posture: rulesets, reporting,<br/>revocations · Req 9"])
     T --> C(["Consumer: verify recipe,<br/>Kyverno policy · Req 2.23, 2.25"])
     classDef drawn fill:#d7ecff,stroke:#1f6feb,stroke-width:2px
-    class U,G,R,S,DSP,P,D drawn
+    class U,G,R,S,DSP,P,D,GOV drawn
 ```
 
 ## Upstream tracking
@@ -888,3 +888,113 @@ flowchart TB
 | The clocks | `rescan.yml`, step "catalogue status, the clocks over the supported set (Req 6.46)"; `cmd/rescan-status` in [`triage/rescan`](../triage/rescan/); it needs the KEV file, the revocation record, the admission proof and the expiry report, and adds the provenance line when one was measured | [the catalogue status issue](user-manual.md#the-catalogue-status-issue), [the catalogue page](user-manual.md#the-catalogue-page) | Req 6.46, 6.47, 6.49, 6.61, and the provenance line of Req 2.29, 2.30; Decision 7, 12 |
 | Publish | `rescan.yml`, steps "catalogue status, published to the status issue (Req 6.47)" and "upload the status data (Req 6.47)" | [the catalogue status issue](user-manual.md#the-catalogue-status-issue) | Req 6.47 |
 | Page | `rescan.yml`, step "upload the catalogue page (Req 6.61)"; the job "publish the catalogue page", steps "deploy the catalogue page (Req 6.61)" and "the served status data is this run's (Req 6.62)" | [the catalogue page](user-manual.md#the-catalogue-page) | Req 6.61, 6.62; Decision 12: an artifact, never a commit, and that job alone holds `pages: write` |
+
+## Posture: rulesets, reporting, revocations
+
+This lane keeps the catalogue's trust statement, [SECURITY.md](../SECURITY.md), true after it was written. Three promises in it can quietly stop being kept: the ruleset on `main` can be changed in GitHub's settings, private vulnerability reporting can be switched off, and a revoked digest can still sit under a tag. So the daily rescan checks all three in one step, "posture invariants", the last check of the run; it runs whatever failed above it, so a governance failure never keeps the day's issues and status from going out (Decision 6, review disposition D1). Its reads are anonymous, with no token, so it sees what any consumer sees. The revocation record itself is written by hand when the owner revokes a digest, and `validate` checks its shape on every pull request. The lane produces summary lines, entries in the status issue, and a failed run naming each promise not kept. It reads no value from `catalogue-policy.yaml`, so its graphs have no slanted boxes; its inputs are records committed in the repository, drawn as rounded boxes. Why this lane exists: Decision 10.
+
+### Rulesets and private reporting
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    IN(["The daily rescan, 06:17 UTC or dispatched;<br/>this step runs last, whatever failed above"])
+    RS(["The committed ruleset export<br/>.github/rulesets/main_sec.json · Req 9.8"])
+    REP["Read whether private vulnerability<br/>reporting is on, anonymously;<br/>a rate-limited read waits for the reset<br/>Req 9.2, 9.3 · Decision 10"]
+    ON{"Enabled?"}
+    LIVE["Read the live rulesets, anonymously;<br/>a rate-limited read waits for the reset;<br/>match each committed one by name<br/>Req 9.9 · Decision 10"]
+    CMP["Compare name, target, enforcement,<br/>conditions and rules, in both directions;<br/>bypass actors left out, anonymous reads<br/>withhold them · Req 9.9 · Decision 10"]
+    DIFF{"A difference, a committed ruleset<br/>with no live one, or an active live<br/>branch ruleset not committed?"}
+    DIS(["The run fails: reporting disabled<br/>or unreadable, named · Req 9.3"])
+    RED(["The run fails, each ruleset<br/>failure named · Req 9.9"])
+    OK(["Summary: reporting enabled, n rulesets<br/>compared, 0 differences, 0 live-only;<br/>the step passes when both hold"])
+    IN --> REP & LIVE
+    REP --> ON
+    RS --> CMP
+    LIVE --> CMP --> DIFF
+    ON -->|yes| OK
+    DIFF -->|no| OK
+    ON -.->|no| DIS
+    REP -.->|unreadable, or still rate limited| DIS
+    LIVE -.->|unreadable, or still rate limited| RED
+    DIFF -.->|yes| RED
+```
+
+The two reads do not depend on each other: a failed or disabled first read does not stop the second, and the step names every failure of the day. A rate-limited read waits for the reset GitHub names (at most 3900 seconds, twice per read) and is made again, still anonymously; a read that stays limited, or fails for any other reason, fails the run, named "unreadable".
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| The trigger | [`rescan.yml`](../.github/workflows/rescan.yml), step "posture invariants (Req 9.3, 9.7, 9.9)", `if: always()` | [the daily rescan and triage](#the-daily-rescan-and-triage) | Decision 6, the D1 correction: placed last so it never starves the issues and status |
+| The committed export | [`.github/rulesets/main_sec.json`](../.github/rulesets/main_sec.json), GitHub's own export format; no workflow step checks which checks it requires, a person keeps it in line | [branch protection](user-manual.md#branch-protection) | Req 9.8; Decision 10 |
+| Private reporting | the same step; [`check-governance.sh`](../scripts/check-governance.sh), the read of `private-vulnerability-reporting` | [SECURITY.md, reporting a vulnerability](../SECURITY.md#reporting-a-vulnerability) | Req 9.2, 9.3; Decision 10 |
+| Live rulesets and the comparison | the same step and script, the reads of `rulesets` and of each matched ruleset by id; its tests: [`validate.yml`](../.github/workflows/validate.yml), step "check-governance unit tests (Req 9.3, 9.9)" | [branch protection](user-manual.md#branch-protection), [SECURITY.md, governance](../SECURITY.md#governance-one-maintainer-the-bypass-kept-in-force) | Req 9.9; Decision 10: bypass actors are carried by the export and stated in SECURITY.md instead |
+| The rate-limit wait | the same script, `DHC_GOVERNANCE_MAX_WAIT` (3900 seconds by default) | [branch protection](user-manual.md#branch-protection) | Req 9.9 says "through anonymous reads", so the token is not used as a fallback; on such a day the rescan can take about an hour longer |
+| The summary line | `rescan.yml`, step "summary", the line "governance:" | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.3, 9.9 |
+
+### A revocation, by hand
+
+A revocation is the owner's decision that a published digest must not be pulled any more. The registry (GHCR) has no way to delete one tag: a tag goes either with its whole package version or when another image is pushed under it. So there are two moves, and both end in one entry in [`triage/revocations.yaml`](../triage/revocations.yaml).
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    DEC(["The owner decides a published digest<br/>must not be pulled · register row M14"])
+    CAN{"Can a fixed definition ship?"}
+    MA["Move A: fix the definition by pull request;<br/>the release moves its three tags<br/>to the new digest · Req 2.7 to 2.9"]
+    MB["Move B1: the owner deletes<br/>the package version, and every<br/>tag on it goes too · Req 9.5 · Decision 10"]
+    ADV["Draft the advisory, a GitHub repository<br/>security advisory · Req 9.4 · Decision 10"]
+    ENT["Add one entry by pull request: replaced,<br/>or withdrawn with the move taken;<br/>nothing is ever removed · Req 9.5 · Decision 10"]
+    SCH["validate: the record fits its schema<br/>Req 9.6"]
+    DONE(["Entry merged, advisory published;<br/>the daily rescan checks it from now on"])
+    SFAIL(["validate fails, naming the entry and the field<br/>Req 9.6"])
+    DEC --> CAN
+    CAN -->|yes| MA --> ADV
+    CAN -->|no| MB --> ADV
+    ADV --> ENT --> SCH --> DONE
+    SCH -.->|does not fit| SFAIL
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| The decision | by hand, the owner | [revoke a digest](user-manual.md#revoke-a-digest), [what GHCR can and cannot do](user-manual.md#what-ghcr-can-and-cannot-do) | Req 9.5; the manual-controls register in [CONVENTIONS.md](CONVENTIONS.md), row M14 |
+| Move A | the [release](#the-release): `build.yml`, step "apply definition-derived tags" | [move A](user-manual.md#move-a-replacement-through-the-release-path) | Req 2.7 to 2.9: the revoked digest is left untagged, which is frozen (Req 2.11) |
+| Move B1 | by hand: `gh api -X DELETE` on the package version; GitHub refuses it for a public version past 5,000 downloads | [move B](user-manual.md#move-b-withdrawal-nothing-replaces-it) | Req 9.5; Decision 10. Move B2, parking the tags on a signed "tombstone" image, is described in the manual and not built |
+| The advisory | by hand, on the repository's Security tab | [then, whichever move](user-manual.md#then-whichever-move), [SECURITY.md, advisories](../SECURITY.md#advisories) | Req 9.4; Decision 10 |
+| The entry | a pull request to `triage/revocations.yaml` | [SECURITY.md, revocation](../SECURITY.md#revocation) | Req 9.5; Decision 10: the record drives the mechanics, so the runbook stays short |
+| The schema | `validate.yml`, step "revocation record (Req 9.6)": `yamale` against [`revocations.schema.yaml`](../triage/revocations.schema.yaml) | [then, whichever move](user-manual.md#then-whichever-move) | Req 9.6 |
+
+### The daily revocation check
+
+The rescan reads the record twice. The invariants step reads it into the list the status issue shows, and ignores the verdict there; the posture step, last, reads it again and gives the verdict, so a revocation that was only half done fails the run after the day's issues and status are out, not instead of them.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    REC(["The merged record<br/>triage/revocations.yaml · Req 9.5"])
+    ENUM(["Today's enumeration: every catalogue tag,<br/>its digest and platform manifests · Req 2.22"])
+    READ["invariants step: read the record<br/>into the status list, verdict ignored<br/>Req 9.5 · Decision 10"]
+    LIST(["The status issue lists every entry<br/>Req 6.46"])
+    HAS{"Enumeration present?"}
+    VERD["posture step: match every recorded digest<br/>against each tag's index and platform manifests<br/>Req 9.7 · Decision 10"]
+    REF{"A tag still on a revoked digest?"}
+    OK(["Summary: n recorded,<br/>0 still referenced"])
+    TAGRED(["The run fails, one line per tag: the digest,<br/>the platform, the date, the advisory · Req 9.7"])
+    NOENUM(["The run fails by name:<br/>the verdict not asserted today · Req 9.7"])
+    UNREAD(["Record unreadable or no list:<br/>the run fails by name"])
+    ENUM --> READ --> LIST
+    REC --> READ
+    ENUM --> HAS
+    HAS -->|yes| VERD --> REF
+    REC --> VERD
+    REF -->|no| OK
+    REF -.->|yes| TAGRED
+    HAS -.->|no| NOENUM
+    VERD -.-> UNREAD
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| The enumeration | `rescan.yml`, step "enumerate the catalogue (Req 2.22)" | [the daily rescan and triage](#scan-attest-and-the-issue-lifecycle) | Req 2.22; Decision 6 |
+| The status list | `rescan.yml`, step "invariants (Req 2.21, 2.24, 6.44, 6.51)", [`check-revocations.sh`](../scripts/check-revocations.sh) with `\|\| true`; then step "catalogue status, the clocks over the supported set (Req 6.46)", which publishes no status when the list is missing | [the catalogue status issue](user-manual.md#the-catalogue-status-issue) | Req 9.5, 6.46; Decision 10 |
+| The verdict | `rescan.yml`, step "posture invariants (Req 9.3, 9.7, 9.9)", `check-revocations.sh` again; its tests: `validate.yml`, step "check-revocations unit tests (Req 9.5 to 9.7)" | [revoke a digest](user-manual.md#revoke-a-digest) | Req 9.7; Decision 10, as built: in the posture step rather than the invariants step |
+| The summary line | `rescan.yml`, step "summary", the line "revocations:" | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.7 |
