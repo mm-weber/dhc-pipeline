@@ -20,7 +20,7 @@ flowchart LR
     D --> GOV(["Posture: rulesets, reporting,<br/>revocations · Req 9"])
     T --> C(["Consumer: verify recipe,<br/>Kyverno policy · Req 2.23, 2.25"])
     classDef drawn fill:#d7ecff,stroke:#1f6feb,stroke-width:2px
-    class U,P drawn
+    class U,G,P drawn
 ```
 
 ## Upstream tracking
@@ -141,6 +141,325 @@ flowchart TB
 | From-source automerge | `renovate.json5`, the rule `matchDatasources: ["github-tags"]` with `matchUpdateTypes: ["patch", "digest"]`; the later rule `matchManagers: ["github-actions"]` takes Actions back out | [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.5; Decision 2: Actions are third-party code holding the workflow's token (review D4) |
 | Chart digest automerge | `renovate.json5`, the rule over `ghcr.io/mm-weber/dhc/**` with `matchUpdateTypes: ["digest"]`, ordered before the build-layer rule | [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.12; Decision 8 (c) |
 | Reviewed | `renovate.json5`, `automerge: false` on grafana, the helm datasource, the build layer and the Actions manager; no automerge rule reaches the rest | [handling Renovate PRs](user-manual.md#handling-renovate-prs) | Req 3.11; Decision 2: a repackage bump swaps a binary this repository did not build |
+
+## The pull-request gate
+
+This lane decides whether a change may reach `main`. Every pull request starts it, whether a person or Renovate opened it, and so does every push to an open pull request. Four workflows run side by side: `validate` checks conventions and declared values and runs every test suite, `build` builds and scans each definition the change touches, `chart` renders every chart and checks it against the Kyverno policies, and `e2e` installs each touched chart on a throwaway Kubernetes cluster. It produces no image and no tag: its result is five check results, and the branch ruleset admits the merge only when all five are green. The merge then starts the [release](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) on `main`. Two step names in `build.yml` contain a long dash; the tables below print it as a colon.
+
+### What must be green
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    PR(["A pull request opened or updated,<br/>by a person or by Renovate"])
+    V["validate.yml, two jobs<br/>conventions, declared values, every test suite<br/>Req 1, 5.8 to 5.10, 7 · Decision 1"]
+    B["build.yml<br/>one build and scan per affected definition<br/>Req 1.14, 6.1 · Decision 5"]
+    C["chart.yml<br/>every chart rendered and checked by Kyverno<br/>Req 4.6 · Decision 4"]
+    E["e2e.yml<br/>one kind cluster per affected chart<br/>Req 5.2 · Decision 11"]
+    REQ{"All five required checks green?<br/>the two validate jobs, build gate,<br/>render + policy gate, e2e gate · Req 9.8"}
+    OK(["Mergeable; the merge starts the release"])
+    RED(["Blocked; the red check names its cause<br/>Req 7.4"])
+    PR --> V & B & C & E
+    V & B & C & E --> REQ
+    REQ -->|yes| OK
+    REQ -.->|no| RED
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| The four workflows | [`validate.yml`](../.github/workflows/validate.yml), [`build.yml`](../.github/workflows/build.yml), [`chart.yml`](../.github/workflows/chart.yml), [`e2e.yml`](../.github/workflows/e2e.yml), each `on: pull_request` | [the six workflows](user-manual.md#the-six-workflows) | Req 7.2, 7.4 |
+| The required checks | [`.github/rulesets/main_sec.json`](../.github/rulesets/main_sec.json), `required_status_checks`: the job names "yamllint, pin lint, policy tests", "go modules (e2e + rescan tool)", "build gate", "render + policy gate", "e2e gate" | [branch protection](user-manual.md#branch-protection) | Req 9.8: a matrix leg has a name per image, so only the fan-in jobs can be required |
+
+### validate: the declared values
+
+These steps hold the repository to what `catalogue-policy.yaml` declares. Each fails naming the value, file or entry that differs.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart LR
+    SET[/"active_set<br/>Req 1.13"/]
+    PRF[/"proofs<br/>Req 5.9"/]
+    VER[/"verification<br/>Req 7.8"/]
+    WFS[/"workflows<br/>Req 7.10"/]
+    REL[/"release<br/>Req 7.7"/]
+    TRI[/"triage<br/>Req 6.49"/]
+    AS["Active set well formed, no group split;<br/>the pull request touches no inactive definition<br/>and no chart deploying none<br/>Req 1.16, 1.18, 1.19 · Decision 11"]
+    TS["Renovate's rendered tracking scope<br/>equals a fresh render<br/>Req 1.14 · Decision 11"]
+    PB["Every active definition has a chart probe<br/>or a proof of kind none with a reason<br/>Req 5.8 to 5.10 · Decision 14"]
+    VR["The Kyverno policies and README block<br/>equal a fresh render<br/>Req 7.8, 7.9 · Decision 6"]
+    WP["Every cron, permissions block and<br/>dispatch input equals the declaration<br/>Req 7.10 · Decision 6"]
+    RW["Release switches well formed<br/>Req 2.13, 2.14, 2.17, 7.7"]
+    AR["Accepted-risk files complete, no expiry<br/>past the largest ceiling, no ignore file elsewhere<br/>Req 6.11, 6.12 · Decision 7"]
+    FAIL(["validate fails, naming the value or entry"])
+    SET --> AS
+    SET --> TS
+    SET --> PB
+    PRF --> PB
+    VER --> VR
+    WFS --> WP
+    REL --> RW
+    TRI --> AR
+    AS -.->|refused| FAIL
+    TS -.->|differs| FAIL
+    PB -.->|differs| FAIL
+    VR -.->|differs| FAIL
+    WP -.->|differs| FAIL
+    RW -.->|refused| FAIL
+    AR -.->|refused| FAIL
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Active set | `validate.yml`, step "active-set coherence and scope (Req 1.16, 1.18, 1.19)"; [`lint-active-set.sh`](../scripts/lint-active-set.sh) with `--changed`, the files the pull request changes against its base | [deactivate a definition](user-manual.md#deactivate-a-definition) | Req 1.16, 1.18, 1.19; Decision 11 |
+| Tracking scope | `validate.yml`, step "tracking scope rendering drift check (Req 1.14)"; [`render-tracking.sh --check`](../scripts/render-tracking.sh) | [Renovate managers](user-manual.md#renovate-managers) | Req 1.14; Decision 11 |
+| Functional proofs | `validate.yml`, step "every active definition declares a functional proof (Req 5.8 to 5.10)"; [`lint-probes.sh`](../scripts/lint-probes.sh), which also prints each kind none entry by name | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.8 to 5.10; Decision 14 |
+| Verification renderings | `validate.yml`, step "verification renderings drift check (Req 7.8, 7.9)"; [`render-verification.sh --check`](../scripts/render-verification.sh) | [policies](user-manual.md#policies) | Req 7.8, 7.9; Decision 6 |
+| Workflow values | `validate.yml`, step "workflow schedule + permissions vs policy file (Req 7.10)"; [`lint-workflow-policy.sh`](../scripts/lint-workflow-policy.sh) | [crons and cadence](user-manual.md#crons-and-cadence) | Req 7.10; Decision 6 |
+| Release switches | `validate.yml`, step "release switches well-formed (Req 2.13, 2.14, 2.17, 7.7)"; [`release-policy.sh check`](../scripts/release-policy.sh), the reader `build.yml` uses too | [the release path](user-manual.md#the-release-path-merge-to-main-the-nightly-or-a-dispatch) | Req 7.7; review D3: a misspelt value is refused, not read as the fail-open branch |
+| Accepted-risk lint | `validate.yml`, step "accepted-risk lint for the risk treatment lane (Req 6.11, 6.12)"; [`lint-accepted-risk.sh`](../scripts/lint-accepted-risk.sh) | [writing an accepted-risk exception](user-manual.md#writing-an-accepted-risk-exception) | Req 6.11, 6.12; Decision 7 |
+
+### validate: conventions and suites
+
+The rest of `validate` reads no policy value. It runs in two jobs, and each is one required check.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    PR(["A pull request"])
+    J1["job: yamllint, pin lint, policy tests<br/>a required check · Req 9.8"]
+    Y["yamllint · Req 7.2"]
+    CP["Chart pins and compat decisions:<br/>shape and review-by date<br/>Req 4.5, 4.8 · Decision 8"]
+    PL["Definition lint: digest pins, checksums,<br/>authenticity class, package repositories<br/>Req 1.3, 1.6, 1.10 to 1.12, 7.4 · Decision 8"]
+    AC["Runtime account uid 65532 · Req 1.4"]
+    KT["Kyverno policy self-tests · Req 4.6"]
+    VX["VEX product identity and LOG citations<br/>Req 6.17, 6.19, 6.20, 9.18"]
+    RC["Records: revocations schema, links and<br/>anchors, live-evidence ledger<br/>Req 9.6, 9.20, 7.11"]
+    SL["Workflow step conditions: rescan steps<br/>always run, release steps stop on a failed scan<br/>Req 2.26 · review D1"]
+    UT["Every script's unit tests, the provenance<br/>scripts against the real tools, and every<br/>script has a suite that runs · Req 7.4"]
+    RN["Renovate config and manager fixtures<br/>Req 3.2 · Decision 2"]
+    J2["job: go modules (e2e + rescan tool)<br/>a required check · Req 9.8"]
+    GO["gofmt, go mod tidy, go vet, go build, go test<br/>for the e2e suite and the rescan tool<br/>Req 5.1, 5.5"]
+    GREEN(["Two required checks green"])
+    FAIL(["The job fails, the step naming the<br/>file, line or convention · Req 7.4"])
+    PR --> J1 --> Y --> CP --> PL --> AC --> KT --> VX --> RC --> SL --> UT --> RN --> GREEN
+    PR --> J2 --> GO --> GREEN
+    J1 -.->|any step fails| FAIL
+    J2 -.->|any step fails| FAIL
+```
+
+The boxes group the job's steps by subject; in the workflow they run in a slightly different order, the declared-value checks above among them.
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| yamllint | `validate.yml`, step "yamllint (Req 7.2)", over every YAML file, not only changed ones | [validate, the lint battery](user-manual.md#validate--the-lint-battery) | Req 7.2 |
+| Chart pins and compat | `validate.yml`, step "chart pins and compat decisions (Req 4.5, 4.8)"; `yamale` and [`lint-compat.sh`](../scripts/lint-compat.sh) | [adapt a chart](user-manual.md#adapt-a-chart) | Req 4.5, 4.8; Decision 8 |
+| Definition lint | `validate.yml`, step "pin + definition lint against docs/CONVENTIONS.md (Req 1.6, 7.2, 7.4)"; [`lint-pins.sh`](../scripts/lint-pins.sh) | [validate, the lint battery](user-manual.md#validate--the-lint-battery), [CONVENTIONS.md](CONVENTIONS.md) | Req 1.3, 1.6, 1.10 to 1.12, 7.4; Decision 8. The schema half of Req 7.2 is the frontend compiling the definition in `build.yml` (Decision 1) |
+| Runtime account | `validate.yml`, step "runtime account lint (Req 1.4)"; [`lint-accounts.sh`](../scripts/lint-accounts.sh) | [add an image definition](user-manual.md#add-an-image-definition) | Req 1.4 |
+| Kyverno self-tests | `validate.yml`, step "kyverno policy tests (Req 4.6 gate self-test)" | [policies](user-manual.md#policies) | Req 4.6 |
+| VEX lints | `validate.yml`, steps "VEX product identity lint (Req 6.17, 6.19, 6.20)" and "VEX statement LOG citations (Req 9.18)"; [`lint-vex-product.sh`](../scripts/lint-vex-product.sh), [`lint-log-anchors.sh`](../scripts/lint-log-anchors.sh) | [writing a VEX statement](user-manual.md#writing-a-vex-statement) | Req 6.17, 6.19, 6.20, 9.18 |
+| Records | `validate.yml`, steps "revocation record (Req 9.6)", "relative links and heading anchors resolve (Req 9.20)", "live-evidence ledger covers every criterion (Req 7.11)" | [revoke a digest](user-manual.md#revoke-a-digest), [validate, the lint battery](user-manual.md#validate--the-lint-battery), [live-evidence.md](live-evidence.md) | Req 9.6, 9.20, 7.11 |
+| Step conditions | `validate.yml`, steps "rescan steps run regardless of earlier failures (D1)" and "release steps stay stopped by a failed scan (Req 2.26)" | [reading job summaries](user-manual.md#reading-job-summaries) | Req 2.26; review D1 of 2026-09-09 |
+| Suites | `validate.yml`, one step per `scripts/*_test.sh`, then "install the pinned crane and cosign for the real-tool suite (Req 7.5)", "provenance scripts against the real crane and cosign (Req 2.27, 2.28)" and "every script has a test suite, and every suite runs here" | [scripts](user-manual.md#scripts) | Req 7.4; review D7: a suite that never runs in CI proves nothing |
+| Renovate fixtures | `validate.yml`, step "renovate config + manager fixtures" | [Renovate managers](user-manual.md#renovate-managers) | Req 3.2; Decision 2 |
+| Go modules | `validate.yml`, job "go modules (e2e + rescan tool)": steps "gofmt", "go.mod and go.sum are what go mod tidy would write", "go vet", "go build (compiles suite + helpers)", "helper unit tests", and the four "rescan tool" steps | [validate, the lint battery](user-manual.md#validate--the-lint-battery) | Req 5.1; Req 5.5 and 5.8 through `TestProbeDeclarations`, every declared probe registered |
+
+### build: which definitions
+
+`build.yml` first works out which definitions the pull request touches, and builds only those. The `changes` job does this; the `build gate` job at the end is the one check branch protection can require.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    SET[/"active_set<br/>Req 1.13"/]
+    PR(["A pull request, diffed against its base"])
+    K{"Which paths changed?<br/>every rule that matches adds"}
+    D1["A definition file under image/:<br/>that definition"]
+    D2["triage/vex/: the definitions publishing each<br/>product a changed statement names,<br/>before and after the change · Req 6.4"]
+    D3["An image's file in triage/accepted-risk/:<br/>that image · Req 6.9"]
+    D4["build.yml itself: hardened-app as a canary,<br/>else the first active definition"]
+    FIL["Keep only active definitions;<br/>each one dropped is named in the log<br/>Req 1.14, 1.15 · Decision 11"]
+    ANY{"Any left?"}
+    LEG(["One build leg per definition,<br/>drawn in the next two graphs"])
+    NONE(["No leg runs"])
+    GATE{"build gate: detection succeeded,<br/>and every leg passed or none ran?"}
+    GREEN(["build gate green"])
+    RED(["build gate red"])
+    PR --> K
+    K --> D1 & D2 & D3 & D4
+    D1 & D2 & D3 & D4 --> FIL
+    SET --> FIL
+    FIL --> ANY
+    ANY -->|yes| LEG
+    ANY -->|no| NONE
+    LEG --> GATE
+    NONE --> GATE
+    GATE -->|yes| GREEN
+    GATE -.->|no| RED
+    FIL -.->|active set unreadable| RED
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Which paths changed | [`build.yml`](../.github/workflows/build.yml), job "affected definitions", its one step (`id: detect`, no `name:`), the `pull_request` branch | [build, the scan gate](user-manual.md#build--the-scan-gate), item 1 | Req 6.4, 6.9: a statement or exception change re-proves itself on the images it names |
+| Keep only active ones | the same step, after the branches; `active_definitions` in [`definition-lib.sh`](../scripts/definition-lib.sh) | [deactivate a definition](user-manual.md#deactivate-a-definition) | Req 1.14, 1.15; Decision 11. `validate` fails such a pull request separately (Req 1.16) |
+| The fan-in | `build.yml`, job "build gate", its one step (no `name:`) | [branch protection](user-manual.md#branch-protection) | Req 9.8: "skipped" passes only when detection itself succeeded |
+
+### build: one definition on a pull request
+
+Each leg builds one definition for linux/amd64 only and loads it into the runner's Docker daemon. Nothing reaches the catalogue registry: the only push goes to a registry that lives on the runner for the length of the job.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    NS[/"verification.registry,<br/>release.platforms · Req 7.7"/]
+    LEG(["One leg, one definition"])
+    META["Read the definition: its image inside the<br/>declared namespace, every platform admitted<br/>Req 2.1, 2.2, 7.7 · Decision 11"]
+    ARCH["Verify every per-architecture checksum<br/>against the bytes upstream serves · Req 1.3"]
+    BLD["Build linux/amd64 through the<br/>dhi.io/build frontend, load, no push<br/>Req 7.2 · Decision 1, ADR 0001"]
+    LR["Push to a throwaway registry on the runner,<br/>so the image has a digest VEX can match<br/>Req 6.29"]
+    NEXT(["An image with a digest,<br/>scanned in the next graph"])
+    STOP(["Leg red, the cause named"])
+    LEG --> META
+    NS --> META
+    META --> ARCH --> BLD --> LR --> NEXT
+    META -.->|outside the namespace,<br/>a platform not admitted| STOP
+    ARCH -.->|checksum differs| STOP
+    BLD -.->|does not compile| STOP
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Read the definition | [`build.yml`](../.github/workflows/build.yml), job "build ${{ matrix.name }}", the step `id: meta` (no `name:`); [`release-policy.sh`](../scripts/release-policy.sh) | [build, the scan gate](user-manual.md#build--the-scan-gate), item 3 | Req 2.1, 2.2, 7.7; Decision 11. It runs on every event, so a pull request is refused the same way a release would be |
+| Build | `build.yml`, the step `id: build` (no `name:`), `docker/build-push-action` with `platforms: linux/amd64` and `load: true` on a pull request | [anatomy of a DHI definition](user-manual.md#anatomy-of-a-dhi-definition) | Req 7.2 (the frontend is the schema check); Decision 1, [ADR 0001](decisions/0001-build-layer.md) |
+| Local registry | `build.yml`, step "local registry: give the image an identity VEX can match" | [build, the scan gate](user-manual.md#build--the-scan-gate), item 4 | Req 6.29; Trivy builds the product identifier from the digest a push mints (upstream trivy#9399) |
+
+### build: the scan and the decision
+
+Only the last step fails the leg on a finding; the one before it fails on an exception that outlives its ceiling. An expired exception covers nothing, so its finding counts. Two earlier steps are evidence: when they fail, the step shows red and the leg goes on.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    AP[/"triage.aperture<br/>CRITICAL, HIGH · Req 6.49"/]
+    CO[/"consumers: trivy authoritative,<br/>grype informational · Req 9.11"/]
+    CE[/"triage ceilings, kev_ceiling,<br/>kev_feed · Req 6.49"/]
+    IMG(["The image from the graph above"])
+    SC["Compile VEX for its digest, then one<br/>Trivy scan with it and the accepted-risk file<br/>Req 6.1, 6.28 to 6.30 · Decision 5"]
+    PT["VEX portability: Grype reads the same image<br/>Req 9.12 · Decision 10"]
+    GV["govulncheck over every Go binary<br/>Req 6.13"]
+    EV(["Step red, the leg goes on:<br/>evidence, not a gate"])
+    CR{"An uncovered CRITICAL?"}
+    GR["Grype second opinion, informational<br/>a convention, its criterion retired"]
+    TI["Exception tiers: each exception within<br/>its severity or KEV ceiling<br/>Req 6.50, 6.59 · Decision 7"]
+    GA{"Anything uncovered<br/>within the aperture?<br/>Req 6.1, 6.9"}
+    OK(["Leg green; scan reports uploaded"])
+    RED(["Leg red, each finding named with<br/>the four ways out; reports uploaded · Req 6.1"])
+    STOP(["Leg red, the cause named"])
+    IMG --> SC
+    AP --> SC
+    SC --> PT --> GV --> CR
+    CO --> PT
+    PT -.->|a consumer failed| EV
+    GV -.->|a tool or a binary gave no output| EV
+    CR -->|yes| GR --> TI
+    CR -->|no| TI
+    CE --> TI
+    TI --> GA
+    GA -->|no| OK
+    GA -.->|yes| RED
+    SC -.->|no report| STOP
+    TI -.->|KEV feed unavailable,<br/>or a ceiling breached| STOP
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Compile and scan | `build.yml`, step "Trivy scan (VEX + accepted risk)"; [`compile-vex.sh`](../scripts/compile-vex.sh), [`scan-image.sh`](../scripts/scan-image.sh), the same script the release scan uses | [writing a VEX statement](user-manual.md#writing-a-vex-statement), [reading job summaries](user-manual.md#reading-job-summaries) | Req 6.1, 6.26 to 6.30; Decision 5, [ADR 0003](decisions/0003-one-openvex-document-per-digest.md) |
+| VEX portability | `build.yml`, step "VEX portability (Req 9.12)", `continue-on-error: true`; [`vex-consumer.sh`](../scripts/vex-consumer.sh), [`vex-portability.sh`](../scripts/vex-portability.sh) | [reading job summaries](user-manual.md#reading-job-summaries) | Req 9.11, 9.12; Decision 10: `consumers.gating` is off, so a divergence is reported, never failed |
+| govulncheck | `build.yml`, step "govulncheck reachability (Req 6.13)", `continue-on-error: true`; [`govulncheck-report.sh`](../scripts/govulncheck-report.sh) | [reachability evidence](user-manual.md#reachability-evidence-govulncheck) | Req 6.13; review D3: a tool that gave no output fails the step by name |
+| Grype | `build.yml`, step "Grype second opinion (CRITICAL present)", run only when Trivy left a CRITICAL uncovered | [build, the scan gate](user-manual.md#build--the-scan-gate), item 7 | A convention: its criterion, Req 6.6, is retired |
+| Exception tiers | `build.yml`, step "exception tiers against KEV (Req 6.50)"; [`check-exceptions.sh gate`](../scripts/check-exceptions.sh) with the KEV feed fetched fresh | [writing an accepted-risk exception](user-manual.md#writing-an-accepted-risk-exception) | Req 6.50, 6.59; Decision 7: an unavailable feed fails closed, by name |
+| The scan gate | `build.yml`, step "Scan gate: fail on uncovered findings within the aperture" | [clearing a red gate](user-manual.md#clearing-a-red-gate--the-four-treatments) | Req 6.1, 6.9 (Trivy drops an expired ignore entry, so its finding counts); Decision 5 |
+| Reports | `build.yml`, step "upload scan reports", `if: always()` | [reading job summaries](user-manual.md#reading-job-summaries) | Req 6.26, 6.27: the summary names what each exception suppressed |
+
+### chart: every chart, every time
+
+`chart.yml` does not ask what changed: every directory under `chart/` is rendered and checked on every pull request. Installing a chart on a cluster is the next graph's job.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    NS[/"verification.registry<br/>rendered into restrict-registries · Req 7.8"/]
+    PR(["A pull request"])
+    TL["Install helm, ct and kyverno,<br/>each pinned and checksum-verified · Req 7.5"]
+    RD["Render each chart: an owned chart from its<br/>own directory, an adapted one from its pinned<br/>upstream plus the overlay · Req 4.1, 4.2 · Decision 4"]
+    KY["Kyverno: digest pinned, allowed registry,<br/>non-root · Req 4.6 · Decision 4"]
+    OW{"An owned chart,<br/>with a Chart.yaml?"}
+    CT["ct lint<br/>no criterion of its own"]
+    OK(["render + policy gate green"])
+    RED(["render + policy gate red,<br/>the chart and the rule named"])
+    PR --> TL --> RD --> KY --> OW
+    NS --> KY
+    OW -->|yes| CT --> OK
+    OW -->|no| OK
+    RD -.->|does not render| RED
+    KY -.->|a policy rejects| RED
+    CT -.->|fails| RED
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Tools | [`chart.yml`](../.github/workflows/chart.yml), job "render + policy gate", step "install helm + ct + kyverno"; [`install-tool.sh`](../scripts/install-tool.sh) | [the six workflows](user-manual.md#the-six-workflows) | Req 7.5 |
+| Render and check | `chart.yml`, step "render every chart and gate with kyverno (Req 4.6)"; [`render-chart.sh`](../scripts/render-chart.sh), the three policies `require-image-digest`, `restrict-registries`, `require-nonroot` under [`policies/`](../policies/) | [chart, render + policy gate](user-manual.md#chart--render--policy-gate) | Req 4.1, 4.2, 4.6; Decision 4 |
+| ct lint | `chart.yml`, step "ct lint owned charts" | [chart, render + policy gate](user-manual.md#chart--render--policy-gate) | No criterion of its own: the chart-testing tool's lint, for the charts this repository owns |
+
+### e2e: the touched charts on a real cluster
+
+`e2e.yml` installs each touched chart on a fresh kind cluster (Kubernetes running inside Docker on the runner). The pods pull the catalogue images the chart pins, which are published digests: a pull request that changes a definition tests its chart with the image already released, and the new image is tested when the chart-pin bump after its release comes through this lane.
+
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    SET[/"active_set, through each chart's<br/>deploys: list · Req 1.13"/]
+    PR(["A pull request, diffed against its base"])
+    AF["Affected components: a chart whose directory<br/>changed, or that deploys an active definition<br/>that changed; a harness change adds the<br/>simplest one · Req 1.14, 5.2 · Decision 11"]
+    ANY{"Any?"}
+    NONE(["No leg runs"])
+    KC["A kind cluster, its nodes given<br/>ghcr pull credentials · Req 5.1, 5.2"]
+    IS["Runner image store checked, the probe<br/>image loaded by digest · Req 5.5"]
+    UP{"A bump: the chart version or the<br/>deployed values file changed? · Req 5.6"}
+    IN["Install the proposed chart"]
+    UG["Install the base state, upgrade to<br/>the proposed one, wait for the rollout<br/>Req 5.6"]
+    AS["Pods Ready within five minutes; restricted<br/>securityContext on live pods; the chart's probe,<br/>once · Req 5.3 to 5.5 · Decision 14"]
+    OK(["Leg green"])
+    DG(["Leg red; diagnostics uploaded · Req 5.7"])
+    GATE{"e2e gate: detection succeeded,<br/>and every leg passed or none ran?"}
+    GREEN(["e2e gate green"])
+    RED(["e2e gate red"])
+    SET --> AF
+    PR --> AF --> ANY
+    ANY -->|no| NONE
+    ANY -->|yes, one leg each| KC --> IS --> UP
+    UP -->|no| IN --> AS
+    UP -->|yes| UG --> AS
+    AS --> OK
+    AS -.->|an assertion fails| DG
+    IS -.->|containerd image store| DG
+    OK --> GATE
+    DG --> GATE
+    NONE --> GATE
+    GATE -->|yes| GREEN
+    GATE -.->|no| RED
+```
+
+| Step | Runs in | Explained in | Rests on |
+|---|---|---|---|
+| Affected components | [`e2e.yml`](../.github/workflows/e2e.yml), job "affected components", its one step (`id: detect`, no `name:`); `active_components` in [`definition-lib.sh`](../scripts/definition-lib.sh) | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 1.14, 5.2; Decision 11: a definition reaches its chart through `deploys:`, never a name prefix |
+| Cluster | `e2e.yml`, job "e2e ${{ matrix.component }}", steps "install helm + kind", "create kind cluster", "give kind nodes ghcr pull credentials" | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.1, 5.2: the charts pin the index digest, which a loaded image cannot match |
+| Image store and probe image | `e2e.yml`, steps "runner image and image store (kind issue 3795)", [`check-runner-image-store.sh`](../scripts/check-runner-image-store.sh), and "load probe image into kind" | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.5 (the probe's image); the job is pinned to `ubuntu-24.04` until kind can load from the containerd store |
+| Bump or not | `e2e.yml`, step "compute upgrade-from on a bump" | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.6 |
+| The suite | `e2e.yml`, step "run e2e suite", `go test ./e2e/` with `DHC_E2E=1`; the Ginkgo specs under [`test/e2e/`](../test/e2e/) | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.3 to 5.6; Decision 14: one probe per chart, standing for every definition it deploys |
+| Diagnostics | `e2e.yml`, steps "collect diagnostics on failure", "upload diagnostics", then "delete kind cluster" | [e2e, the kind suite](user-manual.md#e2e--the-kind-suite) | Req 5.7 |
+| The fan-in | `e2e.yml`, job "e2e gate", its one step (no `name:`) | [branch protection](user-manual.md#branch-protection) | Req 9.8 |
 
 ## SLSA provenance
 
