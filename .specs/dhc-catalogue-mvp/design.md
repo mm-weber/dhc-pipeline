@@ -1190,7 +1190,7 @@ graph TB
       | Requirements, decisions, tasks; ADRs | `.specs/dhc-catalogue-mvp/`; `docs/decisions/` | |
       | Evidence; the record of decisions | `docs/live-evidence.md`; `triage/LOG.md` | |
       | The stack: why each tool | design.md, Technology Stack | `conductor/tech-stack.md` points to the install scripts for versions, which live there alone |
-      | How the repository got here | `docs/archive/` (the review rounds, the closed todo items, the working notes of `concepts.md`) | `data/` stays the owner's research drop (CLAUDE.md) |
+      | How the repository got here | `docs/archive/` (the review rounds, the todo list as it stood with its closed items, the working notes of `concepts.md`; `tasks/todo.md` keeps the open items) | `data/` stays the owner's research drop (CLAUDE.md) |
 
     - **Consequences**: three documents leave the tree (`operating-loop.md`, `concepts.md`,
       `revocation-runbook.md`) and about 115 links move with them, so the link check (Req 9.20)

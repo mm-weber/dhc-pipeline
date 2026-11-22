@@ -12,7 +12,7 @@
 #   S5  subject facts: branch, head commit, diff stat against main
 set -uo pipefail
 REQ=.specs/dhc-catalogue-mvp/requirements.md
-REVIEW=.specs/dhc-catalogue-mvp/reviews/2026-08-25-requirements-primitives-cross-review.md
+REVIEW=docs/archive/reviews/2026-08-25-requirements-primitives-cross-review.md
 SCRATCH="${SCRATCH:-$(mktemp -d)}"
 echo "scratch: $SCRATCH"
 

@@ -191,6 +191,6 @@ THE Repository SHALL declare in `catalogue-policy.yaml`'s release section one pr
 ## References
 
 - SLSA v1.2: `spec/build-track-basics.md` (Build L1, L2), `spec/build-requirements.md` (provenance-exists, provenance-authentic, hosted), `spec/verifying-artifacts.md` (steps 1 and 2), `spec/threats.md` (forge values of the provenance; tamper with provenance)
-- `.specs/dhc-catalogue-mvp/reviews/2026-08-21-cluster-a-independent-review.md` (the 2.10/2.23 note), `2026-08-21-cluster-a-revision-ledger.md` row 1.14, `2026-09-09-requirements-vs-implementation-review.md` finding 2.4 and the dispositions table
+- `docs/archive/reviews/2026-08-21-cluster-a-independent-review.md` (the 2.10/2.23 note), `2026-08-21-cluster-a-revision-ledger.md` row 1.14, `2026-09-09-requirements-vs-implementation-review.md` finding 2.4 and the dispositions table
 - `.github/workflows/build.yml` (`provenance: mode=max`, the sign and attest step), `scripts/render-verification.sh`, `scripts/consumer-smoke.sh`, `scripts/install-tool.sh` (the cosign v2 pin, ADR 0003), `catalogue-policy.yaml` `verification`
 - `data/docker_internal_build.md` (the substrate's catalogue images carry Build L3 provenance)
