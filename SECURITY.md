@@ -196,7 +196,8 @@ The record is [`triage/revocations.yaml`](triage/revocations.yaml): one entry
 per revoked digest with the digest, the reason, the replacement digest or a
 recorded absence of one (and then the move taken, version deletion or a
 tombstone), the advisory link and the date, schema-checked in CI. The runbook
-is [`docs/revocation-runbook.md`](docs/revocation-runbook.md); it names the
+is the user manual's section
+[Revoke a digest](docs/user-manual.md#revoke-a-digest); it names the
 moves GHCR actually has. The daily rescan fails by name while any catalogue
 tag still references a recorded digest, and the status issue lists every
 entry. No digest has been revoked.
@@ -216,7 +217,7 @@ issue on a mismatch.
 | hardened-app | `signed-commit` | the same, since v0.1.1 (2026-09-06) |
 | grafana | `cross-origin-checksum` | grafana.com's versions API and the dl.grafana.com sidecars state the same per-architecture checksum; grafana publishes no signature for its tarballs, so this is agreement of independent origins, not a signature |
 
-The trust-boundary table in [`docs/concepts.md`](docs/concepts.md#trust-boundary-who-owns-what-and-where-the-seams-are)
+The trust-boundary table in [`docs/user-manual.md`](docs/user-manual.md#trust-boundary-who-owns-what-and-where-the-seams-are)
 lists every other component with its owner class and its declared seam
 alternative.
 

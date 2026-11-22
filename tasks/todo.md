@@ -35,6 +35,11 @@ track (`conductor/tracks.md`).
       graphs in the Markdown, working notes to `docs/archive/`,
       overlapping documents merged into fewer, the SLSA lane drawn first.
       Seven pull requests by the plan; phase 0 is the track itself.
+- [ ] The comment on line 4 of `image/valkey-compat/image.yaml` still names
+      `docs/concepts.md`, merged into the manual's Part VI on 2026-11-22
+      ("The variant taxonomy"). Repoint it with that definition's next real
+      change: a change to a definition file alone rebuilds and republishes
+      its image.
 - [ ] The requirements checked against the code (the owner's call of
       2026-11-21): a track of its own, right after task group 19. A
       read-only review holds every criterion of

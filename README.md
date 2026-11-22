@@ -52,7 +52,7 @@ rests on.
 | `policies/` | Kyverno: the chart gate (digest pins, allowed registry, non-root) and the admission policy the daily proof applies (signature, SBOM and OpenVEX from the declared identities); two of the four are rendered from the policy file |
 | `scripts/` | Tested glue: pin lints, VEX compiler, scanner installs |
 | `.specs/` | EARS requirements, design, task ledger (the honest one — open gaps included) |
-| `docs/` | [User manual](docs/user-manual.md), conventions, ADRs, operating-loop evidence |
+| `docs/` | [User manual](docs/user-manual.md), conventions, ADRs, [the archive](docs/archive/README.md) (the operating-loop evidence among it) |
 
 ## Verify an image
 
@@ -118,10 +118,13 @@ that decays back to un-triaged on expiry. Every decision is a commit:
 
 ## Operating loop
 
-Self-hosted Renovate (≤6h cron) opens pinned, checksum-recomputed bump PRs;
+Self-hosted Renovate (at most every six hours by Req 3.1, configured every four
+hours in `catalogue-policy.yaml`) opens pinned, checksum-recomputed bump PRs;
 CI rebuilds, re-scans, and e2e-tests them; a daily rescan of published images
-opens issues with severity/EPSS/KEV. See
-[`docs/operating-loop.md`](docs/operating-loop.md) for a live trace.
+opens issues with severity/EPSS/KEV. See the manual's
+[Handling Renovate PRs](docs/user-manual.md#handling-renovate-prs), and
+[`docs/archive/operating-loop-2026-07-21.md`](docs/archive/operating-loop-2026-07-21.md)
+for a live trace of its first run.
 
 ## Security and trust
 
@@ -130,7 +133,7 @@ does not, the governance (one maintainer, the bypass kept in force), the
 reporting and advisory channels, the revocation record, each definition's
 upstream authenticity class, the transparency-log disclosure and the
 substrate terms. The trust-boundary table in
-[`docs/concepts.md`](docs/concepts.md#trust-boundary-who-owns-what-and-where-the-seams-are)
+[`docs/user-manual.md`](docs/user-manual.md#trust-boundary-who-owns-what-and-where-the-seams-are)
 lists every component with its owner class and declared seam alternative.
 
 ## License

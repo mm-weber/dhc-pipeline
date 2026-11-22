@@ -2,6 +2,8 @@
 
 How dhc-pipeline keeps its pins current, and the evidence it works end-to-end.
 
+> **Archived 2026-11-22** (documentation track, plan 4.1). This was `docs/operating-loop.md`, kept whole as written and not maintained: the evidence of the first live run of the Renovate loop, 2026-07-21. The loop itself is explained in the [user manual](../user-manual.md), "The two loops" and "Handling Renovate PRs". The gap under "Honest gaps" is closed: Req 3.4 was first exercised on 2026-09-10 ([live-evidence.md](../live-evidence.md)). Its history before this date is `git log --follow` on this file.
+
 ## The loop
 
 ```

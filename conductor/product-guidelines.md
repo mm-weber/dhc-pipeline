@@ -41,5 +41,5 @@ Exit 1 is a violation (the input was read and found wrong). Exit 2 is a refusal 
 
 ## Documentation style
 
-- `docs/user-manual.md` is the operator's reference; `docs/CONVENTIONS.md` is the rulebook the lints enforce; `docs/concepts.md` explains why.
+- `docs/user-manual.md` is the operator's reference, and its Part VI (Reference) explains why; `docs/CONVENTIONS.md` is the rulebook the lints enforce.
 - A doc states what is built, with the date, and never claims a mechanism that only exists in a plan.

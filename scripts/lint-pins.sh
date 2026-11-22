@@ -35,7 +35,7 @@ while IFS= read -r -d '' file; do
   # Keyed references: image:/base: always need a digest; uses: only when it
   # names a registry image (first path segment contains a dot). Bare actions
   # like go/build@v1 resolve inside the pinned frontend — nothing to fetch,
-  # nothing to pin (see docs/archive/concepts-working-notes.md, "Actions").
+  # nothing to pin (see docs/user-manual.md, "The frontend and its actions").
   while IFS=$'\t' read -r key line_no top ref; do
     # strip surrounding quotes and trailing comments
     ref="${ref%%[[:space:]]#*}"

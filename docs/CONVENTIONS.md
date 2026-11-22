@@ -144,10 +144,10 @@ One file per component at `image/<name>/image.yaml`. Rules, each with the
 gate that holds it (`scripts/lint-pins.sh` in validate unless another is
 named; a rule naming none is a convention held at review):
 
-- Line 1 is the frontend pin, **digest-pinned** — one step stricter than the
+- Line 1 is the frontend pin, **digest-pinned**, one step stricter than the
   upstream catalog (the frontend is the compiler AND the actions stdlib; its
   digest is their implementation hash; see
-  docs/archive/concepts-working-notes.md, "Actions"):
+  [the user manual, "The frontend and its actions"](user-manual.md#the-frontend-and-its-actions)):
 
   ```yaml
   # syntax=dhi.io/build:2-alpine3.22@sha256:<digest>
@@ -483,7 +483,7 @@ the step altogether.
 | M11 | Feed a grafana build id (`REFRESH_GRAFANA_BUILD_ID`) when no public index carries it yet | deliberate | The refresh refuses by name rather than guessing; the pin is still the sidecar checksum, so a wrong id can only refuse or verify | The `.deb` route (ADR 0002) makes the id unnecessary | none |
 | M12 | File an upstream issue from a draft under `triage/upstream/` and record its number (a transfer's tracker, Req 6.5) | deliberate | An outward-facing report carries the owner's name and measurements; it is reviewed like code before it is sent | none | none |
 | M13 | Re-decide a compat variant at its `review_by` date (`chart/<name>/chart.yaml` `compat:`, Req 4.8) | deliberate | A shell shipped for a chart's sake is a cost with an owner and an expiry; validate fails the day after the date until a dated re-decision lands | Whether compat is allowed at all | valkey: 2026-11-24 |
-| M14 | Revoke a digest: the entry in `triage/revocations.yaml`, the advisory, the replacement release or the version deletion (`docs/revocation-runbook.md`, Req 9.5) | deliberate | The record drives the mechanics; the decision that a digest must not be pulled is not one a rescan makes | none | none |
+| M14 | Revoke a digest: the entry in `triage/revocations.yaml`, the advisory, the replacement release or the version deletion (`docs/user-manual.md`, "Revoke a digest", Req 9.5) | deliberate | The record drives the mechanics; the decision that a digest must not be pulled is not one a rescan makes | none | none |
 | M15 | Repository settings only the administrator holds: private vulnerability reporting on, the ruleset kept equal to its committed export, the weaker ruleset retired, packages public on first publish (Req 9.2, 9.8, 2.21) | deliberate | GitHub exposes these as settings, not as files; the daily rescan asserts each and fails by name when one drifts (Req 9.3, 9.9, 2.21) | none: the GitHub coupling is accepted (design Decision 10) | none |
 | M16 | Merge a pull request over the one-review rule, the recorded bypass (SECURITY.md, Governance) | deliberate | With one maintainer a review nobody else can give is theatre; the required checks are the gate | A second maintainer in `CODEOWNERS` and `require_code_owner_review: true` in the committed ruleset | none |
 | M17 | Dispatch a build (a release) or a rescan by hand | deliberate | A human asking for a release gets one: the dispatch path never runs the publish-on-change comparator | none | none |

@@ -3,8 +3,8 @@
 # One entry per revoked digest, and it drives the mechanics: the daily rescan
 # fails by name while any catalogue tag still references a recorded digest,
 # the status issue lists every entry, and validate checks each entry's shape
-# against triage/revocations.schema.yaml. docs/revocation-runbook.md says how
-# an entry gets here. Two shapes:
+# against triage/revocations.schema.yaml. docs/user-manual.md, "Revoke a digest",
+# says how an entry gets here. Two shapes:
 #
 #   replaced   the fix was published through the release path; the tags moved
 #              to `replacement` and the revoked digest is frozen

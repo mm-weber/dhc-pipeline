@@ -5,10 +5,9 @@ definitions built by the real `dhi.io/build` frontend, upstream Helm charts
 hardened through overrides, automated upstream tracking, Go integration tests
 on real Kubernetes, and CVE triage recorded as portable OpenVEX.
 
-This manual integrates the deeper documents — [CONVENTIONS.md](CONVENTIONS.md),
-[concepts.md](concepts.md), [operating-loop.md](operating-loop.md),
+This manual integrates the deeper documents ([CONVENTIONS.md](CONVENTIONS.md),
 [live-evidence.md](live-evidence.md) (every criterion's first live exercise, Req 7.11),
-the ADRs in [decisions/](decisions/), and [triage/README.md](../triage/README.md) — it does
+the ADRs in [decisions/](decisions/), and [triage/README.md](../triage/README.md)); it does
 not replace them. Requirement references like `(Req 6.20)` point at
 [`.specs/dhc-catalogue-mvp/requirements.md`](../.specs/dhc-catalogue-mvp/requirements.md),
 so every rule here traces to the criterion that demands it. Where this manual
@@ -45,7 +44,7 @@ exception.
 
 What the catalogue promises, what a signature attests and does not, and where
 to report a vulnerability are stated in [`SECURITY.md`](../SECURITY.md); the
-trust-boundary table in [`concepts.md`](concepts.md#trust-boundary-who-owns-what-and-where-the-seams-are)
+trust-boundary table in [Part VI](#trust-boundary-who-owns-what-and-where-the-seams-are)
 says which components are the substrate's, which are upstream's and which
 are this repository's own.
 
@@ -70,10 +69,10 @@ are this repository's own.
 | `scripts/`                    | Tested glue; every script has an `x_test.sh`, and validate checks both ways |
 | `.github/workflows/`          | The six workflows; `.github/requirements-ci.txt` beside them holds the hash-pinned Python deps |
 | `.specs/dhc-catalogue-mvp/`   | EARS requirements, design, task ledger |
-| `docs/`                       | This manual, conventions, concepts, ADRs, operating-loop evidence |
+| `docs/`                       | This manual, conventions, ADRs, the evidence ledger, the lanes, `archive/` (among it the operating-loop evidence of 2026-07-21) |
 | `renovate.json5`              | All upstream tracking: custom regex managers only |
 | `SECURITY.md`                 | The promise, what a signature attests, governance, reporting and advisory channels, revocation record, authenticity classes, transparency-log disclosure, substrate terms |
-| `triage/revocations.yaml`     | The revocation record, schema-checked; `docs/revocation-runbook.md` says how an entry gets there |
+| `triage/revocations.yaml`     | The revocation record, schema-checked; [Revoke a digest](#revoke-a-digest) says how an entry gets there |
 | `NOTICE`, `LICENSES/`         | The substrate's copyright and licence (Docker Hardened Images, Apache-2.0) and the SBOM licence statement |
 
 ### The two loops
@@ -94,7 +93,7 @@ published ─► daily rescan (06:17 UTC, VEX- and exception-aware)
   ─► one issue per new HIGH/CRITICAL (severity · EPSS · KEV)
   ─► triage decision (VEX / exception / fix bump) ─► pull request  ↻
 
-upstream release ─► Renovate cron (every 4h)
+upstream release ─► Renovate cron (every 4h; Req 3.1: at most 6h)
   ─► bump PR (postUpgradeTask recomputes derived fields) ─► pull request  ↻
 
 triage/ (vex/ + accepted-risk/) is consumed by every scan, PR-side and
@@ -143,7 +142,7 @@ The variant taxonomy:
 | `-dev`        | Build-stage toolchain, root permitted                                 | Never — it is the `uses:` stage inside builds |
 | `-compat`     | Runtime plus a minimal shell userland (busybox)                       | Only where a documented decision requires it (Req 4.5) |
 
-The rule, from [concepts.md](concepts.md): *deploy the least capable variant
+The rule, from [the variant taxonomy](#the-variant-taxonomy): *deploy the least capable variant
 that works, and write down why when you can't.* The one existing compat build
 is `valkey:<ver>-alpine3.23-compat`, required because the upstream valkey
 chart runs an unconditional `/bin/sh` init container; the cost is documented
@@ -219,8 +218,8 @@ What each artifact gives you:
   (Req 2.12, 6.38).
 - **Provenance** (BuildKit, `mode=max`) — the builder, the invocation, and
   every input with its *resolved* digest. This is what connects the SBOM's
-  claims to verifiable materials (see [concepts.md](concepts.md), "The trust
-  chain").
+  claims to verifiable materials (see [The trust chain](#the-trust-chain-checksum--purl--sbom--provenance--signature)
+  in Part VI).
 - **OpenVEX** — the maintainer's applicability decisions for known CVEs,
   *compiled for exactly this digest* (Req 6.34), so your own scanner can
   consume it directly (e.g. `trivy image --vex <predicate>.json "$REF"`).
@@ -323,7 +322,7 @@ tells you how portable the statements have proven to be so far, and
 | `build.yml`    | every PR + main + dispatch + daily 04:47 UTC | Build affected definitions; PR path runs the CVE **scan gate**; main path releases (push by digest, scan every platform manifest, sign, SBOMs, VEX, tag last); the nightly rebuilds everything and publishes on change |
 | `chart.yml`    | every PR + main            | Render *every* chart, evaluate with the Kyverno policies; `ct lint` on owned charts |
 | `e2e.yml`      | PR + dispatch              | Per affected component: kind cluster, install the hardened chart, run the Ginkgo suite |
-| `renovate.yml` | cron every 4h + dispatch   | Self-hosted Renovate over the custom managers; postUpgradeTasks recompute derived fields |
+| `renovate.yml` | cron every 4h (Req 3.1: at most 6h) + dispatch | Self-hosted Renovate over the custom managers; postUpgradeTasks recompute derived fields |
 | `rescan.yml`   | daily 06:17 UTC + dispatch (`drill` input: `none`, `kev-outage`, `kev-synthetic`; task 16.8) | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set, close them on evidence with graded labels and reopen them on recurrence; the clocks over the supported set to the catalogue status issue and the catalogue page to GitHub Pages; expiry warnings; the VEX portability block over the supported set and the consumer smoke test (the README recipe run verbatim against one digest) |
 
 Every GitHub Action is pinned to a full commit SHA, and every third-party
@@ -629,7 +628,7 @@ it needs criterion 9.9 amended, and the script's header says what else.
 
 | Cron                      | Schedule                 | Produces                                          | Watch it at |
 |---------------------------|--------------------------|---------------------------------------------------|-------------|
-| Renovate (`renovate.yml`) | every 4h (Req 3.1)       | Bump PRs; the Dependency Dashboard issue          | Actions tab · issue #5 |
+| Renovate (`renovate.yml`) | every 4h (`catalogue-policy.yaml`; Req 3.1: at most 6h) | Bump PRs; the Dependency Dashboard issue          | Actions tab · issue #5 |
 | Rebuild (`build.yml`)     | daily 04:47 UTC (Req 2.14)| Fresh digests for every definition whose package set changed; a discard line for the rest | Actions tab · the run summary per image |
 | Rescan (`rescan.yml`)     | daily 06:17 UTC (Req 2.22, which absorbed the retired Req 6.2)| Enumeration of every catalogue tag; the visibility invariant and the admission proof (Req 2.21, 2.24); every platform manifest scanned by digest; today's reports attested and the OpenVEX document re-attested on change, replacing (Req 6.42, 6.43); the cve issue lifecycle over the supported set, closing on evidence with graded labels and reopening on recurrence (Req 6.52 to 6.57); the clocks to the catalogue status issue (Req 6.46, 6.47) and the catalogue page to GitHub Pages (Req 6.61, 6.62); expiry warnings; VEX compile report | Actions tab · `cve`-labeled issues · the "Catalogue status" issue · the catalogue page |
 
@@ -988,34 +987,17 @@ HIGH/CRITICAL survives suppression — the gate is red
                                   under_investigation naming the lapse  ↻
 ```
 
-The two lanes answer different questions. **VEX** answers "does this apply?"
-— a claim about the artifact, published forever. **Accepted risk** answers
-"what are we doing about it?", a decision about exposure, published as
-`affected` with its expiry (never as `not_affected`, Req 6.8), and it
-*decays back to un-triaged on its own*: Trivy silently stops honouring a
-lapsed entry, the finding reappears as `under_investigation` naming the lapse
-(Req 6.41), and someone must decide again. The decision clock starts at the
-entry's `decided_at`; the ceilings live in `catalogue-policy.yaml`.
+Why the two lanes stay apart, why an exception decays back to un-triaged on
+its own, and where the ceilings live:
+[triage/README.md](../triage/README.md#accepted-risk--time-boxed-exceptions-req-67612).
 
 Ground rules that hold across all four:
 
-- Clearing a red gate means **making a decision, not silencing the scanner**.
-  The only sanctioned suppression inputs are `triage/vex/` and
-  `triage/accepted-risk/`; a `.trivyignore` anywhere else fails validation
-  (Req 6.12).
-- A transfer's upstream issue is filed by the owner from a draft under
-  `triage/upstream/` (register row M12).
-- Avoid has a whole-image form: deactivating the definition
-  ([Part IV](#deactivate-a-definition)) stops every new build while its
-  published digests keep their scans, attestations and statuses.
-- Reaching for accept/transfer before ruling out avoid and fix is the failure
-  mode the lane is designed to expose — the `blocked:` field must say why the
-  stronger treatments were unavailable, and its content is judged at review.
 - Every decision gets a dated `triage/LOG.md` entry: finding → evidence →
   outcome → link.
 - One finding at a time. Deciding one binary must not silently decide another
-  (per-binary scoping, below), and deciding one image never covers another
-  (one exception file per image).
+  (per-binary scoping, [the `paths:` rule](../triage/README.md#authoring-an-exception)),
+  and deciding one image never covers another (one exception file per image).
 
 ### Writing a VEX statement
 
@@ -1032,37 +1014,9 @@ vexctl create \
   --file=triage/vex/CVE-….openvex.json
 ```
 
-**What you write is source — a scanner never sees it.** Trivy builds the
-product identifier it matches from the image's **RepoDigest**, so a statement
-carrying a tag suppresses nothing — measured, not inferred. `compile-vex.sh`
-renders your source per build: it stamps in the digest of the image being
-scanned (Req 6.29) and drops any statement scoped to a tag that build is not
-(Req 6.30). **You write the tag; the compiler writes the digest.**
-
-```
-triage/vex/ (source)          compile-vex.sh (per build)      what the scanner gets
-pkg:oci/grafana@13.1.3-…  ──► drop out-of-scope tags (6.30) ─► pkg:oci/grafana@sha256:…
-reviewable · stable in git    rewrite product → digest (6.29)  the only form Trivy matches
-
-every drop is recorded and reported (6.32/6.33) — inert must never look correct
-```
-
-The product-identifier rules, all lint-enforced:
-
-| Rule | Why | Req |
-|------|-----|-----|
-| Product is an OCI purl naming an image this repo defines, with `repository_url` equal to that definition's published repository | A wrong product produces *no error of any kind* — the statement is simply inert | 6.17, 6.18 |
-| A product version, when present, is a **published tag** of that repository (a variant's tags count) | Scopes the claim to a release the compiler can look up against the build; digests never belong in source | 6.20 |
-| `fixed` must carry a version | A remedy is always about particular releases; stated versionless it would claim every published tag carries the fix | 6.21 |
-| A **versionless** product requires a `version-independent:` note in `status_notes` saying why the claim survives a version change | Versionless claims every build ever, including releases nobody examined — that scope must be argued, not defaulted into | 6.31 |
-| Subcomponent purls carry **no version** | Go module versions move every rebuild; versionless still scopes to the one package | 6.19 |
-| A superseded statement is **kept**; the new one is appended with a later timestamp and a bumped document version | Consumers take the latest per (vuln, product); the document then carries what was argued, when, and what replaced it. Trivy orders by timestamp — supersession is load-bearing | 6.22 |
-
-Choosing the scope is about the *kind of argument*, not the status: a
-structural claim ("this image never starts a Prometheus server") is
-version-independent — versionless plus the note. A dependency-graph claim
-("this build does not reach the symbol") rests on what this release links —
-scope it to the published tag.
+The product-identifier rules (all lint-enforced), why each exists, and how
+to choose a statement's scope:
+[triage/README.md, Authoring a statement](../triage/README.md#authoring-a-statement).
 
 Practical flow: copy the product purl from the failed gate's job summary
 (drop the digest), copy a subcomponent purl from the same summary, write the
@@ -1076,103 +1030,126 @@ The decision is register row M3; a transfer's upstream filing is M12; the
 fix-forward hand-bump is M10.
 
 `triage/accepted-risk/<image>.yaml` is a native Trivy ignorefile plus the
-fields that make an entry reviewable. Real shape (abbreviated from the live
-grafana file):
+fields that make an entry reviewable. A live entry, each field
+explained: [triage/README.md, "Authoring an exception"](../triage/README.md#authoring-an-exception).
 
-```yaml
-vulnerabilities:
-  - id: CVE-2026-27145
-    purls: ["pkg:golang/stdlib"]                    # versionless — survives rebuilds
-    paths: ["usr/share/grafana/…/elasticsearch/*"]  # THE binary this decision covers
-    treatment: transfer                             # accept | transfer
-    owner: mm-weber
-    issue: "https://github.com/grafana/…/issues/410"  # required for transfer
-    ref: "LOG.md#transfer--stdlib-cve-2026-27145-…"   # where the reasoning lives
-    blocked: "avoidance is available and declined, not unavailable: dropping
-              the plugin would remove the datasource … remediation is measured
-              closed — the newest release is itself built with go1.26.3"
-    statement: "transfer: waiting on a release built with go1.26.4+"
-    decided_at: 2026-09-02                          # the clock starts here (Req 6.7)
-    expired_at: 2026-11-02                          # ≤ decided_at + the tier's ceiling — enforced
-```
+The rules, all machine-enforced by `lint-accepted-risk.sh` (Req 6.7, 6.11,
+6.25), and why each exists:
+[triage/README.md, Authoring an exception](../triage/README.md#authoring-an-exception) and
+[Why the expiry is load-bearing](../triage/README.md#why-the-expiry-is-load-bearing). One
+of them is a step for you:
 
-The rules, all machine-enforced by `lint-accepted-risk.sh` (Req 6.11, 6.24,
-6.25):
-
-- **The filename is the image scope.** One file per image — accepting a
-  finding for grafana never silently covers cert-manager.
-- **`paths:` is the binary scope, and it is required.** The same CVE in two
-  bundled binaries is two exposures, owned by different upstreams — so it is
-  two entries, and two entries sharing an id may not name the same path.
-  Globs work and are needed (the arch suffix differs per build); a path
-  matching nothing is silent, which is why the gate reports dead entries
-  (Req 6.26).
-- **`blocked:` is the honesty field** — why avoid *and* fix were unavailable.
-  Presence machine-checked, content judged at review.
-- **`expired_at` within the ceiling from `decided_at`.** The policy file
-  (`catalogue-policy.yaml` `triage`) declares the clocks: 90 days for a HIGH
-  finding, 30 for a CRITICAL, 14 for anything CISA lists as actively
-  exploited, whatever its severity. `validate` bounds every entry by the
-  largest ceiling; the PR gate and the daily rescan hold each entry to the
-  tier its finding actually earns in the scan report, re-checking KEV every
-  day, and fail on a breach by name (Req 6.50, 6.51). If the KEV feed is
-  unreachable the check does not run and the PR or rescan fails closed
-  (Req 6.59, 6.60). Trivy stops honouring a lapsed entry silently;
-  the finding then re-reds the gate on its own (Req 6.9). The daily rescan
-  warns inside the policy's warning window, 14 days as declared (Req 6.10).
 - **Transfer = acceptance with an external owner.** It requires an upstream
   issue to point at — draft it in `triage/upstream/` first (measured
   evidence, re-runnable checks), file it deliberately, then reference it.
-- **Never a VEX.** An exception is a business decision about our exposure;
-  publishing it would tell every consumer the vulnerability doesn't apply to
-  *them* (Req 6.8).
 
 ### Reachability evidence (govulncheck)
 
-Trivy and Grype answer "is this module linked?". `govulncheck -mode=binary`
-reads the symbol table and answers "is the vulnerable code *called*?" — the
-only question that can settle an advisory whose applicability turns on one
-symbol. It runs on every PR build over every Go binary in the image,
-**non-gating** — evidence, never a second gate (Req 6.13). The table's level
-column carries the rules:
-
-| Level         | Meaning                                          | Consequence |
-|---------------|--------------------------------------------------|-------------|
-| `symbol`      | The vulnerable function is reachable in this binary | **Forbids** `not_affected` / `vulnerable_code_not_in_execute_path` for this image (Req 6.14) |
-| `package`     | The package is imported; the symbol is not reached | Citable evidence for a `not_affected` statement (Req 6.15) |
-| `module` only | Rendered as *not measured*                        | Never citable as evidence of unreachability (Req 6.16) — silence, not absence (a stripped binary looks the same) |
+What govulncheck measures, and what each level of its result permits a
+statement to claim: [triage/README.md](../triage/README.md#reachability-evidence-govulncheck).
 
 Every `not_affected` with the execute-path justification must cite a symbol-
 or package-level govulncheck result for that binary in its `LOG.md` entry.
 
 ### The triage log
 
-`triage/LOG.md` records *every* outcome as dated entries — finding → evidence
-→ outcome → link — including retractions, because the three things people
-conflate must stay apart:
-
-| Outcome                  | Means                                          | Where it goes |
-|--------------------------|------------------------------------------------|---------------|
-| `not_affected`           | The vulnerable code cannot execute here        | OpenVEX statement + LOG.md |
-| prioritisation           | Real, but low EPSS / not KEV — it waits        | LOG.md only |
-| accepted risk / transfer | Real and reachable; shipping anyway, bounded   | LOG.md + `accepted-risk/`, with an owner |
-
-Failure mode — **VEX-washing**: writing "low risk" or "we accept it" into a
-VEX statement launders a business decision into a machine-readable claim of
-technical inapplicability — and every downstream consumer inherits it. EPSS
-and KEV order the queue; they never justify a status.
+`triage/LOG.md` records *every* outcome as dated entries (finding → evidence
+→ outcome → link), including retractions. What goes where, why the three
+outcomes stay apart, and how a record cites its entry:
+[triage/README.md, `LOG.md`](../triage/README.md#logmd).
 
 ### Expiries
 
-Expiry happens with time, not with a commit — so the daily rescan is what
-raises it, listing every exception already lapsed or lapsing within the policy's warning window
-(Req 6.10). Each one needs a fresh decision (register row M3; a compat
+The daily rescan lists every exception already lapsed or lapsing within the
+policy's warning window (Req 6.10; why the rescan and not a pull request:
+[triage/README.md](../triage/README.md#the-daily-rescan-req-222-63-642-to-657)).
+Each one needs a fresh decision (register row M3; a compat
 variant's review date is M13): fix (has a remedy shipped
 since?), avoid, prove it does not apply, or re-accept with a new expiry *and
 a reason it is still the right call*. Doing nothing is also a decision — the
 lapsed entry stops suppressing and the next affected PR goes red, blaming a
 change that isn't at fault. Handle the warning when it appears, not when it
 detonates.
+
+### Revoke a digest
+
+A revocation (Req 9.5 to 9.7; manual-controls register row M14) is the decision that a published digest must not be pulled any
+more: a compromised input, a build that shipped what it should not have, a
+published status that was wrong in a way a replacement cannot express. The
+record, `triage/revocations.yaml`, drives the mechanics, which is why this
+section is short: the daily rescan fails by name while any catalogue tag still
+references a recorded digest, the status issue lists every entry, and
+validate refuses an entry that does not fit the schema.
+
+#### What GHCR can and cannot do
+
+Measured for the cluster D review (2026-08-25) and unchanged since:
+
+- **There is no tag deletion.** The packages API deletes packages and package
+  versions only; a version is the digest with every tag on it. A tag is
+  therefore removed either by deleting the whole version or by pushing
+  another manifest under the tag, which re-points it.
+- **Deleting a public version is refused past 5,000 downloads.**
+- **A digest no catalogue tag references is frozen** (Req 2.11): pullable by
+  digest, not rescanned, not re-attested, its last attestations left as they
+  were. Frozen is the state a revoked digest should be in the day after.
+
+#### Move A: replacement through the release path
+
+The normal case, and the only one that needs no hand on the registry.
+
+1. Fix the definition in a pull request: an upstream bump, a fetch-phase
+   module bump, a dropped package. The scan gate scans it like any change.
+2. Merge. The release arm pushes the new digest, scans it, signs and attests
+   it, and moves the definition's three tags to it (Req 2.7 to 2.9). The
+   revoked digest is now untagged: frozen.
+3. Draft the advisory (below), then add the entry with shape `replaced`,
+   naming the revoked digest, the reason, the replacement digest, the
+   advisory link and the date, and merge it. Publish the advisory.
+4. The next rescan asserts no tag references the revoked digest and lists
+   the entry in the status issue.
+
+#### Move B: withdrawal, nothing replaces it
+
+When no fixed upstream exists and the definition cannot ship at all. Record
+`replacement: none` and the move taken in `withdrawal`.
+
+- **B1, delete the package version** (`withdrawal: delete-version`). Find the
+  version id with `gh api /user/packages/container/<name>/versions`, then
+  `gh api -X DELETE /user/packages/container/<name>/versions/<id>`. Every tag
+  on that digest goes with it, and so does the digest: consumers pinned to it
+  by digest break. That is the one deliberate exception to "nothing is
+  deleted" (SECURITY.md, retention), and GitHub refuses it for a public
+  version past 5,000 downloads.
+- **B2, park the tags on a tombstone** (`withdrawal: tombstone`, `tombstone:`
+  the manifest digest). A tombstone is a minimal image whose only content is
+  a `REVOKED` file naming the advisory, pushed under each of the digest's
+  tags so a pull by tag returns something that cannot run instead of the
+  revoked bytes; the revoked digest itself stays pullable and frozen. Not
+  built: the rescan's verification invariant (Req 2.24) applies the policy to
+  every tag-referenced digest, and a tombstone signed by anything but the
+  releaser identity is reported every day as a rejected tag. Parking a tag
+  therefore needs a signed tombstone, which means a tombstone definition
+  released through `build.yml`. Until one exists, B1 or Move A; if B2 is ever
+  needed, that definition is the first step and the entry records its digest.
+
+#### Then, whichever move
+
+- **The advisory** is a GitHub repository security advisory on this
+  repository (Security tab, Advisories, New draft advisory): the affected
+  package is the catalogue repository (`ghcr.io/mm-weber/dhc/<name>`), the
+  affected version the revoked digest, the patched version the replacement
+  digest or "withdrawn", the description the reason. Its URL goes into the
+  entry; publish it when the entry merges. GHSA is the catalogue's advisory
+  channel (Req 9.4, SECURITY.md).
+- **The entry** is one item of `triage/revocations.yaml`; the schema
+  (`triage/revocations.schema.yaml`) decides its shape in validate (Req 9.6),
+  and nothing is ever removed from the list.
+- **The LOG** gets a dated entry saying what was found, what was decided and
+  what moved, in that order.
+- **The daily rescan** reports any catalogue tag still referencing the
+  digest as a failure by name (Req 9.7) and lists the entry in the status
+  issue, so a revocation that was only half executed does not stay quiet.
 
 ## Part IV: Extending the catalogue
 
@@ -1475,6 +1452,202 @@ docker buildx build -f image/hardened-app/image.yaml image/hardened-app/
 
 ## Part VI: Reference
 
+The first sections of this part say how a definition is built and what the
+catalogue trusts: the anatomy of a DHI definition, the trust chain, the
+builder contract per archetype and the trust boundary. The working notes that
+stood beside them (spikes, BuildKit's internals, Actions as compile-time
+macros) are archived in
+[archive/concepts-working-notes.md](archive/concepts-working-notes.md).
+Running example: the DHI catalog's
+[netdata-agent-sd definition](https://github.com/docker-hardened-images/catalog/blob/main/image/netdata-agent-sd/alpine-3.23/0.yaml)
+(local copy under `temp/catalog/`, gitignored), built during the ADR 0001 spike.
+
+### Anatomy of a DHI definition
+
+- `image` / `variant` / `tags`: identity; tags form a semver aliasing fan
+  (`0-`, `0.2-`, `0.2.10-alpine3.23`) so consumers pick update granularity.
+- `vars`: **the bump surface**: VERSION, semver splits, COMMIT_SHA, builder
+  reference. Version state in named variables is what makes definitions
+  mechanically updatable (Renovate rewrites exactly this block).
+- `contents` (top level): the *runtime* image's package manifest:
+  repositories in priority order (hardened `dhi.io/apk` first, public Alpine
+  as fallback), the DHI signing key, and a deliberately tiny package list.
+- `contents.builds[]`: build stages: declarative multi-stage builds.
+  `uses:` pins a `-dev` catalog image by digest as the toolchain;
+  `files:` acquires source (`git+https://…#tag` **plus commit checksum**:
+  the tag is readable, the hash is the trust anchor); `caches:` are BuildKit
+  cache mounts (module cache survives rebuilds).
+- `pipeline`: ordered steps inside the stage; see
+  [The frontend and its actions](#the-frontend-and-its-actions) below, and
+  [Actions](archive/concepts-working-notes.md#actions-uses-are-compile-time-macros-not-github-actions)
+  in the archived notes.
+- `outputs`: the **only bridge** from build stage to runtime image
+  (binary + SBOM, explicit uid/gid). Toolchain, sources, caches die with the
+  stage. Multi-stage as an enforced contract, not a convention.
+- `accounts` / `os-release` / `paths` / `entrypoint`: runtime config as
+  data. `os-release` matters: scanners read it to select the advisory DB.
+
+#### The variant taxonomy
+
+One image family, several capability tiers per version:
+**runtime** (deploy this: binary + deps + certs + nonroot 65532, no shell/pm/
+compiler) · **`-dev`** (build with this: toolchain + shell, root, never
+deployed; it's the `uses:` stage) · **`-compat`** (runtime + minimal shell
+userland, for charts/entrypoints that need one; choosing it is a documented
+decision, Req 4.5). Also `-fips`, `-helm`, `-source`. Rule: deploy the least
+capable variant that works; write down why when you can't.
+
+#### The frontend and its actions
+
+A **frontend** is the compiler, and it ships *as a container image*. The
+first line `# syntax=dhi.io/build:2-alpine3.23` is a shebang with a version
+pin: BuildKit pulls that image and runs it, sandboxed, with **no network**,
+to translate YAML into LLB, BuildKit's intermediate build language. The
+Dockerfile is not special; its parser (`docker/dockerfile:1`) is just
+another frontend.
+
+An action (`uses: go/bump@v2`) borrows GitHub Actions' *syntax*, but a DHI
+action is a **named, versioned template inside the frontend**,
+macro-expanded at compile time into LLB nodes that run in the sandboxed
+stage. Nothing is fetched, so there is nothing to checksum: the action's
+implementation hash *is* the frontend image digest, and `@vN` is interface
+versioning (which behavior contract), not supply-chain pinning. The residual
+gap is the syntax line itself, a floating tag in the upstream catalog.
+BuildKit accepts digests there, so **this repository's convention is to
+digest-pin the `# syntax=` line too** (provenance records the resolved
+digest either way; we pin it up front). The rule and its lint:
+[CONVENTIONS.md, "Definitions"](CONVENTIONS.md#definitions-req-17-72-adr-0001).
+
+### The trust chain: checksum → purl → SBOM → provenance → signature
+
+- **Checksums are verified facts**, enforced at fetch time (mismatch fails
+  the build), but the verification is an *event* that leaves no trace in the
+  artifact by itself.
+- **purl** (`pkg:golang/github.com/netdata/sd@0.2.10`) is a cross-ecosystem
+  *coordinate*: the join key between SBOM entries and advisory databases.
+  It is **not** mechanically linked to the source checksum: the checksum is
+  integrity (machine-verified), the purl is identity (an authored claim).
+  Consistency between them is editorial: `vars` feeds both, one bump PR
+  moves both, review catches drift.
+- **SBOMs are signed claims** about contents, bound to the image digest as an
+  attestation subject. Accountable, but still assertions.
+- **Provenance is what connects them**: an in-toto attestation (SLSA
+  predicate) whose subject is the output digest and whose body records the
+  builder, the invocation, and the **materials**: every input with its
+  *resolved* digest (the frontend tag as resolved, the builder image, the git
+  commit). It carries the ephemeral fetch-time facts forward into a durable
+  record, a signed one where the build platform generates it (below). That
+  enables: **audit** (SBOM claims vs provenance materials), **identity** (who
+  signed, where it is signed), and **reproduction**: rebuild from
+  the recorded inputs and compare digests. Reproducibility is what upgrades
+  provenance from trusted claim to recomputable fact.
+- **SLSA levels grade the bridge** (Build track, v1.2): provenance exists
+  and is distributed, L1; it is generated and signed by a hosted build
+  platform from the platform's own data, and consumers can check both, L2;
+  the build is isolated so the job cannot forge it, L3. A local `--load`
+  build carries BuildKit's unsigned, self-written provenance, which meets L1
+  only once the image is pushed and the provenance travels with it. This
+  repository's releases carried that and no more until 2026-11-18. Signing the image
+  did not lift that, because a signature on the image says who published it
+  and nothing about how it was built, and no verifier read the provenance.
+  Since 2026-11-18 a release made while the provenance mode is not `off` also
+  stores a statement that GitHub's provenance
+  service generates from the job's signed identity token and signs under the
+  release workflow's identity, and the release checks it before tagging: that
+  is provenance of L2 grade. The level claimed stays L1 while the
+  verification policy does not demand it (`release.provenance: report`); the
+  successor claims L2 from its first release, where it does. L3 is out of
+  scope (design Decision 15, option D; Non-Goals). `SECURITY.md`, "SLSA Build
+  level", is the statement of record.
+
+Verification, when images are in a registry: the README's recipe verifies
+the signed provenance statement (`cosign verify-attestation --type
+slsaprovenance1`, then the five expectations with jq). BuildKit's own
+provenance is read with `docker buildx imagetools inspect <ref>` (the
+attestation manifests inside the index) or `docker scout attest list <ref>`;
+it is unsigned, so there is nothing to verify it against.
+
+### The builder contract per archetype
+
+Req 1.17, the seam design Decision 11 declared and did not build: what the
+build backend takes in and what it must hand out, so that everything after
+it (scan gate, rescan, publish-on-change, VEX compilation, charts, status)
+depends on the outputs alone and a fork can swap the backend without
+touching a downstream plane. Today the backend is the `dhi.io/build`
+frontend for both archetypes; the declared alternative is apko plus Wolfi
+through the same contract.
+
+**Input: one definition directory.** `image/<name>/` holds `image.yaml` in
+the backend's native syntax and nothing the build reads from elsewhere.
+Every plane that touches an image reads that directory: the build compiles
+it, the frontend being the authoritative validator; Renovate rewrites its
+`vars:` block and source url and the refresh tooling regenerates the derived
+fields; the lints read its pins and its `# authenticity:` marker; the
+active set names it by directory (Req 1.13). A variant that must be built
+(`-compat`) is one more directory under the same contract, byte-equal in
+source to its runtime sibling plus a package, publishing to the sibling's
+repository as a tag suffix.
+
+**Outputs, identical for every archetype.**
+
+1. *An image pushed by digest* to the declared registry namespace: an index
+   with one platform manifest per declared platform, pushed by digest only
+   and tagged last, after the release-time scan, the signature and the
+   attestations exist (Req 2.7 to 2.9). BuildKit provenance is attached at
+   the push, as attestation manifests inside the index (Req 2.2).
+2. *Per-platform SBOM material carrying package pull checksums*: for every
+   platform manifest, an SPDX and a CycloneDX SBOM generated from the pushed
+   digest and attested to it, the CycloneDX one carrying each apk package's
+   pull checksum (syft's `pullChecksum` property, which the SPDX output
+   drops). That checksum is what makes the resolved package set a fact
+   rather than a name list: the publish-on-change comparison canonicalises
+   type, name, version and checksum per platform manifest (Req 1.9, 2.15),
+   so a package republished under an unchanged version still moves the set.
+
+**What differs per archetype is the input's source stanza, and only that.**
+
+| Archetype | Source stanza | Authenticity class | Refresh on a bump |
+|---|---|---|---|
+| compile-from-source (hardened-app, cert-manager, valkey) | `files: url: git+https://…#<tag>` with the commit `checksum:` beside it, built in a build stage whose toolchain is a digest-pinned `-dev` image (`uses:`, the Go ones) or toolchain packages from the pinned repositories (valkey) | `signed-tag` or `signed-commit`, GitHub's verification statement | `refresh-definition.sh` regenerates the checksum and every version-derived field |
+| tarball-repackage (grafana) | `files: url: https://<vendor>/…<version>…tar.gz` with per-architecture sha256 pins in `vars:`, verified by an in-pipeline `sha256sum -c` step | `cross-origin-checksum`, the publisher's version statement and the object store's sidecar agreeing | `refresh-grafana.sh` re-pins both checksums from two origins |
+
+**Downstream reads outputs only, already true by construction.** The scan
+gate and the rescan scan the pushed digest's platform manifests; the
+comparator reads the CycloneDX attestations; the VEX compiler stamps the
+digest and its platform digests; the charts pin the digest; the admission
+proof verifies the signature and attestations; the status planes read what
+is attested. None of them reads a definition to learn about an image. That
+is the whole seam: a backend that produces these two outputs from that one
+input is a drop-in, and the trust-boundary table below names the declared
+alternative per row.
+
+### Trust boundary: who owns what, and where the seams are
+
+Every component the catalogue depends on, with its owner class (Req 9.15):
+**substrate-inherited** (Docker Hardened Images), **upstream-inherited** with
+the authenticity class or pin that stands behind it, or **own**. The last
+column is the seam the framing addendum declared and deliberately did not
+build (design Decision 11): a fork changes the row, the operating model
+stays. `SECURITY.md` links here; the per-definition classes are also stated
+there.
+
+| Component | Owner class | Authenticity or pin | Declared seam alternative |
+|---|---|---|---|
+| Build frontend `dhi.io/build` | substrate-inherited | digest-pinned `# syntax=` line; docker datasource, bumps reviewed by hand | apko plus Wolfi, the documented backend a fork targets; [the builder contract per archetype](#the-builder-contract-per-archetype) (Req 1.17: definition directory in, image by digest plus SBOM material out) is the seam |
+| Builder images `dhi.io/golang:*-dev` | substrate-inherited | digest-pinned `uses:`; reviewed by hand | Wolfi toolchain images through [the same contract](#the-builder-contract-per-archetype) |
+| Package repositories `dhi.io/apk/<distro>/<release>/main` and their keyring | substrate-inherited | `/main` lines only, enforced by `lint-pins.sh`; packages float by design (Req 1.9), the resolved set is recorded per digest in the attested SBOMs | Wolfi apk repositories; the `dhi.io` login the build step needs is an adoption constraint, stated, not hidden |
+| Runtime base layers (baselayout, certificates, libc) | substrate-inherited | from the repositories above; rebuilt daily, published on change (Req 2.14 to 2.16) | comes with the backend |
+| cert-manager sources (controller, webhook, cainjector) | upstream-inherited, `signed-tag` | GitHub's verification statement for the annotated tag, at bump time and daily | none needed; the class is per definition |
+| valkey sources (runtime and compat) | upstream-inherited, `signed-commit` | GitHub's verification statement for the commit the tag points at, at bump time and daily | none needed |
+| hardened-app source (the owner's own upstream) | upstream-inherited, `signed-commit` | the same, since v0.1.1 | none needed |
+| grafana tarball | upstream-inherited, `cross-origin-checksum` | grafana.com versions API and dl.grafana.com sidecars agree per architecture, at bump time, PR time and daily; no upstream signature exists | the `.deb` route for a cryptographic anchor (ADR 0002); the definition ships as a reference behind the active-set switch |
+| Upstream charts (jetstack cert-manager, grafana community, valkey project) | upstream-inherited, none declared | exact version pinned in `chart.yaml`, tracked by the helm datasource, never automerged; templates never edited | a fork's chart source; the overlay is the only delta |
+| Definitions, overlays, Kyverno policies, triage records (VEX, exceptions, LOG), scripts, workflows, the rescan tool, tests | own | git history under the committed ruleset; every change a pull request | the operating model is the product; forks change declared values in `catalogue-policy.yaml` |
+| Trivy (authoritative scanner and VEX consumer) | upstream-inherited, exact version plus recorded sha256 (Req 7.5) | the PR gate and the rescan | Grype as the measured second consumer and the daily consumer smoke test as migration insurance (task 13.4); a fork flips the authoritative consumer in the policy file |
+| Grype, syft, govulncheck, kind, kyverno, helm, ct, crane, cosign, renovate | upstream-inherited, exact version plus recorded sha256, Go sumdb or npm integrity (Req 7.5, 7.6) | tool pins with Renovate managers; the checksum half is human | each is a rendering of a declared value: cosign to notation and Kyverno to policy-controller are declared renderings, not built |
+| Sigstore public-good instance (Fulcio, Rekor) | upstream-inherited, service | identities pinned in the verification policy; keyless signing | a private Sigstore or a key with notation; the transparency-log disclosure fact changes with it |
+| GitHub: Actions (builds, OIDC identities), the provenance service (`actions/attest-build-provenance`, the SLSA provenance statement of each release), GHCR (registry), Issues (lifecycle, status), Pages (the catalogue page, an artifact deployment), rulesets (governance) | upstream-inherited, platform coupling accepted deliberately | owner, repository and registry names are declared values (Req 1.13 to 1.19); the OIDC issuer is pinned; the provenance action pinned by commit, its statement held against the five declared expectations (Req 2.27, 2.28) | another forge with OIDC, a registry and an issue tracker; the coupling is listed, not abstracted. For provenance: on another forge, signing the build backend's own provenance per platform manifest (design Decision 15, option A); for Build L3 on GitHub, an isolated reusable workflow (option D); neither is built |
+
 ### Scripts
 
 Every script has a sibling `_test.sh` run by validate, which checks it both
@@ -1566,7 +1739,7 @@ three-day minimum release age first.
 |-------------|---------------------------|
 | **Req 1** — Image definition catalogue | `image/*/image.yaml` · `lint-pins.sh` · frontend compile in build.yml · `verify-arch-pins.sh` · ADR 0001 |
 | **Req 2** — Build & release | build.yml release arm: push + cosign + Syft SBOM + provenance; tags from definitions; fail publishes nothing |
-| **Req 3** — Upstream tracking | renovate.yml (4h cron) · renovate.json5 managers · refresh tasks · manager fixtures · Dependency Dashboard · three-day quarantine · declared authenticity signals (bump, PR, daily) · chart-version manager |
+| **Req 3**: Upstream tracking | renovate.yml (4h cron; Req 3.1: at most 6h) · renovate.json5 managers · refresh tasks · manager fixtures · Dependency Dashboard · three-day quarantine · declared authenticity signals (bump, PR, daily) · chart-version manager |
 | **Req 4** — Chart adaptation | `chart/*/` overlays + READMEs · chart.yml render + Kyverno gate · compat decision protocol |
 | **Req 5** — Integration tests | `test/` Ginkgo suite · e2e.yml kind matrix · upgrade path on both bump shapes · diagnostics artifacts |
 | **Req 6** — CVE triage | Scan gate + rescan cron · `triage/` two lanes, three published verbs · compile-vex (affected from exceptions, carry-forward) + both lints · govulncheck evidence · re-attestation replacing, exactly one OpenVEX per digest · issue filing, closing and reopening on evidence · the catalogue status issue · the catalogue page on GitHub Pages (Req 6.61, 6.62) |
