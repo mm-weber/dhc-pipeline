@@ -4647,3 +4647,41 @@ waits for the first day a scheduled rebuild differs from the released digest;
 the first scheduled rescan in the mode `report` reads the coverage line on a
 schedule; the spike's scratch package `ghcr.io/mm-weber/slsa-spike`, pull
 request #401 and its branch are the owner's to remove.
+
+## 2026-11-22: the documentation consolidated, every lane drawn, the evidence of task group 19 (#428, #429, #430, #433, #434, #435)
+
+*Images: none. Track docs-consolidation_20261120, phases 0 to 6, on the owner's
+calls of 2026-11-20: Mermaid graphs in the Markdown, working notes in one
+archive folder, overlapping documents merged into fewer, the SLSA lane first.*
+
+**What changed for a reader.** The pipeline is drawn in one place,
+[docs/lanes.md](../docs/lanes.md): a lane map and a graph for every lane on it,
+each step naming the criterion it fulfils and the decision it rests on, each
+graph's table naming the workflow step that runs it. The working notes (the
+review rounds, the closed todo items, the spike and BuildKit notes) are in
+[docs/archive/](../docs/archive/README.md), marked as not current. Two
+documents merged into the manual (`concepts.md` and `revocation-runbook.md`)
+and a third archived whole (`operating-loop.md`), and values the documents
+stated differently are stated once from where each is declared.
+
+**The reads.**
+
+| What | Run or record | Result |
+|---|---|---|
+| A broken link fails validate (Req 9.20) | #430, validate 44803253992; after the revert 44803406409 | red at the link step alone, naming a missing file and a missing heading; green again |
+| Every lane drawn (Req 9.21) | #429, #435 | 31 graphs, each rendered and looked at before its push, each lane held against its workflow by a separate reviewer |
+
+**What the work found on the way.** Drawing the lanes from the code rather
+than from the documents found places where the two differ: in the documents
+(among them Req 2.5 against `fail-fast: false`, the manual's tag line, the
+built-in Renovate managers said to be off) and in the code (among them a
+Renovate rule that keeps GitHub Actions bumps from opening, and a published
+verify recipe without `pipefail`). None is fixed by this track, which moves
+and draws but changes no behaviour; each is listed under the requirements
+checked against the code in `tasks/todo.md`, the owner's call of 2026-11-21
+for the track that follows.
+
+**Carried, nothing to build.** The comment on line 4 of
+`image/valkey-compat/image.yaml` still names `docs/concepts.md`; it is
+repointed with that definition's next real change, since editing a
+definition republishes its image.

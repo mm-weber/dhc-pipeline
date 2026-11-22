@@ -32,9 +32,9 @@ THE Repository SHALL give, in one document linked from its README, one Mermaid g
 
 **Acceptance criteria:**
 
-- [ ] The lanes document exists, the README links it near the top, and each graph renders on GitHub (rendered locally first by the Mermaid command-line tool, in a container)
-- [ ] The SLSA provenance lane first, as the pattern the others follow (phase 1)
-- [ ] Every lane named in the lane map has its graph; the stale diagrams in design.md and the manual are replaced by a link to the lane, or brought up to date where they show something no lane graph shows
+- [x] The lanes document exists, the README links it near the top, and each graph renders on GitHub (rendered locally first by the Mermaid command-line tool, in a container)
+- [x] The SLSA provenance lane first, as the pattern the others follow (phase 1)
+- [x] Every lane named in the lane map has its graph; the stale diagrams in design.md and the manual are replaced by a link to the lane, or brought up to date where they show something no lane graph shows
 
 ### FR-2: Relative links resolve (Req 9.20)
 
@@ -42,8 +42,8 @@ IF a Markdown document of the Repository links to a path or a heading inside the
 
 **Acceptance criteria:**
 
-- [ ] A link checker (an established tool, pinned like every other tool, Req 7.5) runs in validate over every tracked Markdown file, offline, relative links and heading anchors
-- [ ] Green on main before the first move; a pull request with a broken link red, naming it (the drill that exercises 9.20)
+- [x] A link checker (an established tool, pinned like every other tool, Req 7.5) runs in validate over every tracked Markdown file, offline, relative links and heading anchors
+- [x] Green on main before the first move; a pull request with a broken link red, naming it (the drill that exercises 9.20)
 
 ### FR-3: Working notes in one archive folder
 
@@ -51,9 +51,9 @@ THE Repository SHALL keep its working notes under `docs/archive/`, each moved fi
 
 **Acceptance criteria:**
 
-- [ ] `.specs/dhc-catalogue-mvp/reviews/` under `docs/archive/reviews/`; the closed items of `tasks/todo.md` under `docs/archive/`; the working-notes half of `docs/concepts.md` under `docs/archive/`
-- [ ] `docs/archive/README.md` says what each file is and that nothing there is current
-- [ ] The link check green
+- [x] `.specs/dhc-catalogue-mvp/reviews/` under `docs/archive/reviews/`; the closed items of `tasks/todo.md` under `docs/archive/`; the working-notes half of `docs/concepts.md` under `docs/archive/`
+- [x] `docs/archive/README.md` says what each file is and that nothing there is current
+- [x] The link check green
 
 ### FR-4: Each topic explained once
 
@@ -61,10 +61,10 @@ THE Repository SHALL explain each topic in one document, SHALL merge a document 
 
 **Acceptance criteria:**
 
-- [ ] `docs/operating-loop.md`, `docs/concepts.md` and `docs/revocation-runbook.md` merged into the documents named in design Decision 16 and removed; every link to them, and every comment that names them, updated
-- [ ] The Renovate cadence stated the same way everywhere: at most six hours (Req 3.1), configured every four (`catalogue-policy.yaml`); `conductor/tech-stack.md` names the install scripts as the home of tool versions instead of repeating them; the decision and ADR counts and the definition counts current
-- [ ] The manual's triage chapters reduced to what an operator does and a link to `triage/README.md` for the rest; design.md's stack table reduced to the reasons, the versions living in one place
-- [ ] The link check green; `render-verification.sh --check`, `lint-live-evidence.sh`, `lint-log-anchors.sh` green
+- [x] `docs/operating-loop.md`, `docs/concepts.md` and `docs/revocation-runbook.md` merged into the documents named in design Decision 16 and removed; every link to them, and every comment that names them, updated (except the comment on line 4 of `image/valkey-compat/image.yaml`, carried: a definition change republishes its image)
+- [x] The Renovate cadence stated the same way everywhere: at most six hours (Req 3.1), configured every four (`catalogue-policy.yaml`); `conductor/tech-stack.md` names the install scripts as the home of tool versions instead of repeating them; the decision and ADR counts and the definition counts current
+- [x] The manual's triage chapters reduced to what an operator does and a link to `triage/README.md` for the rest; design.md's stack table reduced to the reasons, the versions living in one place
+- [x] The link check green; `render-verification.sh --check`, `lint-live-evidence.sh`, `lint-log-anchors.sh` green
 
 ### FR-5: The evidence (Req 7.11)
 
@@ -72,7 +72,7 @@ THE Repository SHALL record ledger rows 9.20 and 9.21 and a LOG entry naming wha
 
 **Acceptance criteria:**
 
-- [ ] `scripts/lint-live-evidence.sh .` green; the track listed under Completed
+- [x] `scripts/lint-live-evidence.sh .` green; the track listed under Completed
 
 ## Scope
 

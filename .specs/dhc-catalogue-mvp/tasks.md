@@ -541,10 +541,10 @@
     - The first release after 18.3 read: each digest's provenance verified with ADR 0005's verifier and the declared expectations, the predicate's fields recorded; the first rescan after 18.4 read (the coverage line); an offline must-reject: the rendered policy with provenance required, applied locally (`kyverno apply`) to one pre-18.3 supported digest, rejecting it by name, and to one post-18.3 digest, admitting it; one release with the mode `off` through a normal pull request and back the same day (Decision 13's switch rule): the digest released with every other signature and attestation and no provenance attestation, the rescan's line stating that provenance is off; ledger rows 2.27 and 2.29 exercised, 2.30 exercised by that flip, 9.19 measured present, 2.28 left to the successor's first proof (12.1); the LOG entry
     - _Requirements: Req 2.27, Req 2.28, Req 2.29, Req 2.30, Req 7.11, Req 9.19_
 
-- [ ] 19. The documentation consolidated, every lane drawn (Req 9.20, 9.21; design Decision 16; the owner's calls of 2026-11-20: Mermaid in the Markdown, working notes to one archive folder, overlapping documents merged into fewer, the SLSA lane first). Executes before task 12; one pull request per task; conductor track docs-consolidation_20261120
+- [x] 19. The documentation consolidated, every lane drawn (Req 9.20, 9.21; design Decision 16; the owner's calls of 2026-11-20: Mermaid in the Markdown, working notes to one archive folder, overlapping documents merged into fewer, the SLSA lane first). Executes before task 12; one pull request per task; conductor track docs-consolidation_20261120
   - [x] 19.1 Spec amendment: 9.20 and 9.21, Decision 16, this group, ledger rows 9.20 and 9.21 (unexercised, each with its reason)
     - _Requirements: Req 9.20, Req 9.21_
-  - [ ] 19.2 The lanes document and the SLSA provenance lane, the pattern for the others
+  - [x] 19.2 The lanes document and the SLSA provenance lane, the pattern for the others
     - _Requirements: Req 9.21_
   - [x] 19.3 The link check in validate: a pinned link checker, offline, every tracked Markdown file, relative links and heading anchors; green on main; a broken link drilled red
     - 2026-11-20 done (#430): lychee 0.24.2 through `install-tool.sh`, with a Renovate rule for its `lychee-v` tags; the one broken link on main repaired; the drill red at the link step alone (run 44803253992), green again after the revert (run 44803406409)
@@ -555,7 +555,7 @@
     - _Requirements: Req 9.1, Req 9.15, Req 9.20_
   - [x] 19.6 The other lanes, and the stale diagrams retired
     - _Requirements: Req 9.21_
-  - [ ] 19.7 Evidence: ledger rows 9.20 and 9.21, the LOG entry
+  - [x] 19.7 Evidence: ledger rows 9.20 and 9.21, the LOG entry
     - _Requirements: Req 7.11, Req 9.20, Req 9.21_
 
 ## Requirements Coverage

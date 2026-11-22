@@ -430,7 +430,7 @@ flowchart TB
     KC["A kind cluster, its nodes given<br/>ghcr pull credentials · Req 5.1, 5.2"]
     IS["Runner image store checked; the probe image<br/>pulled by digest, loaded into kind by tag · Req 5.5"]
     UP{"A bump: the pinned upstream chart version<br/>or the deployed values file changed? · Req 5.6"}
-    IN["Install the proposed chart"]
+    IN["Install the proposed chart · Req 5.2"]
     UG["Install the base state, upgrade to<br/>the proposed one, wait for the rollout<br/>Req 5.6"]
     AS["Pods Ready within five minutes; restricted<br/>securityContext on live pods; the chart's probe,<br/>once · Req 5.3 to 5.5 · Decision 14"]
     OK(["Leg green"])
@@ -1122,7 +1122,7 @@ flowchart TB
     CTRL[/"verification.control<br/>an unsigned digest that must be refused · Req 2.24"/]
     ADM["kyverno apply with the rendered policy,<br/>one call per tag-referenced digest<br/>and one for the control · Req 2.24 · Decision 6"]
     AV{"Every digest admitted,<br/>the control refused?"}
-    COS["A cosign second opinion on each refused<br/>digest and its platform manifests, to name why"]
+    COS["A cosign second opinion on each refused<br/>digest and its platform manifests, to name why<br/>Req 2.24"]
     OK(["The step's log: n admitted, control refused;<br/>the verdicts reach the status and the page"])
     RED(["The run fails, naming each digest<br/>and the reason"])
     REFU(["Refused by name: no enumeration,<br/>or no control declared"])
@@ -1150,7 +1150,7 @@ flowchart TB
     PICK["Pick the first supported full-release tag<br/>in the enumeration, as a digest · Req 9.13"]
     RUN["Extract the README recipe, set REF<br/>to that digest, run each step under<br/>pipefail in a scratch directory<br/>Req 9.13 · Decision 10"]
     SUP["Count each not_affected or fixed statement<br/>in the authoritative consumer: suppressed,<br/>nothing to suppress, or missing · Req 9.13"]
-    OCI["Trivy reading the attestation itself, --vex oci:<br/>at least the same suppressions · ADR 0004"]
+    OCI["Trivy reading the attestation itself, --vex oci:<br/>at least the same suppressions · Req 6.44 · ADR 0004"]
     OTH(["Each other consumer's result in the<br/>portability block, never fails the run<br/>Req 9.12, 9.13 · Decision 10"])
     OK(["Summary: the smoke line, each step<br/>with its result, the three counts"])
     RED(["The run fails, naming the step<br/>or the statement"])

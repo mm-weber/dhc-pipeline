@@ -30,7 +30,7 @@ track (`conductor/tracks.md`).
 
 ## Open items
 
-- [ ] The documentation consolidated, task group 19 (opened 2026-11-20, conductor
+- [x] The documentation consolidated, task group 19 (opened 2026-11-20, conductor
       track docs-consolidation_20261120): the owner's calls of that day, Mermaid
       graphs in the Markdown, working notes to `docs/archive/`,
       overlapping documents merged into fewer, the SLSA lane drawn first.
