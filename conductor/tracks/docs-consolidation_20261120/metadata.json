@@ -1,9 +1,9 @@
 {
   "id": "docs-consolidation_20261120",
   "type": "chore",
-  "status": "in_progress",
+  "status": "completed",
   "created_at": "2026-11-20T18:00:00Z",
-  "updated_at": "2026-11-20T18:00:00Z",
+  "updated_at": "2026-11-22T00:00:00Z",
   "description": "The documentation consolidated: every lane of the pipeline drawn as one Mermaid graph naming the decision behind each step, the SLSA provenance lane first; working notes moved to docs/archive/; overlapping documents merged into fewer, each topic explained once, the contradictions fixed; relative links checked in the pull request gate (Req 9.20, 9.21; design Decision 16; task group 19)",
   "spec_path": "conductor/tracks/docs-consolidation_20261120/spec.md",
   "plan_path": "conductor/tracks/docs-consolidation_20261120/plan.md"

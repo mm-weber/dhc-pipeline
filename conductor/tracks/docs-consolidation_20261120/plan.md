@@ -53,9 +53,10 @@ Seven phases, one pull request each. Phase 0 is this pull request: the track, De
 
 ## Phase 6: the evidence (task 19.7)
 
-- [ ] **6.1** Ledger rows 9.20 and 9.21, the LOG entry, task group 19 ticked, this track closed
+- [x] **6.1** Ledger rows 9.20 and 9.21, the LOG entry, task group 19 ticked, this track closed
+  - Done 2026-11-22: row 9.20 exercised by the drill of #430, row 9.21 measured present after #435; the LOG entry of 2026-11-22; task group 19 ticked (19.2 had been left open when #429 merged); the track under Completed
 
 ## Final verification
 
-- [ ] Every FR's acceptance criteria met
-- [ ] The link check, `render-verification.sh --check`, `lint-live-evidence.sh`, `lint-log-anchors.sh` and every suite green
+- [x] Every FR's acceptance criteria met
+- [x] The link check, `render-verification.sh --check`, `lint-live-evidence.sh`, `lint-log-anchors.sh` and every suite green
