@@ -57,7 +57,7 @@ graph TB
     end
 
     subgraph Automation["GitHub Actions"]
-        REN[Renovate cron ≤6h]
+        REN["Renovate cron, at most every 6 h (Req 3.1), configured every 4 h"]
         CI[PR gates: schema, build, ct, kind e2e, trivy+VEX, kyverno]
         REL[main: build, push by digest, scan, sign, SBOM + VEX attest, tag]
         SCAN[daily rescan → issues]
@@ -88,6 +88,8 @@ graph TB
 | Scanning/VEX | Trivy (gate + cron), Grype (second opinion), Syft (SBOM), OpenVEX/`vexctl` | Req 6; DHI's own triage model |
 | Signing | cosign keyless (GitHub OIDC) + buildx provenance | Req 2.2 |
 | Documentation | Markdown with Mermaid graphs (`docs/lanes.md`); lychee, offline, over every tracked Markdown file in validate | Req 9.20, 9.21; GitHub draws Mermaid itself, and an established link checker beats a bespoke one |
+
+The table names no tool versions: each is declared once, in `scripts/install-scanners.sh` (Trivy, Grype), `scripts/install-tool.sh` (the other workflow tools), the Go modules' `go.mod`, `.github/requirements-ci.txt` (Python) and the workflows' env blocks (Renovate, govulncheck); `conductor/tech-stack.md` lists where.
 
 ### Key Design Decisions
 
@@ -1606,7 +1608,7 @@ release. Getting 6.30's tag set right is what stops that.
 ### .github/workflows/
 `validate.yml` (yamllint/conventions/lints), `build.yml` (PR build + scan gates; main: release),
 `chart.yml` (ct lint + kyverno over rendered charts), `e2e.yml` (kind matrix),
-`renovate.yml` (cron ≤6h), `rescan.yml` (daily; opens issues).
+`renovate.yml` (cron at most every six hours by Req 3.1, configured every four hours in `catalogue-policy.yaml`), `rescan.yml` (daily; opens issues).
 
 **Platforms: every declared platform as built since task 9.3 (2026-09-02; Req 2.1 as amended 2026-08-22, Req 2.22).** The release arm scans each platform manifest of the pushed digest by its own digest and the rescan enumerates and scans every platform manifest of every tag-referenced digest daily, so arm64 returned once both existed; the PR gate stays amd64. The history that ordered it: the catalogue built and
 published both arches until 2026-08-04, when measurement showed nothing ever

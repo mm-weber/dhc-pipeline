@@ -93,7 +93,7 @@ published ─► daily rescan (06:17 UTC, VEX- and exception-aware)
   ─► one issue per new HIGH/CRITICAL (severity · EPSS · KEV)
   ─► triage decision (VEX / exception / fix bump) ─► pull request  ↻
 
-upstream release ─► Renovate cron (every 4h)
+upstream release ─► Renovate cron (every 4h; Req 3.1: at most 6h)
   ─► bump PR (postUpgradeTask recomputes derived fields) ─► pull request  ↻
 
 triage/ (vex/ + accepted-risk/) is consumed by every scan, PR-side and
@@ -322,7 +322,7 @@ tells you how portable the statements have proven to be so far, and
 | `build.yml`    | every PR + main + dispatch + daily 04:47 UTC | Build affected definitions; PR path runs the CVE **scan gate**; main path releases (push by digest, scan every platform manifest, sign, SBOMs, VEX, tag last); the nightly rebuilds everything and publishes on change |
 | `chart.yml`    | every PR + main            | Render *every* chart, evaluate with the Kyverno policies; `ct lint` on owned charts |
 | `e2e.yml`      | PR + dispatch              | Per affected component: kind cluster, install the hardened chart, run the Ginkgo suite |
-| `renovate.yml` | cron every 4h + dispatch   | Self-hosted Renovate over the custom managers; postUpgradeTasks recompute derived fields |
+| `renovate.yml` | cron every 4h (Req 3.1: at most 6h) + dispatch | Self-hosted Renovate over the custom managers; postUpgradeTasks recompute derived fields |
 | `rescan.yml`   | daily 06:17 UTC + dispatch (`drill` input: `none`, `kev-outage`, `kev-synthetic`; task 16.8) | Enumerate every catalogue tag; visibility invariant and admission proof; scan every platform manifest by digest; attest today's reports and re-attest the OpenVEX document on change, replacing (exactly one per digest, proven daily); file new-CVE issues for the supported set, close them on evidence with graded labels and reopen them on recurrence; the clocks over the supported set to the catalogue status issue and the catalogue page to GitHub Pages; expiry warnings; the VEX portability block over the supported set and the consumer smoke test (the README recipe run verbatim against one digest) |
 
 Every GitHub Action is pinned to a full commit SHA, and every third-party
@@ -628,7 +628,7 @@ it needs criterion 9.9 amended, and the script's header says what else.
 
 | Cron                      | Schedule                 | Produces                                          | Watch it at |
 |---------------------------|--------------------------|---------------------------------------------------|-------------|
-| Renovate (`renovate.yml`) | every 4h (Req 3.1)       | Bump PRs; the Dependency Dashboard issue          | Actions tab · issue #5 |
+| Renovate (`renovate.yml`) | every 4h (`catalogue-policy.yaml`; Req 3.1: at most 6h) | Bump PRs; the Dependency Dashboard issue          | Actions tab · issue #5 |
 | Rebuild (`build.yml`)     | daily 04:47 UTC (Req 2.14)| Fresh digests for every definition whose package set changed; a discard line for the rest | Actions tab · the run summary per image |
 | Rescan (`rescan.yml`)     | daily 06:17 UTC (Req 2.22, which absorbed the retired Req 6.2)| Enumeration of every catalogue tag; the visibility invariant and the admission proof (Req 2.21, 2.24); every platform manifest scanned by digest; today's reports attested and the OpenVEX document re-attested on change, replacing (Req 6.42, 6.43); the cve issue lifecycle over the supported set, closing on evidence with graded labels and reopening on recurrence (Req 6.52 to 6.57); the clocks to the catalogue status issue (Req 6.46, 6.47) and the catalogue page to GitHub Pages (Req 6.61, 6.62); expiry warnings; VEX compile report | Actions tab · `cve`-labeled issues · the "Catalogue status" issue · the catalogue page |
 
@@ -987,34 +987,17 @@ HIGH/CRITICAL survives suppression — the gate is red
                                   under_investigation naming the lapse  ↻
 ```
 
-The two lanes answer different questions. **VEX** answers "does this apply?"
-— a claim about the artifact, published forever. **Accepted risk** answers
-"what are we doing about it?", a decision about exposure, published as
-`affected` with its expiry (never as `not_affected`, Req 6.8), and it
-*decays back to un-triaged on its own*: Trivy silently stops honouring a
-lapsed entry, the finding reappears as `under_investigation` naming the lapse
-(Req 6.41), and someone must decide again. The decision clock starts at the
-entry's `decided_at`; the ceilings live in `catalogue-policy.yaml`.
+Why the two lanes stay apart, why an exception decays back to un-triaged on
+its own, and where the ceilings live:
+[triage/README.md](../triage/README.md#accepted-risk--time-boxed-exceptions-req-67612).
 
 Ground rules that hold across all four:
 
-- Clearing a red gate means **making a decision, not silencing the scanner**.
-  The only sanctioned suppression inputs are `triage/vex/` and
-  `triage/accepted-risk/`; a `.trivyignore` anywhere else fails validation
-  (Req 6.12).
-- A transfer's upstream issue is filed by the owner from a draft under
-  `triage/upstream/` (register row M12).
-- Avoid has a whole-image form: deactivating the definition
-  ([Part IV](#deactivate-a-definition)) stops every new build while its
-  published digests keep their scans, attestations and statuses.
-- Reaching for accept/transfer before ruling out avoid and fix is the failure
-  mode the lane is designed to expose — the `blocked:` field must say why the
-  stronger treatments were unavailable, and its content is judged at review.
 - Every decision gets a dated `triage/LOG.md` entry: finding → evidence →
   outcome → link.
 - One finding at a time. Deciding one binary must not silently decide another
-  (per-binary scoping, below), and deciding one image never covers another
-  (one exception file per image).
+  (per-binary scoping, [the `paths:` rule](../triage/README.md#authoring-an-exception)),
+  and deciding one image never covers another (one exception file per image).
 
 ### Writing a VEX statement
 
@@ -1031,37 +1014,9 @@ vexctl create \
   --file=triage/vex/CVE-….openvex.json
 ```
 
-**What you write is source — a scanner never sees it.** Trivy builds the
-product identifier it matches from the image's **RepoDigest**, so a statement
-carrying a tag suppresses nothing — measured, not inferred. `compile-vex.sh`
-renders your source per build: it stamps in the digest of the image being
-scanned (Req 6.29) and drops any statement scoped to a tag that build is not
-(Req 6.30). **You write the tag; the compiler writes the digest.**
-
-```
-triage/vex/ (source)          compile-vex.sh (per build)      what the scanner gets
-pkg:oci/grafana@13.1.3-…  ──► drop out-of-scope tags (6.30) ─► pkg:oci/grafana@sha256:…
-reviewable · stable in git    rewrite product → digest (6.29)  the only form Trivy matches
-
-every drop is recorded and reported (6.32/6.33) — inert must never look correct
-```
-
-The product-identifier rules, all lint-enforced:
-
-| Rule | Why | Req |
-|------|-----|-----|
-| Product is an OCI purl naming an image this repo defines, with `repository_url` equal to that definition's published repository | A wrong product produces *no error of any kind* — the statement is simply inert | 6.17, 6.18 |
-| A product version, when present, is a **published tag** of that repository (a variant's tags count) | Scopes the claim to a release the compiler can look up against the build; digests never belong in source | 6.20 |
-| `fixed` must carry a version | A remedy is always about particular releases; stated versionless it would claim every published tag carries the fix | 6.21 |
-| A **versionless** product requires a `version-independent:` note in `status_notes` saying why the claim survives a version change | Versionless claims every build ever, including releases nobody examined — that scope must be argued, not defaulted into | 6.31 |
-| Subcomponent purls carry **no version** | Go module versions move every rebuild; versionless still scopes to the one package | 6.19 |
-| A superseded statement is **kept**; the new one is appended with a later timestamp and a bumped document version | Consumers take the latest per (vuln, product); the document then carries what was argued, when, and what replaced it. Trivy orders by timestamp — supersession is load-bearing | 6.22 |
-
-Choosing the scope is about the *kind of argument*, not the status: a
-structural claim ("this image never starts a Prometheus server") is
-version-independent — versionless plus the note. A dependency-graph claim
-("this build does not reach the symbol") rests on what this release links —
-scope it to the published tag.
+The product-identifier rules (all lint-enforced), why each exists, and how
+to choose a statement's scope:
+[triage/README.md, Authoring a statement](../triage/README.md#authoring-a-statement).
 
 Practical flow: copy the product purl from the failed gate's job summary
 (drop the digest), copy a subcomponent purl from the same summary, write the
@@ -1095,77 +1050,37 @@ vulnerabilities:
     expired_at: 2026-11-02                          # ≤ decided_at + the tier's ceiling — enforced
 ```
 
-The rules, all machine-enforced by `lint-accepted-risk.sh` (Req 6.11, 6.24,
-6.25):
+The rules, all machine-enforced by `lint-accepted-risk.sh` (Req 6.7, 6.11,
+6.25), and why each exists:
+[triage/README.md, Authoring an exception](../triage/README.md#authoring-an-exception) and
+[Why the expiry is load-bearing](../triage/README.md#why-the-expiry-is-load-bearing). One
+of them is a step for you:
 
-- **The filename is the image scope.** One file per image — accepting a
-  finding for grafana never silently covers cert-manager.
-- **`paths:` is the binary scope, and it is required.** The same CVE in two
-  bundled binaries is two exposures, owned by different upstreams — so it is
-  two entries, and two entries sharing an id may not name the same path.
-  Globs work and are needed (the arch suffix differs per build); a path
-  matching nothing is silent, which is why the gate reports dead entries
-  (Req 6.26).
-- **`blocked:` is the honesty field** — why avoid *and* fix were unavailable.
-  Presence machine-checked, content judged at review.
-- **`expired_at` within the ceiling from `decided_at`.** The policy file
-  (`catalogue-policy.yaml` `triage`) declares the clocks: 90 days for a HIGH
-  finding, 30 for a CRITICAL, 14 for anything CISA lists as actively
-  exploited, whatever its severity. `validate` bounds every entry by the
-  largest ceiling; the PR gate and the daily rescan hold each entry to the
-  tier its finding actually earns in the scan report, re-checking KEV every
-  day, and fail on a breach by name (Req 6.50, 6.51). If the KEV feed is
-  unreachable the check does not run and the PR or rescan fails closed
-  (Req 6.59, 6.60). Trivy stops honouring a lapsed entry silently;
-  the finding then re-reds the gate on its own (Req 6.9). The daily rescan
-  warns inside the policy's warning window, 14 days as declared (Req 6.10).
 - **Transfer = acceptance with an external owner.** It requires an upstream
   issue to point at — draft it in `triage/upstream/` first (measured
   evidence, re-runnable checks), file it deliberately, then reference it.
-- **Never a VEX.** An exception is a business decision about our exposure;
-  publishing it would tell every consumer the vulnerability doesn't apply to
-  *them* (Req 6.8).
 
 ### Reachability evidence (govulncheck)
 
-Trivy and Grype answer "is this module linked?". `govulncheck -mode=binary`
-reads the symbol table and answers "is the vulnerable code *called*?" — the
-only question that can settle an advisory whose applicability turns on one
-symbol. It runs on every PR build over every Go binary in the image,
-**non-gating** — evidence, never a second gate (Req 6.13). The table's level
-column carries the rules:
-
-| Level         | Meaning                                          | Consequence |
-|---------------|--------------------------------------------------|-------------|
-| `symbol`      | The vulnerable function is reachable in this binary | **Forbids** `not_affected` / `vulnerable_code_not_in_execute_path` for this image (Req 6.14) |
-| `package`     | The package is imported; the symbol is not reached | Citable evidence for a `not_affected` statement (Req 6.15) |
-| `module` only | Rendered as *not measured*                        | Never citable as evidence of unreachability (Req 6.16) — silence, not absence (a stripped binary looks the same) |
+What govulncheck measures, and what each level of its result permits a
+statement to claim: [triage/README.md](../triage/README.md#reachability-evidence-govulncheck).
 
 Every `not_affected` with the execute-path justification must cite a symbol-
 or package-level govulncheck result for that binary in its `LOG.md` entry.
 
 ### The triage log
 
-`triage/LOG.md` records *every* outcome as dated entries — finding → evidence
-→ outcome → link — including retractions, because the three things people
-conflate must stay apart:
-
-| Outcome                  | Means                                          | Where it goes |
-|--------------------------|------------------------------------------------|---------------|
-| `not_affected`           | The vulnerable code cannot execute here        | OpenVEX statement + LOG.md |
-| prioritisation           | Real, but low EPSS / not KEV — it waits        | LOG.md only |
-| accepted risk / transfer | Real and reachable; shipping anyway, bounded   | LOG.md + `accepted-risk/`, with an owner |
-
-Failure mode — **VEX-washing**: writing "low risk" or "we accept it" into a
-VEX statement launders a business decision into a machine-readable claim of
-technical inapplicability — and every downstream consumer inherits it. EPSS
-and KEV order the queue; they never justify a status.
+`triage/LOG.md` records *every* outcome as dated entries (finding → evidence
+→ outcome → link), including retractions. What goes where, why the three
+outcomes stay apart, and how a record cites its entry:
+[triage/README.md, `LOG.md`](../triage/README.md#logmd).
 
 ### Expiries
 
-Expiry happens with time, not with a commit — so the daily rescan is what
-raises it, listing every exception already lapsed or lapsing within the policy's warning window
-(Req 6.10). Each one needs a fresh decision (register row M3; a compat
+The daily rescan lists every exception already lapsed or lapsing within the
+policy's warning window (Req 6.10; why the rescan and not a pull request:
+[triage/README.md](../triage/README.md#the-daily-rescan-req-222-63-642-to-657)).
+Each one needs a fresh decision (register row M3; a compat
 variant's review date is M13): fix (has a remedy shipped
 since?), avoid, prove it does not apply, or re-accept with a new expiry *and
 a reason it is still the right call*. Doing nothing is also a decision — the
@@ -1841,7 +1756,7 @@ three-day minimum release age first.
 |-------------|---------------------------|
 | **Req 1** — Image definition catalogue | `image/*/image.yaml` · `lint-pins.sh` · frontend compile in build.yml · `verify-arch-pins.sh` · ADR 0001 |
 | **Req 2** — Build & release | build.yml release arm: push + cosign + Syft SBOM + provenance; tags from definitions; fail publishes nothing |
-| **Req 3** — Upstream tracking | renovate.yml (4h cron) · renovate.json5 managers · refresh tasks · manager fixtures · Dependency Dashboard · three-day quarantine · declared authenticity signals (bump, PR, daily) · chart-version manager |
+| **Req 3**: Upstream tracking | renovate.yml (4h cron; Req 3.1: at most 6h) · renovate.json5 managers · refresh tasks · manager fixtures · Dependency Dashboard · three-day quarantine · declared authenticity signals (bump, PR, daily) · chart-version manager |
 | **Req 4** — Chart adaptation | `chart/*/` overlays + READMEs · chart.yml render + Kyverno gate · compat decision protocol |
 | **Req 5** — Integration tests | `test/` Ginkgo suite · e2e.yml kind matrix · upgrade path on both bump shapes · diagnostics artifacts |
 | **Req 6** — CVE triage | Scan gate + rescan cron · `triage/` two lanes, three published verbs · compile-vex (affected from exceptions, carry-forward) + both lints · govulncheck evidence · re-attestation replacing, exactly one OpenVEX per digest · issue filing, closing and reopening on evidence · the catalogue status issue · the catalogue page on GitHub Pages (Req 6.61, 6.62) |

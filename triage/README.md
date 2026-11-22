@@ -56,33 +56,48 @@ scans and its attested document and holds no issues.
 
 An acceptance without one is indistinguishable from an unfixed bug. Trivy stops
 honouring an entry the moment `expired_at` passes, silently, with nothing logged,
-so the finding reappears, the gate goes red, the compiled document carries it
+so the finding reappears, the gate goes red (Req 6.9), the compiled document carries it
 as `under_investigation` naming the lapse with its original first-seen time
 (Req 6.41), and somebody has to decide again.
 **Risk acceptance decays back to un-triaged on its own.** That is why the ceiling
 is the policy file's largest ceiling from `decided_at` (`scripts/lint-accepted-risk.sh`, reading `catalogue-policy.yaml` `triage.ceilings`: 90 days for HIGH, 30 for CRITICAL, 14 for anything CISA lists as exploited, enforced per finding by `scripts/check-exceptions.sh` in the gate and the rescan) and why the daily rescan reports
 anything within the policy's warning window of lapsing (Req 6.10).
+`validate` bounds every entry by the
+largest ceiling; the PR gate and the daily rescan hold each entry to the
+tier its finding actually earns in the scan report, re-checking KEV every
+day, and fail on a breach by name (Req 6.50, 6.51). If the KEV feed is
+unreachable the check does not run and the PR or rescan fails closed
+(Req 6.59, 6.60).
 
 ### Authoring an exception
 
 ```yaml
-# triage/accepted-risk/grafana.yaml
+# triage/accepted-risk/grafana.yaml (abbreviated from the live file)
 vulnerabilities:
-  - id: CVE-2026-33186
-    purls: ["pkg:golang/google.golang.org/grpc"]   # versionless — survives rebuilds
-    treatment: transfer                            # accept | transfer
-    owner: mm-weber                                # who carries this
-    issue: 28                                      # required when transfer
-    ref: "LOG.md#2026-07-27-grpc"                  # where the reasoning lives
-    blocked: "no upstream release pins a fixed grpc, and the pipeline sandbox has
-              no egress, so a build-time patch is not available either"
-    statement: "transfer: waiting on upstream to move off grpc v1.81.1"
-    expired_at: 2026-10-25
+  - id: CVE-2026-27145
+    purls: ["pkg:golang/stdlib"]                    # versionless, survives rebuilds
+    paths: ["usr/share/grafana/…/elasticsearch/*"]  # THE binary this decision covers
+    treatment: transfer                             # accept | transfer
+    owner: mm-weber
+    issue: "https://github.com/grafana/…/issues/410"  # required for transfer
+    ref: "LOG.md#transfer--stdlib-cve-2026-27145-…"   # where the reasoning lives
+    blocked: "avoidance is available and declined, not unavailable: dropping
+              the plugin would remove the datasource … remediation is measured
+              closed: the newest release is itself built with go1.26.3"
+    statement: "transfer: waiting on a release built with go1.26.4+"
+    decided_at: 2026-09-02                          # the clock starts here (Req 6.7)
+    expired_at: 2026-11-02                          # ≤ decided_at + the tier's ceiling, enforced
 ```
 
 - **The filename is the scope.** One file per image, so accepting a finding for
   `grafana` never silently covers `cert-manager` — whose exposure to the same
   module is a separate question nobody answered.
+- **`paths:` is the binary scope, and it is required.** The same CVE in two
+  bundled binaries is two exposures, owned by different upstreams, so it is
+  two entries, and two entries sharing an id may not name the same path.
+  Globs work and are needed (the arch suffix differs per build); a path
+  matching nothing is silent, which is why the gate reports dead entries
+  (Req 6.26).
 - **`blocked:` is the honesty field**: why *avoid* and *mitigate* were
   unavailable. Its presence is machine-enforced, its content is judged at review.
   It is what keeps this file from becoming the path of least resistance.
@@ -123,6 +138,25 @@ Four ways, in order of strength — the gate's error message names all four:
 
 Reaching for the last one before ruling out the first two is the failure mode
 this lane is designed to make visible, which is what `blocked:` is for.
+
+Avoid has a whole-image form: deactivating the definition
+([Part IV of the user manual](../docs/user-manual.md#deactivate-a-definition)) stops every new build while its
+published digests keep their scans, attestations and statuses.
+
+## Reachability evidence (govulncheck)
+
+Trivy and Grype answer "is this module linked?". `govulncheck -mode=binary`
+reads the symbol table and answers "is the vulnerable code *called*?": the
+only question that can settle an advisory whose applicability turns on one
+symbol. It runs on every PR build over every Go binary in the image,
+**non-gating** (evidence, never a second gate; Req 6.13). The table's level
+column carries the rules:
+
+| Level         | Meaning                                          | Consequence |
+|---------------|--------------------------------------------------|-------------|
+| `symbol`      | The vulnerable function is reachable in this binary | **Forbids** `not_affected` / `vulnerable_code_not_in_execute_path` for this image (Req 6.14) |
+| `package`     | The package is imported; the symbol is not reached | Citable evidence for a `not_affected` statement (Req 6.15) |
+| `module` only | Rendered as *not measured*                        | Never citable as evidence of unreachability (Req 6.16): silence, not absence (a stripped binary looks the same) |
 
 ## The daily rescan (Req 2.22, 6.3, 6.42 to 6.57)
 
@@ -215,7 +249,8 @@ dropped, spaces to dashes, so an em dash between spaces becomes a double
 dash), and `LOG.md <YYYY-MM-DD>`, a day heading of that date. Rename a
 heading and the lint names every record that pointed at it.
 
-It records **every** outcome, not just the excused ones — because the three
+It records **every** outcome, not just the excused ones, including retractions,
+because the three
 things people conflate have to stay apart:
 
 | Outcome | Means | Where it goes |
@@ -274,6 +309,14 @@ vexctl create \
   | `pkg:oci/grafana` | `fixed` | yes |
   | `pkg:oci/grafana` | `not_affected` | yes |
 
+  ```
+  triage/vex/ (source)          compile-vex.sh (per build)      what the scanner gets
+  pkg:oci/grafana@13.1.3-…  ──► drop out-of-scope tags (6.30) ─► pkg:oci/grafana@sha256:…
+  reviewable · stable in git    rewrite product → digest (6.29)  the only form Trivy matches
+
+  every drop is recorded and reported (6.32/6.33): inert must never look correct
+  ```
+
 - **A version in the product purl is a published tag, or nothing** (Req 6.20).
   A tag means the claim is about that release, and the compiler applies it only
   when building it. No version means the claim holds for every build of that
@@ -311,6 +354,17 @@ vexctl create \
   argued, when, and what replaced it — deleting it would leave only the outcome.
 - Every behaviour above was confirmed against Trivy before being written down
   here, not inferred from documentation.
+
+The product-identifier rules, all lint-enforced:
+
+| Rule | Why | Req |
+|------|-----|-----|
+| Product is an OCI purl naming an image this repo defines, with `repository_url` equal to that definition's published repository | A wrong product produces *no error of any kind*; the statement is simply inert | 6.17 |
+| A product version, when present, is a **published tag** of that repository (a variant's tags count) | Scopes the claim to a release the compiler can look up against the build; digests never belong in source | 6.20 |
+| `fixed` must carry a version | A remedy is always about particular releases; stated versionless it would claim every published tag carries the fix | 6.20 |
+| A **versionless** product requires a `version-independent:` note in `status_notes` saying why the claim survives a version change | Versionless claims every build ever, including releases nobody examined: that scope must be argued, not defaulted into | 6.20 |
+| Subcomponent purls carry **no version** | Go module versions move every rebuild; versionless still scopes to the one package | 6.19 |
+| A superseded statement is **kept**; the new one is appended with a later timestamp and a bumped document version | Consumers take the latest per (vuln, product); the document then carries what was argued, when, and what replaced it. Trivy orders by timestamp, so supersession is load-bearing | 6.22 |
 
 Statements are attached to the images they name as `openvex` attestations by
 `build.yml` on the main branch (Req 6.4) and re-attested by the rescan when the

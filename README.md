@@ -118,7 +118,8 @@ that decays back to un-triaged on expiry. Every decision is a commit:
 
 ## Operating loop
 
-Self-hosted Renovate (≤6h cron) opens pinned, checksum-recomputed bump PRs;
+Self-hosted Renovate (at most every six hours by Req 3.1, configured every four
+hours in `catalogue-policy.yaml`) opens pinned, checksum-recomputed bump PRs;
 CI rebuilds, re-scans, and e2e-tests them; a daily rescan of published images
 opens issues with severity/EPSS/KEV. See the manual's
 [Handling Renovate PRs](docs/user-manual.md#handling-renovate-prs), and
