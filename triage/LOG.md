@@ -4685,3 +4685,24 @@ for the track that follows.
 `image/valkey-compat/image.yaml` still names `docs/concepts.md`; it is
 repointed with that definition's next real change, since editing a
 definition republishes its image.
+
+## 2026-11-23: the valkey compat variant re-decided for one month
+
+*Images: valkey-compat (no rebuild: only `chart/valkey/` changes). Register row
+M13, Req 4.8.*
+
+**The decision.** The chart keeps deploying `valkey-compat`, the runtime image
+plus busybox, because the upstream chart's init container still needs a shell:
+measured on chart 1.0.0 (2026-11-13), it is rendered unconditionally from the main
+container's image and runs `/scripts/init.sh`. `decided_at` moves to 2026-11-23,
+`review_by` from 2026-11-24 to 2026-12-24.
+
+**Why one month.** The exit is upstream: the init container from an image of its
+own, agreed by the maintainer on #247 (2026-09-22) and written as
+valkey-io/valkey-helm#263. The maintainer held #263 for the 1.0 restructuring
+(#272), which merged on 2026-10-20 without it, and #263 now conflicts. The owner
+chose a short date so the rebase is made and the maintainer asked to take it
+within the month; the next re-decision reads where #263 stands.
+
+**Not changed.** The variant's cost stays as recorded in the chart README: the
+deployed valkey has a shell, and busybox's CVEs are scanned and triaged with it.

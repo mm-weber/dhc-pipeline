@@ -119,7 +119,7 @@ evidence obligation, and a retired one cannot keep a row.
 | 4.5 | A compat-variant decision recorded with a review-by date | exercised | 2026-09-06 | LOG 2026-09-06; `lint-compat.sh` on every validate run. | nature |
 | 4.6 | Rendered manifests gated by Kyverno policies | exercised | 2026-08-11 | The gate blocked #50 (the valkey chart) on 2026-08-11 (run 31538146580) before the overlay was corrected; 458 green pull-request runs by 2026-10-08. Re-observed by drill #323 (task 16.15, 2026-10-26): three chart commits refused by the gate, runs 40334006281, 40334100881 and 40334200141, one policy each. | nature |
 | 4.7 | Every deviation documented in a per-chart README | exercised | 2026-10-08 | `chart/*/README.md` (present 2026-10-08), the valkey README carrying the compat decision. | nature |
-| 4.8 | A lapsed review-by date fails validation | exercised | 2026-10-26 | Drill #323 (task 16.15, never merged), commit 1e1e194: the valkey compat decision's review-by moved to 2026-10-01; validate run 40330564462 red at the compat lint with `compat decision (Req 4.8): review_by 2026-10-01 has passed (today 2026-10-26); record a dated re-decision (a new decided_at and review_by) or retire the variant`. The real date stays 2026-11-24. LOG 2026-10-26. | pull request |
+| 4.8 | A lapsed review-by date fails validation | exercised | 2026-10-26 | Drill #323 (task 16.15, never merged), commit 1e1e194: the valkey compat decision's review-by moved to 2026-10-01; validate run 40330564462 red at the compat lint with `compat decision (Req 4.8): review_by 2026-10-01 has passed (today 2026-10-26); record a dated re-decision (a new decided_at and review_by) or retire the variant`. The real date was then 2026-11-24, re-decided on 2026-11-23 to 2026-12-24. LOG 2026-10-26. | pull request |
 | 4.9 | A lapsed review-by date reported daily | unexercised | | Same event as 4.8; the daily step runs with nothing lapsed. | nature |
 
 ## Requirement 5: Go Integration Tests on Real Kubernetes
@@ -265,6 +265,6 @@ evidence obligation, and a retired one cannot keep a row.
 Rows no drill reaches, with their reason: 1.18 (no split group), 2.26 (no scanner failure at
 release can be induced within Decision 13's rules), 3.13 (an unreadable origin cannot be
 induced without harming the day's run), 3.15 (a dismissed alert waits for a real alert),
-4.8 and 4.9 (the review-by date is 2026-11-24). The one `defect` row is 6.55: the
+4.8 and 4.9 (the review-by date is 2026-12-24, re-decided 2026-11-23). The one `defect` row is 6.55: the
 attested scan reports have carried empty database fields since the first release-time
 scan; the ledger keeps it until the fix lands and a new attestation shows the fields.

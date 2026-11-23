@@ -125,6 +125,18 @@ retires. `scripts/lint-compat.sh` fails validate the day after `review_by`
 until a dated re-decision lands (Req 4.8), and the daily rescan reports the
 lapse (Req 4.9), so the shell is never simply forgotten.
 
+**Re-decided 2026-11-23, for one month.** The first decision (2026-08-25)
+ran to 2026-11-24. Measured again on the chart's 1.0.0 release (2026-11-13,
+`checks/valkey-helm-init-container.sh`): `templates/_pod.tpl` still renders the
+init container unconditionally, from the main container's image, running
+`/scripts/init.sh`; the shell is still needed. Upstream agreed to the ask
+(#247, 2026-09-22) and the pull request for it,
+[valkey-io/valkey-helm#263](https://github.com/valkey-io/valkey-helm/pull/263),
+waited for the 1.0 restructuring, which merged on 2026-10-20 without it; the pull
+request now needs a rebase onto 1.0. The owner kept the variant and chose a short
+date, 2026-12-24, so the rebase is made and the maintainer asked to take it
+within the month; the next re-decision reads where #263 stands.
+
 ## e2e probe (Req 5.5)
 
 `probeValkey` (`test/e2e/probes_test.go`) runs a Job that writes a key and

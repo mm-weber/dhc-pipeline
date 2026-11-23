@@ -217,8 +217,9 @@ track (`conductor/tracks.md`).
   and trivy.
 - 2026-10-29: the valkey-helm fork PAT expires (`/workspace/repos/valkey-helm/.keys/fork.pat`).
 - 2026-11-21: register row M6, re-verify the DHI terms memo.
-- 2026-11-24: the valkey compat decision's review-by date (4.8 lapses the day
-  after unless renewed).
+- 2026-12-24: the valkey compat decision's review-by date (re-decided
+  2026-11-23 from 2026-11-24, one month, for upstream #263's rebase onto
+  chart 1.0; 4.8 lapses the day after unless renewed).
 - 2026-12-05: the hardened-app clone's PAT expires
   (`/workspace/repos/hardened-app/.keys/90d_hardened_app.pat`).
 - 2026-12-12: the nine grafana transfers of 2026-10-13 re-decided; grafana
