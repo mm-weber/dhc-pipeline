@@ -14,4 +14,13 @@ Each file is the output of one read-only reader agent of phase 1.1, saved exactl
 | [r7.md](./r7.md) | Requirement 7 (all its criteria) |
 | [r9.md](./r9.md) | Requirement 9 (all its criteria) |
 
-These are claims of one reader each. The independent re-check (phase 1.2) is saved beside them as `recheck-*.md`, also raw; `../review.md` is the reviewed result, and where it differs from a reading, the re-check says why.
+| File | Second reader over |
+|---|---|
+| [recheck-r1-r4-r5.md](./recheck-r1-r4-r5.md) | the findings of r1, r4, r5 |
+| [recheck-r2.md](./recheck-r2.md) | the findings of r2 |
+| [recheck-r3-r7.md](./recheck-r3-r7.md) | the findings of r3, r7 |
+| [recheck-r6a.md](./recheck-r6a.md) | the findings of r6a |
+| [recheck-r6b.md](./recheck-r6b.md) | the findings of r6b |
+| [recheck-r9.md](./recheck-r9.md) | the findings of r9 |
+
+The re-checkers saw only each finding's title and verified it from the code themselves. These are claims of one reader each. The independent re-check (phase 1.2) is saved beside them as `recheck-*.md`, also raw, unedited; `../review.md` is the reviewed result, and where it differs from a reading, the re-check says why.
