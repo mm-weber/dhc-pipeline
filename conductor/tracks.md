@@ -8,7 +8,7 @@
 
 ## Active tracks
 
-### [ ] requirements-check_20261122: The requirements checked against the code
+### [~] requirements-check_20261122: The requirements checked against the code
 
 **Description:** Every live criterion of requirements.md read against the code at one commit, the mechanism named and a verdict given (held, partial, not held, owner-side), the reader documents' statements of behaviour beside it, every finding re-checked by a second reader; each finding put to the owner as a decision; the fixes one pull request per cluster, code test-first; the evidence in the LOG and the ledger (the owner's call of 2026-11-21; task group 20).
 **Priority:** high (executes before the successor, task 12)
