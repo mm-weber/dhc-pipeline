@@ -22,5 +22,6 @@ Each file is the output of one read-only reader agent of phase 1.1, saved exactl
 | [recheck-r6a.md](./recheck-r6a.md) | the findings of r6a |
 | [recheck-r6b.md](./recheck-r6b.md) | the findings of r6b |
 | [recheck-r9.md](./recheck-r9.md) | the findings of r9 |
+| [recheck-r6a-4.md](./recheck-r6a-4.md) | r6a.4 alone, which the first extraction of titles missed; this re-checker saw the finding's first line, which carries its evidence, not only its title |
 
 The re-checkers saw only each finding's title and verified it from the code themselves. These are claims of one reader each. The independent re-check (phase 1.2) is saved beside them as `recheck-*.md`, also raw, unedited; `../review.md` is the reviewed result, and where it differs from a reading, the re-check says why.
