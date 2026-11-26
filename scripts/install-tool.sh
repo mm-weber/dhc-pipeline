@@ -63,7 +63,7 @@ KYVERNO_VERSION="1.19.2"
 KYVERNO_SHA256="357eaf1df8bc24ddd5a73979fadeaae6a032e8710f11af264229756e4956bf4a"
 
 # renovate: datasource=github-releases depName=helm/helm
-HELM_VERSION="4.3.1"
+HELM_VERSION="4.3.2"
 HELM_SHA256="0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b"
 
 # renovate: datasource=github-releases depName=helm/chart-testing
