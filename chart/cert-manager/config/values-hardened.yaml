@@ -9,8 +9,8 @@
 # --- controller (top-level image + pod securityContext) ---
 image:
   repository: ghcr.io/mm-weber/dhc/cert-manager-controller
-  tag: 1.21.2-alpine3.23
-  digest: sha256:dafb08f8fd597f259981247181dc19c687db661d8fe169d6e82342140ed52140
+  tag: 1.21.3-alpine3.23
+  digest: sha256:879d18756dcdac04286f74c51bf0cf916939e48777b2d9d3c5887e90e88b9e5d
 securityContext:
   runAsUser: 65532
   runAsGroup: 65532
@@ -20,8 +20,8 @@ securityContext:
 webhook:
   image:
     repository: ghcr.io/mm-weber/dhc/cert-manager-webhook
-    tag: 1.21.2-alpine3.23
-    digest: sha256:2d64fa84faa0010ea657eef66253a106a06c698a88c07058ec4ce83e1a708844
+    tag: 1.21.3-alpine3.23
+    digest: sha256:7356e435112f77990aa93182e627790daa2ae19dbc40141590caaa8bbc12de59
   securityContext:
     runAsUser: 65532
     runAsGroup: 65532
@@ -31,8 +31,8 @@ webhook:
 cainjector:
   image:
     repository: ghcr.io/mm-weber/dhc/cert-manager-cainjector
-    tag: 1.21.2-alpine3.23
-    digest: sha256:73c5f45539103a5d99033c171278dc1e5de74c977cb3b1f240b5eedd75b03705
+    tag: 1.21.3-alpine3.23
+    digest: sha256:315203a0595a9a0a44ce333d31d8f805dd25987adef497811561bbdc22cfd68f
   securityContext:
     runAsUser: 65532
     runAsGroup: 65532
