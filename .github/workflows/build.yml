@@ -191,7 +191,7 @@ jobs:
       # (GOARCH) so arm64 assembly runs little arm64 code, but multi-platform
       # buildx expects binfmt to be registered either way.
       - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
-      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: log in to dhi.io (frontend + builder pulls)
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
