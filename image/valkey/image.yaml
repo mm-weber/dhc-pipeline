@@ -1,4 +1,4 @@
-# syntax=dhi.io/build:2-alpine3.23@sha256:6a1c7de1668d793a3183d4aaef062997e54bc149cee2d1604286f5e1b4aa8340
+# syntax=dhi.io/build:2-alpine3.23@sha256:acedaa9b0ff18f89e0af21a7368c1f80f7a7513744b9e4c549c39f68f0bcdc87
 
 name: Valkey 9.1.x
 image: ghcr.io/mm-weber/dhc/valkey
